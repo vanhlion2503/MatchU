@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "758089818242",
+    "project_id": "matchu-5bd75",
+    "storage_bucket": "matchu-5bd75.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:758089818242:android:adf8aa46b3dc8abdc5149b",
+        "android_client_info": {
+          "package_name": "com.example.matchu_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMVtY2c1MO1oO-p67TgdwOpHfZ79X5QAI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
