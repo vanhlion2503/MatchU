@@ -11,147 +11,201 @@ class SplashView extends StatefulWidget {
   State<SplashView> createState() => _SplashViewState();
 }
 
-class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
-  @override
+class _SplashViewState extends State<SplashView>
+    with TickerProviderStateMixin {
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  
+
   @override
-  void initState(){
+  void initState() {
     super.initState();
+
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),  
+      duration: const Duration(seconds: 2),
     );
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
+
     _animationController.forward();
   }
 
   @override
-  void dispose(){
+  void dispose() {
     _animationController.dispose();
     super.dispose();
   }
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _animationController, 
-          builder: (context, child) {
-            return FadeTransition(
-              opacity: _fadeAnimation, 
-              child: ScaleTransition(
-                scale: _scaleAnimation,
+
+  @override
+  @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppTheme.backgroundColor,
+    body: Center(
+      child: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      child:Image.asset(
-                      'assets/icon/Icon.png',
-                      width: 160,
-                      fit: BoxFit.contain,
-                      ),
-                    ),
-                    RichText(
-                      text: TextSpan(
-                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                        children: const [
-                          TextSpan(
-                            text: "Match",
-                            style: TextStyle(
-                              color: AppTheme.textPrimaryColor,
+                    /// ✅ PHẦN TRÊN (NỘI DUNG CHÍNH)
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          /// LOGO
+                          Image.asset(
+                            'assets/icon/Icon.png',
+                            width: 160,
+                            fit: BoxFit.contain,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          /// APP NAME
+                          RichText(
+                            text: TextSpan(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineLarge!
+                                  .copyWith(fontWeight: FontWeight.bold),
+                              children: const [
+                                TextSpan(
+                                  text: "Match",
+                                  style: TextStyle(
+                                    color: AppTheme.textPrimaryColor,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: "U",
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          TextSpan(
-                            text: "U",
-                            style: TextStyle(
-                              color: AppTheme.primaryColor,
+
+                          const SizedBox(height: 18),
+
+                          /// SLOGAN
+                          Text(
+                            "Khám phá những mối quan hệ mới.",
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyLarge!
+                                .copyWith(
+                                  color: AppTheme.textSecondaryColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+
+                          const SizedBox(height: 120),
+
+                          /// BUTTON START
+                          SizedBox(
+                            width: double.infinity,
+                            height: 60,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Get.toNamed(AppRouter.register);
+                              },
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Bắt đầu ngay",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                  SizedBox(width: 10),
+                                  Icon(
+                                    Icons.arrow_forward,
+                                    size: 21,
+                                    color: Colors.white,
+                                  ),
+                                ],
+                              ),
                             ),
+                          ),
+
+                          const SizedBox(height: 28),
+
+                          /// LOGIN REDIRECT
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Đã có tài khoản?",
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium!
+                                    .copyWith(
+                                      color:
+                                          AppTheme.textSecondaryColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: () {
+                                  Get.toNamed(AppRouter.login);
+                                },
+                                child: Text(
+                                  "Đăng nhập",
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium!
+                                      .copyWith(
+                                        color: AppTheme.primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Text(
-                      "Khám phá những mối quan \nhệ mới.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: const Color.fromARGB(255, 112, 112, 112),
-                      ),
-                    ),
-                    const SizedBox(height: 180),
-                    SizedBox(
-                      width: 350,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Get.toNamed(AppRouter.register);
-                        },
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text("Bắt đầu ngay",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
-                            ),
-                            SizedBox(width: 10),
-                            Icon(
-                              Icons.arrow_forward, 
-                              size: 21,
-                              color: Colors.black,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text("Đã có tài khoản?",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: const Color.fromARGB(255, 112, 112, 112),
-                          fontWeight: FontWeight.w700,
-                        ),
-                        ),
-                        SizedBox(width: 10),
-                        GestureDetector(
-                          onTap:(){
-                            Get.toNamed(AppRouter.login);
-                          },
-                          child: 
-                          const Text("Đăng nhập",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          ),
-                        )
 
-                      ],
-                    )
+                    /// ✅ VERSION Ở CUỐI MÀN HÌNH
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        "Version 1.0.0",
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge!
+                            .copyWith(
+                              color: AppTheme.textSecondaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            );
-          }
-        ),
+            ),
+          );
+        },
       ),
-    );
-  }
+    ),
+  );
+}
+
 }

@@ -12,6 +12,7 @@ class AuthController extends GetxController{
   final passwordC = TextEditingController();
   final confirmPasswordC = TextEditingController();
   final phoneC = TextEditingController();
+  final RxString fullPhoneNumber = ''.obs;
   final fullnameC = TextEditingController();
   final nicknameC = TextEditingController();
   final otpC = TextEditingController();
@@ -53,10 +54,22 @@ class AuthController extends GetxController{
     }
   }
   Future<void> register() async{
+    final phone = fullPhoneNumber.value.trim();
+    if (phone.isEmpty) {
+      Get.snackbar("Lỗi", "Vui lòng nhập số điện thoại");
+      return;
+    }
+
+    if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
+      Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
+      return;
+    }
+
     if(emailC.text.isEmpty || passwordC.text.isEmpty || phoneC.text.isEmpty){
       Get.snackbar('Lỗi', 'Vui lòng nhập đầy đủ thông tin yêu cầu');
       return;
     }
+
     if (passwordC.text.trim() != confirmPasswordC.text.trim()) {
       Get.snackbar("Lỗi", "Mật khẩu nhập lại không khớp");
       return;
@@ -71,7 +84,7 @@ class AuthController extends GetxController{
     await _authService.registerWithEmailAndPassWord(
       email: emailC.text.trim(), 
       password: passwordC.text.trim(), 
-      phonenumber: phoneC.text.trim(), 
+      phonenumber: phone, 
       onCodeSent: (verificationId){
         registerVerificationId = verificationId;
         isLoadingRegister.value = true;
@@ -111,7 +124,7 @@ class AuthController extends GetxController{
       await _authService.saveUserProfile(
         fullname: fullnameC.text.trim(), 
         nickname: nicknameC.text.trim(), 
-        phonenumber: phoneC.text.trim(),
+        phonenumber: fullPhoneNumber.value.trim(),
         birthday: selectedBirthday.value,
         gender: selectedGender.value,
       );
@@ -201,6 +214,7 @@ class AuthController extends GetxController{
   @override
   void onClose(){
     emailC.dispose();
+    confirmPasswordC.dispose();
     passwordC.dispose();
     confirmPasswordC.dispose();
     phoneC.dispose();

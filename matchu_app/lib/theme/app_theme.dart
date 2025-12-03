@@ -25,34 +25,34 @@ class AppTheme {
       onSurface: textPrimaryColor,
       onBackground: textPrimaryColor,
     ),
-    textTheme: GoogleFonts.poppinsTextTheme().copyWith(
-      headlineLarge: GoogleFonts.poppins(
+    textTheme: GoogleFonts.interTextTheme().copyWith(
+      headlineLarge: GoogleFonts.inter(
         fontSize: 32,
         fontWeight: FontWeight.bold,
         color: textPrimaryColor,
       ),
 
-      headlineMedium: GoogleFonts.poppins(
+      headlineMedium: GoogleFonts.inter(
         fontSize: 24,
         fontWeight: FontWeight.w600,
         color: textPrimaryColor,
       ),
-      headlineSmall: GoogleFonts.poppins(
+      headlineSmall: GoogleFonts.inter(
         fontSize: 20,
         fontWeight: FontWeight.w500,
         color: textPrimaryColor,
       ),
-      bodyLarge: GoogleFonts.poppins(
+      bodyLarge: GoogleFonts.inter(
         fontSize: 16,
         fontWeight: FontWeight.normal,
         color: textPrimaryColor,
       ),
-      bodyMedium: GoogleFonts.poppins(
+      bodyMedium: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.normal,
         color: textPrimaryColor,
       ),
-      bodySmall: GoogleFonts.poppins(
+      bodySmall: GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.normal,
         color: textPrimaryColor,
