@@ -5,12 +5,14 @@ import 'package:get/route_manager.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-
+import 'package:get/get.dart';
+import 'package:matchu_app/controllers/auth/auth_controller.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform
   );
+  Get.put(AuthController(), permanent: true);
   runApp(MyApp());
 }
 

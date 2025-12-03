@@ -1,4 +1,3 @@
-import 'dart:ffi';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -17,7 +16,8 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-
+  
+  @override
   void initState(){
     super.initState();
     _animationController = AnimationController(
@@ -31,20 +31,9 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
       CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
     _animationController.forward();
-
-    // _checkAuthAndNavigate();
   }
-  // void _checkAuthAndNavigate()async{
-  //   await Future.delayed(Duration(seconds: 2));
 
-  //   final authController = Get.put(AuthController(), permanent: true);
-
-  //   await Future.delayed(Duration(milliseconds: 500));
-
-  //   if (authController.isAuthenticated){
-  //     Get.offAllNamed(AppRouter.main);
-  //   }
-  // }
+  @override
   void dispose(){
     _animationController.dispose();
     super.dispose();
@@ -80,13 +69,13 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                           TextSpan(
                             text: "Match",
                             style: TextStyle(
-                              color: AppTheme.textPrimaryColor, // Màu cho chữ Match
+                              color: AppTheme.textPrimaryColor,
                             ),
                           ),
                           TextSpan(
                             text: "U",
                             style: TextStyle(
-                              color: AppTheme.primaryColor, // Màu khác cho chữ U
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                         ],
@@ -106,7 +95,9 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                     SizedBox(
                       width: 350,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Get.toNamed(AppRouter.register);
+                        },
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -140,6 +131,7 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                         SizedBox(width: 10),
                         GestureDetector(
                           onTap:(){
+                            Get.toNamed(AppRouter.login);
                           },
                           child: 
                           const Text("Đăng nhập",

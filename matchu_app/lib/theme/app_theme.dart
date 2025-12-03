@@ -9,7 +9,7 @@ class AppTheme {
   static const Color cardColor = Color(0xFFFFFFFF);
   static const Color textPrimaryColor = Color(0xFF2D3436);
   static const Color textSecondaryColor = Color(0xFF636E73);
-  static const Color borderColor = Color(0xFFF1E2E2);
+  static const Color borderColor = Color(0xFFE3E8EF);
   static const Color errorColor = Color(0xFFE17055);
   static const Color successColor = Color(0xFF00B894);
 
@@ -71,16 +71,16 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryColor,
-        foregroundColor: Colors.black,
+        backgroundColor: const Color.fromARGB(255, 11, 12, 12),
+        foregroundColor: const Color.fromARGB(255, 255, 255, 255),
         elevation: 2,
         padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
         textStyle: GoogleFonts.poppins(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontSize: 18,
+          fontWeight: FontWeight.w500,
         ),
       )
     ),

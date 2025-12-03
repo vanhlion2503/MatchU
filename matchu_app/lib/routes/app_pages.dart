@@ -1,23 +1,52 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/splash_view.dart';
+import 'package:matchu_app/views/auth/login_view.dart';
+import 'package:matchu_app/views/auth/register_view.dart';
+import 'package:matchu_app/views/auth/otp_register_view.dart';
+import 'package:matchu_app/views/auth/otp_login_view.dart';
+import 'package:matchu_app/views/auth/complete_profile_view.dart';
+import 'package:matchu_app/views/home_view.dart';
 
 class AppPages {
   static const initial = AppRouter.splash;
 
   static final routes = [
-    GetPage(name: AppRouter.splash, page: ()=> const SplashView()),
-    // GetPage(name: AppRouter.login, page: ()=> const LoginView()),
-    // GetPage(name: AppRouter.register, page: ()=> const RegisterView()),
+    GetPage(
+      name: AppRouter.splash, 
+      page: ()=> const SplashView(),
+    ),
+    GetPage(
+      name: AppRouter.login, 
+      page: ()=> const LoginView(),
+    ),
+    GetPage(
+      name: AppRouter.register, 
+      page: ()=> const RegisterView(),
+    ),
+    GetPage(
+      name: AppRouter.otpRegister, 
+      page: () => const OtpRegisterView(),
+    ),
+    GetPage(
+      name: AppRouter.otpLogin, 
+      page: () => const OtpLoginView(),
+    ),
+    GetPage(
+      name: AppRouter.completeProfile, 
+      page: () => const CompleteProfileView(),
+    ),
+
+
     // GetPage(name: AppRouter.forgotPassword, page: ()=> const ForgotPasswordView()),
     // GetPage(name: AppRouter.changePassword, page: ()=> const ChangePasswordView()),
-    // GetPage(
-    //   name: AppRouter.home, 
-    //   page: ()=> const HomeView(),
-    //   binding: BindingsBuilder((){
-    //     Get.put(HomeController());
-    //   })
-    // ),
+    GetPage(
+      name: AppRouter.home, 
+      page: ()=> const HomeView(),
+      // binding: BindingsBuilder((){
+      //   Get.put(HomeController());
+      // })
+    ),
     // GetPage(
     //   name: AppRouter.main, 
     //   page: ()=> const MainView(),

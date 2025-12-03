@@ -8,7 +8,9 @@ class AuthService {
   FirebaseAuth get auth => _auth;
   FirebaseFirestore get db => _db;
 
-  /* ======================= REGISTER ======================= */
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  /* ======================= REGISTER + MFA ======================= */
 
   Future<void> registerWithEmailAndPassWord({
     required String email,
@@ -18,23 +20,26 @@ class AuthService {
     required Function(String error) onFailed,
   }) async {
     try {
+      // 1. Tạo tài khoản email/password
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       final user = cred.user;
-      if (user == null) {
-        throw Exception("Không tạo được user");
-      }
+      if (user == null) throw Exception("Không tạo được user");
 
+      // 2. Tạo session cho MFA
       final session = await user.multiFactor.getSession();
 
+      // 3. Gửi OTP để enroll MFA với số điện thoại
       await _auth.verifyPhoneNumber(
         phoneNumber: phonenumber,
         multiFactorSession: session,
 
-        verificationCompleted: (PhoneAuthCredential credential) async {},
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Ở bước đăng ký, ta KHÔNG auto verify, vì cần user nhập OTP tay
+        },
 
         verificationFailed: (FirebaseAuthException e) {
           onFailed(e.message ?? "Gửi OTP bị lỗi");
@@ -51,17 +56,14 @@ class AuthService {
     }
   }
 
-  /* ======================= CONFIRM REGISTER OTP ======================= */
-
+  /// Xác nhận OTP đăng ký + enroll MFA SMS
   Future<void> confirmRegisterOtp({
     required String verificationId,
     required String smsCode,
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        throw Exception("User chưa đăng nhập");
-      }
+      if (user == null) throw Exception("User chưa đăng nhập");
 
       final credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
@@ -71,16 +73,13 @@ class AuthService {
       final assertion =
           PhoneMultiFactorGenerator.getAssertion(credential);
 
-      await user.multiFactor.enroll(
-        assertion,
-        displayName: "SMS",
-      );
+      await user.multiFactor.enroll(assertion, displayName: "SMS");
     } catch (e) {
       rethrow;
     }
   }
 
-  /* ======================= SAVE USER PROFILE ======================= */
+  /* ======================= SAVE PROFILE ======================= */
 
   Future<void> saveUserProfile({
     required String fullname,
@@ -91,14 +90,16 @@ class AuthService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
-        throw Exception("User chưa đăng nhập");
-      }
+      if (user == null) throw Exception("User chưa đăng nhập");
 
       await user.updateDisplayName(nickname);
 
-      await _db.collection('users').doc(user.uid).set({
+      final docRef = _db.collection('users').doc(user.uid);
+
+      await docRef.set({
         'uid': user.uid,
+        'email': user.email,
+
         'fullname': fullname,
         'nickname': nickname,
         'phonenumber': phonenumber,
@@ -119,14 +120,23 @@ class AuthService {
         'followingCount': 0,
         'activeStatus': 'offline',
 
+        // Các field thêm để dễ quản lý
+        'emailVerified': user.emailVerified,
+        'role': 'user',                 // ✅ phân quyền sau này
+        'isProfileCompleted': false,    // ✅ ban đầu false, controller sẽ update true
+
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(
+        merge: true,
+      ));
     } catch (e) {
       rethrow;
     }
   }
 
-  /* ======================= LOGIN ======================= */
+  /* ======================= LOGIN + MFA ======================= */
 
   Future<void> login({
     required String email,
@@ -136,10 +146,14 @@ class AuthService {
     required Function(String error) onFailed,
   }) async {
     try {
+      // Đăng nhập email/password
       await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      await setOnlineStatus(true);
+
       onSuccess();
     } on FirebaseAuthMultiFactorException catch (e) {
       onMfaRequired(e);
@@ -150,8 +164,7 @@ class AuthService {
     }
   }
 
-  /* ======================= SEND MFA OTP LOGIN ======================= */
-
+  /// Gửi OTP khi login có MFA
   Future<void> resolveMfaLogin({
     required FirebaseAuthMultiFactorException e,
     required Function(String verificationId) onCodeSent,
@@ -167,9 +180,13 @@ class AuthService {
 
         verificationCompleted:
             (PhoneAuthCredential credential) async {
+
           final assertion =
               PhoneMultiFactorGenerator.getAssertion(credential);
           await resolver.resolveSignIn(assertion);
+
+
+          await setOnlineStatus(true);
         },
 
         verificationFailed: (FirebaseAuthException error) {
@@ -187,8 +204,7 @@ class AuthService {
     }
   }
 
-  /* ======================= CONFIRM MFA LOGIN OTP ======================= */
-
+  /// Xác nhận OTP để hoàn tất đăng nhập MFA
   Future<void> confirmLoginOtp({
     required FirebaseAuthMultiFactorException e,
     required String verificationId,
@@ -204,12 +220,15 @@ class AuthService {
           PhoneMultiFactorGenerator.getAssertion(cred);
 
       await e.resolver.resolveSignIn(assertion);
+
+      // ✅ Đăng nhập MFA thành công → set online
+      await setOnlineStatus(true);
     } catch (e) {
       rethrow;
     }
   }
 
-  /* ======================= STATUS ======================= */
+  /* ======================= ONLINE / OFFLINE ======================= */
 
   Future<void> setOnlineStatus(bool online) async {
     final user = _auth.currentUser;
@@ -217,6 +236,8 @@ class AuthService {
 
     await _db.collection('users').doc(user.uid).update({
       'activeStatus': online ? 'online' : 'offline',
+      'lastActiveAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
