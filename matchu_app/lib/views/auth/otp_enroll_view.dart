@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 
-class OtpLoginView extends StatelessWidget {
-const OtpLoginView({super.key});
+class OtpEnrollView extends StatelessWidget {
+const OtpEnrollView({super.key});
 
 
 @override
@@ -12,7 +12,7 @@ final c = Get.find<AuthController>();
 
 
 return Scaffold(
-appBar: AppBar(title: const Text('OTP Đăng nhập')),
+appBar: AppBar(title: const Text('Xác nhận OTP')),
 body: Padding(
 padding: const EdgeInsets.all(24),
 child: Column(
@@ -20,16 +20,16 @@ children: [
 TextField(
 controller: c.otpC,
 keyboardType: TextInputType.number,
-decoration: const InputDecoration(labelText: 'Nhập OTP'),
+decoration: const InputDecoration(labelText: 'Mã OTP'),
 ),
 const SizedBox(height: 24),
 Obx(() => SizedBox(
 width: double.infinity,
 child: ElevatedButton(
-onPressed: c.isLoadingLogin.value ? null : c.confirmLogOtp,
-child: c.isLoadingLogin.value
+onPressed: c.isLoadingRegister.value ? null : c.confirmEnrollOtp,
+child: c.isLoadingRegister.value
 ? const CircularProgressIndicator()
-: const Text('Đăng nhập'),
+: const Text('Xác nhận'),
 ),
 )),
 ],
