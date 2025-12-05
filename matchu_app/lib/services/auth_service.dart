@@ -15,7 +15,6 @@ class AuthService {
   Future<void> registerWithEmailAndPassWord({
     required String email,
     required String password,
-    required String phonenumber,
     required Function() onSuccess,
     required Function(String error) onFailed,
   }) async {

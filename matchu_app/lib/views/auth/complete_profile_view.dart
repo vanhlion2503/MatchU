@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:intl/intl.dart';
+import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/gender_widget.dart';
 
 class CompleteProfileView extends StatelessWidget {
   const CompleteProfileView({super.key});
@@ -12,9 +14,14 @@ class CompleteProfileView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Hoàn thiện hồ sơ"),
         centerTitle: true,
-        automaticallyImplyLeading: false, // không cho back
+        title: 
+        Text(
+          "Hoàn thiện hồ sơ",
+          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -23,8 +30,13 @@ class CompleteProfileView extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
-                /// ===== HỌ TÊN =====
+                Text(
+                " Họ và tên",
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: c.fullnameC,
                   decoration: const InputDecoration(
@@ -34,84 +46,101 @@ class CompleteProfileView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
 
-                /// ===== NICKNAME =====
+                Text(
+                " Biệt danh",
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: c.nicknameC,
                   decoration: const InputDecoration(
-                    labelText: "Nickname",
+                    labelText: "@usename",
                     prefixIcon: Icon(Icons.tag_faces_outlined),
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                /// ===== NGÀY SINH =====
+                Text(
+                " Ngày sinh",
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
+                ),
+                const SizedBox(height: 12),
+
                 GestureDetector(
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
-                      initialDate: DateTime(2005),
+                      initialDate: c.selectedBirthday.value ?? DateTime(2005),
                       firstDate: DateTime(1950),
                       lastDate: DateTime.now(),
                     );
+
                     if (picked != null) {
                       c.selectedBirthday.value = picked;
+
+                      c.birthdayC.text = DateFormat('dd/MM/yyyy').format(picked);
                     }
                   },
                   child: AbsorbPointer(
                     child: TextField(
-                      decoration: InputDecoration(
+                      controller: c.birthdayC, // ✅ GÁN CONTROLLER
+                      decoration: const InputDecoration(
                         labelText: "Ngày sinh",
-                        prefixIcon: const Icon(Icons.cake_outlined),
-                        hintText: c.selectedBirthday.value == null
-                            ? "Chọn ngày sinh"
-                            : DateFormat('dd/MM/yyyy')
-                                .format(c.selectedBirthday.value!),
+                        prefixIcon: Icon(Icons.cake_outlined),
+                        hintText: "Chọn ngày sinh",
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
+                Text(
+                " Giới tính",
+                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.w700,
+                )
+                ),
+                const SizedBox(height: 12),
+
                 /// ===== GIỚI TÍNH =====
-                DropdownButtonFormField<String>(
-                  value: c.selectedGender.value.isEmpty
-                      ? null
-                      : c.selectedGender.value,
-                  decoration: const InputDecoration(
-                    labelText: "Giới tính",
-                    prefixIcon: Icon(Icons.wc_outlined),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'male', child: Text("Nam")),
-                    DropdownMenuItem(value: 'female', child: Text("Nữ")),
-                    DropdownMenuItem(value: 'other', child: Text("Khác")),
+                Obx(() => Row(
+                  children: [
+                    genderButton(
+                      context,
+                      label: "Nam",
+                      value: "male",
+                      isSelected: c.selectedGender.value == "male",
+                      onTap: () => c.selectedGender.value = "male",
+                    ),
+                    const SizedBox(width: 12),
+                    genderButton(
+                      context,
+                      label: "Nữ",
+                      value: "female",
+                      isSelected: c.selectedGender.value == "female",
+                      onTap: () => c.selectedGender.value = "female",
+                    ),
+                    const SizedBox(width: 12),
+                    genderButton(
+                      context,
+                      label: "Khác",
+                      value: "other",
+                      isSelected: c.selectedGender.value == "other",
+                      onTap: () => c.selectedGender.value = "other",
+                    ),
                   ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      c.selectedGender.value = value;
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
+                )),
 
-                /// ===== SỐ ĐIỆN THOẠI (READ ONLY) =====
-                TextField(
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: "Số điện thoại",
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    hintText: c.fullPhoneNumber.value.isEmpty
-                        ? "Chưa có số điện thoại"
-                        : c.fullPhoneNumber.value,
-                  ),
-                ),
-
-                const SizedBox(height: 32),
+                const SizedBox(height: 46),
 
                 /// ===== NÚT LƯU =====
                 SizedBox(
                   width: double.infinity,
-                  height: 55,
+                  height: 60,
                   child: ElevatedButton(
                     onPressed: c.isLoadingRegister.value
                         ? null

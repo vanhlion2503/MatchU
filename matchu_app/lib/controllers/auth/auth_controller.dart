@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/services/auth_service.dart';
+import 'dart:async';
+
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -13,7 +15,8 @@ class AuthController extends GetxController {
   final otpC = TextEditingController();
   final fullnameC = TextEditingController();
   final nicknameC = TextEditingController();
-  
+  final birthdayC = TextEditingController();
+
 
   final RxString fullPhoneNumber = ''.obs;
   final Rx<DateTime?> selectedBirthday = Rx<DateTime?>(null);
@@ -22,6 +25,14 @@ class AuthController extends GetxController {
   final isPasswordHidden = true.obs;
   final isLoadingRegister = false.obs;
   final isLoadingLogin = false.obs;
+
+  final resendEmailSeconds = 60.obs;
+  final resendEnrollOtpSeconds = 60.obs;
+  final resendLoginOtpSeconds = 60.obs;
+
+  Timer? _emailTimer;
+  Timer? _enrollOtpTimer;
+  Timer? _loginOtpTimer;
 
   final Rxn<User> _user = Rxn<User>();
   User? get user => _user.value;
@@ -40,12 +51,6 @@ class AuthController extends GetxController {
   /// ✅ REGISTER — GỬI EMAIL VERIFY ĐÚNG LUỒNG
   Future<void> register() async {
     final phone = fullPhoneNumber.value.trim();
-
-    if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
-      Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
-      return;
-    }
-
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
@@ -63,7 +68,6 @@ class AuthController extends GetxController {
       await _authService.registerWithEmailAndPassWord(
         email: emailC.text.trim(),
         password: passwordC.text.trim(),
-        phonenumber: phone,
         onSuccess: () {
           isLoadingRegister.value = false;
           Get.toNamed('/verify-email');
@@ -80,19 +84,62 @@ class AuthController extends GetxController {
     }
   }
   Future<void> checkEmailVeriFied() async{
-    final user = FirebaseAuth.instance.currentUser;
-    await user?.reload();
+    isLoadingRegister.value = true;
 
-    if(user!.emailVerified){
-      Get.toNamed('/enroll-phone');
-    }else{
-      Get.snackbar("Chưa xác minh", "Vui lòng kiểm tra email của bạn");
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        Get.snackbar("Lỗi", "Không tìm thấy người dùng");
+        return;
+      }
+
+      await user.reload();
+
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+
+      if (refreshedUser != null && refreshedUser.emailVerified) {
+        Get.toNamed('/enroll-phone');
+      } else {
+        Get.snackbar(
+          "Chưa xác minh",
+          "Email chưa được xác minh. Vui lòng kiểm tra hộp thư và bấm link.",
+        );
+      }
+    } catch (e) {
+      Get.snackbar("Lỗi", e.toString());
+    } finally {
+      isLoadingRegister.value = false;
     }
+  }
+  Future<void> resendVerifyEmail() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if(user == null){
+      Get.snackbar("Lỗi", "Không tìm thấy user");
+      return;
+    }
+
+    try{
+      await user.sendEmailVerification();
+      startEmailResendTimer();
+      Get.snackbar("Thành công", "Đã gửi lại email xác minh");
+    }catch(e){}
+  }
+  void startEmailResendTimer(){
+    resendEmailSeconds.value = 60;
+    _emailTimer?.cancel();
+
+    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (resendEmailSeconds.value == 0) {
+        timer.cancel();
+      } else {
+        resendEmailSeconds.value--;
+      }
+    });
   }
   Future<void> sendEnrollOtp() async{
     final phone = fullPhoneNumber.value.trim();
-    if(!phone.startsWith("+")){
-      Get.snackbar('Lỗi', 'Số điện thoại không hợp lệ');
+    if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
+      Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
       return;
     }
     isLoadingRegister.value = true;
@@ -100,6 +147,7 @@ class AuthController extends GetxController {
       phonenumber: phone, 
       onCodeSent: (verificationId) {
         enrollVerificationId = verificationId;
+        startEnrollOtpResendTimer();
         isLoadingRegister.value = false;
         Get.toNamed('/otp-enroll');
       },
@@ -107,6 +155,18 @@ class AuthController extends GetxController {
         isLoadingRegister.value = false;
         Get.snackbar("Lỗi", e);
       });
+  }
+  void startEnrollOtpResendTimer(){
+    resendEnrollOtpSeconds.value = 60;
+    _enrollOtpTimer?.cancel();
+
+    _enrollOtpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (resendEnrollOtpSeconds.value == 0) {
+        timer.cancel();
+      } else {
+        resendEnrollOtpSeconds.value--;
+      }
+    });
   }
   Future<void> confirmEnrollOtp() async {
     if (enrollVerificationId == null || otpC.text.isEmpty){
@@ -165,6 +225,7 @@ class AuthController extends GetxController {
       e: _mfaException!,
       onCodeSent: (verificationId) {
         loginVerificationId = verificationId;
+        startLoginOtpResendTimer();
         isLoadingLogin.value = false;
         Get.toNamed('/otp-login');
       },
@@ -173,6 +234,18 @@ class AuthController extends GetxController {
         Get.snackbar("Lỗi OTP", error);
       },
     );
+  }
+  void startLoginOtpResendTimer() {
+    resendLoginOtpSeconds.value = 60;
+    _loginOtpTimer?.cancel();
+
+    _loginOtpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (resendLoginOtpSeconds.value == 0) {
+        timer.cancel();
+      } else {
+        resendLoginOtpSeconds.value--;
+      }
+    });
   }
 
   /// ✅ XÁC NHẬN OTP MFA LOGIN
@@ -271,6 +344,12 @@ class AuthController extends GetxController {
     otpC.dispose();
     fullnameC.dispose();
     nicknameC.dispose();
+    birthdayC.dispose();
+
+    _emailTimer?.cancel();
+    _enrollOtpTimer?.cancel();
+    _loginOtpTimer?.cancel();
+
     super.onClose();
   }
 }

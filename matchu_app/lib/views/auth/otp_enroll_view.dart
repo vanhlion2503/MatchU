@@ -1,40 +1,135 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
+import 'package:pinput/pinput.dart';
 
 class OtpEnrollView extends StatelessWidget {
-const OtpEnrollView({super.key});
+  const OtpEnrollView({super.key});
 
+  String maskPhone(String phone) {
+    if (phone.isEmpty || phone.length < 6) return phone;
 
-@override
-Widget build(BuildContext context) {
-final c = Get.find<AuthController>();
+    final start = phone.substring(0, 3);
+    final end = phone.substring(phone.length - 4); 
 
+    return '$start***$end';
+  }
+  @override
+  Widget build(BuildContext context) {
+    final c = Get.find<AuthController>();
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: () => Get.back(),
+          icon: const Icon(Icons.arrow_back_ios),
+        ),
+        title: 
+        Text('Xác nhận OTP',
+          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        )
+        ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+            children: [
+              const Icon(Icons.verified, size: 80),
+              const SizedBox(height: 24),
+              Center(
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: AppTheme.textSecondaryColor,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: 'Mã xác thực đã được gửi đến số \n',
+                          style: Theme.of(context).textTheme.bodyLarge
+                        ),
+                        TextSpan(
+                          text: maskPhone(c.fullPhoneNumber.value.trim()),
+                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                            fontWeight: FontWeight.bold, 
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 24),
+              Pinput(
+                length: 6, // ✅ 6 ô
+                controller: c.otpC,
+                keyboardType: TextInputType.number,
 
-return Scaffold(
-appBar: AppBar(title: const Text('Xác nhận OTP')),
-body: Padding(
-padding: const EdgeInsets.all(24),
-child: Column(
-children: [
-TextField(
-controller: c.otpC,
-keyboardType: TextInputType.number,
-decoration: const InputDecoration(labelText: 'Mã OTP'),
-),
-const SizedBox(height: 24),
-Obx(() => SizedBox(
-width: double.infinity,
-child: ElevatedButton(
-onPressed: c.isLoadingRegister.value ? null : c.confirmEnrollOtp,
-child: c.isLoadingRegister.value
-? const CircularProgressIndicator()
-: const Text('Xác nhận'),
-),
-)),
-],
-),
-),
-);
-}
+                defaultPinTheme: PinTheme(
+                  width: 56,
+                  height: 56,
+                  textStyle: Theme.of(context).textTheme.headlineSmall,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    ),
+                  ),
+                ),
+
+                focusedPinTheme: PinTheme(
+                  width: 56,
+                  height: 56,
+                  textStyle: Theme.of(context).textTheme.headlineSmall,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 2,
+                    ),
+                  ),
+                ),
+
+                submittedPinTheme: PinTheme(
+                  width: 56,
+                  height: 56,
+                  textStyle: Theme.of(context).textTheme.headlineSmall,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Obx(() => SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: c.isLoadingRegister.value ? null : c.confirmEnrollOtp,
+                  child: c.isLoadingRegister.value
+                  ? const CircularProgressIndicator()
+                  : const Text('Xác nhận'),
+                ),
+              )),
+              const SizedBox(height: 8),
+              Obx(() => TextButton(
+                onPressed: c.resendEnrollOtpSeconds.value == 0
+                    ? c.sendEnrollOtp
+                    : null,
+                child: Text(
+                  c.resendEnrollOtpSeconds.value == 0
+                      ? "Gửi lại OTP"
+                      : "Gửi lại sau ${c.resendEnrollOtpSeconds.value}s",
+                ),
+              )),
+            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
