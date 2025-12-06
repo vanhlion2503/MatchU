@@ -65,9 +65,8 @@ class _RegisterViewState extends State<RegisterView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 12),
               Text(
-                " Email:",
+                " Email",
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                   fontWeight: FontWeight.w700,
                 )
@@ -82,9 +81,9 @@ class _RegisterViewState extends State<RegisterView> {
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               Text(
-                " Mật khẩu:",
+                " Mật khẩu",
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                   fontWeight: FontWeight.w700,
                 )
@@ -111,7 +110,7 @@ class _RegisterViewState extends State<RegisterView> {
                   ),
                 );
               }),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               Text(
                 " Nhập lại mật khẩu:",
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(

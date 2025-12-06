@@ -9,6 +9,8 @@ import 'package:matchu_app/views/auth/register_view.dart';
 import 'package:matchu_app/views/auth/otp_login_view.dart';
 import 'package:matchu_app/views/auth/complete_profile_view.dart';
 import 'package:matchu_app/views/home_view.dart';
+import 'package:matchu_app/controllers/main/main_controller.dart';
+import 'package:matchu_app/views/main_view.dart';
 
 class AppPages {
   static const initial = AppRouter.splash;
@@ -59,13 +61,13 @@ class AppPages {
       //   Get.put(HomeController());
       // })
     ),
-    // GetPage(
-    //   name: AppRouter.main, 
-    //   page: ()=> const MainView(),
-    //   binding: BindingsBuilder((){
-    //     Get.put(MainController());
-    //   })
-    // ),
+    GetPage(
+      name: AppRouter.main, 
+      page: ()=> MainView(),
+      binding: BindingsBuilder((){
+        Get.put(MainController());
+      })
+    ),
     // GetPage(
     //   name: AppRouter.profile, 
     //   page: ()=> const ProfileView(),

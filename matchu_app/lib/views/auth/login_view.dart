@@ -66,9 +66,8 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 12),
                 Text(
-                  " Email:",
+                  " Email",
                   style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                     fontWeight: FontWeight.w700,
                   )
@@ -83,12 +82,12 @@ class _LoginViewState extends State<LoginView> {
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                    " Mật khẩu:",
+                    " Mật khẩu",
                     style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                       fontWeight: FontWeight.w700,
                     )

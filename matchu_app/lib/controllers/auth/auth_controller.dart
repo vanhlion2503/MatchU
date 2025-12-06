@@ -299,7 +299,7 @@ class AuthController extends GetxController {
 
       // 4. Điều hướng
       if (isProfileCompleted) {
-        Get.offAllNamed('/home');
+        Get.offAllNamed('/main');
       } else {
         Get.toNamed('/complete-profile');
       }
@@ -372,7 +372,7 @@ class AuthController extends GetxController {
       }
 
       isLoadingRegister.value = false;
-      Get.offAllNamed('/home');
+      Get.offAllNamed('/main');
     } catch (e) {
       isLoadingRegister.value = false;
       Get.snackbar("Lỗi", e.toString());
