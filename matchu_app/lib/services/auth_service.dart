@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -34,9 +35,9 @@ class AuthService {
       // 3. Gọi callback thành công
       onSuccess();
     } on FirebaseAuthException catch (e) {
-      onFailed(e.message ?? "Đăng ký thất bại");
+      onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed(e.toString());
+      onFailed("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
     }
   }
 
@@ -67,12 +68,12 @@ class AuthService {
         },
         codeSent: (String verificationId, int? resendToken) {
           onCodeSent(verificationId);
-          print("OTP ĐÃ ĐƯỢC GỬI - verificationId = $verificationId");
+          // print("OTP ĐÃ ĐƯỢC GỬI - verificationId = $verificationId");
         },
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed(e.toString());
+      onFailed("Không thể gửi OTP. Vui lòng thử lại.");
     }
   }
 
@@ -98,8 +99,10 @@ class AuthService {
           PhoneMultiFactorGenerator.getAssertion(credential);
 
       await user.multiFactor.enroll(assertion, displayName: "SMS");
+    } on FirebaseAuthException catch (e) {
+      throw firebaseErrorToVietnamese(e.code);
     } catch (e) {
-      rethrow;
+      throw "Đã xảy ra lỗi khi xác minh OTP.";
     }
   }
 
@@ -118,30 +121,53 @@ class AuthService {
     await user.updateDisplayName(nickname);
 
     await _db.collection('users').doc(user.uid).set({
-      'uid': user.uid,
-      'email': user.email,
-      'fullname': fullname,
-      'nickname': nickname,
-      'phonenumber': phonenumber,
-      'birthday': birthday?.toIso8601String(),
-      'gender': gender,
-      'bio': '',
-      'avatarUrl': '',
-      'location': {
-        'lat': null,
-        'lng': null,
+      "uid": user.uid,
+      "email": user.email,
+      "fullname": fullname,
+      "nickname": nickname,
+      "phonenumber": phonenumber,
+
+      "googleId": null,
+
+      "birthday": birthday?.toIso8601String(),
+      "gender": gender,
+      "bio": "",
+      "avatarUrl": "",
+
+      "interests": [],
+
+      "location": {
+        "lat": null,
+        "lng": null,
       },
-      'nearlyEnabled': true,
-      'reputationScore': 100,
-      'followersCount': 0,
-      'followingCount': 0,
-      'activeStatus': 'offline',
-      'emailVerified': user.emailVerified,
-      'role': 'user',
-      'isProfileCompleted': false,
-      'lastActiveAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
+
+      "nearlyEnabled": true,
+      "reputationScore": 100,
+      "trustWarnings": 0,
+      "totalReports": 0,
+
+      "avgChatRating": 0.0,
+      "totalChatRatings": 0,
+
+      "followers": [],
+      "following": [],
+
+      "rank": 1,
+      "experience": 0,
+      "dailyExp": 0,
+
+      "totalPosts": 0,
+      "totalLikes": 0,
+
+      "activeStatus": "offline",
+      "accountStatus": "active",
+
+      "role": "user",
+      "isProfileCompleted": false,
+
+      "lastActiveAt": FieldValue.serverTimestamp(),
+      "createdAt": FieldValue.serverTimestamp(),
+      "updatedAt": FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 
@@ -165,9 +191,9 @@ class AuthService {
     } on FirebaseAuthMultiFactorException catch (e) {
       onMfaRequired(e);
     } on FirebaseAuthException catch (e) {
-      onFailed(e.message ?? "Đăng nhập thất bại");
+      onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed(e.toString());
+      onFailed("Lỗi không xác định.");
     }
   }
 
@@ -189,8 +215,8 @@ class AuthService {
           await resolver.resolveSignIn(assertion);
           await setOnlineStatus(true);
         },
-        verificationFailed: (error) {
-          onFailed(error.message ?? "OTP lỗi");
+        verificationFailed: (FirebaseAuthException error) {
+          onFailed(firebaseErrorToVietnamese(error.code));
         },
         codeSent: (verificationId, _) {
           onCodeSent(verificationId);
@@ -198,7 +224,7 @@ class AuthService {
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed(e.toString());
+      onFailed("Không thể gửi OTP xác minh MFA.");
     }
   }
 

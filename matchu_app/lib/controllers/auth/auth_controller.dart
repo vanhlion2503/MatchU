@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/services/auth_service.dart';
+import 'package:matchu_app/translates/firebase_error_translator.dart';
 import 'dart:async';
 
 
@@ -50,9 +51,12 @@ class AuthController extends GetxController {
 
   /// ✅ REGISTER — GỬI EMAIL VERIFY ĐÚNG LUỒNG
   Future<void> register() async {
-    final phone = fullPhoneNumber.value.trim();
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+    if (passwordC.text.length < 6) {
+      Get.snackbar("Lỗi", "Mật khẩu phải từ 6 ký tự trở lên");
       return;
     }
 
@@ -77,10 +81,10 @@ class AuthController extends GetxController {
           Get.snackbar("Đăng ký thất bại", error);
         },
       );
-    } catch (e) {
-      isLoadingRegister.value = false;
-      Get.snackbar("Đăng ký thất bại", e.toString());
-      _isRegistering = false;
+    } on FirebaseAuthException catch (e) {
+      Get.snackbar("Đăng ký thất bại", firebaseErrorToVietnamese(e.code));
+    } catch (_) {
+      Get.snackbar("Đăng ký thất bại", "Lỗi không xác định. Vui lòng thử lại.");
     }
   }
   Future<void> checkEmailVeriFied() async{
@@ -142,6 +146,14 @@ class AuthController extends GetxController {
       Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
       return;
     }
+    final phoneQuery = await _authService.db
+      .collection('users')
+      .where("phonenumber", isEqualTo: phone)
+      .get();
+    if (phoneQuery.docs.isNotEmpty) {
+      Get.snackbar("Lỗi", "Số điện thoại đã được sử dụng bởi tài khoản khác");
+      return;
+    }
     isLoadingRegister.value = true;
     await _authService.sendEnrollMfaOtp(
       phonenumber: phone, 
@@ -185,9 +197,10 @@ class AuthController extends GetxController {
       isLoadingRegister.value = false;
       await logoutC();
       Get.offAllNamed('/');
-    } catch (e) {
-      isLoadingRegister.value = false;
-      Get.snackbar("OTP sai", e.toString());
+    } on FirebaseAuthException catch (e) {
+      Get.snackbar("OTP sai", firebaseErrorToVietnamese(e.code));
+    } catch (_) {
+      Get.snackbar("Lỗi", "Mã OTP không hợp lệ.");
     }
   }
   /// ✅ LOGIN
@@ -210,8 +223,9 @@ class AuthController extends GetxController {
         isLoadingLogin.value = false;
         _sendMfaLoginCode();
       }, 
-      onFailed: (e){
+      onFailed: (error){
         isLoadingLogin.value = false;
+        Get.snackbar("Đăng nhập thất bại", error);
       });
   }
 
@@ -296,11 +310,45 @@ class AuthController extends GetxController {
     }
   }
 
-
   /// ✅ LƯU PROFILE
   Future<void> saveProfile() async {
+    final nickname = nicknameC.text.trim();
+    final nicknameRegex = RegExp(r'^[A-Za-z0-9_]+$');
+    if (!nicknameRegex.hasMatch(nickname)) {
+      Get.snackbar(
+        "Lỗi",
+        "Biệt danh chỉ được chứa chữ cái không dấu, số hoặc dấu gạch dưới (_), và không được có khoảng trắng.",
+      );
+      return;
+    }
+    final nicknameQuery = await _authService.db
+    .collection('users')
+    .where("nickname", isEqualTo: nickname)
+    .get();
+
+    if (nicknameQuery.docs.isNotEmpty) {
+      Get.snackbar("Lỗi", "Biệt danh này đã có người sử dụng");
+      return;
+    }
     if (fullnameC.text.isEmpty || nicknameC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+      return;
+    }
+    if (selectedGender.value.isEmpty) {
+      Get.snackbar("Lỗi", "Vui lòng chọn giới tính");
+      return;
+    }
+    if (selectedBirthday.value == null) {
+      Get.snackbar("Lỗi", "Vui lòng chọn ngày sinh");
+      return;
+    }
+    final phone = fullPhoneNumber.value.trim();
+    final phoneQuery = await _authService.db
+      .collection('users')
+      .where("phonenumber", isEqualTo: phone)
+      .get();
+    if (phoneQuery.docs.isNotEmpty) {
+      Get.snackbar("Lỗi", "Số điện thoại đã được sử dụng bởi tài khoản khác");
       return;
     }
 
@@ -309,8 +357,8 @@ class AuthController extends GetxController {
     try {
       await _authService.saveUserProfile(
         fullname: fullnameC.text.trim(),
-        nickname: nicknameC.text.trim(),
-        phonenumber: fullPhoneNumber.value.trim(),
+        nickname: nickname,
+        phonenumber: phone,
         birthday: selectedBirthday.value,
         gender: selectedGender.value,
       );

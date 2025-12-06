@@ -21,6 +21,10 @@ class _LoginViewState extends State<LoginView> {
     c.emailC.clear();
     c.passwordC.clear();
     c.otpC.clear();
+    c.birthdayC.clear();
+    c.nicknameC.clear();
+    c.fullnameC.clear();
+
   }
   @override
   Widget build(BuildContext context) {

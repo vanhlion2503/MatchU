@@ -7,19 +7,37 @@ class UserModel {
   final String nickname;
   final String phonenumber;
 
+  final String? googleId;                 // Đăng nhập Google
   final DateTime? birthday;
   final String? gender;
   final String bio;
   final String avatarUrl;
 
+  final List<String> interests;           // Sở thích
+
   final double? lat;
   final double? lng;
 
-  final bool nearlyEnabled;
-  final int reputationScore;
-  final int followersCount;
-  final int followingCount;
-  final String activeStatus;
+  final bool nearlyEnabled;               
+  final int reputationScore;              
+  final int trustWarnings;                
+  final int totalReports;                 
+
+  final double avgChatRating;             
+  final int totalChatRatings;             
+
+  final List<String> followers;           // Danh sách người theo dõi
+  final List<String> following;           // Danh sách mình theo dõi
+
+  final int rank;                         
+  final int experience;                   
+  final int dailyExp;                     
+
+  final int totalPosts;                   
+  final int totalLikes;                   
+
+  final String activeStatus;              
+  final String accountStatus;             
 
   final String role;
   final bool isProfileCompleted;
@@ -35,21 +53,40 @@ class UserModel {
     required this.nickname,
     required this.phonenumber,
 
+    this.googleId,
+
     this.birthday,
     this.gender,
-    this.bio = '',
-    this.avatarUrl = '',
+    this.bio = "",
+    this.avatarUrl = "",
+
+    this.interests = const [],
 
     this.lat,
     this.lng,
 
     this.nearlyEnabled = true,
     this.reputationScore = 100,
-    this.followersCount = 0,
-    this.followingCount = 0,
-    this.activeStatus = 'offline',
+    this.trustWarnings = 0,
+    this.totalReports = 0,
 
-    this.role = 'user',
+    this.avgChatRating = 0.0,
+    this.totalChatRatings = 0,
+
+    this.followers = const [],
+    this.following = const [],
+
+    this.rank = 1,
+    this.experience = 0,
+    this.dailyExp = 0,
+
+    this.totalPosts = 0,
+    this.totalLikes = 0,
+
+    this.activeStatus = "offline",
+    this.accountStatus = "active",
+
+    this.role = "user",
     this.isProfileCompleted = false,
 
     this.lastActiveAt,
@@ -61,41 +98,60 @@ class UserModel {
 
   Map<String, dynamic> toJson() {
     return {
-      'uid': uid,
-      'email': email,
-      'fullname': fullname,
-      'nickname': nickname,
-      'phonenumber': phonenumber,
+      "uid": uid,
+      "email": email,
+      "fullname": fullname,
+      "nickname": nickname,
+      "phonenumber": phonenumber,
 
-      'birthday': birthday?.toIso8601String(),
-      'gender': gender,
-      'bio': bio,
-      'avatarUrl': avatarUrl,
+      "googleId": googleId,
 
-      'location': {
-        'lat': lat,
-        'lng': lng,
+      "birthday": birthday?.toIso8601String(),
+      "gender": gender,
+      "bio": bio,
+      "avatarUrl": avatarUrl,
+
+      "interests": interests,
+
+      "location": {
+        "lat": lat,
+        "lng": lng,
       },
 
-      'nearlyEnabled': nearlyEnabled,
-      'reputationScore': reputationScore,
-      'followersCount': followersCount,
-      'followingCount': followingCount,
-      'activeStatus': activeStatus,
+      "nearlyEnabled": nearlyEnabled,
+      "reputationScore": reputationScore,
+      "trustWarnings": trustWarnings,
+      "totalReports": totalReports,
 
-      'role': role,
-      'isProfileCompleted': isProfileCompleted,
+      "avgChatRating": avgChatRating,
+      "totalChatRatings": totalChatRatings,
 
-      'lastActiveAt': lastActiveAt?.toIso8601String(),
-      'createdAt': createdAt?.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      "followers": followers,
+      "following": following,
+
+      "rank": rank,
+      "experience": experience,
+      "dailyExp": dailyExp,
+
+      "totalPosts": totalPosts,
+      "totalLikes": totalLikes,
+
+      "activeStatus": activeStatus,
+      "accountStatus": accountStatus,
+
+      "role": role,
+      "isProfileCompleted": isProfileCompleted,
+
+      "lastActiveAt": lastActiveAt?.toIso8601String(),
+      "createdAt": createdAt?.toIso8601String(),
+      "updatedAt": updatedAt?.toIso8601String(),
     };
   }
 
   /* ======================= fromJson ======================= */
 
   factory UserModel.fromJson(Map<String, dynamic> json, String uid) {
-    final location = json['location'] as Map<String, dynamic>?;
+    final location = json["location"] as Map<String, dynamic>?;
 
     DateTime? parseDate(dynamic value) {
       if (value == null) return null;
@@ -106,36 +162,50 @@ class UserModel {
 
     return UserModel(
       uid: uid,
-      email: json['email'] ?? '',
+      email: json["email"] ?? "",
+      fullname: json["fullname"] ?? "",
+      nickname: json["nickname"] ?? "",
+      phonenumber: json["phonenumber"] ?? "",
 
-      fullname: json['fullname'] ?? '',
-      nickname: json['nickname'] ?? '',
-      phonenumber: json['phonenumber'] ?? '',
+      googleId: json["googleId"],
 
-      birthday: parseDate(json['birthday']),
-      gender: json['gender'],
-      bio: json['bio'] ?? '',
-      avatarUrl: json['avatarUrl'] ?? '',
+      birthday: parseDate(json["birthday"]),
+      gender: json["gender"],
+      bio: json["bio"] ?? "",
+      avatarUrl: json["avatarUrl"] ?? "",
 
-      lat: location?['lat'] != null
-          ? (location!['lat'] as num).toDouble()
-          : null,
-      lng: location?['lng'] != null
-          ? (location!['lng'] as num).toDouble()
-          : null,
+      interests: List<String>.from(json["interests"] ?? []),
 
-      nearlyEnabled: json['nearlyEnabled'] ?? true,
-      reputationScore: json['reputationScore'] ?? 100,
-      followersCount: json['followersCount'] ?? 0,
-      followingCount: json['followingCount'] ?? 0,
-      activeStatus: json['activeStatus'] ?? 'offline',
+      lat: location?["lat"] != null ? (location!["lat"] as num).toDouble() : null,
+      lng: location?["lng"] != null ? (location!["lng"] as num).toDouble() : null,
 
-      role: json['role'] ?? 'user',
-      isProfileCompleted: json['isProfileCompleted'] ?? false,
+      nearlyEnabled: json["nearlyEnabled"] ?? true,
+      reputationScore: json["reputationScore"] ?? 100,
+      trustWarnings: json["trustWarnings"] ?? 0,
+      totalReports: json["totalReports"] ?? 0,
 
-      lastActiveAt: parseDate(json['lastActiveAt']),
-      createdAt: parseDate(json['createdAt']),
-      updatedAt: parseDate(json['updatedAt']),
+      avgChatRating: (json["avgChatRating"] ?? 0).toDouble(),
+      totalChatRatings: json["totalChatRatings"] ?? 0,
+
+      followers: List<String>.from(json["followers"] ?? []),
+      following: List<String>.from(json["following"] ?? []),
+
+      rank: json["rank"] ?? 1,
+      experience: json["experience"] ?? 0,
+      dailyExp: json["dailyExp"] ?? 0,
+
+      totalPosts: json["totalPosts"] ?? 0,
+      totalLikes: json["totalLikes"] ?? 0,
+
+      activeStatus: json["activeStatus"] ?? "offline",
+      accountStatus: json["accountStatus"] ?? "active",
+
+      role: json["role"] ?? "user",
+      isProfileCompleted: json["isProfileCompleted"] ?? false,
+
+      lastActiveAt: parseDate(json["lastActiveAt"]),
+      createdAt: parseDate(json["createdAt"]),
+      updatedAt: parseDate(json["updatedAt"]),
     );
   }
 
@@ -148,19 +218,38 @@ class UserModel {
     String? nickname,
     String? phonenumber,
 
+    String? googleId,
+
     DateTime? birthday,
     String? gender,
     String? bio,
     String? avatarUrl,
+
+    List<String>? interests,
 
     double? lat,
     double? lng,
 
     bool? nearlyEnabled,
     int? reputationScore,
-    int? followersCount,
-    int? followingCount,
+    int? trustWarnings,
+    int? totalReports,
+
+    double? avgChatRating,
+    int? totalChatRatings,
+
+    List<String>? followers,
+    List<String>? following,
+
+    int? rank,
+    int? experience,
+    int? dailyExp,
+
+    int? totalPosts,
+    int? totalLikes,
+
     String? activeStatus,
+    String? accountStatus,
 
     String? role,
     bool? isProfileCompleted,
@@ -176,23 +265,41 @@ class UserModel {
       nickname: nickname ?? this.nickname,
       phonenumber: phonenumber ?? this.phonenumber,
 
+      googleId: googleId ?? this.googleId,
+
       birthday: birthday ?? this.birthday,
       gender: gender ?? this.gender,
       bio: bio ?? this.bio,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+
+      interests: interests ?? this.interests,
 
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
 
       nearlyEnabled: nearlyEnabled ?? this.nearlyEnabled,
       reputationScore: reputationScore ?? this.reputationScore,
-      followersCount: followersCount ?? this.followersCount,
-      followingCount: followingCount ?? this.followingCount,
+      trustWarnings: trustWarnings ?? this.trustWarnings,
+      totalReports: totalReports ?? this.totalReports,
+
+      avgChatRating: avgChatRating ?? this.avgChatRating,
+      totalChatRatings: totalChatRatings ?? this.totalChatRatings,
+
+      followers: followers ?? this.followers,
+      following: following ?? this.following,
+
+      rank: rank ?? this.rank,
+      experience: experience ?? this.experience,
+      dailyExp: dailyExp ?? this.dailyExp,
+
+      totalPosts: totalPosts ?? this.totalPosts,
+      totalLikes: totalLikes ?? this.totalLikes,
+
       activeStatus: activeStatus ?? this.activeStatus,
+      accountStatus: accountStatus ?? this.accountStatus,
 
       role: role ?? this.role,
-      isProfileCompleted:
-          isProfileCompleted ?? this.isProfileCompleted,
+      isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,
 
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       createdAt: createdAt ?? this.createdAt,

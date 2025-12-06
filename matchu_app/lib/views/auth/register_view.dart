@@ -97,7 +97,7 @@ class _RegisterViewState extends State<RegisterView> {
                   obscureText: controllerRegis.isPasswordHidden.value,
                   decoration: InputDecoration(
                     labelText: "Mật khẩu",
-                    hintText: "Nhập mật khẩu",
+                    hintText: "8+ | Aa | 0–9 | !@#",
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -111,7 +111,6 @@ class _RegisterViewState extends State<RegisterView> {
                   ),
                 );
               }),
-
               const SizedBox(height: 24),
               Text(
                 " Nhập lại mật khẩu:",
