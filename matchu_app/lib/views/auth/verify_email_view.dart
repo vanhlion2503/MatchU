@@ -18,7 +18,7 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
     super.initState();
     c = Get.find<AuthController>();
 
-    c.startEmailResendTimer();
+    c.startEmailTimer();
   }
     String maskEmail(String email) {
     if (email.isEmpty || !email.contains('@')) return email;
@@ -124,7 +124,7 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: c.checkEmailVeriFied,
+                    onPressed: c.checkEmailVerified,
                     child: Text('Tôi đã xác minh',
                     ),
                   ),

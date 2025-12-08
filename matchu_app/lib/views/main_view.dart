@@ -7,6 +7,7 @@ import 'package:matchu_app/views/nearby/nearby_view.dart';
 import 'package:matchu_app/views/profile/profile_view.dart';
 import 'package:matchu_app/views/random_chat/random_chat_view.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:iconsax/iconsax.dart';
 
 class MainView extends StatefulWidget {
   const MainView({super.key});
@@ -96,8 +97,8 @@ class _MainViewState extends State<MainView>
                       duration: Duration(milliseconds: 250),
                       curve: Curves.easeOut,
                       child: Icon(
-                        Icons.home,
-                        size: c.currentIndex.value == 0 ? 32 : 25,
+                        Iconsax.home_2,
+                        size: c.currentIndex.value == 0 ? 32 : 27,
                       ),
                     ),
                     label: "Home",
@@ -108,8 +109,8 @@ class _MainViewState extends State<MainView>
                       duration: Duration(milliseconds: 250),
                       curve: Curves.easeOut,
                       child: Icon(
-                        Icons.location_on,
-                        size: c.currentIndex.value == 1 ? 32 : 25,
+                        Iconsax.location,
+                        size: c.currentIndex.value == 1 ? 32 : 27,
                       ),
                     ),
                     label: "Nearby",
@@ -126,8 +127,8 @@ class _MainViewState extends State<MainView>
                       duration: Duration(milliseconds: 250),
                       curve: Curves.easeOut,
                       child: Icon(
-                        Icons.sports_esports,
-                        size: c.currentIndex.value == 3 ? 32 : 25,
+                        Iconsax.game,
+                        size: c.currentIndex.value == 3 ? 32 : 27,
                       ),
                     ),
                     label: "Game",
@@ -138,8 +139,8 @@ class _MainViewState extends State<MainView>
                       duration: Duration(milliseconds: 250),
                       curve: Curves.easeOut,
                       child: Icon(
-                        Icons.person,
-                        size: c.currentIndex.value == 4 ? 32 : 25,
+                        Iconsax.profile_circle,
+                        size: c.currentIndex.value == 4 ? 32 : 27,
                       ),
                     ),
                     label: "Profile",

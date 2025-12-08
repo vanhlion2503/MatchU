@@ -1,15 +1,15 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/services/auth_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
-import 'dart:async';
-
 
 class AuthController extends GetxController {
-  final AuthService _authService = AuthService();
+  final AuthService _auth = AuthService();
 
+  // ========= INPUT CONTROLLERS =========
   final emailC = TextEditingController();
   final passwordC = TextEditingController();
   final confirmPasswordC = TextEditingController();
@@ -18,11 +18,11 @@ class AuthController extends GetxController {
   final nicknameC = TextEditingController();
   final birthdayC = TextEditingController();
 
-
   final RxString fullPhoneNumber = ''.obs;
   final Rx<DateTime?> selectedBirthday = Rx<DateTime?>(null);
   final RxString selectedGender = ''.obs;
 
+  // ========= UI STATE =========
   final isPasswordHidden = true.obs;
   final isLoadingRegister = false.obs;
   final isLoadingLogin = false.obs;
@@ -32,29 +32,59 @@ class AuthController extends GetxController {
   final resendLoginOtpSeconds = 60.obs;
 
   Timer? _emailTimer;
-  Timer? _enrollOtpTimer;
-  Timer? _loginOtpTimer;
+  Timer? _enrollTimer;
+  Timer? _loginTimer;
 
-  final Rxn<User> _user = Rxn<User>();
-  User? get user => _user.value;
+  // ========= FIREBASE USER STREAM =========
+  final Rxn<User> _userRx = Rxn<User>();
+  User? get user => _userRx.value;
 
   FirebaseAuthMultiFactorException? _mfaException;
-  String? loginVerificationId;
   String? enrollVerificationId;
-  bool _isRegistering = false;
+  String? loginVerificationId;
 
   @override
   void onInit() {
     super.onInit();
-    _user.bindStream(_authService.authStateChanges);
+
+    // Lắng nghe trạng thái đăng nhập nhưng KHÔNG redirect
+    _userRx.bindStream(_auth.authStateChanges);
+
+    // checkInitialLogin();
   }
 
-  /// ✅ REGISTER — GỬI EMAIL VERIFY ĐÚNG LUỒNG
+  Future<void> checkInitialLogin() async {
+    await Future.delayed(Duration(milliseconds: 500));
+
+    final u = FirebaseAuth.instance.currentUser;
+
+    if (u == null) {
+      Get.offAllNamed('/');
+      return;
+    }
+
+    await u.reload();
+    final refreshed = FirebaseAuth.instance.currentUser;
+
+    final snap = await _auth.db.collection('users').doc(refreshed!.uid).get();
+    final completed = snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
+
+    if (completed) {
+      Get.offAllNamed('/main');
+    } else {
+      Get.offAllNamed('/complete-profile');
+    }
+  }
+
+  // =============================================================
+  //                      REGISTER ACCOUNT
+  // =============================================================
   Future<void> register() async {
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
     }
+
     if (passwordC.text.length < 6) {
       Get.snackbar("Lỗi", "Mật khẩu phải từ 6 ký tự trở lên");
       return;
@@ -65,74 +95,80 @@ class AuthController extends GetxController {
       return;
     }
 
-    _isRegistering = true;
     isLoadingRegister.value = true;
 
     try {
-      await _authService.registerWithEmailAndPassWord(
+      await _auth.registerWithEmailAndPassWord(
         email: emailC.text.trim(),
         password: passwordC.text.trim(),
         onSuccess: () {
           isLoadingRegister.value = false;
           Get.toNamed('/verify-email');
         },
-        onFailed: (error){
+        onFailed: (errorMsg) {
           isLoadingRegister.value = false;
-          Get.snackbar("Đăng ký thất bại", error);
+          Get.snackbar("Đăng ký thất bại", errorMsg);
         },
       );
     } on FirebaseAuthException catch (e) {
+      isLoadingRegister.value = false;
       Get.snackbar("Đăng ký thất bại", firebaseErrorToVietnamese(e.code));
-    } catch (_) {
-      Get.snackbar("Đăng ký thất bại", "Lỗi không xác định. Vui lòng thử lại.");
     }
   }
-  Future<void> checkEmailVeriFied() async{
+
+  // =============================================================
+  //               CHECK EMAIL VERIFIED (AFTER REGISTER)
+  // =============================================================
+  Future<void> checkEmailVerified() async {
     isLoadingRegister.value = true;
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         Get.snackbar("Lỗi", "Không tìm thấy người dùng");
+        isLoadingRegister.value = false;
         return;
       }
 
       await user.reload();
-
       final refreshedUser = FirebaseAuth.instance.currentUser;
 
-      if (refreshedUser != null && refreshedUser.emailVerified) {
+      if (refreshedUser!.emailVerified) {
+        isLoadingRegister.value = false;
         Get.toNamed('/enroll-phone');
       } else {
-        Get.snackbar(
-          "Chưa xác minh",
-          "Email chưa được xác minh. Vui lòng kiểm tra hộp thư và bấm link.",
-        );
+        isLoadingRegister.value = false;
+        Get.snackbar("Chưa xác minh", "Vui lòng kiểm tra email.");
       }
     } catch (e) {
-      Get.snackbar("Lỗi", e.toString());
-    } finally {
       isLoadingRegister.value = false;
+      Get.snackbar("Lỗi", e.toString());
     }
   }
+
+  // =============================================================
+  //                RESEND VERIFY EMAIL
+  // =============================================================
   Future<void> resendVerifyEmail() async {
     final user = FirebaseAuth.instance.currentUser;
-    if(user == null){
+
+    if (user == null) {
       Get.snackbar("Lỗi", "Không tìm thấy user");
       return;
     }
 
-    try{
+    try {
       await user.sendEmailVerification();
-      startEmailResendTimer();
-      Get.snackbar("Thành công", "Đã gửi lại email xác minh");
-    }catch(e){}
+      startEmailTimer();
+      Get.snackbar("Thành công", "Đã gửi email xác minh");
+    } catch (_) {}
   }
-  void startEmailResendTimer(){
+
+  void startEmailTimer() {
     resendEmailSeconds.value = 60;
     _emailTimer?.cancel();
 
-    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _emailTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       if (resendEmailSeconds.value == 0) {
         timer.cancel();
       } else {
@@ -140,39 +176,51 @@ class AuthController extends GetxController {
       }
     });
   }
-  Future<void> sendEnrollOtp() async{
+
+  // =============================================================
+  //                    SEND OTP (MFA ENROLL)
+  // =============================================================
+  Future<void> sendEnrollOtp() async {
     final phone = fullPhoneNumber.value.trim();
+
     if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
       Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
       return;
     }
-    final phoneQuery = await _authService.db
-      .collection('users')
-      .where("phonenumber", isEqualTo: phone)
-      .get();
+
+    // Kiểm tra sdt có bị trùng không
+    final phoneQuery = await _auth.db
+        .collection('users')
+        .where("phonenumber", isEqualTo: phone)
+        .get();
+
     if (phoneQuery.docs.isNotEmpty) {
-      Get.snackbar("Lỗi", "Số điện thoại đã được sử dụng bởi tài khoản khác");
+      Get.snackbar("Lỗi", "Số điện thoại đã có người sử dụng");
       return;
     }
+
     isLoadingRegister.value = true;
-    await _authService.sendEnrollMfaOtp(
-      phonenumber: phone, 
-      onCodeSent: (verificationId) {
-        enrollVerificationId = verificationId;
-        startEnrollOtpResendTimer();
+
+    await _auth.sendEnrollMfaOtp(
+      phonenumber: phone,
+      onCodeSent: (verId) {
+        enrollVerificationId = verId;
+        startEnrollOtpTimer();
         isLoadingRegister.value = false;
         Get.toNamed('/otp-enroll');
       },
-      onFailed: (e){
+      onFailed: (msg) {
         isLoadingRegister.value = false;
-        Get.snackbar("Lỗi", e);
-      });
+        Get.snackbar("Lỗi OTP", msg);
+      },
+    );
   }
-  void startEnrollOtpResendTimer(){
-    resendEnrollOtpSeconds.value = 60;
-    _enrollOtpTimer?.cancel();
 
-    _enrollOtpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+  void startEnrollOtpTimer() {
+    resendEnrollOtpSeconds.value = 60;
+    _enrollTimer?.cancel();
+
+    _enrollTimer = Timer.periodic(Duration(seconds: 1), (timer) {
       if (resendEnrollOtpSeconds.value == 0) {
         timer.cancel();
       } else {
@@ -180,93 +228,106 @@ class AuthController extends GetxController {
       }
     });
   }
+
+  // =============================================================
+  //             CONFIRM ENROLL OTP → LOGOUT (FLOW OF YOU)
+  // =============================================================
   Future<void> confirmEnrollOtp() async {
-    if (enrollVerificationId == null || otpC.text.isEmpty){
+    if (enrollVerificationId == null || otpC.text.isEmpty) {
       Get.snackbar("Lỗi", "Thiếu mã OTP");
       return;
-    } 
+    }
 
     isLoadingRegister.value = true;
 
     try {
-      await _authService.confirmRegisterOtp(
+      await _auth.confirmRegisterOtp(
         verificationId: enrollVerificationId!,
         smsCode: otpC.text.trim(),
       );
 
       isLoadingRegister.value = false;
+
+      // 🔥 THEO LUỒNG CỦA BẠN: ENROLL XONG PHẢI LOGOUT
       await logoutC();
       Get.offAllNamed('/');
+
     } on FirebaseAuthException catch (e) {
-      Get.snackbar("OTP sai", firebaseErrorToVietnamese(e.code));
-    } catch (_) {
-      Get.snackbar("Lỗi", "Mã OTP không hợp lệ.");
+      isLoadingRegister.value = false;
+      Get.snackbar("Lỗi OTP", firebaseErrorToVietnamese(e.code));
     }
   }
-  /// ✅ LOGIN
+
+  // =============================================================
+  //                       LOGIN
+  // =============================================================
   Future<void> loginC() async {
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Vui lòng nhập email và mật khẩu");
+      Get.snackbar("Lỗi", "Nhập email và mật khẩu");
       return;
     }
 
     isLoadingLogin.value = true;
 
-    await _authService.login(
-      email: emailC.text.trim(), 
-      password: passwordC.text.trim(), 
-      onSuccess: () async{
+    await _auth.login(
+      email: emailC.text.trim(),
+      password: passwordC.text.trim(),
+      onSuccess: () {
         isLoadingLogin.value = false;
-      }, 
-      onMfaRequired: (e){
+      },
+      onMfaRequired: (e) {
+        isLoadingLogin.value = false;
         _mfaException = e;
+        sendLoginOtp();
+      },
+      onFailed: (msg) {
         isLoadingLogin.value = false;
-        _sendMfaLoginCode();
-      }, 
-      onFailed: (error){
-        isLoadingLogin.value = false;
-        Get.snackbar("Đăng nhập thất bại", error);
-      });
+        Get.snackbar("Đăng nhập thất bại", msg);
+      },
+    );
   }
 
-  /// ✅ GỬI OTP MFA
-  Future<void> _sendMfaLoginCode() async {
+  // =============================================================
+  //               SEND LOGIN OTP (MFA LOGIN)
+  // =============================================================
+  Future<void> sendLoginOtp() async {
     if (_mfaException == null) {
       Get.snackbar("Lỗi", "Không tìm thấy phiên MFA");
       return;
     }
-    await _authService.resolveMfaLogin(
+
+    await _auth.resolveMfaLogin(
       e: _mfaException!,
-      onCodeSent: (verificationId) {
-        loginVerificationId = verificationId;
-        startLoginOtpResendTimer();
-        isLoadingLogin.value = false;
+      onCodeSent: (verId) {
+        loginVerificationId = verId;
+        startLoginOtpTimer();
         Get.toNamed('/otp-login');
       },
-      onFailed: (error) {
-        isLoadingLogin.value = false;
-        Get.snackbar("Lỗi OTP", error);
+      onFailed: (msg) {
+        Get.snackbar("Lỗi OTP", msg);
       },
     );
   }
-  void startLoginOtpResendTimer() {
-    resendLoginOtpSeconds.value = 60;
-    _loginOtpTimer?.cancel();
 
-    _loginOtpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (resendLoginOtpSeconds.value == 0) {
+  void startLoginOtpTimer() {
+    resendLoginOtpSeconds.value = 60;
+    _loginTimer?.cancel();
+
+    _loginTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (resendLoginOtpSeconds.value == 0)
         timer.cancel();
-      } else {
+      else
         resendLoginOtpSeconds.value--;
-      }
     });
   }
 
-  /// ✅ XÁC NHẬN OTP MFA LOGIN
+  // =============================================================
+  //               CONFIRM LOGIN OTP
+  // =============================================================
   Future<void> confirmLogOtp() async {
     if (_mfaException == null ||
-        otpC.text.isEmpty ||
-        loginVerificationId == null) {
+        loginVerificationId == null ||
+        otpC.text.isEmpty) {
       Get.snackbar("Lỗi", "Phiên OTP không hợp lệ");
       return;
     }
@@ -274,31 +335,27 @@ class AuthController extends GetxController {
     isLoadingLogin.value = true;
 
     try {
-      // 1. Xác thực OTP
-      await _authService.confirmLoginOtp(
+      // Xác thực MFA OTP
+      await _auth.confirmLoginOtp(
         e: _mfaException!,
         verificationId: loginVerificationId!,
         smsCode: otpC.text.trim(),
       );
 
-      // 2. Lấy user hiện tại
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         Get.snackbar("Lỗi", "Đăng nhập thất bại");
         return;
       }
 
-      // 3. Kiểm tra hồ sơ
-      final snap = await _authService.db
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      // Kiểm tra hồ sơ
+      final snap =
+          await _auth.db.collection('users').doc(user.uid).get();
 
-      final isProfileCompleted =
+      final completed =
           snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
 
-      // 4. Điều hướng
-      if (isProfileCompleted) {
+      if (completed) {
         Get.offAllNamed('/main');
       } else {
         Get.toNamed('/complete-profile');
@@ -310,28 +367,19 @@ class AuthController extends GetxController {
     }
   }
 
-  /// ✅ LƯU PROFILE
+  // =============================================================
+  //                     SAVE PROFILE
+  // =============================================================
   Future<void> saveProfile() async {
     final nickname = nicknameC.text.trim();
-    final nicknameRegex = RegExp(r'^[A-Za-z0-9_]+$');
-    if (!nicknameRegex.hasMatch(nickname)) {
-      Get.snackbar(
-        "Lỗi",
-        "Biệt danh chỉ được chứa chữ cái không dấu, số hoặc dấu gạch dưới (_), và không được có khoảng trắng.",
-      );
-      return;
-    }
-    final nicknameQuery = await _authService.db
-    .collection('users')
-    .where("nickname", isEqualTo: nickname)
-    .get();
 
-    if (nicknameQuery.docs.isNotEmpty) {
-      Get.snackbar("Lỗi", "Biệt danh này đã có người sử dụng");
+    if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(nickname)) {
+      Get.snackbar("Lỗi",
+          "Nickname chỉ gồm chữ không dấu, số, hoặc dấu gạch dưới (_)");
       return;
     }
-    if (fullnameC.text.isEmpty || nicknameC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+    if (fullnameC.text.isEmpty) {
+      Get.snackbar("Lỗi", "Vui lòng nhập họ tên");
       return;
     }
     if (selectedGender.value.isEmpty) {
@@ -342,36 +390,28 @@ class AuthController extends GetxController {
       Get.snackbar("Lỗi", "Vui lòng chọn ngày sinh");
       return;
     }
-    final phone = fullPhoneNumber.value.trim();
-    final phoneQuery = await _authService.db
-      .collection('users')
-      .where("phonenumber", isEqualTo: phone)
-      .get();
-    if (phoneQuery.docs.isNotEmpty) {
-      Get.snackbar("Lỗi", "Số điện thoại đã được sử dụng bởi tài khoản khác");
-      return;
-    }
 
     isLoadingRegister.value = true;
 
     try {
-      await _authService.saveUserProfile(
+      await _auth.saveUserProfile(
         fullname: fullnameC.text.trim(),
         nickname: nickname,
-        phonenumber: phone,
-        birthday: selectedBirthday.value,
+        phonenumber: fullPhoneNumber.value.trim(),
+        birthday: selectedBirthday.value!,
         gender: selectedGender.value,
       );
 
-      final user = _authService.auth.currentUser;
-      if (user != null) {
-        await _authService.db
-            .collection('users')
-            .doc(user.uid)
-            .update({'isProfileCompleted': true});
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        await _auth.db
+            .collection("users")
+            .doc(uid)
+            .update({"isProfileCompleted": true});
       }
 
       isLoadingRegister.value = false;
+
       Get.offAllNamed('/main');
     } catch (e) {
       isLoadingRegister.value = false;
@@ -379,11 +419,17 @@ class AuthController extends GetxController {
     }
   }
 
+  // =============================================================
+  //                        LOGOUT
+  // =============================================================
   Future<void> logoutC() async {
-    await _authService.logout();
+    await _auth.logout();
     Get.offAllNamed('/');
   }
 
+  // =============================================================
+  //                        DISPOSE
+  // =============================================================
   @override
   void onClose() {
     emailC.dispose();
@@ -395,8 +441,8 @@ class AuthController extends GetxController {
     birthdayC.dispose();
 
     _emailTimer?.cancel();
-    _enrollOtpTimer?.cancel();
-    _loginOtpTimer?.cancel();
+    _enrollTimer?.cancel();
+    _loginTimer?.cancel();
 
     super.onClose();
   }

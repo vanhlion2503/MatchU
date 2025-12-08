@@ -43,17 +43,17 @@ class AppTheme {
         color: textPrimaryColor,
       ),
       bodyLarge: GoogleFonts.inter(
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: FontWeight.normal,
         color: textPrimaryColor,
       ),
       bodyMedium: GoogleFonts.inter(
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: FontWeight.normal,
         color: textPrimaryColor,
       ),
       bodySmall: GoogleFonts.inter(
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: FontWeight.normal,
         color: textPrimaryColor,
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/controllers/auth/auth_controller.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -34,6 +35,11 @@ class _SplashViewState extends State<SplashView>
     );
 
     _animationController.forward();
+
+    Future.microtask(() {
+    final authC = Get.put(AuthController(), permanent: true);
+    authC.checkInitialLogin();
+  });
   }
 
   @override

@@ -15,5 +15,6 @@ class AppRouter {
   static const String main = '/main';
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String searchUser = '/search-user';
 
 }

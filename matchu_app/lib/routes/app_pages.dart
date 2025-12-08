@@ -1,8 +1,10 @@
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/auth/enroll_phone_view.dart';
 import 'package:matchu_app/views/auth/otp_enroll_view.dart';
 import 'package:matchu_app/views/auth/verify_email_view.dart';
+import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
 import 'package:matchu_app/views/auth/login_view.dart';
 import 'package:matchu_app/views/auth/register_view.dart';
@@ -67,6 +69,13 @@ class AppPages {
       binding: BindingsBuilder((){
         Get.put(MainController());
       })
+    ),
+    GetPage(
+      name: AppRouter.searchUser,
+      page: () => SearchUserView(),
+      binding: BindingsBuilder(() {
+        Get.put(SearchUserController());
+      }),
     ),
     // GetPage(
     //   name: AppRouter.profile, 
