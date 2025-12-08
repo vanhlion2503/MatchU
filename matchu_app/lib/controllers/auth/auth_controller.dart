@@ -54,27 +54,28 @@ class AuthController extends GetxController {
   }
 
   Future<void> checkInitialLogin() async {
-    await Future.delayed(Duration(milliseconds: 500));
-
     final u = FirebaseAuth.instance.currentUser;
 
     if (u == null) {
-      Get.offAllNamed('/');
+      Get.offAllNamed('/welcome');
       return;
     }
 
-    await u.reload();
-    final refreshed = FirebaseAuth.instance.currentUser;
+    try {
+      final snap = await _auth.db.collection('users').doc(u.uid).get();
 
-    final snap = await _auth.db.collection('users').doc(refreshed!.uid).get();
-    final completed = snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
+      final completed = snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
 
-    if (completed) {
-      Get.offAllNamed('/main');
-    } else {
-      Get.offAllNamed('/complete-profile');
+      if (completed) {
+        Get.offAllNamed('/main');
+      } else {
+        Get.offAllNamed('/complete-profile');
+      }
+    } catch (e) {
+      Get.offAllNamed('/welcome');
     }
   }
+
 
   // =============================================================
   //                      REGISTER ACCOUNT
@@ -248,7 +249,6 @@ class AuthController extends GetxController {
 
       isLoadingRegister.value = false;
 
-      // 🔥 THEO LUỒNG CỦA BẠN: ENROLL XONG PHẢI LOGOUT
       await logoutC();
       Get.offAllNamed('/');
 

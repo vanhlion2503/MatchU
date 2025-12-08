@@ -10,7 +10,7 @@ class AppRouter {
   static const String forgotPassword = '/forgot-password';
   static const String changePassword = '/change-password';
   
- 
+  static const String welcome = '/welcome';
   static const String home = '/home';
   static const String main = '/main';
   static const String profile = '/profile';

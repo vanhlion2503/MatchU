@@ -13,6 +13,7 @@ import 'package:matchu_app/views/auth/complete_profile_view.dart';
 import 'package:matchu_app/views/home_view.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/views/main_view.dart';
+import 'package:matchu_app/views/welcome_view.dart';
 
 class AppPages {
   static const initial = AppRouter.splash;
@@ -50,6 +51,10 @@ class AppPages {
     GetPage(
       name: AppRouter.completeProfile, 
       page: () => const CompleteProfileView(),
+    ),
+    GetPage(
+      name: AppRouter.welcome, 
+      page: () => const WelcomeView(),
     ),
 
 

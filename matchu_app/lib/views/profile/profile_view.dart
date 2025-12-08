@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/widgets/profile_widget/popup_profile_widget.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/widgets/profile_widget/right_side_menu.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
@@ -66,6 +67,7 @@ class ProfileView extends StatelessWidget {
                             ),
                             IconButton(
                               onPressed: () {
+                                RightSideMenu.open(context);
                               },
                               icon: const Icon(Iconsax.more_circle, color: Colors.white, size: 30),
                             ),
@@ -85,7 +87,7 @@ class ProfileView extends StatelessWidget {
                         backgroundColor: Colors.white,
                         child: const CircleAvatar(
                           radius: 50,
-                          // backgroundImage: AssetImage("assets/avatar.jpg"),
+                          backgroundImage: AssetImage("assets/avatas/avataMd.png"),
                         ),
                       ),
                     ),
@@ -151,23 +153,30 @@ class ProfileView extends StatelessWidget {
         
               // ---------------- STATS ----------------
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  statItem(
-                    c.followersCount.toString(), 
-                    "Người theo dõi", 
-                    textTheme),
-                  statItem(
-                    c.followingCount.toString(), 
-                    "Đang theo dõi", 
-                    textTheme),
-                  statItem(
-                    "Lv. ${c.rank}", 
-                    "Rank", 
-                    textTheme),
+                  Expanded(
+                    child: statItem(
+                      c.followersCount.toString(), 
+                      "Người theo dõi", 
+                      textTheme
+                    ),
+                  ),
+                  Expanded(
+                    child: statItem(
+                      c.followingCount.toString(), 
+                      "Đang theo dõi", 
+                      textTheme
+                    ),
+                  ),
+                  Expanded(
+                    child: statItem(
+                      "Lv. ${c.rank}", 
+                      "Rank", 
+                      textTheme
+                    ),
+                  ),
                 ],
               ),
-        
               const SizedBox(height: 25),
         
               // ---------------- REPUTATION CARD ----------------
@@ -249,7 +258,7 @@ class ProfileView extends StatelessWidget {
               ),
         
               const SizedBox(height: 30),
-        
+  
               // ---------------- TABS ----------------
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,

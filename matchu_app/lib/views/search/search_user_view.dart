@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class SearchUserView extends StatelessWidget {
   SearchUserView({super.key});
@@ -55,14 +56,10 @@ class SearchUserView extends StatelessWidget {
                 ),
               ))
             ),
-            Text(
-              "Kết quả tìm kiếm",
-              style: textTheme.bodyLarge,
-            ),
-            Expanded( // ⬅ ĐƯỢC PHÉP DÙNG Ở ĐÂY
+            Expanded(
               child: Obx(() {
                 if (suc.isLoading.value) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 if (suc.results.isEmpty) {
@@ -70,46 +67,99 @@ class SearchUserView extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_search,
-                            size: 50, color: AppTheme.textSecondaryColor),
+                        Icon(Icons.person_search, size: 50, color: Colors.grey),
                         SizedBox(height: 10),
-                        Text(
-                          "Không tìm thấy người dùng",
-                          style: TextStyle(color: AppTheme.textSecondaryColor),
-                        )
+                        Text("Không tìm thấy người dùng",
+                            style: TextStyle(color: Colors.grey)),
                       ],
                     ),
                   );
                 }
 
-                return ListView.separated(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  itemCount: suc.results.length,
-                  itemBuilder: (_, index) {
-                    final user = suc.results[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: 26,
-                        backgroundImage: user.avatarUrl.isNotEmpty
-                            ? NetworkImage(user.avatarUrl)
-                            : null,
-                        child: user.avatarUrl.isEmpty
-                            ? Text(
-                                user.nickname[0].toUpperCase(),
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              )
-                            : null,
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // =============== TITLE: KẾT QUẢ TÌM KIẾM ===============
+                    Padding(
+                      padding: const EdgeInsets.only(left: 18, bottom: 8, top: 10),
+                      child: Text(
+                        "Kết quả tìm kiếm",
+                        style: textTheme.bodySmall!.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                      title: Text(user.nickname),
-                      subtitle: Text(user.fullname),
-                      trailing: Icon(Icons.chevron_right),
-                      onTap: () {},
-                    );
-                  },
-                  separatorBuilder: (_, __) => Divider(height: 1),
+                    ),
+
+                    // =============== LIST USER ===============
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        itemCount: suc.results.length,
+                        itemBuilder: (_, index) {
+                          final user = suc.results[index];
+
+                          return GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              Get.to(()=> OtherProfileView(userId: user.uid));
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                children: [
+                                  // AVATAR
+                                  CircleAvatar(
+                                    radius: 26,
+                                    backgroundImage: user.avatarUrl.isNotEmpty
+                                        ? NetworkImage(user.avatarUrl)
+                                        : null,
+                                    child: user.avatarUrl.isEmpty
+                                        ? Text(
+                                            user.nickname[0].toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                            
+                                  SizedBox(width: 12),
+                            
+                                  // NAME & USERNAME
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          user.fullname,
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        Text(
+                                          "@${user.nickname}",
+                                          style: TextStyle(color: Colors.grey[600]),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                            
+                                  Icon(Icons.chevron_right, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  ],
                 );
               }),
             )
+
           ],
         ),
       )
