@@ -119,7 +119,7 @@ class RightSideMenu {
         title,
         style: TextStyle(
           color: AppTheme.textSecondaryColor,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -154,7 +154,7 @@ class RightSideMenu {
                       ? Colors.red
                       : AppTheme.textPrimaryColor,
                   fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),

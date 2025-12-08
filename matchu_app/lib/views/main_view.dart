@@ -8,6 +8,7 @@ import 'package:matchu_app/views/profile/profile_view.dart';
 import 'package:matchu_app/views/random_chat/random_chat_view.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/widgets/main_widget/bottom_half_border_painter.dart';
 
 class MainView extends StatefulWidget {
   const MainView({super.key});
@@ -148,49 +149,62 @@ class _MainViewState extends State<MainView>
                 ],
               ),
             ),
-
-            // -----------------------------
-            // 🔥 FLOATING CENTER BUTTON (PULSE ANIMATION)
+            // 🔥 FLOATING CENTER BUTTON + WHITE CIRCLE BACKGROUND
             // -----------------------------
             Positioned(
-              top: -28,
+              top: -38,
               left: 0,
               right: 0,
               child: GestureDetector(
                 onTap: () {
-                  // chạy animation pulse zoom
                   _centerButtonController.forward().then((_) {
                     _centerButtonController.reverse();
                   });
-
                   c.changePage(2);
                 },
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Container(
-                    width: 68,
-                    height: 68,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryColor.withOpacity(0.45),
-                          blurRadius: 25,
-                          spreadRadius: 3,
-                          offset: Offset(0, 10),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // ◯ Vòng tròn trắng phía sau (KHÔNG ĐỔ BÓNG)
+                    CustomPaint(
+                      size: const Size(80, 80),
+                      painter: BottomHalfBorderPainter(
+                        color: AppTheme.borderColor,   // màu viền
+                        strokeWidth: 2,       // độ dày viền
+                      ),
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
                         ),
-                      ],
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.bolt,
-                      color: Colors.white,
-                      size: 35,
+
+                    // 🔵 Nút xanh (KHÔNG ĐỔ BÓNG)
+                    ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.bolt,
+                          color: Colors.white,
+                          size: 35,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
+
+
           ],
         ),
       );
