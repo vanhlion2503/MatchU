@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/widgets/profile_widget/profile_widget.dart';
 
 class OtherProfileView extends StatelessWidget {
@@ -14,8 +15,7 @@ class OtherProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final OtherProfileController c =
-        Get.put(OtherProfileController(userId));
+    final OtherProfileController c = Get.put(OtherProfileController(userId));
 
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
@@ -147,9 +147,29 @@ class OtherProfileView extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _stat("${u.followers.length}", "Người theo dõi"),
-                  _stat("${u.following.length}", "Đang theo dõi"),
-                  _stat("Lv. ${u.rank}", "Rank"),
+                  statItem(
+                    "${u.followers.length}", 
+                    "Người theo dõi",
+                    textTheme,
+                    onTap: () {
+                      Get.to(() => FollowTabView(
+                        userId: c.user.value!.uid,
+                        initialIndex: 0,
+                        ));
+                    },
+                    ),
+                  statItem(
+                    "${u.following.length}", 
+                    "Đang theo dõi",
+                    textTheme,
+                    onTap: () {
+                      Get.to(() => FollowTabView(
+                        userId: c.user.value!.uid,
+                        initialIndex: 1,
+                        ));
+                    },
+                    ),
+                  statItem("Lv. ${u.rank}", "Rank", textTheme),
                 ],
               ),
 
@@ -194,14 +214,4 @@ class OtherProfileView extends StatelessWidget {
     );
   }
 
-  // ================= WIDGET STAT =================
-  Widget _stat(String value, String label) {
-    return Column(
-      children: [
-        Text(value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(color: Colors.grey)),
-      ],
-    );
-  }
 }

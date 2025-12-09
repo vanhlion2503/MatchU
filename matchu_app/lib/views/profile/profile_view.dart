@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/widgets/profile_widget/profile_widget.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:get/get.dart';
@@ -158,14 +159,26 @@ class ProfileView extends StatelessWidget {
                     child: statItem(
                       c.followersCount.toString(), 
                       "Người theo dõi", 
-                      textTheme
+                      textTheme,
+                      onTap: () {
+                        Get.to(() => FollowTabView(
+                          userId: c.user.value!.uid,
+                          initialIndex: 0, // ⭐ mở tab Followers
+                        ));
+                      },
                     ),
                   ),
                   Expanded(
                     child: statItem(
                       c.followingCount.toString(), 
                       "Đang theo dõi", 
-                      textTheme
+                      textTheme,
+                      onTap: () {
+                        Get.to(() => FollowTabView(
+                          userId: c.user.value!.uid,
+                          initialIndex: 1, // ⭐ mở tab Following
+                        ));
+                      },
                     ),
                   ),
                   Expanded(

@@ -5,6 +5,7 @@ import 'package:matchu_app/views/auth/enroll_phone_view.dart';
 import 'package:matchu_app/views/auth/otp_enroll_view.dart';
 import 'package:matchu_app/views/auth/verify_email_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
+import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
 import 'package:matchu_app/views/auth/login_view.dart';
 import 'package:matchu_app/views/auth/register_view.dart';
@@ -64,9 +65,6 @@ class AppPages {
     GetPage(
       name: AppRouter.home, 
       page: ()=> const HomeView(),
-      // binding: BindingsBuilder((){
-      //   Get.put(HomeController());
-      // })
     ),
     GetPage(
       name: AppRouter.main, 
@@ -82,12 +80,10 @@ class AppPages {
         Get.put(SearchUserController());
       }),
     ),
-    // GetPage(
-    //   name: AppRouter.profile, 
-    //   page: ()=> const ProfileView(),
-    //   binding: BindingsBuilder((){
-    //     Get.put(ProfileController());
-    //   })
-    // ),
+
+    GetPage(
+      name: AppRouter.displayMode,
+      page: () => DisplayModeView(),
+    ),
   ];
 }

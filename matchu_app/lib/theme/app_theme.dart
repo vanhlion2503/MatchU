@@ -154,5 +154,121 @@ class AppTheme {
       elevation: 2,
     ),
   );
+  static ThemeData darkTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: const ColorScheme.dark(
+      primary: primaryColor,
+      secondary: secondaryColor,
+      surface: Color(0xFF121212),
+      background: Color(0xFF0D0D0D),
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      error: errorColor,
+      onSurface: Colors.white,
+      onBackground: Colors.white,
+    ),
+
+    textTheme: GoogleFonts.interTextTheme().copyWith(
+      headlineLarge: GoogleFonts.inter(
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+      ),
+      headlineMedium: GoogleFonts.inter(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      headlineSmall: GoogleFonts.inter(
+        fontSize: 20,
+        fontWeight: FontWeight.w500,
+        color: Colors.white,
+      ),
+      bodyLarge: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.normal,
+        color: Colors.white,
+      ),
+      bodyMedium: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.normal,
+        color: Colors.white,
+      ),
+      bodySmall: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.normal,
+        color: Colors.white,
+      ),
+    ),
+
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      iconTheme: IconThemeData(color: Colors.white),
+    ),
+
+    cardTheme: CardTheme(
+      color: const Color(0xFF1E1E1E),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(
+          color: Color(0xFF2C2C2C),
+          width: 1,
+        ),
+      ),
+    ),
+
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: const Color(0xFF1E1E1E),
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2C2C2C)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2C2C2C)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: primaryColor, width: 2),
+      ),
+
+      labelStyle: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
+        color: Colors.white70,
+      ),
+      hintStyle: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.normal,
+        color: Colors.white54,
+      ),
+      errorStyle: GoogleFonts.inter(
+        fontSize: 18,
+        color: errorColor,
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 16,
+        horizontal: 16,
+      )
+    ),
+
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: primaryColor,
+      foregroundColor: Colors.white,
+      elevation: 2,
+    ),
+  );
+
 
 }

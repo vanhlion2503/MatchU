@@ -85,6 +85,14 @@ class RightSideMenu {
                         text: "Cài đặt ứng dụng",
                         onTap: () => Get.toNamed("/app-settings"),
                       ),
+                      menuItem(
+                        icon: Icons.brightness_6_outlined,
+                        text: "Chế độ",
+                        onTap: (){
+                          Navigator.pop(context);
+                          Get.toNamed("/display-mode");
+                          },
+                      ),
 
                       const Spacer(),
 
