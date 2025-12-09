@@ -146,8 +146,8 @@ class CompleteProfileView extends StatelessWidget {
                         ? null
                         : c.saveProfile,
                     child: c.isLoadingRegister.value
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
+                        ? CircularProgressIndicator(
+                            color: Theme.of(context).colorScheme.onPrimary,
                           )
                         : const Text(
                             "Lưu thông tin",

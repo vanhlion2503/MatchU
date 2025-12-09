@@ -45,7 +45,7 @@ class _SplashViewState extends State<SplashView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           /// Logo + Tên app ở giữa
@@ -65,17 +65,17 @@ class _SplashViewState extends State<SplashView>
                   const SizedBox(height: 12),
 
                   RichText(
-                    text: const TextSpan(
+                    text: TextSpan(
                       children: [
                         TextSpan(
                           text: "Match",
                           style: TextStyle(
                             fontSize: 40,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimaryColor,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
-                        TextSpan(
+                        const TextSpan(
                           text: "U",
                           style: TextStyle(
                             fontSize: 40,
@@ -102,7 +102,7 @@ class _SplashViewState extends State<SplashView>
                 "Version 1.0.0",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppTheme.textSecondaryColor,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),

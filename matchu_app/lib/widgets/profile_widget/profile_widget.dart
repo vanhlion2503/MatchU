@@ -16,11 +16,15 @@ import 'package:matchu_app/theme/app_theme.dart';
             value,
             style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
-          Text(
-            label,
-            style: textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondaryColor,
-            ),
+          Builder(
+            builder: (context) {
+              return Text(
+                label,
+                style: textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -31,14 +35,18 @@ import 'package:matchu_app/theme/app_theme.dart';
   Widget tabItem(String text, bool active, TextTheme textTheme) {
     return Column(
       children: [
-        Text(
-          text,
-          style: textTheme.bodyMedium?.copyWith(
-            fontWeight: active ? FontWeight.bold : FontWeight.normal,
-            color: active
-                ? AppTheme.primaryColor
-                : AppTheme.textSecondaryColor,
-          ),
+        Builder(
+          builder: (context) {
+            return Text(
+              text,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                color: active
+                    ? AppTheme.primaryColor
+                    : Theme.of(context).textTheme.bodySmall?.color,
+              ),
+            );
+          },
         ),
         if (active)
           Container(

@@ -15,10 +15,11 @@ class ProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     final ProfileController c = Get.put(ProfileController());
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Obx((){
         // ====== LOADING ======
         if (c.isLoading.value) {
@@ -64,13 +65,13 @@ class ProfileView extends StatelessWidget {
                               onPressed: () {
                                 Get.toNamed('/search-user');
                               },
-                              icon: const Icon(Iconsax.user_cirlce_add, color: Colors.white, size: 30),
+                              icon: Icon(Iconsax.user_cirlce_add, color: colorScheme.onPrimary, size: 30),
                             ),
                             IconButton(
                               onPressed: () {
                                 RightSideMenu.open(context);
                               },
-                              icon: const Icon(Iconsax.more_circle, color: Colors.white, size: 30),
+                              icon: Icon(Iconsax.more_circle, color: colorScheme.onPrimary, size: 30),
                             ),
                           ],
                         ),
@@ -85,7 +86,7 @@ class ProfileView extends StatelessWidget {
                     child: Center(
                       child: CircleAvatar(
                         radius: 55,
-                        backgroundColor: Colors.white,
+                        backgroundColor: theme.scaffoldBackgroundColor,
                         child: const CircleAvatar(
                           radius: 50,
                           backgroundImage: AssetImage("assets/avatas/avataMd.png"),
@@ -106,7 +107,7 @@ class ProfileView extends StatelessWidget {
               Text(
                 "@${c.nickName} • ${c.getAge}",
                 style: textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondaryColor,
+                  color: theme.textTheme.bodySmall?.color,
                 ),
               ),
         
@@ -127,8 +128,8 @@ class ProfileView extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: textTheme.bodyMedium?.copyWith(
                             color: c.bio.isNotEmpty
-                                ? Colors.black87
-                                : AppTheme.textSecondaryColor,
+                                ? textTheme.bodyMedium?.color
+                                : theme.textTheme.bodySmall?.color,
                           ),
                         ),
                       ),
@@ -205,7 +206,12 @@ class ProfileView extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text("Điểm uy tín",
-                              style: textTheme.titleMedium),
+                              style: textTheme.titleMedium?.copyWith(
+                                color: Theme.of(context).brightness == Brightness.dark 
+                                  ? AppTheme.darkTextPrimary
+                                  : AppTheme.lightTextPrimary,
+                                fontWeight: FontWeight.w700,
+                              )),
         
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -239,7 +245,9 @@ class ProfileView extends StatelessWidget {
                                   value: c.reputationPercent,
                                   strokeWidth: 6,
                                   color: colorScheme.primary,
-                                  backgroundColor: AppTheme.borderColor,
+                                  backgroundColor: theme.brightness == Brightness.dark 
+                                      ? AppTheme.darkBorder 
+                                      : AppTheme.lightBorder,
                                 ),
                                 Center(
                                   child: Text(
@@ -259,7 +267,7 @@ class ProfileView extends StatelessWidget {
                             child: Text(
                               "Giữ cách trò chuyện lịch sự để tăng độ uy tín và mở khóa nhiều tính năng hơn.",
                               style: textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondaryColor,
+                                color: theme.textTheme.bodySmall?.color,
                               ),
                             ),
                           )
@@ -293,9 +301,13 @@ class ProfileView extends StatelessWidget {
                   itemBuilder: (_, index) => Container(
                     width: 120,
                     decoration: BoxDecoration(
-                      color: AppTheme.cardColor,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.borderColor),
+                      border: Border.all(
+                        color: theme.brightness == Brightness.dark 
+                            ? AppTheme.darkBorder 
+                            : AppTheme.lightBorder,
+                      ),
                     ),
                   ),
                   separatorBuilder: (_, __) => const SizedBox(width: 10),

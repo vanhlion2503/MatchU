@@ -52,7 +52,7 @@ class _RegisterViewState extends State<RegisterView> {
             Text(
               "Nhập thông tin để bắt đầu hành trình.",
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: const Color.fromARGB(255, 78, 87, 92),
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                     fontWeight: FontWeight.w700,
                   ),
             ),
@@ -153,9 +153,9 @@ class _RegisterViewState extends State<RegisterView> {
                             ? null
                             : controllerRegis.register,
                     child: controllerRegis.isLoadingRegister.value
-                        ? const CircularProgressIndicator(
+                        ? CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                           )
                         : const Text("Đăng ký"),
                   ),
@@ -163,30 +163,35 @@ class _RegisterViewState extends State<RegisterView> {
               }),
 
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Divider(
-                      thickness: 1,
-                      color: AppTheme.borderColor,
-                    )
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      "Hoặc đăng ký với",
-                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                            color: const Color.fromARGB(255, 56, 55, 55),
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Divider(
-                      thickness: 1,
-                      color: AppTheme.borderColor,
-                      )),
-                ],
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          thickness: 1,
+                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        )
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          "Hoặc đăng ký với",
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                color: Theme.of(context).textTheme.bodySmall?.color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          thickness: 1,
+                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        )),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 24),
               Row(
@@ -203,13 +208,16 @@ class _RegisterViewState extends State<RegisterView> {
                         Text(
                           "Google",
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Colors.black,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: AppTheme.borderColor),
+                        side: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                              ? AppTheme.darkBorder 
+                              : AppTheme.lightBorder,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -227,19 +235,22 @@ class _RegisterViewState extends State<RegisterView> {
                       icon: Icon(
                         Icons.phone,
                         size: 40,
-                        color: Colors.black,
+                        color: Theme.of(context).iconTheme.color,
                         ),
                       label: 
                         Text(
                           "Số điện thoại",
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Colors.black,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: AppTheme.borderColor),
+                        side: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                              ? AppTheme.darkBorder 
+                              : AppTheme.lightBorder,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -259,7 +270,7 @@ class _RegisterViewState extends State<RegisterView> {
                         .textTheme
                         .bodyMedium!
                         .copyWith(
-                          color: AppTheme.textSecondaryColor,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
                           fontWeight: FontWeight.w600,
                         ),
                   ),

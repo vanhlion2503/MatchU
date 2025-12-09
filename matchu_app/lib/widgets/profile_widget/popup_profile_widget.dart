@@ -29,7 +29,11 @@ void showEditBioDialog(BuildContext context, ProfileController c) {
                 // TITLE
                 Text(
                   "Chỉnh sửa mô tả",
-                  style: Theme.of(context).textTheme.titleLarge,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.darkTextPrimary 
+                        : AppTheme.lightTextSecondary,
+                  ),
                 ),
 
                 const SizedBox(height: 15),
@@ -60,7 +64,7 @@ void showEditBioDialog(BuildContext context, ProfileController c) {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primaryColor,   
-                        foregroundColor: Colors.white,         
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,         
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

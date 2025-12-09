@@ -15,13 +15,18 @@ class OtherProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final OtherProfileController c = Get.put(OtherProfileController(userId));
+    final OtherProfileController c = Get.put(
+      OtherProfileController(userId),
+      tag: userId,        // ⭐ Gán tag để controller không bị trùng
+      permanent: false,   // Cho phép tự hủy khi back
+    );
+
 
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Obx(() {
         if (c.isLoadingFollowing.value || c.user.value == null) {
           return const Center(child: CircularProgressIndicator());
@@ -57,7 +62,7 @@ class OtherProfileView extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            BackButton(color: Colors.white),
+                            BackButton(color: colorScheme.onPrimary),
                           ],
                         ),
                       ),
@@ -72,7 +77,7 @@ class OtherProfileView extends StatelessWidget {
                     child: Center(
                       child: CircleAvatar(
                         radius: 55,
-                        backgroundColor: Colors.white,
+                        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                         child: CircleAvatar(
                           radius: 50,
                           backgroundImage: u.avatarUrl.isNotEmpty
@@ -102,32 +107,57 @@ class OtherProfileView extends StatelessWidget {
               const SizedBox(height: 18),
 
               // ================= FOLLOW BUTTON =================
+              // ================= FOLLOW BUTTON =================
               if (!isMe)
-              Obx(() {
-                final followed = c.isFollowing.value;
+                Obx(() {
+                  final followed = c.isFollowing.value;
 
-                return ElevatedButton(
-                  onPressed: () {
-                    followed ? c.unfollow() : c.follow();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        followed ? Colors.grey.shade300 : Colors.black,
-                    foregroundColor:
-                        followed ? Colors.black : Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: Text(
-                    followed ? "Đang theo dõi" : "Theo dõi",
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                );
-              }),
+                  if (followed) {
+                    // ------------------ NÚT ĐANG THEO DÕI ------------------
+                    return OutlinedButton(
+                      onPressed: () => c.unfollow(),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 1.5,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: const Text(
+                        "Đang theo dõi",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    );
+                  } else {
+                    // ------------------ NÚT THEO DÕI ------------------
+                    return ElevatedButton(
+                      onPressed: () => c.follow(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        "Theo dõi",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    );
+                  }
+                }),
+
 
               const SizedBox(height: 20),
 
@@ -195,14 +225,20 @@ class OtherProfileView extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: 4,
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, index) => Container(
-                    width: 120,
-                    decoration: BoxDecoration(
-                      color: AppTheme.cardColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.borderColor),
-                    ),
-                  ),
+                  itemBuilder: (_, index) {
+                    final theme = Theme.of(context);
+                    final isDark = theme.brightness == Brightness.dark;
+                    return Container(
+                      width: 120,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
 

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
-Widget lightningIcon() {
+Widget lightningIcon(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  
   return Container(
     width: 36,
     height: 36,
@@ -9,17 +13,22 @@ Widget lightningIcon() {
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          Color(0xFF1F2937), // xám đậm
-          Color(0xFF111827), // xám rất đậm
-        ],
+        colors: isDark
+            ? [
+                AppTheme.darkSurface,
+                AppTheme.darkBackground,
+              ]
+            : [
+                AppTheme.lightSurface,
+                AppTheme.lightBackground,
+              ],
       ),
     ),
-    child: const Center(
+    child: Center(
       child: Icon(
         Icons.flash_on, // ⚡ icon tia sét
         size: 20,
-        color: Colors.white,
+        color: theme.colorScheme.onPrimary,
       ),
     ),
   );

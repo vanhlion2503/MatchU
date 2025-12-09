@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:matchu_app/theme/app_theme.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -11,16 +11,19 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SafeArea(
       bottom: false, 
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         height: 60,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.scaffoldBackgroundColor,
           border: Border(
             bottom: BorderSide(
-              color: Colors.grey.shade300, // 🔹 border bottom
+              color: theme.brightness == Brightness.dark 
+                  ? AppTheme.darkBorder 
+                  : AppTheme.lightBorder,
               width: 1,
             ),
           ),
@@ -42,10 +45,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.darkTextPrimary 
+                        : AppTheme.lightTextPrimary,
                   ),
                 ),
               ],
@@ -55,7 +59,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             Row(
               children: [
                 // Search icon
-                const Icon(Icons.search, size: 24),
+                Icon(Icons.search, size: 24, color: theme.iconTheme.color),
       
                 const SizedBox(width: 18),
       
@@ -63,16 +67,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    const Icon(Icons.notifications_none, size: 24),
+                    Icon(Icons.notifications_none, size: 24, color: theme.iconTheme.color),
                     Positioned(
                       right: -1,
                       top: -1,
                       child: Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.red,
+                          color: AppTheme.errorColor,
                         ),
                       ),
                     ),

@@ -31,7 +31,7 @@ class EnrollPhoneView extends StatelessWidget {
                 const SizedBox(height: 24),
                 Text("Chúng tôi cần số điện thoại của bạn để xác thực tài khoản và tăng cường bảo mật.",
                     style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                      color: AppTheme.textSecondaryColor,
+                      color: Theme.of(context).textTheme.bodySmall?.color,
                       fontWeight: FontWeight.w500,
                     ),
                 ),
@@ -52,7 +52,7 @@ class EnrollPhoneView extends StatelessWidget {
                 Text('Chúng tôi sẽ mã OTP qua tin nhắn SMS',
                     textAlign: TextAlign.start,
                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                            color: AppTheme.textSecondaryColor,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
                             fontWeight: FontWeight.w500,
                         ),
                     ),
@@ -64,12 +64,12 @@ class EnrollPhoneView extends StatelessWidget {
                           ? null
                           : c.sendEnrollOtp,
                       child: c.isLoadingRegister.value
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 22,
                               height: 22,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Gửi mã ngay'),

@@ -72,10 +72,12 @@ class _MainViewState extends State<MainView>
             Container(
               height: 95,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 border: Border(
                   top: BorderSide(
-                    color: AppTheme.borderColor,
+                    color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.darkBorder 
+                        : AppTheme.lightBorder,
                     width: 1,
                   ),
                 ),
@@ -88,7 +90,7 @@ class _MainViewState extends State<MainView>
                   if (index != 2) c.changePage(index);
                 },
                 selectedItemColor: AppTheme.primaryColor,
-                unselectedItemColor: AppTheme.textPrimaryColor,
+                unselectedItemColor: Theme.of(context).colorScheme.onSurface,
                 showSelectedLabels: false,
                 showUnselectedLabels: false,
 
@@ -169,15 +171,19 @@ class _MainViewState extends State<MainView>
                     CustomPaint(
                       size: const Size(80, 80),
                       painter: BottomHalfBorderPainter(
-                        color: AppTheme.borderColor,   // màu viền
+                        color: Theme.of(context).brightness == Brightness.dark 
+                            ? AppTheme.darkBorder 
+                            : AppTheme.lightBorder,   // màu viền
                         strokeWidth: 2,       // độ dày viền
                       ),
                       child: Container(
                         width: 80,
                         height: 80,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white,
+                          color: Theme.of(context).brightness == Brightness.dark 
+                                ? AppTheme.darkSurface 
+                                : AppTheme.lightSurface,
                         ),
                       ),
                     ),
@@ -192,9 +198,9 @@ class _MainViewState extends State<MainView>
                           color: AppTheme.primaryColor,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.bolt,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           size: 35,
                         ),
                       ),

@@ -14,8 +14,9 @@ class SearchUserView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           "Tìm bạn bè",
@@ -35,19 +36,29 @@ class SearchUserView extends StatelessWidget {
                   prefixIcon: Icon(Icons.search),
                   filled: true,
                   fillColor: suc.isFocused.value 
-                      ? Colors.white                     
-                      : Colors.grey.shade200,
+                      ? theme.colorScheme.background                     
+                      : (theme.brightness == Brightness.dark 
+                          ? AppTheme.darkBorder 
+                          : AppTheme.lightBorder).withOpacity(0.5),
                   contentPadding: const EdgeInsets.symmetric(
                     vertical: 8,
                     horizontal: 12,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(
+                      color: theme.brightness == Brightness.dark 
+                          ? AppTheme.darkBorder 
+                          : AppTheme.lightBorder,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+                    borderSide: BorderSide(
+                      color: theme.brightness == Brightness.dark 
+                          ? AppTheme.darkBorder 
+                          : AppTheme.lightBorder,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -67,10 +78,16 @@ class SearchUserView extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_search, size: 50, color: Colors.grey),
+                        Icon(
+                          Icons.person_search, 
+                          size: 50, 
+                          color: theme.textTheme.bodySmall?.color,
+                        ),
                         SizedBox(height: 10),
-                        Text("Không tìm thấy người dùng",
-                            style: TextStyle(color: Colors.grey)),
+                        Text(
+                          "Không tìm thấy người dùng",
+                          style: TextStyle(color: theme.textTheme.bodySmall?.color),
+                        ),
                       ],
                     ),
                   );
@@ -117,8 +134,7 @@ class SearchUserView extends StatelessWidget {
                                     child: user.avatarUrl.isEmpty
                                         ? Text(
                                             user.nickname[0].toUpperCase(),
-                                            style: TextStyle(
-                                              fontSize: 18,
+                                            style: textTheme.bodyLarge?.copyWith(
                                               fontWeight: FontWeight.bold,
                                             ),
                                           )
@@ -134,14 +150,15 @@ class SearchUserView extends StatelessWidget {
                                       children: [
                                         Text(
                                           user.fullname,
-                                          style: TextStyle(
-                                            fontSize: 16,
+                                          style: textTheme.bodyLarge?.copyWith(
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                         Text(
                                           "@${user.nickname}",
-                                          style: TextStyle(color: Colors.grey[600]),
+                                          style: textTheme.bodyMedium?.copyWith(
+                                            color: theme.textTheme.bodySmall?.color,
+                                          ),
                                         ),
                                       ],
                                     ),

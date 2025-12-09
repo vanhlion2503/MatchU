@@ -29,7 +29,7 @@ class _LoginViewState extends State<LoginView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         toolbarHeight: 80,
         centerTitle: true,
@@ -50,7 +50,7 @@ class _LoginViewState extends State<LoginView> {
             Text(
               "Vui lòng nhập thông tin để đăng nhập.",
               style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: const Color.fromARGB(255, 78, 87, 92),
+                    color: Theme.of(context).textTheme.bodySmall?.color,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -133,30 +133,35 @@ class _LoginViewState extends State<LoginView> {
                 ),
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Divider(
-                      thickness: 1,
-                      color: AppTheme.borderColor,
-                    )
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      "Hoặc tiếp tục với",
-                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                            color: const Color.fromARGB(255, 56, 55, 55),
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Divider(
-                      thickness: 1,
-                      color: AppTheme.borderColor,
-                      )),
-                ],
+              Builder(
+                builder: (context) {
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          thickness: 1,
+                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        )
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          "Hoặc tiếp tục với",
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                                color: Theme.of(context).textTheme.bodySmall?.color,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          thickness: 1,
+                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                        )),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 24),
               Row(
@@ -173,13 +178,16 @@ class _LoginViewState extends State<LoginView> {
                         Text(
                           "Google",
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Colors.black,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: AppTheme.borderColor),
+                        side: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                              ? AppTheme.darkBorder 
+                              : AppTheme.lightBorder,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -197,19 +205,22 @@ class _LoginViewState extends State<LoginView> {
                       icon: Icon(
                         Icons.phone,
                         size: 40,
-                        color: Colors.black,
+                        color: Theme.of(context).iconTheme.color,
                         ),
                       label: 
                         Text(
                           "Số điện thoại",
                           style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            color: Colors.black,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: AppTheme.borderColor),
+                        side: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                              ? AppTheme.darkBorder 
+                              : AppTheme.lightBorder,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -230,7 +241,7 @@ class _LoginViewState extends State<LoginView> {
                         .textTheme
                         .bodyMedium!
                         .copyWith(
-                          color: AppTheme.textSecondaryColor,
+                          color: Theme.of(context).textTheme.bodySmall?.color,
                           fontWeight: FontWeight.w600,
                         ),
                   ),

@@ -24,7 +24,7 @@ class DisplayModeView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondaryColor,
+                color: Theme.of(context).textTheme.bodySmall?.color,
               ),
             ),
             const SizedBox(height: 16),
@@ -33,9 +33,13 @@ class DisplayModeView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.cardColor,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.borderColor),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? AppTheme.darkBorder 
+                      : AppTheme.lightBorder,
+                ),
               ),
               child: Obx(() => Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -85,16 +89,21 @@ class DisplayModeView extends StatelessWidget {
           const SizedBox(height: 8),
 
           // Radio chọn
-          Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected ? AppTheme.primaryColor : Colors.grey,
-                width: 2,
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isSelected 
+                        ? AppTheme.primaryColor 
+                        : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                    width: 2,
+                  ),
+                ),
             child: isSelected
                 ? Center(
                     child: Container(
@@ -107,6 +116,8 @@ class DisplayModeView extends StatelessWidget {
                     ),
                   )
                 : null,
+              );
+            },
           ),
         ],
       ),
@@ -120,19 +131,20 @@ class DisplayModeView extends StatelessWidget {
       height: 160,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.lightBackground,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.lightBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 6),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6),
         ],
       ),
       child: Column(
         children: [
-          Container(height: 40, color: Colors.grey[200]),
+          Container(height: 40, color: AppTheme.lightSurface),
           const SizedBox(height: 8),
           Expanded(
             child: Container(
-              color: Colors.grey[300],
+              color: AppTheme.lightBorder.withOpacity(0.3),
             ),
           ),
         ],
@@ -147,19 +159,20 @@ class DisplayModeView extends StatelessWidget {
       height: 160,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: AppTheme.darkBackground,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.darkBorder),
         boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 6),
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6),
         ],
       ),
       child: Column(
         children: [
-          Container(height: 40, color: Colors.grey[800]),
+          Container(height: 40, color: AppTheme.darkSurface),
           const SizedBox(height: 8),
           Expanded(
             child: Container(
-              color: Colors.grey[700],
+              color: AppTheme.darkBorder.withOpacity(0.5),
             ),
           ),
         ],

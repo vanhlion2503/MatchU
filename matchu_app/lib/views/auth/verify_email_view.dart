@@ -76,7 +76,7 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                     textAlign: TextAlign.center,
                     text: TextSpan(
                       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                        color: AppTheme.textSecondaryColor,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                       children: [
                         const TextSpan(
@@ -102,17 +102,16 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                     onPressed: openGmail,
                     icon: Icon(
                       Icons.open_in_new,
-                      color: Colors.black,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                     label: Text(
                       'Mở email',
                       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.backgroundColor,       
+                      backgroundColor: Theme.of(context).colorScheme.surface,       
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

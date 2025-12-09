@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/profile/following_controller.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
 class FollowingView extends StatelessWidget {
   final String userId;
@@ -30,7 +31,10 @@ class FollowingView extends StatelessWidget {
           return GestureDetector(
             behavior: HitTestBehavior.translucent,
             onTap: () {
-              Get.to(()=> OtherProfileView(userId: u.uid));
+              Get.to(
+                () => OtherProfileView(userId: u.uid),
+                preventDuplicates: false,   // 🔥 CHỐT QUAN TRỌNG
+              );
             },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -55,10 +59,21 @@ class FollowingView extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(u.fullname, style: textTheme.titleMedium),
+                            Text(u.fullname, 
+                            style: textTheme.titleMedium?.copyWith(
+                              color: Theme.of(context).brightness == Brightness.dark 
+                                  ? AppTheme.darkTextPrimary 
+                                  : AppTheme.lightTextPrimary,
+
+                              fontWeight: FontWeight.w800
+                            )
+                            ),
                             Text("@${u.nickname}",
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: Colors.grey)),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).brightness == Brightness.dark 
+                                  ? AppTheme.darkTextPrimary 
+                                  : AppTheme.lightTextPrimary,
+                                )),
                           ],
                         ),
                       ),

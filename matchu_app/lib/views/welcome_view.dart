@@ -50,7 +50,7 @@ class _WelcomeViewState extends State<WelcomeView>
     final height = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: AnimatedBuilder(
           animation: _animationController,
@@ -84,14 +84,14 @@ class _WelcomeViewState extends State<WelcomeView>
                                     .textTheme
                                     .headlineLarge!
                                     .copyWith(fontWeight: FontWeight.bold),
-                                children: const [
+                                children: [
                                   TextSpan(
                                     text: "Match",
                                     style: TextStyle(
-                                      color: AppTheme.textPrimaryColor,
+                                      color: Theme.of(context).colorScheme.onSurface,
                                     ),
                                   ),
-                                  TextSpan(
+                                  const TextSpan(
                                     text: "U",
                                     style: TextStyle(
                                       color: AppTheme.primaryColor,
@@ -111,7 +111,7 @@ class _WelcomeViewState extends State<WelcomeView>
                                   .textTheme
                                   .bodyLarge!
                                   .copyWith(
-                                    color: AppTheme.textSecondaryColor,
+                                    color: Theme.of(context).textTheme.bodySmall?.color,
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
@@ -126,20 +126,20 @@ class _WelcomeViewState extends State<WelcomeView>
                                 onPressed: () {
                                   Get.toNamed(AppRouter.register);
                                 },
-                                child: const Row(
+                                child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text(
+                                    const Text(
                                       "Bắt đầu ngay",
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    SizedBox(width: 10),
+                                    const SizedBox(width: 10),
                                     Icon(
                                       Icons.arrow_forward,
                                       size: 21,
-                                      color: Colors.white,
+                                      color: Theme.of(context).colorScheme.onPrimary,
                                     ),
                                   ],
                                 ),
@@ -158,7 +158,7 @@ class _WelcomeViewState extends State<WelcomeView>
                                       .textTheme
                                       .bodyMedium!
                                       .copyWith(
-                                        color: AppTheme.textSecondaryColor,
+                                        color: Theme.of(context).textTheme.bodySmall?.color,
                                         fontWeight: FontWeight.w600,
                                       ),
                                 ),
@@ -194,7 +194,7 @@ class _WelcomeViewState extends State<WelcomeView>
                               .textTheme
                               .bodyLarge!
                               .copyWith(
-                                color: AppTheme.textSecondaryColor,
+                                color: Theme.of(context).textTheme.bodySmall?.color,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),

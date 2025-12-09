@@ -55,22 +55,34 @@ class _FollowTabViewState extends State<FollowTabView>
           appBar: AppBar(
             title: Text(
               user.nickname,
-              style: textTheme.titleLarge,
+              style: textTheme.titleLarge?.copyWith(
+                color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.darkTextPrimary 
+                        : AppTheme.lightTextPrimary,
+              ),
             ),
             centerTitle: true,
             elevation: 0,
             shadowColor: Colors.transparent,
             surfaceTintColor: Colors.transparent, // Quan trọng
-            bottom: TabBar(
-              controller: tabC,
-              labelColor: AppTheme.textPrimaryColor,
-              unselectedLabelColor: AppTheme.textSecondaryColor,
-              indicatorColor: AppTheme.textPrimaryColor,
-              dividerColor: Colors.transparent,   // Quan trọng
-              tabs: const [
-                Tab(text: "Người theo dõi"),
-                Tab(text: "Đang theo dõi"),
-              ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(48),
+              child: Builder(
+                builder: (context) {
+                  final theme = Theme.of(context);
+                  return TabBar(
+                    controller: tabC,
+                    labelColor: theme.colorScheme.onSurface,
+                    unselectedLabelColor: theme.textTheme.bodySmall?.color,
+                    indicatorColor: theme.colorScheme.onSurface,
+                    dividerColor: Colors.transparent,   // Quan trọng
+                    tabs: const [
+                      Tab(text: "Người theo dõi"),
+                      Tab(text: "Đang theo dõi"),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
 

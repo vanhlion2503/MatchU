@@ -44,7 +44,7 @@ class OtpEnrollView extends StatelessWidget {
                     textAlign: TextAlign.center,
                     text: TextSpan(
                       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                        color: AppTheme.textSecondaryColor,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
                       ),
                       children: [
                         TextSpan(

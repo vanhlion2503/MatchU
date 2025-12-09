@@ -11,7 +11,7 @@ class RightSideMenu {
       context: context,
       barrierLabel: "Menu",
       barrierDismissible: true,
-      barrierColor: Colors.black26,
+      barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 280),
 
       pageBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -31,7 +31,7 @@ class RightSideMenu {
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.75,
                 height: double.infinity,
-                color: AppTheme.backgroundColor,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 child: SafeArea(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -56,7 +56,14 @@ class RightSideMenu {
                         },
                       ),
 
-                      Divider(color: AppTheme.borderColor),
+                      Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Divider(
+                            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                          );
+                        },
+                      ),
 
                       // ==== HOẠT ĐỘNG ====
                       sectionHeader("Hoạt động"),
@@ -76,7 +83,14 @@ class RightSideMenu {
                         onTap: () => Get.toNamed("/following-list"),
                       ),
 
-                      Divider(color: AppTheme.borderColor),
+                      Builder(
+                        builder: (context) {
+                          final isDark = Theme.of(context).brightness == Brightness.dark;
+                          return Divider(
+                            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                          );
+                        },
+                      ),
 
                       // ==== CÀI ĐẶT ====
                       sectionHeader("Hệ thống"),
@@ -121,16 +135,20 @@ class RightSideMenu {
 
   // ===== PHẦN HEADER =====
   static Widget sectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: AppTheme.textSecondaryColor,
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+    return Builder(
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: Theme.of(context).textTheme.bodySmall?.color,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -141,38 +159,43 @@ class RightSideMenu {
     required VoidCallback onTap,
     bool danger = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: danger ? Colors.red : AppTheme.primaryColor,
-              size: 22,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: danger
-                      ? Colors.red
-                      : AppTheme.textPrimaryColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: danger ? AppTheme.errorColor : AppTheme.primaryColor,
+                  size: 22,
                 ),
-              ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      color: danger
+                          ? AppTheme.errorColor
+                          : theme.colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.textTheme.bodySmall?.color,
+                ),
+              ],
             ),
-            Icon(
-              Icons.chevron_right,
-              color: AppTheme.textSecondaryColor,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

@@ -8,6 +8,9 @@ Widget genderButton(
   required bool isSelected,
   required VoidCallback onTap,
 }) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  
   return Expanded(
     child: GestureDetector(
       onTap: onTap,
@@ -22,17 +25,17 @@ Widget genderButton(
           border: Border.all(
             color: isSelected
                 ? AppTheme.primaryColor
-                : AppTheme.borderColor,
+                : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
             width: 1.5,
           ),
         ),
         child: Center(
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+            style: theme.textTheme.bodyMedium!.copyWith(
                   color: isSelected
                       ? AppTheme.primaryColor
-                      : AppTheme.textSecondaryColor,
+                      : (isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
                   fontWeight:
                       isSelected ? FontWeight.bold : FontWeight.w600,
                 ),
