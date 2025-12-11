@@ -46,6 +46,7 @@ dependencies:
   pinput: ^5.0.0
   iconsax: ^0.0.8
   get_storage: ^2.1.1
+  firebase_database: ^12.1.0
 
 
 dev_dependencies:

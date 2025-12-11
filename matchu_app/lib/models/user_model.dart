@@ -70,7 +70,7 @@ class UserModel {
     this.trustWarnings = 0,
     this.totalReports = 0,
 
-    this.avgChatRating = 0.0,
+    this.avgChatRating = 5.0,
     this.totalChatRatings = 0,
 
     this.followers = const [],
@@ -184,7 +184,7 @@ class UserModel {
       trustWarnings: json["trustWarnings"] ?? 0,
       totalReports: json["totalReports"] ?? 0,
 
-      avgChatRating: (json["avgChatRating"] ?? 0).toDouble(),
+      avgChatRating: (json["avgChatRating"] ?? 5.0).toDouble(),
       totalChatRatings: json["totalChatRatings"] ?? 0,
 
       followers: List<String>.from(json["followers"] ?? []),
