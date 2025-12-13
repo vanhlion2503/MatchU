@@ -56,14 +56,16 @@ class MatchingController extends GetxController {
 
     // 2️⃣ Wait for room
     _roomSub = _firestore
-        .collection("tempChats")
-        .where("participants", arrayContains: fbUser.uid)
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.docs.isNotEmpty) {
-        _go(snapshot.docs.first.id);
-      }
-    });
+      .collection("tempChats")
+      .where("participants", arrayContains: fbUser.uid)
+      .where("status", isEqualTo: "active")
+      .snapshots()
+      .listen((snapshot) {
+    if (snapshot.docs.isEmpty) return;
+
+    _go(snapshot.docs.first.id);
+  });
+
   }
 
   // =========================================================

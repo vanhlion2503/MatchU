@@ -88,7 +88,7 @@ class MatchingService {
 
       if (putRes.statusCode != 200) continue;
 
-      final roomId = await _getOrCreateRoom(seeker.uid, oppUid);
+      final roomId = await _createNewRoom(seeker.uid, oppUid);
 
       await _cleanupAfterMatch(seeker.uid, oppUid, child.key!);
       return roomId;
@@ -143,16 +143,7 @@ class MatchingService {
   }
 
   // =========================================================
-  Future<String> _getOrCreateRoom(String a, String b) async {
-    final q = await _firestore
-        .collection("tempChats")
-        .where("participants", arrayContains: a)
-        .get();
-
-    for (final d in q.docs) {
-      final p = List<String>.from(d["participants"]);
-      if (p.contains(b)) return d.id;
-    }
+  Future<String> _createNewRoom(String a, String b) async {
 
     final ref = _firestore.collection("tempChats").doc();
     await ref.set({
