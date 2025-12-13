@@ -17,5 +17,7 @@ class AppRouter {
   static const String settings = '/settings';
   static const String searchUser = '/search-user';
   static const String displayMode = '/display-mode';
-
+  
+  static const String matching = '/matching';
+  static const String tempChat = '/tempChat';
 }

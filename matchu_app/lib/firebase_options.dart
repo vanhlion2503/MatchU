@@ -48,6 +48,7 @@ class DefaultFirebaseOptions {
     authDomain: 'matchu-5bd75.firebaseapp.com',
     storageBucket: 'matchu-5bd75.firebasestorage.app',
     measurementId: 'G-BSMNF0TB65',
+    // databaseURL: 'https://matchu-5bd75-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -56,6 +57,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '758089818242',
     projectId: 'matchu-5bd75',
     storageBucket: 'matchu-5bd75.firebasestorage.app',
+    // databaseURL: 'https://matchu-5bd75-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -65,6 +67,7 @@ class DefaultFirebaseOptions {
     projectId: 'matchu-5bd75',
     storageBucket: 'matchu-5bd75.firebasestorage.app',
     iosBundleId: 'com.example.matchuApp',
+    // databaseURL: 'https://matchu-5bd75-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -74,6 +77,7 @@ class DefaultFirebaseOptions {
     projectId: 'matchu-5bd75',
     storageBucket: 'matchu-5bd75.firebasestorage.app',
     iosBundleId: 'com.example.matchuApp',
+    // databaseURL: 'https://matchu-5bd75-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -84,5 +88,6 @@ class DefaultFirebaseOptions {
     authDomain: 'matchu-5bd75.firebaseapp.com',
     storageBucket: 'matchu-5bd75.firebasestorage.app',
     measurementId: 'G-BER51CBXPZ',
+    // databaseURL: 'https://matchu-5bd75-default-rtdb.asia-southeast1.firebasedatabase.app',
   );
 }

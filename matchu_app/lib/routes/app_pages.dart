@@ -4,6 +4,7 @@ import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/auth/enroll_phone_view.dart';
 import 'package:matchu_app/views/auth/otp_enroll_view.dart';
 import 'package:matchu_app/views/auth/verify_email_view.dart';
+import 'package:matchu_app/views/matching/matching_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
@@ -15,6 +16,8 @@ import 'package:matchu_app/views/home_view.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/views/main_view.dart';
 import 'package:matchu_app/views/welcome_view.dart';
+import 'package:matchu_app/controllers/matching/matching_controller.dart';
+import 'package:matchu_app/views/chat/temp_chat_view.dart';
 
 class AppPages {
   static const initial = AppRouter.splash;
@@ -85,5 +88,20 @@ class AppPages {
       name: AppRouter.displayMode,
       page: () => DisplayModeView(),
     ),
+    
+    GetPage(
+      name: AppRouter.matching,
+      page: () => MatchingView(),
+      binding: BindingsBuilder(() {
+        Get.put(MatchingController());
+      }),
+    ),
+
+    /// TEMP CHAT ROOM
+    GetPage(
+      name: AppRouter.tempChat,
+      page: () => TempChatView(),
+    ),
+
   ];
 }
