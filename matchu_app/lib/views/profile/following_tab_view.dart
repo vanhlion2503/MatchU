@@ -33,7 +33,7 @@ class FollowingView extends StatelessWidget {
             onTap: () {
               Get.to(
                 () => OtherProfileView(userId: u.uid),
-                preventDuplicates: false,   // 🔥 CHỐT QUAN TRỌNG
+                preventDuplicates: false,  
               );
             },
             child: Padding(

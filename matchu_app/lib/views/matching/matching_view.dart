@@ -23,6 +23,13 @@ class _MatchingViewState extends State<MatchingView> {
   }
 
   @override
+  void dispose() {
+    /// 🔥 QUAN TRỌNG: cleanup khi view bị huỷ
+    controller.stopMatching();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -46,10 +53,7 @@ class _MatchingViewState extends State<MatchingView> {
             children: const [
               CircularProgressIndicator(),
               SizedBox(height: 20),
-              Text(
-                "Đang tìm người phù hợp...",
-                style: TextStyle(fontSize: 16),
-              ),
+              Text("Đang tìm người phù hợp..."),
             ],
           );
         }),
@@ -57,3 +61,4 @@ class _MatchingViewState extends State<MatchingView> {
     );
   }
 }
+

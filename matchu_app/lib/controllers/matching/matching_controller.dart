@@ -7,68 +7,88 @@ import '../../services/chat/matching_service.dart';
 import '../auth/auth_controller.dart';
 
 class MatchingController extends GetxController {
-  final MatchingService _matchingService = MatchingService();
+  final MatchingService _service = MatchingService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final isSearching = false.obs;
   final isMatched = false.obs;
-  final currentRoomId = RxnString();
 
-  StreamSubscription? _roomListener;
+  StreamSubscription<QuerySnapshot>? _roomSub;
 
   // =========================================================
   // START MATCHING
   // =========================================================
-  Future<void> startMatching({
-    required String targetGender,
-  }) async {
+  Future<void> startMatching({required String targetGender}) async {
     if (isSearching.value) return;
 
     final auth = Get.find<AuthController>();
-    final fbUser = auth.user; // 🔥 FIX 1
+    final fbUser = auth.user;
     if (fbUser == null) return;
-
-    /// 🔥 FIX 2: load hồ sơ user từ Firestore
-    final userSnap =
-        await _firestore.collection("users").doc(fbUser.uid).get();
-
-    if (!userSnap.exists) {
-      Get.snackbar("Lỗi", "Không tìm thấy hồ sơ người dùng");
-      return;
-    }
-
-    final data = userSnap.data()!;
 
     isSearching.value = true;
     isMatched.value = false;
-    currentRoomId.value = null;
+
+    // Load profile
+    final snap =
+        await _firestore.collection("users").doc(fbUser.uid).get();
+    if (!snap.exists) {
+      isSearching.value = false;
+      return;
+    }
+
+    final data = snap.data()!;
 
     final seeker = QueueUserModel(
       uid: fbUser.uid,
       gender: data["gender"],
       targetGender: targetGender,
-      avgChatRating: (data["avgChatRating"] ?? 0).toDouble(),
-      interests: List<String>.from(data["interests"] ?? []),
+      avgChatRating: 0,
+      interests: const [],
       createdAt: DateTime.now(),
     );
 
-    print("🔍 START MATCHING: ${seeker.uid}");
-
-    /// 1️⃣ Try match immediately
-    final roomId = await _matchingService.matchUser(seeker);
-
+    // 1️⃣ Try match immediately
+    final roomId = await _service.matchUser(seeker);
     if (roomId != null) {
-      _onMatched(roomId);
+      _go(roomId);
       return;
     }
 
-    /// 2️⃣ Not matched → listen for room
-    _listenForRoom(seeker.uid);
+    // 2️⃣ Wait for room
+    _roomSub = _firestore
+        .collection("tempChats")
+        .where("participants", arrayContains: fbUser.uid)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        _go(snapshot.docs.first.id);
+      }
+    });
   }
 
+  // =========================================================
+  // NAVIGATE TO ROOM
+  // =========================================================
+  void _go(String roomId) async {
+    if (isMatched.value) return;
+
+    isMatched.value = true;
+    isSearching.value = false;
+
+    _roomSub?.cancel();
+    _roomSub = null;
+
+    // Unlock user khi nhận được room (cho cả user đang match và user đang đợi)
+    final user = Get.find<AuthController>().user;
+    if (user != null) {
+      await _service.forceUnlock(user.uid);
+    }
+
+    Get.offNamed("/tempChat", arguments: {"roomId": roomId});
+  }
 
   // =========================================================
-  // STOP MATCHING (USER CANCEL)
+  // STOP MATCHING
   // =========================================================
   Future<void> stopMatching() async {
     if (!isSearching.value) return;
@@ -76,62 +96,13 @@ class MatchingController extends GetxController {
     final user = Get.find<AuthController>().user;
     if (user == null) return;
 
-    print("🛑 STOP MATCHING: ${user.uid}");
+    await _service.dequeue(user.uid);
 
-    await _matchingService.dequeue(user.uid);
-
-    await _roomListener?.cancel();
-    _roomListener = null;
+    await _roomSub?.cancel();
+    _roomSub = null;
 
     isSearching.value = false;
     isMatched.value = false;
-    currentRoomId.value = null;
-  }
-
-  // =========================================================
-  // LISTEN FOR ROOM CREATION
-  // =========================================================
-  void _listenForRoom(String uid) {
-    print("👂 LISTEN tempChats for $uid");
-
-    _roomListener = _firestore
-        .collection("tempChats")
-        .where(Filter.or(
-          Filter("userA", isEqualTo: uid),
-          Filter("userB", isEqualTo: uid),
-        ))
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.docs.isEmpty) return;
-
-      final doc = snapshot.docs.first;
-      final roomId = doc.id;
-
-      print("💘 ROOM FOUND: $roomId");
-      _onMatched(roomId);
-    });
-  }
-
-  // =========================================================
-  // MATCH SUCCESS HANDLER
-  // =========================================================
-  Future<void> _onMatched(String roomId) async {
-    if (isMatched.value) return;
-
-    print("🎉 MATCHED → room $roomId");
-
-    isMatched.value = true;
-    isSearching.value = false;
-    currentRoomId.value = roomId;
-
-    await _roomListener?.cancel();
-    _roomListener = null;
-
-    /// Điều hướng sang màn chat
-    Get.offNamed(
-      "/tempChat",
-      arguments: {"roomId": roomId},
-    );
   }
 
   // =========================================================
@@ -139,7 +110,8 @@ class MatchingController extends GetxController {
   // =========================================================
   @override
   void onClose() {
-    _roomListener?.cancel();
+    stopMatching();
     super.onClose();
   }
+
 }
