@@ -48,6 +48,7 @@ dependencies:
   get_storage: ^2.1.1
   firebase_database: ^12.1.0
   cloud_functions: ^6.0.4
+  simple_ripple_animation: ^0.1.0
 
 
 dev_dependencies:

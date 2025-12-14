@@ -20,7 +20,7 @@ class AppTheme {
   static const Color darkTextSecondary = Color(0xFFB5B5B5);
   static const Color darkBorder = Color(0xFF2F2F2F);
 
-  static const Color errorColor = Color(0xFFE17055);
+  static const Color errorColor = Color.fromARGB(255, 241, 28, 28);
   static const Color successColor = Color(0xFF00B894);
 
   // =======================================================

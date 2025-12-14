@@ -15,12 +15,31 @@ class MatchingController extends GetxController {
 
   StreamSubscription<QuerySnapshot>? _roomSub;
 
+  final elapsedSeconds = 0.obs;
+  Timer? _timer;
+
+  void startTimer(){
+    _timer?.cancel();
+    elapsedSeconds.value =0;
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) {
+        elapsedSeconds.value++;
+      },
+    );
+  }
+
+  void stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   // =========================================================
   // START MATCHING
   // =========================================================
   Future<void> startMatching({required String targetGender}) async {
     if (isSearching.value) return;
-
+    startTimer();
     final auth = Get.find<AuthController>();
     final fbUser = auth.user;
     if (fbUser == null) return;
@@ -80,12 +99,13 @@ class MatchingController extends GetxController {
     _roomSub?.cancel();
     _roomSub = null;
 
-    // Unlock user khi nhận được room (cho cả user đang match và user đang đợi)
     final user = Get.find<AuthController>().user;
     if (user != null) {
       await _service.forceUnlock(user.uid);
     }
 
+    await Future.delayed(const Duration(milliseconds: 1500));
+    
     Get.offNamed("/tempChat", arguments: {"roomId": roomId});
   }
 
@@ -94,6 +114,7 @@ class MatchingController extends GetxController {
   // =========================================================
   Future<void> stopMatching() async {
     if (!isSearching.value) return;
+    stopTimer();
 
     final user = Get.find<AuthController>().user;
     if (user == null) return;
@@ -113,6 +134,7 @@ class MatchingController extends GetxController {
   @override
   void onClose() {
     stopMatching();
+    stopTimer();
     super.onClose();
   }
 

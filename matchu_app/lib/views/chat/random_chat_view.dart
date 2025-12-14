@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
+import 'package:iconsax/iconsax.dart';
 
 class RandomChatView extends StatefulWidget {
   const RandomChatView({super.key});
@@ -16,7 +17,7 @@ class _RandomChatViewState extends State<RandomChatView>
 
   late final AnimationController _rippleController;
   final _matchingService = MatchingService();
-  String selectedTarget = "anyone";
+  String selectedTarget = "random";
 
   @override
   void initState() {
@@ -70,6 +71,23 @@ class _RandomChatViewState extends State<RandomChatView>
           ),
         ],
       ),
+      actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 15),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.6),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+              ),
+            ),
+            child: IconButton(
+              icon: const Icon(Iconsax.messages, size: 25,),
+              onPressed: () {
+              },
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
