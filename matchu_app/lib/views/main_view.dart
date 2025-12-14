@@ -5,7 +5,7 @@ import 'package:matchu_app/views/game/game_view.dart';
 import 'package:matchu_app/views/home_view.dart';
 import 'package:matchu_app/views/nearby/nearby_view.dart';
 import 'package:matchu_app/views/profile/profile_view.dart';
-import 'package:matchu_app/views/random_chat/random_chat_view.dart';
+import 'package:matchu_app/views/chat/random_chat_view.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/widgets/main_widget/bottom_half_border_painter.dart';
