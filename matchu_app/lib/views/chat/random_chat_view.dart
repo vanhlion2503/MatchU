@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/matching/matching_controller.dart';
 
 class RandomChatView extends StatefulWidget {
   const RandomChatView({super.key});
@@ -16,6 +17,7 @@ class _RandomChatViewState extends State<RandomChatView>
     with SingleTickerProviderStateMixin {
 
   late final AnimationController _rippleController;
+  final controller = Get.find<MatchingController>();
   final _matchingService = MatchingService();
   String selectedTarget = "random";
 
@@ -171,6 +173,7 @@ class _RandomChatViewState extends State<RandomChatView>
                 height: 60,
                 child: ElevatedButton(
                   onPressed:() {
+                    controller.isMinimized.value = false;
                     Get.toNamed(
                       "/matching",
                       arguments: {"targetGender": selectedTarget},

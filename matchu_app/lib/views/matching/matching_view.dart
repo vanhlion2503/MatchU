@@ -19,16 +19,26 @@ class _MatchingViewState extends State<MatchingView>
   final controller = Get.find<MatchingController>();
   late final AnimationController? _lineController;
 
-
   @override
   void initState() {
     super.initState();
 
-    final args = Get.arguments as Map<String, dynamic>;
-    final targetGender = args["targetGender"] as String;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.startMatching(targetGender: targetGender);
+      // Nếu đang match hoặc đã match thì chỉ hiển thị UI
+      if (controller.isSearching.value ||
+          controller.isMatched.value) {
+        return;
+      }
+
+      controller.isMinimized.value = false;
+
+      final args = Get.arguments as Map<String, dynamic>?;
+
+      if (args != null && args["targetGender"] is String) {
+        controller.startMatching(
+          targetGender: args["targetGender"],
+        );
+      }
     });
 
     _lineController = AnimationController(
@@ -37,9 +47,9 @@ class _MatchingViewState extends State<MatchingView>
     )..repeat();
   }
 
+
   @override
   void dispose() {
-    controller.stopMatching();
     _lineController?.dispose();
     super.dispose();
   }
@@ -86,6 +96,8 @@ class _MatchingViewState extends State<MatchingView>
             child: IconButton(
               icon: const Icon(Iconsax.home_2, size: 25,),
               onPressed: () {
+                controller.isMinimized.value = true;
+                Get.back();
               },
             ),
           ),
@@ -153,23 +165,33 @@ class _MatchingViewState extends State<MatchingView>
                 _matchTimer(theme),
 
                 const Spacer(),
-                SizedBox(
-                  width: 300,
-                  height: 60,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.error, // 👈 màu nút
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                Obx(() {
+                  return AnimatedOpacity(
+                    duration: const Duration(milliseconds: 300),
+                    opacity: controller.canCancel.value ? 1 : 0,
+                    child: IgnorePointer(
+                      ignoring: !controller.canCancel.value,
+                      child: SizedBox(
+                        width: 300,
+                        height: 60,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.colorScheme.error,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          onPressed: () async {
+                            await controller.stopMatching();
+                            Get.back();
+                          },
+                          child: const Text("Hủy tìm kiếm"),
+                        ),
+                      ),
                     ),
-                  ),
-                    onPressed:() async {
-                      await controller.stopMatching();
-                      Get.back();
-                    }, 
-                    child: Text("Hủy tìm kiếm")),
-                ),
+                  );
+                }),
                 const SizedBox(height: 50),
               ],
             ),

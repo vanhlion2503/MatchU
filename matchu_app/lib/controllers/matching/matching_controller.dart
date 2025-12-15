@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -12,6 +13,14 @@ class MatchingController extends GetxController {
 
   final isSearching = false.obs;
   final isMatched = false.obs;
+  final isMatchingActive = false.obs;
+  final isMinimized = false.obs;
+  final canCancel = false.obs;
+
+
+  final targetGender = RxnString();
+  final bubbleOffset = Offset(20, 200).obs;
+
 
   StreamSubscription<QuerySnapshot>? _roomSub;
 
@@ -39,13 +48,22 @@ class MatchingController extends GetxController {
   // =========================================================
   Future<void> startMatching({required String targetGender}) async {
     if (isSearching.value) return;
+    this.targetGender.value = targetGender;
+    isMatchingActive.value = true;
+    canCancel.value = false;
     startTimer();
+    Future.delayed(const Duration(seconds: 1), () {
+      if (isSearching.value && !isMatched.value) {
+        canCancel.value = true;
+      }
+    });
     final auth = Get.find<AuthController>();
     final fbUser = auth.user;
     if (fbUser == null) return;
 
     isSearching.value = true;
     isMatched.value = false;
+    isMinimized.value = false;
 
     // Load profile
     final snap =
@@ -95,6 +113,8 @@ class MatchingController extends GetxController {
 
     isMatched.value = true;
     isSearching.value = false;
+    canCancel.value = false;
+
 
     _roomSub?.cancel();
     _roomSub = null;
@@ -115,7 +135,6 @@ class MatchingController extends GetxController {
   Future<void> stopMatching() async {
     if (!isSearching.value) return;
     stopTimer();
-
     final user = Get.find<AuthController>().user;
     if (user == null) return;
 
@@ -126,6 +145,9 @@ class MatchingController extends GetxController {
 
     isSearching.value = false;
     isMatched.value = false;
+    isMatchingActive.value = false;
+    canCancel.value = false;
+
   }
 
   // =========================================================

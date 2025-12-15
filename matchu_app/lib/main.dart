@@ -8,7 +8,8 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/theme_controller.dart';
-
+import 'package:matchu_app/widgets/global_matching_bubble.dart';
+import 'package:matchu_app/controllers/matching/matching_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,8 @@ void main() async {
   // GetX controllers
   Get.put(ThemeController(), permanent: true);
   Get.put(AuthController(), permanent: true);
+  Get.put(MatchingController(), permanent: true);
+
 
   runApp(const MyApp());
 }
@@ -43,6 +46,18 @@ class MyApp extends StatelessWidget {
           initialRoute: AppPages.initial,
           getPages: AppPages.routes,
           debugShowCheckedModeBanner: false,
+
+          // ⭐ QUAN TRỌNG NHẤT
+          builder: (context, child) {
+            return Stack(
+              children: [
+                child!,
+
+                GlobalMatchingBubble(),
+              ],
+            );
+          },
         ));
   }
 }
+

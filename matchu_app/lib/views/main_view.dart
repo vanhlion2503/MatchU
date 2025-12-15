@@ -195,7 +195,14 @@ class _MainViewState extends State<MainView>
                         width: 68,
                         height: 68,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor,
+                        gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(context).colorScheme.secondary,
+                            ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
