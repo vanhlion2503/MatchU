@@ -8,7 +8,7 @@ class AppTheme {
 
   // Light
   static const Color lightBackground = Color(0xFFFFFFFF);
-  static const Color lightSurface = Color(0xFFF8FAFD);
+  static const Color lightSurface = Color(0xFFF3F6FA);
   static const Color lightTextPrimary = Color(0xFF2D3436);
   static const Color lightTextSecondary = Color(0xFF636E73);
   static const Color lightBorder = Color(0xFFE5EAF0);
@@ -187,6 +187,27 @@ class AppTheme {
       ),
     ),
 
+    chipTheme: ChipThemeData(
+      backgroundColor: lightSurface,
+      selectedColor: primaryColor.withOpacity(0.15),
+      disabledColor: lightBorder,
+      labelStyle: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: lightTextPrimary,
+      ),
+      secondaryLabelStyle: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      side: BorderSide(color: lightBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    ),
+
+
     
   );
 
@@ -347,6 +368,27 @@ class AppTheme {
         ),
       ),
     ),
+
+    chipTheme: ChipThemeData(
+      backgroundColor: darkSurface,
+      selectedColor: primaryColor.withOpacity(0.25),
+      disabledColor: darkBorder,
+      labelStyle: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: darkTextPrimary,
+      ),
+      secondaryLabelStyle: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+      side: BorderSide(color: darkBorder),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+    ),
+
 
   );
 }

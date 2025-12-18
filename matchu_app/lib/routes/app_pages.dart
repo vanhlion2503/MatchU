@@ -17,7 +17,7 @@ import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/views/main_view.dart';
 import 'package:matchu_app/views/welcome_view.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
-import 'package:matchu_app/views/chat/temp_chat_view.dart';
+import 'package:matchu_app/views/chat/temp_chat/temp_chat_view.dart';
 
 class AppPages {
   static const initial = AppRouter.splash;

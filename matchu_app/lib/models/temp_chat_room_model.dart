@@ -14,7 +14,7 @@ class TempChatRoomModel {
   final bool userALiked;
   final bool userBLiked;
 
-  final String status; // active | expired | matched | rejected
+  final String status;
 
   TempChatRoomModel({
     required this.roomId,
