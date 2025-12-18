@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
 import '../auth/auth_controller.dart';
 import 'dart:async';
+import 'package:flutter/services.dart'; 
 
 class TempChatController extends GetxController {
   final String roomId;
@@ -16,6 +18,9 @@ class TempChatController extends GetxController {
   final userLiked = RxnBool();
   final otherLiked = RxnBool();
   final isTyping = false.obs;
+  final hasLeft = false.obs;
+  final hasSent30sWarning = false.obs;
+
 
   Timer? _timer;
   StreamSubscription? _roomSub;
@@ -28,9 +33,27 @@ class TempChatController extends GetxController {
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       remainingSeconds.value--;
-      if (remainingSeconds.value <= 0) {
+      if (remainingSeconds.value == 30 &&
+        hasSent30sWarning.value == false) {
+
+        hasSent30sWarning.value = true;
+
+        final room = await service.getRoom(roomId);
+        final isA = room["userA"] == uid;
+
+        if (isA) {
+          await service.sendSystemMessage(
+            roomId: roomId,
+            text: "⏰ Sắp hết giờ! Còn 30 giây",
+            code: "timeout30",
+            senderId: uid,
+          );
+        }
+      }
+      if (remainingSeconds.value <= 0 && hasLeft.value == false) {
+        hasLeft.value = true;
         endRoom("timeout");
       }
     });
@@ -55,11 +78,32 @@ class TempChatController extends GetxController {
       userLiked.value = isA ? data["userALiked"] : data["userBLiked"];
       otherLiked.value = isA ? data["userBLiked"] : data["userALiked"];
 
-      if (data["userALiked"] == false || data["userBLiked"] == false) {
-        await endRoom("dislike");
+      if (data["status"] == "ended") {
+
+        final matchController = Get.find<MatchingController>();
+        matchController.isMatched.value = false;
+        if (hasLeft.value == true) {
+          return;
+        }
+
+        // 👉 Người ở lại
+        Get.snackbar(
+          "Thông báo",
+          "Người kia đã rời phòng",
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 2),
+        );
+
+        Future.delayed(const Duration(seconds: 2), () {
+          Get.offNamed("/rating", arguments: {"roomId": roomId});
+        });
       }
 
+
+
       if (data["userALiked"] == true && data["userBLiked"] == true && data["status"] == "active") {
+        final matchController = Get.find<MatchingController>();
+        matchController.isMatched.value = false;
         final newRoomId = await service.convertToPermanent(roomId);
         Get.offNamed("/chat", arguments: {"roomId": newRoomId});
       }
@@ -77,11 +121,45 @@ class TempChatController extends GetxController {
   }
 
   Future<void> like(bool value) async{
+    if (userLiked.value != null) return;
+    HapticFeedback.lightImpact();
+
     await service.setLike(
       roomId: roomId, 
       uid: uid, 
-      value: value);
+      value: value
+    );
+    userLiked.value = value;
   }
+
+  Future<void> leaveByDislike() async {
+    if (hasLeft.value) return; // 🔒 chặn double tap
+    hasLeft.value = true;
+
+    _timer?.cancel();
+
+    final matchController = Get.find<MatchingController>();
+    matchController.isMatched.value = false;
+
+    // ❗ Chỉ set dislike nếu chưa like
+    if (userLiked.value == null) {
+      await service.setLike(
+        roomId: roomId,
+        uid: uid,
+        value: false,
+      );
+      userLiked.value = false;
+    }
+
+    await service.endRoom(
+      roomId: roomId,
+      uid: uid,
+      reason: "left",
+    );
+
+    Get.offAllNamed("/rating");
+  }
+
 
   @override
   void onClose() {
@@ -90,25 +168,7 @@ class TempChatController extends GetxController {
     super.onClose();
   }
 
-  Future<void> leaveRoom({String reason = "manual"}) async {
-    _timer?.cancel();
+  
 
-    final room = await service.getRoom(roomId);
-
-    // 🔥 Nếu room đã ended → CHỈ RỜI UI
-    if (room["status"] != "active") {
-      Get.offNamed("/rating", arguments: {"roomId": roomId});
-      return;
-    }
-
-    // 🔥 Chỉ user đầu tiên mới ghi Firestore
-    await service.endRoom(
-      roomId: roomId,
-      uid: uid,
-      reason: reason,
-    );
-
-    Get.offNamed("/rating", arguments: {"roomId": roomId});
-  }
 
 }

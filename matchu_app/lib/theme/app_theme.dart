@@ -8,7 +8,7 @@ class AppTheme {
 
   // Light
   static const Color lightBackground = Color(0xFFFFFFFF);
-  static const Color lightSurface = Color(0xFFF3F6FA);
+  static const Color lightSurface = Color(0xFFF8FAFD);
   static const Color lightTextPrimary = Color(0xFF2D3436);
   static const Color lightTextSecondary = Color(0xFF636E73);
   static const Color lightBorder = Color(0xFFE5EAF0);

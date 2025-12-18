@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:matchu_app/theme/app_theme.dart';
 
 class EnrollPhoneView extends StatelessWidget {
   const EnrollPhoneView({super.key});

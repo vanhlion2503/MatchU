@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 
 
+
 class TempChatService {
   final _db = FirebaseFirestore.instance;
 
@@ -28,36 +29,70 @@ class TempChatService {
   }
 
   Future<void> setLike({
-    required String roomId, 
-    required String uid, 
+    required String roomId,
+    required String uid,
     required bool value,
-    }) async {
-      final ref = _db.collection("tempChats").doc(roomId);
-      final snap = await ref.get();
+  }) async {
+    final ref = _db.collection("tempChats").doc(roomId);
+    final snap = await ref.get();
+    if (!snap.exists) return;
 
-      if(!snap.exists) return;
+    final data = snap.data()!;
+    final isA = data["userA"] == uid;
+    final otherUid = isA ? data["userB"] : data["userA"];
 
-      final data = snap.data() as Map<String, dynamic>;
+    await ref.update({
+      isA ? "userALiked" : "userBLiked": value,
+    });
 
-      if (uid != data["userA"] && uid != data["userB"]) return;
-
-      final isA = data["userA"] == uid;
-
-      await ref.update({
-        isA ? "userALiked" : "userBLiked": value,
+    // ❤️ SYSTEM MESSAGE CHỈ CHO ĐỐI PHƯƠNG
+    if (value == true) {
+      await ref.collection("messages").add({
+        "type": "system",
+        "systemCode": "like",
+        "text": "❤️ Đối phương đã thích bạn",
+        "senderId": uid,
+        "targetUid": otherUid,
+        "createdAt": FieldValue.serverTimestamp(),
       });
     }
+  }
 
   Future<void> endRoom({
     required String roomId,
     required String uid,
     required String reason,
   }) async {
-    await _db.collection("tempChats").doc(roomId).update({
-      "status": "ended",
-      "endedBy": uid,
-      "endedReason": reason,
-      "endedAt": FieldValue.serverTimestamp(),
+    final ref = _db.collection("tempChats").doc(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data()!;
+      if (data["status"] != "active") return;
+
+      // 1️⃣ Update room
+      tx.update(ref, {
+        "status": "ended",
+        "endedBy": uid,
+        "endedReason": reason,
+        "endedAt": FieldValue.serverTimestamp(),
+      });
+
+      // 2️⃣ System message
+      tx.set(
+        ref.collection("messages").doc(),
+        {
+          "type": "system",
+          "event": "ended",
+          "text": reason == "left"
+              ? "Người kia đã rời phòng"
+              : "Cuộc trò chuyện đã kết thúc",
+          "senderId": uid,
+          "createdAt": FieldValue.serverTimestamp(),
+        },
+      );
     });
   }
 
@@ -77,4 +112,24 @@ class TempChatService {
 
     return ref.id;
   }
+
+  Future<void> sendSystemMessage({
+    required String roomId,
+    required String text,
+    required String code,
+    required String senderId,
+  }) async {
+    await _db
+        .collection("tempChats")
+        .doc(roomId)
+        .collection("messages")
+        .add({
+      "type": "system",
+      "systemCode": code,
+      "text": text,
+      "senderId": senderId,
+      "createdAt": FieldValue.serverTimestamp(),
+    });
+  }
+
 }

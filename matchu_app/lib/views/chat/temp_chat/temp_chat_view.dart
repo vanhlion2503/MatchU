@@ -42,10 +42,6 @@ class TempChatView extends StatelessWidget {
             ],
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Iconsax.logout),
-          onPressed: () => _confirmLeave(controller,matchController,),
-        ),
 
         title: RichText(
           text: TextSpan(
@@ -109,35 +105,6 @@ class TempChatView extends StatelessWidget {
         ),
       )),
     );
-  }
-
-  Future<void> _confirmLeave(TempChatController controller, MatchingController matchController) async{
-    final ok = await Get.dialog<bool>(
-      AlertDialog(
-        title: Text(
-          "Thoát chat", 
-          style: Get.textTheme.headlineMedium,
-        ),
-        content: Text(
-          "Bạn có chắc muốn thoát chat không?",
-          style: Get.textTheme.headlineSmall,
-          ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: Text("Hủy"),
-          ),
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            child: Text("Thoát"),
-          ),
-        ],
-      )
-    );
-    if (ok == true) {
-      await controller.leaveRoom();
-      matchController.isMatched.value = false;
-    }
   }
 }
 
