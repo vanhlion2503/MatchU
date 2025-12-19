@@ -132,4 +132,20 @@ class TempChatService {
     });
   }
 
+  Future<void> setTyping({
+    required String roomId,
+    required String uid,
+    required bool typing,
+  }) async {
+    final ref = _db.collection("tempChats").doc(roomId);
+    final snap = await ref.get();
+    if (!snap.exists) return;
+    final data = snap.data()!;
+
+    final isA = data["userA"] == uid;
+
+    await ref.update({
+      "typing.${isA ? 'userA' : 'userB'}": typing,
+    });
+  }
 }

@@ -21,6 +21,7 @@ class TempChatView extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(

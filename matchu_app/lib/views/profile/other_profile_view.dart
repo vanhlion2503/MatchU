@@ -62,7 +62,11 @@ class OtherProfileView extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            BackButton(color: colorScheme.onPrimary),
+                            IconButton(
+                              onPressed: () => Get.back(),
+                              icon: const Icon(Icons.arrow_back_ios_new),
+                              color: colorScheme.onPrimary,
+                            ),
                           ],
                         ),
                       ),
@@ -106,7 +110,6 @@ class OtherProfileView extends StatelessWidget {
 
               const SizedBox(height: 18),
 
-              // ================= FOLLOW BUTTON =================
               // ================= FOLLOW BUTTON =================
               if (!isMe)
                 Obx(() {
@@ -175,31 +178,34 @@ class OtherProfileView extends StatelessWidget {
 
               // ================= FOLLOW STATS =================
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  statItem(
-                    "${u.followers.length}", 
-                    "Người theo dõi",
-                    textTheme,
-                    onTap: () {
-                      Get.to(() => FollowTabView(
-                        userId: c.user.value!.uid,
-                        initialIndex: 0,
-                        ));
-                    },
-                    ),
-                  statItem(
-                    "${u.following.length}", 
-                    "Đang theo dõi",
-                    textTheme,
-                    onTap: () {
-                      Get.to(() => FollowTabView(
-                        userId: c.user.value!.uid,
-                        initialIndex: 1,
-                        ));
-                    },
-                    ),
-                  statItem("Lv. ${u.rank}", "Rank", textTheme),
+                  Expanded(
+                    child: statItem(
+                      "${u.followers.length}", 
+                      "Người theo dõi",
+                      textTheme,
+                      onTap: () {
+                        Get.to(() => FollowTabView(
+                          userId: c.user.value!.uid,
+                          initialIndex: 0,
+                          ));
+                      },
+                      ),
+                  ),
+                  Expanded(
+                    child: statItem(
+                      "${u.following.length}", 
+                      "Đang theo dõi",
+                      textTheme,
+                      onTap: () {
+                        Get.to(() => FollowTabView(
+                          userId: c.user.value!.uid,
+                          initialIndex: 1,
+                          ));
+                      },
+                      ),
+                  ),
+                  Expanded(child: statItem("Lv. ${u.rank}", "Rank", textTheme)),
                 ],
               ),
 

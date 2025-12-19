@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
 class ChatRow extends StatelessWidget {
   final String text;
@@ -24,7 +25,9 @@ class ChatRow extends StatelessWidget {
     final theme = Theme.of(context);
 
     final bubbleColor =
-        isMe ? theme.colorScheme.primary : theme.colorScheme.surface;
+        isMe ? theme.colorScheme.primary : Theme.of(context).brightness == Brightness.dark 
+                                            ? theme.colorScheme.surface
+                                            : Color(0xFFEEF2F7);
     final textColor =
         isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
 

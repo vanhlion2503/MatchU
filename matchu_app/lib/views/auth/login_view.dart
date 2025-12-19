@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
+import 'package:iconsax/iconsax.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -30,35 +32,6 @@ class _LoginViewState extends State<LoginView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        toolbarHeight: 80,
-        centerTitle: true,
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.arrow_back_ios),
-        ),
-        title: Column(
-          children: [
-            Text(
-              "Chào mừng trở lại!",
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineLarge!
-                  .copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 16),
-            Text(
-              "Vui lòng nhập thông tin để đăng nhập.",
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-            ),
-          ],
-        ),
-      ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
@@ -66,6 +39,36 @@ class _LoginViewState extends State<LoginView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                BackCircleButton(
+                  offset: const Offset(-6, -8),
+                  size: 44,
+                  iconSize: 20,
+                ),
+                // ===== TITLE =====
+                Center(
+                  child: Text(
+                    "Chào mừng trở lại !",
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // ===== SUBTITLE =====
+                Center(
+                  child: Text(
+                    "Vui lòng nhập thông tin để đăng nhập.",
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey.shade600,
+                          fontSize: 15,
+                        ),
+                  ),
+                ),
+
+                const SizedBox(height: 25),
                 Text(
                   " Email",
                   style: Theme.of(context).textTheme.bodyLarge!.copyWith(
@@ -120,7 +123,7 @@ class _LoginViewState extends State<LoginView> {
                 );
               }),
               const SizedBox(height: 32),
-              SizedBox(
+              Obx(() => SizedBox(
                 width: double.infinity,
                 height: 65,
                 child: ElevatedButton(
@@ -131,7 +134,7 @@ class _LoginViewState extends State<LoginView> {
                       ? const CircularProgressIndicator()
                       : const Text("Đăng nhập"),
                 ),
-              ),
+              )),
               const SizedBox(height: 24),
               Builder(
                 builder: (context) {
@@ -203,7 +206,7 @@ class _LoginViewState extends State<LoginView> {
                       onPressed: () {
                       },
                       icon: Icon(
-                        Icons.phone,
+                        Iconsax.mobile,
                         size: 40,
                         color: Theme.of(context).iconTheme.color,
                         ),

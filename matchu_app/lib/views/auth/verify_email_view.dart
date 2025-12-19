@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class VerifyEmailView extends StatefulWidget {
@@ -51,9 +52,15 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.arrow_back_ios),
+        automaticallyImplyLeading: false,
+        leadingWidth: 56, // 👈 đủ chỗ cho nút tròn
+        leading: Align(
+          alignment: Alignment.centerLeft,
+          child: BackCircleButton(
+            offset: const Offset(10, 0),
+            size: 44,
+            iconSize: 20,
+          ),
         ),
         title:
         Text('Xác minh Email',

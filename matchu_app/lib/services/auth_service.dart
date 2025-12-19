@@ -146,7 +146,7 @@ class AuthService {
       "trustWarnings": 0,
       "totalReports": 0,
 
-      "avgChatRating": 0.0,
+      "avgChatRating": 5.0,
       "totalChatRatings": 0,
 
       "followers": [],

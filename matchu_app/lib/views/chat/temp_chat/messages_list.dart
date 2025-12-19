@@ -10,6 +10,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/temp_chat/chat_row.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/system_message_event.dart';
+import 'package:matchu_app/views/chat/temp_chat/typing_bubble_row.dart';
 
 class MessagesList extends StatelessWidget {
   final String roomId;
@@ -36,82 +37,92 @@ class MessagesList extends StatelessWidget {
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: docs.length + 1,
+          itemCount: docs.length + 2,
           itemBuilder: (_, i) {
-            // ================= HEADER =================
-            if (i == 0) {
-              return Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: theme.brightness == Brightness.dark
-                          ? AppTheme.darkBorder
-                          : AppTheme.lightBorder,
-                    ),
-                  ),
-                  child: Text(
-                    "Bắt đầu cuộc trò chuyện",
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+          // ================= HEADER =================
+          if (i == 0) {
+            return Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: theme.brightness == Brightness.dark
+                        ? AppTheme.darkBorder
+                        : AppTheme.lightBorder,
                   ),
                 ),
-              );
-            }
+                child: Text(
+                  "Bắt đầu cuộc trò chuyện",
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            );
+          }
 
-            final index = i - 1;
-            if (index < 0 || index >= docs.length) {
+          // ================= TYPING BUBBLE (CUỐI LIST) =================
+          if (i == docs.length + 1) {
+            return Obx(() {
+              if (!controller.otherTyping.value) {
+                return const SizedBox();
+              }
+              return const TypingBubbleRow();
+            });
+          }
+
+          // ================= MESSAGE =================
+          final index = i - 1;
+          if (index < 0 || index >= docs.length) {
+            return const SizedBox();
+          }
+
+          final doc = docs[index];
+          final data = doc.data() as Map<String, dynamic>;
+          final type = data["type"] ?? "text";
+
+          // ================= SYSTEM MESSAGE =================
+          if (type == "system") {
+            final code = data["systemCode"];
+            final senderId = data["senderId"];
+            final targetUid = data["targetUid"];
+
+            if (code == "like" && targetUid != uid) {
               return const SizedBox();
             }
 
-            final doc = docs[index];
-            final data = doc.data() as Map<String, dynamic>;
-            final type = data["type"] ?? "text";
-
-            // ================= SYSTEM MESSAGE =================
-            if (type == "system") {
-              final code = data["systemCode"];
-              final senderId = data["senderId"];
-              final targetUid = data["targetUid"];
-
-              // 👀 LIKE: chỉ hiện cho đối phương
-              if (code == "like" && targetUid != uid) {
-                return const SizedBox();
-              }
-
-              // 👀 END: không hiện cho người bấm thoát
-              if (code == "ended" && senderId == uid) {
-                return const SizedBox();
-              }
-
-              return SystemMessageEvent(
-                text: data["text"] ?? "",
-              );
+            if (code == "ended" && senderId == uid) {
+              return const SizedBox();
             }
 
-            // ================= TEXT MESSAGE =================
-            final isMe = data["senderId"] == uid;
-
-            final grouped = _shouldGroup(docs, index);
-            final showTime = _isLastInGroup(docs, index);
-
-            return AnimatedMessageBubble(
-              child: ChatRow(
-                text: data["text"] ?? "",
-                isMe: isMe,
-                showAvatar: !grouped && !isMe,
-                smallMargin: grouped,
-                showTime: showTime,
-                time: _formatTime(data["createdAt"]),
-              ),
+            return SystemMessageEvent(
+              text: data["text"] ?? "",
             );
-          },
+          }
+
+          // ================= TEXT MESSAGE =================
+          final isMe = data["senderId"] == uid;
+
+          final grouped = _shouldGroup(docs, index);
+          final showTime = _isLastInGroup(docs, index);
+
+          return AnimatedMessageBubble(
+            child: ChatRow(
+              text: data["text"] ?? "",
+              isMe: isMe,
+              showAvatar: !grouped && !isMe,
+              smallMargin: grouped,
+              showTime: showTime,
+              time: _formatTime(data["createdAt"]),
+            ),
+          );
+        },
+
         );
       },
     );

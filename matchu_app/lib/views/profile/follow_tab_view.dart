@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/follower_tab_view.dart';
 import 'package:matchu_app/views/profile/following_tab_view.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
 
 
 class FollowTabView extends StatefulWidget {
@@ -53,6 +54,16 @@ class _FollowTabViewState extends State<FollowTabView>
 
         return Scaffold(
           appBar: AppBar(
+            automaticallyImplyLeading: false,
+            leadingWidth: 56, // 👈 đủ chỗ cho nút tròn
+            leading: Align(
+              alignment: Alignment.centerLeft,
+              child: BackCircleButton(
+                offset: const Offset(10, 0),
+                size: 44,
+                iconSize: 20,
+              ),
+            ),
             title: Text(
               user.nickname,
               style: textTheme.titleLarge?.copyWith(

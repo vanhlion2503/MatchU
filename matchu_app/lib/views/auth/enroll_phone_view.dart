@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
 
 class EnrollPhoneView extends StatelessWidget {
   const EnrollPhoneView({super.key});
@@ -12,9 +13,15 @@ class EnrollPhoneView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.arrow_back_ios),
+        automaticallyImplyLeading: false,
+        leadingWidth: 56, // 👈 đủ chỗ cho nút tròn
+        leading: Align(
+          alignment: Alignment.centerLeft,
+          child: BackCircleButton(
+            offset: const Offset(10, 0),
+            size: 44,
+            iconSize: 20,
+          ),
         ),
         title: Text('Số điện thoại',
             style: Theme.of(context).textTheme.headlineMedium!.copyWith(

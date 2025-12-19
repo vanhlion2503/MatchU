@@ -103,100 +103,102 @@ class _MatchingViewState extends State<MatchingView>
           ),
         ],
       ),
-      body: Center(
-        child: Obx(() {
-          if (controller.isMatched.value) {
-            return _matchedSuccessView(theme);
-          }
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children:[
-                const SizedBox(height: 60),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _meAvatar(),
-                    SizedBox(width: 8,),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        // Khoảng cách giữa 2 avatar
-                        final lineWidth = MediaQuery.of(context).size.width * 0.4;
-
-                        return SizedBox(
-                          width: lineWidth,
-                          height: 60,
-                          child: _centerLine(),
-                        );
-                      },
-                    ),
-                    SizedBox(width: 8,),
-                    _strangerRipple(theme),
-                  ],
-                ),
-                const SizedBox(height: 100),
-                Text(
-                  "Đang tìm bạn chat...",
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.dark 
-                        ? AppTheme.darkTextPrimary
-                        : AppTheme.lightTextPrimary,
-                        ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Chúng tôi đang kết nối bạn với một người ngẫu nhiên phù hợp.",
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.hintColor),
-                ),
-
-                SizedBox(height: 40),
-
-                AnimatedDots(
-                  color: theme.colorScheme.primary,
-                  size: 10,
-                ),
-
-                SizedBox(height: 24),
-
-                _matchTimer(theme),
-
-                const Spacer(),
-                Obx(() {
-                  return AnimatedOpacity(
-                    duration: const Duration(milliseconds: 300),
-                    opacity: controller.canCancel.value ? 1 : 0,
-                    child: IgnorePointer(
-                      ignoring: !controller.canCancel.value,
-                      child: SizedBox(
-                        width: 300,
-                        height: 60,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.error,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+      body: SafeArea(
+        child: Center(
+          child: Obx(() {
+            if (controller.isMatched.value) {
+              return _matchedSuccessView(theme);
+            }
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children:[
+                  const SizedBox(height: 60),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _meAvatar(),
+                      SizedBox(width: 8,),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          // Khoảng cách giữa 2 avatar
+                          final lineWidth = MediaQuery.of(context).size.width * 0.4;
+        
+                          return SizedBox(
+                            width: lineWidth,
+                            height: 60,
+                            child: _centerLine(),
+                          );
+                        },
+                      ),
+                      SizedBox(width: 8,),
+                      _strangerRipple(theme),
+                    ],
+                  ),
+                  const SizedBox(height: 100),
+                  Text(
+                    "Đang tìm bạn chat...",
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).brightness == Brightness.dark 
+                          ? AppTheme.darkTextPrimary
+                          : AppTheme.lightTextPrimary,
                           ),
-                          onPressed: () async {
-                            await controller.stopMatching();
-                            Get.back();
-                          },
-                          child: const Text("Hủy tìm kiếm"),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Chúng tôi đang kết nối bạn với một người ngẫu nhiên phù hợp.",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.hintColor),
+                  ),
+        
+                  SizedBox(height: 40),
+        
+                  AnimatedDots(
+                    color: theme.colorScheme.primary,
+                    size: 10,
+                  ),
+        
+                  SizedBox(height: 24),
+        
+                  _matchTimer(theme),
+        
+                  const Spacer(),
+                  Obx(() {
+                    return AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      opacity: controller.canCancel.value ? 1 : 0,
+                      child: IgnorePointer(
+                        ignoring: !controller.canCancel.value,
+                        child: SizedBox(
+                          width: 300,
+                          height: 60,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () async {
+                              await controller.stopMatching();
+                              Get.back();
+                            },
+                            child: const Text("Hủy tìm kiếm"),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 50),
-              ],
-            ),
-          );
-        }),
+                    );
+                  }),
+                  const SizedBox(height: 50),
+                ],
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

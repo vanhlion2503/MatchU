@@ -24,7 +24,6 @@ class BottomActionBar extends StatelessWidget {
         child: Obx(() {
           final isTyping = controller.isTyping.value;
           final liked = controller.userLiked.value; // bool?
-
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -53,10 +52,7 @@ class BottomActionBar extends StatelessWidget {
                         controller: _ctrl,
                         minLines: 1,
                         maxLines: null,
-                        onChanged: (v) {
-                          controller.isTyping.value =
-                              v.trim().isNotEmpty;
-                        },
+                        onChanged: controller.onTypingChanged,
                         decoration: InputDecoration(
                           hintText: "Nhập tin nhắn...",
                           isDense: true,
@@ -109,7 +105,7 @@ class BottomActionBar extends StatelessWidget {
                               if (text.isEmpty) return;
                               controller.send(text);
                               _ctrl.clear();
-                              controller.isTyping.value = false;
+                              controller.stopTyping();
                             },
                             child: Icon(
                               Iconsax.send_1,

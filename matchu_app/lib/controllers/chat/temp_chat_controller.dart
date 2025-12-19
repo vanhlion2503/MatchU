@@ -18,10 +18,11 @@ class TempChatController extends GetxController {
   final userLiked = RxnBool();
   final otherLiked = RxnBool();
   final isTyping = false.obs;
+  final otherTyping = false.obs; 
   final hasLeft = false.obs;
   final hasSent30sWarning = false.obs;
 
-
+  Timer? _typingTimer;
   Timer? _timer;
   StreamSubscription? _roomSub;
 
@@ -72,8 +73,11 @@ class TempChatController extends GetxController {
     _roomSub = service.listenRoom(roomId).listen((doc) async {
       if (!doc.exists) return;
       final data = doc.data() as Map<String,dynamic>;
-
+      final typing = data["typing"] ?? {};
       final isA = data["userA"] == uid;
+
+      otherTyping.value = isA ? typing["userB"] == true : typing["userA"] == true;
+
 
       userLiked.value = isA ? data["userALiked"] : data["userBLiked"];
       otherLiked.value = isA ? data["userBLiked"] : data["userALiked"];
@@ -160,9 +164,63 @@ class TempChatController extends GetxController {
     Get.offAllNamed("/rating");
   }
 
+  void onTypingChanged(String text) {
+    final hasText = text.trim().isNotEmpty;
+
+    if (hasText && !isTyping.value) {
+      isTyping.value = true;
+      service.setTyping(
+        roomId: roomId,
+        uid: uid,
+        typing: true,
+      );
+    }
+
+    _typingTimer?.cancel();
+
+    if (!hasText) {
+      isTyping.value = false;
+      service.setTyping(
+        roomId: roomId,
+        uid: uid,
+        typing: false,
+      );
+      return;
+    }
+
+    _typingTimer = Timer(const Duration(seconds: 10), () {
+      isTyping.value = false;
+      service.setTyping(
+        roomId: roomId,
+        uid: uid,
+        typing: false,
+      );
+    });
+  }
+
+  void stopTyping() {
+    if (!isTyping.value) return;
+
+    isTyping.value = false;
+    _typingTimer?.cancel();
+
+    service.setTyping(
+      roomId: roomId,
+      uid: uid,
+      typing: false,
+    );
+  }
+
+
 
   @override
   void onClose() {
+    service.setTyping(
+      roomId: roomId,
+      uid: uid,
+      typing: false,
+    );
+    _typingTimer?.cancel();
     _timer?.cancel();
     _roomSub?.cancel();
     super.onClose();

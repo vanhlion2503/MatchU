@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
 
 class RegisterView extends StatefulWidget {
   const RegisterView({super.key});
@@ -30,41 +31,34 @@ class _RegisterViewState extends State<RegisterView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        centerTitle: false,
-        toolbarHeight: 80,
-        titleSpacing: 0,
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.arrow_back_ios),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Tạo tài khoản",
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineLarge!
-                  .copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text(
-              "Nhập thông tin để bắt đầu hành trình.",
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ],
-        ),
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              BackCircleButton(
+                offset: const Offset(-6, -8),
+                size: 44,
+                iconSize: 20,
+              ),
+              SizedBox(height: 8),
+              Text(
+                "Tạo tài khoản",
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineLarge!
+                    .copyWith(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 12),
+              Text(
+                "Nhập thông tin để bắt đầu hành trình.",
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              SizedBox(height: 35),
               Text(
                 " Email",
                 style: Theme.of(context).textTheme.bodyLarge!.copyWith(

@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
 
 class SearchUserView extends StatelessWidget {
   SearchUserView({super.key});
@@ -18,6 +19,16 @@ class SearchUserView extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leadingWidth: 56, // 👈 đủ chỗ cho nút tròn
+        leading: Align(
+          alignment: Alignment.centerLeft,
+          child: BackCircleButton(
+            offset: const Offset(10, 0),
+            size: 44,
+            iconSize: 20,
+          ),
+        ),
         title: Text(
           "Tìm bạn bè",
           style: textTheme.headlineMedium,

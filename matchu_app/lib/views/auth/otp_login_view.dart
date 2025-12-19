@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:pinput/pinput.dart';
 
 class OtpLoginView extends StatelessWidget {
@@ -19,9 +20,15 @@ class OtpLoginView extends StatelessWidget {
     final c = Get.find<AuthController>();
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.arrow_back_ios),
+        automaticallyImplyLeading: false,
+        leadingWidth: 56, // 👈 đủ chỗ cho nút tròn
+        leading: Align(
+          alignment: Alignment.centerLeft,
+          child: BackCircleButton(
+            offset: const Offset(10, 0),
+            size: 44,
+            iconSize: 20,
+          ),
         ),
         title: 
         Text('Xác nhận OTP',
@@ -121,7 +128,7 @@ class OtpLoginView extends StatelessWidget {
                     : null,
                 child: Text(
                   c.resendLoginOtpSeconds.value == 0
-                      ? "Gửi lại email"
+                      ? "Gửi lại mã"
                       : "Gửi lại sau ${c.resendLoginOtpSeconds.value}s",
                 ),
               )),
