@@ -23,27 +23,32 @@ class TypingBubbleRow extends StatelessWidget {
           const SizedBox(width: 6),
 
           // ❗ KHÔNG DÙNG Flexible
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 16,
-            ),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark 
-                                            ? theme.colorScheme.surface
-                                            : Color(0xFFEEF2F7),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(4),
-                bottomRight: Radius.circular(16),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: SizedBox(
+              width: 52,  
+              height: 36,
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? theme.colorScheme.surface
+                      : const Color(0xFFEEF2F7),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                    bottomLeft: Radius.circular(4),
+                    bottomRight: Radius.circular(16),
+                  ),
+                ),
+                child: AnimatedDots(
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  size: 4,
+                ),
               ),
             ),
-            child: AnimatedDots(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-              size: 4,
-            ),
           ),
+
         ],
       ),
     );

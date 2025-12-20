@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/rating/star_rating.dart';
+import 'package:matchu_app/views/report/report_bottom_sheet.dart';
 import 'package:matchu_app/widgets/circle_icon_button.dart';
 
 class RatingView extends StatelessWidget {
@@ -39,7 +40,14 @@ class RatingView extends StatelessWidget {
                   icon: Iconsax.flag,
                   iconColor: AppTheme.errorColor,
                   onTap: () {
-                    // TODO: report
+                    Get.bottomSheet(
+                      ReportBottomSheet(
+                        roomId: controller.roomId,
+                        toUid: controller.toUid,
+                      ),
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                    );
                   },
                 ),
               ),
@@ -134,7 +142,9 @@ class RatingView extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: colorTheme.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.lightBorder),
+                  border: Border.all(color: Theme.of(context).brightness == Brightness.dark 
+                            ? AppTheme.darkBorder 
+                            : AppTheme.lightBorder,),
                 ),
 
                 child: Column(
@@ -167,13 +177,26 @@ class RatingView extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              SizedBox(
+              
+              Obx(() => SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: controller.submit,
-                  child: const Text("Gửi đánh giá →"),
+                  onPressed: controller.isSubmitting.value
+                      ? null
+                      : controller.submit,
+                  child: controller.isSubmitting.value
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text("Gửi đánh giá →"),
                 ),
-              ),
+              )),
+
               const SizedBox(height: 46),
             ],
           ),

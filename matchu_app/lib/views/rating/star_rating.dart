@@ -24,9 +24,9 @@ class StarRating extends StatelessWidget {
           splashRadius: 22,
           onPressed: () => onChanged(value),
           icon: Icon(
-            rating >= value ? Iconsax.star : Iconsax.star,
-            color: rating >= value ? color : Colors.grey.shade400,
-            size: 38,
+            rating >= value ? Icons.star_rounded : Icons.star_border_rounded,
+            color: rating >= value ? color : color,
+            size: 36,
           ),
         );
       }),

@@ -9,6 +9,7 @@ class RatingController extends GetxController{
   late final String toUid;
 
   final rating = 5.0.obs;
+  final isSubmitting = false.obs;
 
   void onInit() {
     super.onInit();
@@ -19,32 +20,46 @@ class RatingController extends GetxController{
   }
 
   Future<void> submit() async {
-    await RatingService.submitRating(
-      ChatRatingModel(
-        roomId: roomId,
-        fromUid: myUid,
-        toUid: toUid,
-        score: rating.value,
-        skipped: false,
-        createdAt: DateTime.now(),
-      ),
-    );
+    if (isSubmitting.value) return; // 🔒 chặn double tap
+    isSubmitting.value = true;
 
-    Get.offAllNamed("/home");
+    try {
+      await RatingService.submitRating(
+        ChatRatingModel(
+          roomId: roomId,
+          fromUid: myUid,
+          toUid: toUid,
+          score: rating.value,
+          skipped: false,
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      Get.offAllNamed("/main");
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 
   Future<void> skip() async {
-    await RatingService.submitRating(
-      ChatRatingModel(
-        roomId: roomId,
-        fromUid: myUid,
-        toUid: toUid,
-        score: 0,
-        skipped: true,
-        createdAt: DateTime.now(),
-      ),
-    );
+    if (isSubmitting.value) return;
+    isSubmitting.value = true;
 
-    Get.offAllNamed("/home");
+    try {
+      await RatingService.submitRating(
+        ChatRatingModel(
+          roomId: roomId,
+          fromUid: myUid,
+          toUid: toUid,
+          score: 0,
+          skipped: true,
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      Get.offAllNamed("/main");
+    } finally {
+      isSubmitting.value = false;
+    }
   }
 }
