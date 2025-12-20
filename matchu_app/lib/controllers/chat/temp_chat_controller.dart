@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
+import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
 import '../auth/auth_controller.dart';
 import 'dart:async';
@@ -89,7 +90,8 @@ class TempChatController extends GetxController {
         if (hasLeft.value == true) {
           return;
         }
-
+        final myUid = uid;
+        final toUid = myUid == data["userA"] ? data["userB"] : data["userA"];
         // 👉 Người ở lại
         Get.snackbar(
           "Thông báo",
@@ -99,15 +101,31 @@ class TempChatController extends GetxController {
         );
 
         Future.delayed(const Duration(seconds: 2), () {
-          Get.offNamed("/rating", arguments: {"roomId": roomId});
+          Get.offNamed(
+            "/rating",
+            arguments: {
+              "roomId": roomId,
+              "toUid": toUid,
+            },
+          );
         });
       }
-
-
 
       if (data["userALiked"] == true && data["userBLiked"] == true && data["status"] == "active") {
         final matchController = Get.find<MatchingController>();
         matchController.isMatched.value = false;
+
+        final myUid = uid;
+        final userA = data["userA"];
+        final userB = data["userB"];
+        final toUid = myUid == userA ? userB : userA;
+        
+        await RatingService.autoRate(
+          roomId: roomId,
+          fromUid: myUid,
+          toUid: toUid,
+        );
+
         final newRoomId = await service.convertToPermanent(roomId);
         Get.offNamed("/chat", arguments: {"roomId": newRoomId});
       }
@@ -144,6 +162,11 @@ class TempChatController extends GetxController {
 
     final matchController = Get.find<MatchingController>();
     matchController.isMatched.value = false;
+    // 🔹 Lấy snapshot room TRƯỚC khi end
+    final room = await service.getRoom(roomId);
+    final userA = room["userA"];
+    final userB = room["userB"];
+    final toUid = uid == userA ? userB : userA;
 
     // ❗ Chỉ set dislike nếu chưa like
     if (userLiked.value == null) {
@@ -160,8 +183,13 @@ class TempChatController extends GetxController {
       uid: uid,
       reason: "left",
     );
-
-    Get.offAllNamed("/rating");
+    Get.offAllNamed(
+      "/rating",
+      arguments: {
+        "roomId": roomId,
+        "toUid": toUid,
+      },
+    );
   }
 
   void onTypingChanged(String text) {
@@ -188,7 +216,7 @@ class TempChatController extends GetxController {
       return;
     }
 
-    _typingTimer = Timer(const Duration(seconds: 10), () {
+    _typingTimer = Timer(const Duration(seconds: 5), () {
       isTyping.value = false;
       service.setTyping(
         roomId: roomId,

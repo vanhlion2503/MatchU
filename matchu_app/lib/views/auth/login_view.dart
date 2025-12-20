@@ -180,7 +180,7 @@ class _LoginViewState extends State<LoginView> {
                       label: 
                         Text(
                           "Google",
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -213,7 +213,7 @@ class _LoginViewState extends State<LoginView> {
                       label: 
                         Text(
                           "Số điện thoại",
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),

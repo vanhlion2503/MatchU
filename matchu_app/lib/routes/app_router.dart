@@ -20,4 +20,5 @@ class AppRouter {
   
   static const String matching = '/matching';
   static const String tempChat = '/tempChat';
+  static const String rating = '/rating';
 }

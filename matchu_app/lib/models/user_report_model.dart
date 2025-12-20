@@ -1,19 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ChatRatingModel {
+class UserReportMatchingModel {
   final String roomId;
   final String fromUid;
   final String toUid;
-  final double score;
-  final bool skipped;
+  final String reason;
+  final String description;
   final DateTime createdAt;
 
-  ChatRatingModel({
+  UserReportMatchingModel({
     required this.roomId,
     required this.fromUid,
     required this.toUid,
-    required this.score,
-    required this.skipped,
+    required this.reason,
+    this.description = "",
     required this.createdAt,
   });
 
@@ -21,8 +21,8 @@ class ChatRatingModel {
         "roomId": roomId,
         "fromUid": fromUid,
         "toUid": toUid,
-        "score": score,
-        "skipped": skipped,
+        "reason": reason,
+        "description": description,
         "createdAt": Timestamp.fromDate(createdAt),
       };
 }

@@ -169,7 +169,7 @@ class _RandomChatViewState extends State<RandomChatView>
                     ],
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 120),
                 SizedBox(
                   width: double.infinity,
                   height: 60,
@@ -183,7 +183,6 @@ class _RandomChatViewState extends State<RandomChatView>
                     }, 
                     child: Text("🔍 Bắt đầu tìm kiếm")),
                 ),
-                const SizedBox(height: 50),
               ],
             ),
           ),

@@ -72,7 +72,7 @@ class _MainViewState extends State<MainView>
             Container(
               height: 95,
               decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
+                color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.85),
                 border: Border(
                   top: BorderSide(
                     color: Theme.of(context).brightness == Brightness.dark 

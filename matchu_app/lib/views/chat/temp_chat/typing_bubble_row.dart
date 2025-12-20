@@ -29,7 +29,9 @@ class TypingBubbleRow extends StatelessWidget {
               vertical: 16,
             ),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
+              color: Theme.of(context).brightness == Brightness.dark 
+                                            ? theme.colorScheme.surface
+                                            : Color(0xFFEEF2F7),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
