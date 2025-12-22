@@ -23,7 +23,6 @@ class MessagesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = Get.find<AuthController>().user!.uid;
     final theme = Theme.of(context);
-    final Map<String, GlobalKey> _messageKeys = {};
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -38,6 +37,7 @@ class MessagesList extends StatelessWidget {
         final docs = snap.data!.docs;
 
         return ListView.builder(
+          controller: controller.scrollController,
           padding: const EdgeInsets.all(16),
           itemCount: docs.length + 2,
           itemBuilder: (_, i) {
@@ -86,10 +86,11 @@ class MessagesList extends StatelessWidget {
 
           final doc = docs[index];
           final data = doc.data() as Map<String, dynamic>;
-          final type = data["type"] ?? "text";
+          final messageType = data["type"] ?? "text";
+
 
           // ================= SYSTEM MESSAGE =================
-          if (type == "system") {
+          if (messageType == "system") {
             final code = data["systemCode"];
             final senderId = data["senderId"];
             final targetUid = data["targetUid"];
@@ -112,40 +113,90 @@ class MessagesList extends StatelessWidget {
 
           final grouped = _shouldGroup(docs, index);
           final showTime = _isLastInGroup(docs, index);
+          
+          final key = controller.messageKeys.putIfAbsent(
+            doc.id,
+            () => GlobalKey(),
+          );
 
-          return AnimatedMessageBubble(
-            child: Dismissible(
-              key: ValueKey(doc.id),
-              direction: DismissDirection.startToEnd,
-              resizeDuration: Duration.zero,
-              movementDuration: const Duration(milliseconds: 120),
-              confirmDismiss: (_) async {
-                HapticFeedback.lightImpact();
-                controller.startReply({
-                  "id": doc.id, 
-                  "text": data["text"],
-                });
-                return false; // ❌ không dismiss
-              },
-              background: Container(
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.only(left: 20),
-                child: Icon(
-                  Icons.reply,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              child: ChatRow(
-                text: data["text"] ?? "",
-                
-                isMe: isMe,
-                showAvatar: !grouped && !isMe,
-                smallMargin: grouped,
-                showTime: showTime,
-                time: _formatTime(data["createdAt"]),
+          double dragDx = 0;
+
+          return Container(
+            key: key,
+            child: AnimatedMessageBubble(
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  return GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      if (isMe) return;
+
+                      dragDx += details.delta.dx;
+                      dragDx = dragDx.clamp(0, 80);
+
+                      setState(() {});
+                    },
+                    onHorizontalDragEnd: (_) {
+                      if (dragDx > 32) {
+                        HapticFeedback.lightImpact();
+                        controller.startReply({
+                          "id": doc.id,
+                          "text": data["text"],
+                        });
+                      }
+
+                      setState(() => dragDx = 0);
+                    },
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        // 🔄 ICON REPLY – TRƯỢT THEO TAY
+                        Positioned(
+                          left: 12 + dragDx * 0.5,
+                          child: Opacity(
+                            opacity: (dragDx / 40).clamp(0, 1),
+                            child: Icon(
+                              Icons.reply,
+                              color: theme.colorScheme.primary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+
+                        // 💬 BUBBLE – TRƯỢT + MỜ THEO LỰC
+                        Transform.translate(
+                          offset: Offset(dragDx, 0),
+                          child: Opacity(
+                            opacity: (1 - dragDx / 120).clamp(0.7, 1),
+                            child: Obx(() {
+                              return ChatRow(
+                                text: data["text"] ?? "",
+                                type: messageType,
+                                replyText: data["replyText"],
+                                replyToId: data["replyToId"],
+                                isMe: isMe,
+                                showAvatar: showTime && !isMe,
+                                smallMargin: grouped,
+                                showTime: showTime,
+                                time: _formatTime(data["createdAt"]),
+                                onTapReply: data["replyToId"] != null
+                                    ? () => controller.scrollToMessage(data["replyToId"])
+                                    : null,
+                                messageId: doc.id,
+                                highlighted:
+                                    controller.highlightedMessageId.value == doc.id,
+                              );
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           );
+
+
         },
 
         );
@@ -162,20 +213,22 @@ class MessagesList extends StatelessWidget {
   }
 
   bool _shouldGroup(List docs, int index) {
-    if (index == 0) return false;
+  if (index == 0) return false;
 
-    final prev = docs[index - 1];
-    final curr = docs[index];
+  final prev = docs[index - 1];
+  final curr = docs[index];
 
-    if (prev["senderId"] != curr["senderId"]) return false;
+  // ✅ CÙNG NGƯỜI GỬI
+  if (prev["senderId"] != curr["senderId"]) return false;
 
-    final prevTime = _getTime(prev["createdAt"]);
-    final currTime = _getTime(curr["createdAt"]);
+  final prevTime = _getTime(prev["createdAt"]);
+  final currTime = _getTime(curr["createdAt"]);
 
-    if (prevTime == null || currTime == null) return false;
+  if (prevTime == null || currTime == null) return false;
 
-    return currTime.difference(prevTime).inMinutes < 2;
-  }
+  // ✅ < 2 PHÚT → GROUP
+  return currTime.difference(prevTime).inMinutes < 2;
+}
 
   bool _isLastInGroup(List docs, int index) {
     if (index == docs.length - 1) return true;
@@ -192,6 +245,7 @@ class MessagesList extends StatelessWidget {
 
     return nextTime.difference(currTime).inMinutes >= 2;
   }
+
 
   String _formatTime(dynamic value) {
     final dt = _getTime(value);

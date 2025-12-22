@@ -7,6 +7,8 @@ import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/icon_action.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+
 
 class BottomActionBar extends StatelessWidget {
   final TempChatController controller;
@@ -20,86 +22,85 @@ class BottomActionBar extends StatelessWidget {
     final color = theme.colorScheme;
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Obx(() {
           final isTyping = controller.isTyping.value;
           final liked = controller.userLiked.value; // bool?
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Obx((){
-                final reply = controller.replyingMessage.value;
-                if (reply == null) return const SizedBox();
-
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: theme.brightness == Brightness.dark
-                        ? const Color(0xFF2A2A2A)
-                        : const Color(0xFFF1F3F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      // VẠCH TRÁI
-                      Container(
-                        width: 3,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      // TEXT
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "Đang trả lời",
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              reply["text"],
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // CLOSE
-                      GestureDetector(
-                        onTap: controller.cancelReply,
-                        child: Container(
-                          width: 28,
-                          height: 28,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Obx((){
+                  final reply = controller.replyingMessage.value;
+                  if (reply == null) return const SizedBox();
+                  return Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: theme.brightness == Brightness.dark
+                          ? const Color(0xFF2A2A2A)
+                          : const Color(0xFFF1F3F5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        // VẠCH TRÁI
+                        Container(
+                          width: 3,
+                          height: 36,
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.onSurface.withOpacity(0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 18,
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-
-              }),
+                        const SizedBox(width: 10),
+                        // TEXT
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Đang trả lời",
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                reply["text"],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        // CLOSE
+                        GestureDetector(
+                          onTap: controller.cancelReply,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.onSurface.withOpacity(0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                
+                }),
+              ),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -126,9 +127,23 @@ class BottomActionBar extends StatelessWidget {
                         minLines: 1,
                         maxLines: null,
                         onChanged: controller.onTypingChanged,
+                        onTap: () {
+                          controller.hideEmoji();
+                        },
                         decoration: InputDecoration(
                           hintText: "Nhập tin nhắn...",
                           isDense: true,
+                          prefixIcon: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                                FocusScope.of(context).unfocus();
+                                controller.toggleEmoji();
+                              },
+                              child: const Icon(
+                                Iconsax.emoji_happy,
+                                size: 22,
+                              ),
+                          ),
                           contentPadding:
                               const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -175,12 +190,20 @@ class BottomActionBar extends StatelessWidget {
                             key: const ValueKey("send"),
                             onTap: () {
                               final text = _ctrl.text.trim();
-                              // final reply = controller.replyingMessage.value;
                               if (text.isEmpty) return;
-                              controller.send(text);
+
+                              final isEmojiOnly = _isEmojiOnly(text);
+
+                              controller.send(
+                                text,
+                                type: isEmojiOnly ? "emoji" : "text",
+                              );
+
                               _ctrl.clear();
                               controller.stopTyping();
+                              controller.hideEmoji();
                             },
+
                             child: Icon(
                               Iconsax.send_1,
                               color: color.primary,
@@ -222,10 +245,67 @@ class BottomActionBar extends StatelessWidget {
 
                 ],
               ),
+              
+              Obx(() {
+                final scheme = Theme.of(context).colorScheme;
+
+                return AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: controller.showEmoji.value
+                      ? SizedBox(
+                          height: 280,
+                          width: MediaQuery.of(context).size.width,
+                            child: EmojiPicker(
+                              onEmojiSelected: (category, emoji) {
+                                final text = _ctrl.text;
+                                final selection = _ctrl.selection;
+
+                                final newText = text.replaceRange(
+                                  selection.start,
+                                  selection.end,
+                                  emoji.emoji,
+                                );
+
+                                _ctrl.text = newText;
+                                _ctrl.selection = TextSelection.collapsed(
+                                  offset: selection.start + emoji.emoji.length,
+                                );
+
+                                controller.isTyping.value = true;
+                              },
+                              config: Config(
+                                height: 280,
+                                emojiViewConfig: EmojiViewConfig(
+                                  columns: 8,
+                                  emojiSizeMax: 28,
+                                  backgroundColor: scheme.surface,
+                                ),
+                                categoryViewConfig: CategoryViewConfig(
+                                  backgroundColor: scheme.surface,
+                                  indicatorColor: scheme.primary,
+                                  iconColor: scheme.onSurface.withOpacity(0.6),
+                                  iconColorSelected: scheme.primary,
+                                ),
+                                bottomActionBarConfig: BottomActionBarConfig(
+                                  backgroundColor: scheme.surface,
+                                  buttonColor: scheme.primary,
+                                ),
+                                searchViewConfig: SearchViewConfig(
+                                  backgroundColor: scheme.surface,
+                                ),
+                                skinToneConfig: const SkinToneConfig(enabled: true),
+                              ),
+                            ),
+                        )
+                      : const SizedBox.shrink(),
+                );
+              }),
+
             ],
           );
         }),
-      ),
     );
   }
 
@@ -251,6 +331,18 @@ class BottomActionBar extends StatelessWidget {
 
     if (ok == true) {
       controller.leaveByDislike();
+      }
     }
+    bool _isEmojiOnly(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return false;
+
+    final emojiRegex = RegExp(
+      r'^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})+$',
+      unicode: true,
+    );
+
+    return emojiRegex.hasMatch(trimmed);
   }
+
 }

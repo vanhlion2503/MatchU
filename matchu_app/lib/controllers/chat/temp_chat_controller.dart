@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
@@ -24,6 +25,12 @@ class TempChatController extends GetxController {
   final hasSent30sWarning = false.obs;
   final otherAvgRating = RxnDouble();
   final replyingMessage = Rxn<Map<String, dynamic>>();
+  final scrollController = ScrollController();
+  final highlightedMessageId = RxnString();
+  final Map<String, GlobalKey> messageKeys = {};
+  final showEmoji = false.obs;
+  final inputController = TextEditingController();
+  final otherRatingCount = RxnInt();
 
 
   Timer? _typingTimer;
@@ -37,6 +44,38 @@ class TempChatController extends GetxController {
     _listenRoom();
     _loadOtherUserRating();
   }
+
+  void toggleEmoji() {
+    showEmoji.toggle();
+  }
+
+  void hideEmoji() {
+    showEmoji.value = false;
+  }
+
+  void scrollToMessage(String messageId) {
+    final key = messageKeys[messageId];
+    if (key == null) return;
+
+    final context = key.currentContext;
+    if (context == null) return;
+
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      alignment: 0.3,
+    );
+
+    highlightedMessageId.value = messageId;
+
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (highlightedMessageId.value == messageId) {
+        highlightedMessageId.value = null;
+      }
+    });
+  }
+
 
   void startReply(Map<String, dynamic> message) {
   replyingMessage.value = message;
@@ -145,7 +184,7 @@ class TempChatController extends GetxController {
     });
   }
 
-  Future<void> send(String text) async {
+  Future<void> send(String text, {String type = "text"}) async {
     final reply = replyingMessage.value;
 
     await service.sendMessages(
@@ -153,6 +192,7 @@ class TempChatController extends GetxController {
       TempMessageModel(
         senderId: uid,
         text: text,
+        type: type,
         replyToId: reply?["id"],
         replyText: reply?["text"],
       ),
@@ -160,6 +200,16 @@ class TempChatController extends GetxController {
 
     // 🔥 clear reply SAU KHI GỬI
     replyingMessage.value = null;
+
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (!scrollController.hasClients) return;
+
+      scrollController.animateTo(
+        scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
 
@@ -272,11 +322,16 @@ class TempChatController extends GetxController {
       .get();
 
     if (!userSnap.exists) return;
+    final data = userSnap.data()!;
 
-    otherAvgRating.value = (userSnap.data()?["avgChatRating"] ?? 5.0).toDouble();
+
+    otherAvgRating.value =
+      (data["avgChatRating"] ?? 5.0).toDouble();
+
+  otherRatingCount.value =
+      (data["totalChatRatings"] ?? 0) as int;
 
   }
-
 
   @override
   void onClose() {
@@ -288,6 +343,7 @@ class TempChatController extends GetxController {
     _typingTimer?.cancel();
     _timer?.cancel();
     _roomSub?.cancel();
+    inputController.dispose();
     super.onClose();
   }
 

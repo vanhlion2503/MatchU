@@ -48,12 +48,18 @@ class RatingService {
       if (rating.skipped) return;
 
       final data = userSnap!.data()!;
-      final oldAvg = (data["avgChatRating"] ?? 5.0).toDouble();
       final oldTotal = (data["totalChatRatings"] ?? 0) as int;
 
-      final newTotal = oldTotal + 1;
-      final newAvg =
-          ((oldAvg * oldTotal) + rating.score) / newTotal;
+      double newAvg;
+      int newTotal = oldTotal + 1;
+
+      if (oldTotal == 0) {
+        // 🟢 Vote đầu tiên
+        newAvg = rating.score;
+      } else {
+        final oldAvg = (data["avgChatRating"] ?? 5.0).toDouble();
+        newAvg = ((oldAvg * oldTotal) + rating.score) / newTotal;
+      }
 
       tx.update(userRef, {
         "avgChatRating": newAvg,
