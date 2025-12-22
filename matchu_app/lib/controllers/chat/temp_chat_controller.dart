@@ -22,6 +22,7 @@ class TempChatController extends GetxController {
   final otherTyping = false.obs; 
   final hasLeft = false.obs;
   final hasSent30sWarning = false.obs;
+  final otherAvgRating = RxnDouble();
 
   Timer? _typingTimer;
   Timer? _timer;
@@ -32,6 +33,7 @@ class TempChatController extends GetxController {
     super.onInit();
     _startTimer();
     _listenRoom();
+    _loadOtherUserRating();
   }
 
   void _startTimer() {
@@ -54,8 +56,8 @@ class TempChatController extends GetxController {
           );
         }
       }
-      if (remainingSeconds.value <= 0 && hasLeft.value == false) {
-        hasLeft.value = true;
+      if (remainingSeconds.value <= 0) {
+        _timer?.cancel();
         endRoom("timeout");
       }
     });
@@ -239,6 +241,21 @@ class TempChatController extends GetxController {
     );
   }
 
+  Future<void> _loadOtherUserRating() async {
+    final room = await service.getRoom(roomId);
+    final isA = room["userA"] == uid;
+    final otherUid = isA ? room["userB"] : room["userA"];
+
+    final userSnap = await FirebaseFirestore.instance
+      .collection("users")
+      .doc(otherUid)
+      .get();
+
+    if (!userSnap.exists) return;
+
+    otherAvgRating.value = (userSnap.data()?["avgChatRating"] ?? 5.0).toDouble();
+
+  }
 
 
   @override

@@ -22,6 +22,7 @@ class TempChatView extends StatelessWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        toolbarHeight: 78,
         elevation: 0,
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -44,24 +45,73 @@ class TempChatView extends StatelessWidget {
           ),
         ),
 
-        title: RichText(
-          text: TextSpan(
-            style: theme.textTheme.headlineSmall,
-            children: [
-              TextSpan(
-                text: "● ",
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const TextSpan(
-                text: "Người lạ",
-              ),
-            ]
-          ),
-        ),
+        title: Stack(
+          alignment: Alignment.center,
+          children: [
+            Obx(() {
+              final rating = controller.otherAvgRating.value;
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: theme.textTheme.headlineSmall,
+                      children: const [
+                        TextSpan(
+                          text: "● ",
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        TextSpan(text: "Người lạ"),
+                      ],
+                    ),
+                  ),
+                  if (rating != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.2), // 🌕 nền vàng nhạt
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: Colors.amber.withOpacity(0.6), // viền vàng nhẹ
+                          width: 0.3,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: const Color.fromARGB(255, 248, 100, 2)
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Icon(
+                            Iconsax.star,
+                            size: 16,
+                            color: const Color.fromARGB(255, 250, 188, 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            }),
+          ],
+        ),      
         actions: [
           Obx(() {
             final sec = controller.remainingSeconds.value;
@@ -71,30 +121,43 @@ class TempChatView extends StatelessWidget {
 
             return Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Chip(
-                backgroundColor: isDanger
-                    ? theme.colorScheme.error.withOpacity(0.15)
-                    : theme.colorScheme.primary.withOpacity(0.12),
-
-                side: BorderSide(
-                  color: isDanger
-                      ? theme.colorScheme.error
-                      : theme.colorScheme.primary,
-                ),
-
-                label: Text(
-                  "⏱ ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}",
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w500,
+              child: Align( // 👈 căn giữa theo chiều dọc AppBar
+                alignment: Alignment.center,
+                child: Container(
+                  height: 36,        
+                  width: 95, 
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
                     color: isDanger
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.primary,
+                        ? theme.colorScheme.error.withOpacity(0.15)
+                        : theme.colorScheme.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDanger
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.primary,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Text(
+                    "⏱ ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 15,
+                      height: 1.0, // 👈 QUAN TRỌNG: FIX LỆCH BASELINE
+                      fontWeight: FontWeight.w600,
+                      color: isDanger
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
             );
           }),
         ],
+
+
       ),
       body: SafeArea(child: Padding(
         padding: const EdgeInsets.all(8),

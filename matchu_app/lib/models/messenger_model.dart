@@ -4,6 +4,7 @@ class MessageModel {
   final String text;
   final String type;  // text | image | system
   final DateTime createdAt;
+  
 
   MessageModel({
     required this.id,
