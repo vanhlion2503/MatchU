@@ -120,30 +120,34 @@ class TempChatView extends StatelessWidget {
             final seconds = sec % 60;
 
             return Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Align( // 👈 căn giữa theo chiều dọc AppBar
+              padding: const EdgeInsets.only(
+                right: 12,
+                top: 10,
+                bottom: 10,
+              ),
+              child: Align( 
                 alignment: Alignment.center,
                 child: Container(
-                  height: 36,        
-                  width: 95, 
+                  height: 33,        
+                  width: 94, 
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: isDanger
                         ? theme.colorScheme.error.withOpacity(0.15)
                         : theme.colorScheme.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isDanger
                           ? theme.colorScheme.error
                           : theme.colorScheme.primary,
-                      width: 0.8,
+                      width: 0.6,
                     ),
                   ),
                   child: Text(
                     "⏱ ${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}",
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 15,
+                      fontSize: 12,
                       height: 1.0, // 👈 QUAN TRỌNG: FIX LỆCH BASELINE
                       fontWeight: FontWeight.w600,
                       color: isDanger

@@ -25,7 +25,7 @@ class SystemMessageEvent extends StatelessWidget {
             vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: theme.colorScheme.error.withOpacity(0.3),
+            color: theme.colorScheme.error.withOpacity(0.25),
             borderRadius: BorderRadius.circular(18),
             // border: Border.all(
             //   color: theme.colorScheme.primary.withOpacity(0.25),

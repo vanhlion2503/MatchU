@@ -9,6 +9,7 @@ class ChatRow extends StatelessWidget {
   final bool smallMargin;
   final bool showTime;
   final String time;
+  final String? replyText;
 
   const ChatRow({
     super.key,
@@ -18,6 +19,7 @@ class ChatRow extends StatelessWidget {
     required this.smallMargin,
     required this.showTime,
     required this.time,
+    this.replyText,
   });
 
   @override
@@ -27,7 +29,7 @@ class ChatRow extends StatelessWidget {
     final bubbleColor =
         isMe ? theme.colorScheme.primary : Theme.of(context).brightness == Brightness.dark 
                                             ? theme.colorScheme.surface
-                                            : Color(0xFFEEF2F7);
+                                            : Color.fromARGB(255, 244, 246, 248);
     final textColor =
         isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
 
@@ -44,48 +46,87 @@ class ChatRow extends StatelessWidget {
               child:
                   showAvatar ? const AnonymousAvatar() : const SizedBox(),
             ),
-            const SizedBox(width: 6),
+          const SizedBox(width: 6),
           Flexible(
-            child: Column(
-              crossAxisAlignment:
-                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: bubbleColor,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: isMe
-                          ? const Radius.circular(16)
-                          : const Radius.circular(4),
-                      bottomRight: isMe
-                          ? const Radius.circular(4)
-                          : const Radius.circular(16),
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.65, // 👈 60%
                   ),
-                  child: Text(
-                    text,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: textColor,
-                    ),
-                  ),
-                ),
+                  child: Column(
+                    crossAxisAlignment:
+                        isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ===== REPLY PREVIEW (TÁCH RIÊNG) =====
+                      if (replyText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).brightness == Brightness.dark 
+                                            ? theme.colorScheme.surface
+                                            : Color.fromARGB(255, 244, 246, 248).withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border(
+                              left: BorderSide(
+                                color: theme.colorScheme.primary,
+                                width: 4,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            replyText!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
 
-                if (showTime && time.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      time,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.outline,
+                      // ===== MESSAGE BUBBLE (CHÍNH) =====
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: bubbleColor,
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(16),
+                            topRight: const Radius.circular(16),
+                            bottomLeft:
+                                isMe ? const Radius.circular(16) : const Radius.circular(4),
+                            bottomRight:
+                                isMe ? const Radius.circular(4) : const Radius.circular(16),
+                          ),
+                        ),
+                        child: Text(
+                          text,
+                          softWrap: true,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: textColor,
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // ===== TIME =====
+                      if (showTime && time.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            time,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                );
+              },
             ),
           ),
+
         ],
       ),
     );

@@ -43,7 +43,7 @@ class TypingBubbleRow extends StatelessWidget {
                 ),
                 child: AnimatedDots(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  size: 4,
+                  size: 3,
                 ),
               ),
             ),

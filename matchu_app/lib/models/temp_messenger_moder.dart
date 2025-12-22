@@ -3,10 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class TempMessageModel {
   final String senderId;
   final String text;
+  final String? replyToId;
+  final String? replyText;
 
   TempMessageModel({
     required this.senderId,
     required this.text,
+    this.replyToId,
+    this.replyText,
   });
 
   /// 🔥 GỬI LÊN FIRESTORE
@@ -14,6 +18,8 @@ class TempMessageModel {
         "senderId": senderId,
         "text": text,
         "type": "text",
+        "replyToId": replyToId,
+        "replyText": replyText,
         "createdAt": FieldValue.serverTimestamp(), // ✅ CHUẨN
       };
 

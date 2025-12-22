@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -22,6 +23,7 @@ class MessagesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = Get.find<AuthController>().user!.uid;
     final theme = Theme.of(context);
+    final Map<String, GlobalKey> _messageKeys = {};
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -112,13 +114,36 @@ class MessagesList extends StatelessWidget {
           final showTime = _isLastInGroup(docs, index);
 
           return AnimatedMessageBubble(
-            child: ChatRow(
-              text: data["text"] ?? "",
-              isMe: isMe,
-              showAvatar: !grouped && !isMe,
-              smallMargin: grouped,
-              showTime: showTime,
-              time: _formatTime(data["createdAt"]),
+            child: Dismissible(
+              key: ValueKey(doc.id),
+              direction: DismissDirection.startToEnd,
+              resizeDuration: Duration.zero,
+              movementDuration: const Duration(milliseconds: 120),
+              confirmDismiss: (_) async {
+                HapticFeedback.lightImpact();
+                controller.startReply({
+                  "id": doc.id, 
+                  "text": data["text"],
+                });
+                return false; // ❌ không dismiss
+              },
+              background: Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(left: 20),
+                child: Icon(
+                  Icons.reply,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              child: ChatRow(
+                text: data["text"] ?? "",
+                
+                isMe: isMe,
+                showAvatar: !grouped && !isMe,
+                smallMargin: grouped,
+                showTime: showTime,
+                time: _formatTime(data["createdAt"]),
+              ),
             ),
           );
         },

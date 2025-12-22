@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/icon_action.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:iconsax/iconsax.dart';
 
 class BottomActionBar extends StatelessWidget {
   final TempChatController controller;
@@ -27,6 +28,78 @@ class BottomActionBar extends StatelessWidget {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Obx((){
+                final reply = controller.replyingMessage.value;
+                if (reply == null) return const SizedBox();
+
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: theme.brightness == Brightness.dark
+                        ? const Color(0xFF2A2A2A)
+                        : const Color(0xFFF1F3F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      // VẠCH TRÁI
+                      Container(
+                        width: 3,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // TEXT
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              "Đang trả lời",
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              reply["text"],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+
+                      // CLOSE
+                      GestureDetector(
+                        onTap: controller.cancelReply,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.onSurface.withOpacity(0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+
+              }),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -102,6 +175,7 @@ class BottomActionBar extends StatelessWidget {
                             key: const ValueKey("send"),
                             onTap: () {
                               final text = _ctrl.text.trim();
+                              // final reply = controller.replyingMessage.value;
                               if (text.isEmpty) return;
                               controller.send(text);
                               _ctrl.clear();

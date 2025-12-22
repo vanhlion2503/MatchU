@@ -23,6 +23,8 @@ class TempChatController extends GetxController {
   final hasLeft = false.obs;
   final hasSent30sWarning = false.obs;
   final otherAvgRating = RxnDouble();
+  final replyingMessage = Rxn<Map<String, dynamic>>();
+
 
   Timer? _typingTimer;
   Timer? _timer;
@@ -35,6 +37,15 @@ class TempChatController extends GetxController {
     _listenRoom();
     _loadOtherUserRating();
   }
+
+  void startReply(Map<String, dynamic> message) {
+  replyingMessage.value = message;
+  }
+
+  void cancelReply() {
+    replyingMessage.value = null;
+  }
+
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
@@ -134,15 +145,24 @@ class TempChatController extends GetxController {
     });
   }
 
-  Future<void> send(String text)async{
+  Future<void> send(String text) async {
+    final reply = replyingMessage.value;
+
     await service.sendMessages(
-      roomId, 
+      roomId,
       TempMessageModel(
-        senderId: uid, 
-        text: text, 
-        )
-      );
+        senderId: uid,
+        text: text,
+        replyToId: reply?["id"],
+        replyText: reply?["text"],
+      ),
+    );
+
+    // 🔥 clear reply SAU KHI GỬI
+    replyingMessage.value = null;
   }
+
+
 
   Future<void> like(bool value) async{
     if (userLiked.value != null) return;
