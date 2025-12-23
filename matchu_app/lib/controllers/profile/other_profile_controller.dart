@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/models/user_model.dart';
-import 'package:matchu_app/services/user_service.dart';
+import 'package:matchu_app/services/user/user_service.dart';
 
 class OtherProfileController extends GetxController{
   final UserService _userService = UserService();
@@ -36,5 +36,22 @@ class OtherProfileController extends GetxController{
   Future<void> unfollow() async{
     await _userService.unfollowUser(userId);
     isFollowing.value = false;
+  }
+
+  int get age {
+    final u = user.value;
+    if (u == null || u.birthday == null) return 0;
+
+    final birthday = u.birthday!; // ✅ đã null-check
+    final now = DateTime.now();
+
+    int age = now.year - birthday.year;
+
+    if (now.month < birthday.month ||
+        (now.month == birthday.month && now.day < birthday.day)) {
+      age--;
+    }
+
+    return age;
   }
 }

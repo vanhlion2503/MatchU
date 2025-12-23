@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/route_manager.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -10,26 +11,36 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/theme_controller.dart';
 import 'package:matchu_app/widgets/global_matching_bubble.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ⭐ Fix duplicate-app — chỉ init Firebase nếu chưa init
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
+  // ✅ 1. INIT FIREBASE ĐÚNG CÁCH (CHỈ 1 LẦN)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ✅ 2. ACTIVATE APP CHECK (SAU FIREBASE)
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug,
+    appleProvider: AppleProvider.debug,
+  );
+
+  // ✅ 3. LOCAL STORAGE
   await GetStorage.init();
 
-  // GetX controllers
+  // ✅ 4. GLOBAL CONTROLLERS
   Get.put(ThemeController(), permanent: true);
   Get.put(AuthController(), permanent: true);
   Get.put(MatchingController(), permanent: true);
+  Get.put(AvatarController(), permanent: true);
 
 
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

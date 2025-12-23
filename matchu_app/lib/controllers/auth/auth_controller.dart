@@ -1,10 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:matchu_app/services/auth_service.dart';
+import 'package:matchu_app/services/user/avatar_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
+
+enum DobField { day, month, year }
+
 
 class AuthController extends GetxController {
   final AuthService _auth = AuthService();
@@ -31,6 +39,15 @@ class AuthController extends GetxController {
   final resendEnrollOtpSeconds = 60.obs;
   final resendLoginOtpSeconds = 60.obs;
 
+  final selectedDobField = Rxn<DobField>();
+
+  final selectedDay = RxnInt();
+  final selectedMonth = RxnInt();
+  final selectedYear = RxnInt();
+  final tempAvatarFile = Rxn<File>();
+  final isUploadingAvatar = false.obs;
+
+
   Timer? _emailTimer;
   Timer? _enrollTimer;
   Timer? _loginTimer;
@@ -51,6 +68,41 @@ class AuthController extends GetxController {
     _userRx.bindStream(_auth.authStateChanges);
 
     // checkInitialLogin();
+  }
+
+  void updateBirthdayIfReady() {
+    if (selectedDay.value == null ||
+        selectedMonth.value == null ||
+        selectedYear.value == null) return;
+
+    final y = selectedYear.value!;
+    final m = selectedMonth.value!;
+    final d = selectedDay.value!;
+
+    // 🔒 Validate số ngày trong tháng
+    final lastDayOfMonth = DateTime(y, m + 1, 0).day;
+    if (d > lastDayOfMonth) {
+      selectedDay.value = lastDayOfMonth;
+    }
+
+    final date = DateTime(
+      y,
+      m,
+      selectedDay.value!,
+    );
+
+    selectedBirthday.value = date;
+    birthdayC.text = DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  void onMonthChanged(int month) {
+    selectedMonth.value = month;
+    updateBirthdayIfReady();
+  }
+
+  void onYearChanged(int year) {
+    selectedYear.value = year;
+    updateBirthdayIfReady();
   }
 
   Future<void> checkInitialLogin() async {
@@ -367,6 +419,34 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<void> pickTempAvatar(ImageSource source) async {
+    final picker = ImagePicker();
+
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 100,
+    );
+    if (picked == null) return;
+
+    final cropped = await ImageCropper().cropImage(
+      sourcePath: picked.path,
+      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+      compressFormat: ImageCompressFormat.jpg,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Cắt ảnh',
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(title: 'Cắt ảnh'),
+      ],
+    );
+
+    if (cropped == null) return;
+
+    tempAvatarFile.value = File(cropped.path);
+  }
+
+
   // =============================================================
   //                     SAVE PROFILE
   // =============================================================
@@ -391,15 +471,31 @@ class AuthController extends GetxController {
       return;
     }
 
+    if (tempAvatarFile.value == null) {
+      Get.snackbar(
+        "Thiếu ảnh đại diện",
+        "Vui lòng chọn ảnh đại diện để tiếp tục",
+        snackPosition: SnackPosition.TOP,
+      );
+      return;
+    }
+
     isLoadingRegister.value = true;
 
     try {
+      String? avatarUrl;
+      if (tempAvatarFile.value != null) {
+        avatarUrl = await AvatarService.uploadAvatar(
+          tempAvatarFile.value!,
+        );
+      }
       await _auth.saveUserProfile(
         fullname: fullnameC.text.trim(),
         nickname: nickname,
         phonenumber: fullPhoneNumber.value.trim(),
         birthday: selectedBirthday.value!,
         gender: selectedGender.value,
+        avatarUrl: avatarUrl,
       );
 
       final uid = FirebaseAuth.instance.currentUser?.uid;

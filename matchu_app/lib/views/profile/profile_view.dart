@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
+import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
 import 'package:matchu_app/widgets/profile_widget/profile_widget.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/widgets/profile_widget/popup_profile_widget.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/widgets/profile_widget/right_side_menu.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
@@ -17,6 +20,8 @@ class ProfileView extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     final ProfileController c = Get.put(ProfileController());
+    final AvatarController avatarC = Get.find<AvatarController>();
+
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -36,68 +41,118 @@ class ProfileView extends StatelessWidget {
         return SingleChildScrollView(
           child: Column(
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    height: 180,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          colorScheme.primary,
-                          colorScheme.secondary,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(30),
-                        bottomRight: Radius.circular(30),
-                      ),
-                    ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 0, left: 20, right: 20),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children:[
-                            IconButton(
-                              onPressed: () {
-                                Get.toNamed('/search-user');
-                              },
-                              icon: Icon(Iconsax.user_cirlce_add, color: colorScheme.onPrimary, size: 30),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                RightSideMenu.open(context);
-                              },
-                              icon: Icon(Iconsax.more_circle, color: colorScheme.onPrimary, size: 30),
-                            ),
+              SizedBox(
+                height: 240,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      height: 180,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.secondary,
                           ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(30),
+                          bottomRight: Radius.circular(30),
                         ),
                       ),
-                   ),
-        
-                  // AVATAR
-                  Positioned(
-                    bottom: -50,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: CircleAvatar(
-                        radius: 55,
-                        backgroundColor: theme.scaffoldBackgroundColor,
-                        child: const CircleAvatar(
-                          radius: 50,
-                          backgroundImage: AssetImage("assets/avatas/avataMd.png"),
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 0, left: 20, right: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children:[
+                              IconButton(
+                                onPressed: () {
+                                  Get.toNamed('/search-user');
+                                },
+                                icon: Icon(Iconsax.user_cirlce_add, color: colorScheme.onPrimary, size: 30),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  RightSideMenu.open(context);
+                                },
+                                icon: Icon(Iconsax.more_circle, color: colorScheme.onPrimary, size: 30),
+                              ),
+                            ],
+                          ),
                         ),
+                     ),
+                    // AVATAR
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Obx(() {
+                          final user = avatarC.user.value;
+                          return GestureDetector(
+                            onTap: () => showAvatarBottomSheet(context),
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 55,
+                                  backgroundColor: theme.scaffoldBackgroundColor,
+                                  child: CircleAvatar(
+                                    radius: 50,
+                                    backgroundColor: Colors.grey.shade200,
+                                    backgroundImage: user != null && user.avatarUrl.isNotEmpty
+                                      ? CachedNetworkImageProvider(
+                                          "${user.avatarUrl}?v=${user.updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch}",
+                                        )
+                                      : const AssetImage("assets/avatas/avataMd.png"),
+                                  ),
+                                ),
+                
+                                // ICON CAMERA
+                                Positioned(
+                                  bottom: 4,
+                                  right: 4,
+                                  child: CircleAvatar(
+                                    radius: 16,
+                                    backgroundColor: AppTheme.primaryColor,
+                                    child: const Icon(
+                                      Iconsax.camera,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                
+                                // LOADING OVERLAY
+                                if (avatarC.isUploadingAvatar.value)
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.3),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
                       ),
                     ),
-                  ),
-                ],
+                
+                  ],
+                ),
               ),
         
-              const SizedBox(height: 60),
+              const SizedBox(height: 10),
         
               // ---------------- NAME ----------------
               Text(c.fullName, style: textTheme.headlineSmall),

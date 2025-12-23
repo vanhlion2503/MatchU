@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/models/user_model.dart';
-import 'package:matchu_app/services/user_service.dart';
+import 'package:matchu_app/services/user/user_service.dart';
 import 'package:flutter/material.dart';
 
 

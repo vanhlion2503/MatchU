@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/profile/following_controller.dart';
@@ -46,7 +47,7 @@ class FollowingView extends StatelessWidget {
                       CircleAvatar(
                         radius: 26,
                         backgroundImage: u.avatarUrl.isNotEmpty
-                            ? NetworkImage(u.avatarUrl)
+                            ? CachedNetworkImageProvider(u.avatarUrl)
                             : null,
                         child: u.avatarUrl.isEmpty
                             ? Text(u.nickname[0].toUpperCase())

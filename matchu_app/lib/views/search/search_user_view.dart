@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
@@ -140,7 +141,7 @@ class SearchUserView extends StatelessWidget {
                                   CircleAvatar(
                                     radius: 26,
                                     backgroundImage: user.avatarUrl.isNotEmpty
-                                        ? NetworkImage(user.avatarUrl)
+                                        ? CachedNetworkImageProvider(user.avatarUrl)
                                         : null,
                                     child: user.avatarUrl.isEmpty
                                         ? Text(

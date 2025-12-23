@@ -1,10 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/profile/avatar_fullscreen_view.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/widgets/profile_widget/profile_widget.dart';
 
@@ -20,6 +23,8 @@ class OtherProfileView extends StatelessWidget {
       tag: userId,        // ⭐ Gán tag để controller không bị trùng
       permanent: false,   // Cho phép tự hủy khi back
     );
+
+    final AvatarController avatarC = Get.put(AvatarController());
 
 
     final textTheme = Theme.of(context).textTheme;
@@ -40,73 +45,92 @@ class OtherProfileView extends StatelessWidget {
           child: Column(
             children: [
               // ================= HEADER =================
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [colorScheme.primary, colorScheme.secondary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+              SizedBox(
+                height: 240,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [colorScheme.primary, colorScheme.secondary],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(30),
+                          bottomRight: Radius.circular(30),
+                        ),
                       ),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(30),
-                        bottomRight: Radius.circular(30),
+                      child: SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                onPressed: () => Get.back(),
+                                icon: const Icon(Icons.arrow_back_ios_new),
+                                color: colorScheme.onPrimary,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton(
-                              onPressed: () => Get.back(),
-                              icon: const Icon(Icons.arrow_back_ios_new),
-                              color: colorScheme.onPrimary,
+                
+                    // ================= AVATAR =================
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Material(
+                          shape: const CircleBorder(),
+                          color: Colors.transparent,
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: () => openAvatarFullscreen(context, u.avatarUrl),
+                            child: CircleAvatar(
+                              radius: 55,
+                              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                              child: CircleAvatar(
+                                radius: 50,
+                                backgroundImage: u.avatarUrl.isNotEmpty
+                                    ? CachedNetworkImageProvider(u.avatarUrl)
+                                    : const AssetImage("assets/avatas/avataMd.png")
+                                        as ImageProvider,
+                                child: u.avatarUrl.isEmpty
+                                    ? Text(
+                                        u.nickname[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  // ================= AVATAR =================
-                  Positioned(
-                    bottom: -45,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: CircleAvatar(
-                        radius: 55,
-                        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundImage: u.avatarUrl.isNotEmpty
-                              ? NetworkImage(u.avatarUrl)
-                              : AssetImage("assets/avatas/avataMd.png"),
-                          child: u.avatarUrl.isEmpty
-                              ? Text(
-                                  u.nickname[0].toUpperCase(),
-                                  style: const TextStyle(
-                                      fontSize: 22, fontWeight: FontWeight.bold),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 60),
+              const SizedBox(height: 10),
 
               // ================= NAME =================
               Text(u.fullname, style: textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text("@${u.nickname}", style: textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              Text(
+                "@${u.nickname} • ${c.age}", 
+                  style: textTheme.bodyMedium?.copyWith(
+                  color: textTheme.bodySmall?.color,
+                ),),
 
               const SizedBox(height: 18),
 
@@ -256,4 +280,13 @@ class OtherProfileView extends StatelessWidget {
     );
   }
 
+  void openAvatarFullscreen(BuildContext context, String? avatarUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (_) => AvatarFullscreenView(
+        avatarUrl: avatarUrl,
+      ),
+    );
+  }
 }

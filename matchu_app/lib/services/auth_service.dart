@@ -114,13 +114,14 @@ class AuthService {
     required String phonenumber,
     DateTime? birthday,
     String? gender,
+    String? avatarUrl,
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("User chưa đăng nhập");
 
     await user.updateDisplayName(nickname);
 
-    await _db.collection('users').doc(user.uid).set({
+    final data = <String, dynamic>{
       "uid": user.uid,
       "email": user.email,
       "fullname": fullname,
@@ -132,8 +133,6 @@ class AuthService {
       "birthday": birthday?.toIso8601String(),
       "gender": gender,
       "bio": "",
-      "avatarUrl": "",
-
       "interests": [],
 
       "location": {
@@ -168,8 +167,19 @@ class AuthService {
       "lastActiveAt": FieldValue.serverTimestamp(),
       "createdAt": FieldValue.serverTimestamp(),
       "updatedAt": FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+
+    // ⭐⭐⭐ CHỈ GHI KHI CÓ AVATAR
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      data["avatarUrl"] = avatarUrl;
+    }
+
+    await _db
+        .collection('users')
+        .doc(user.uid)
+        .set(data, SetOptions(merge: true));
   }
+
 
   /* ======================= LOGIN + MFA ======================= */
 
