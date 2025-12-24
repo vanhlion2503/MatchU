@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 
 import '../../models/queue_user_model.dart';
 import '../../services/chat/matching_service.dart';
 import '../auth/auth_controller.dart';
 
-class MatchingController extends GetxController {
+class MatchingController extends GetxController{
   final MatchingService _service = MatchingService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -24,9 +27,42 @@ class MatchingController extends GetxController {
 
 
   StreamSubscription<QuerySnapshot>? _roomSub;
+  StreamSubscription<List<ConnectivityResult>>? _netSub;
 
   final elapsedSeconds = 0.obs;
   Timer? _timer;
+
+  @override
+  void onInit() {
+    super.onInit();
+
+    _netSub = Connectivity()
+        .onConnectivityChanged
+        .listen((results) {
+      _handleConnectivity(results);
+    });
+  }
+
+  void _handleConnectivity(List<ConnectivityResult> results) async {
+    final isOffline = results.contains(ConnectivityResult.none);
+
+    if (isOffline && isSearching.value) {
+      // ❗ Hủy listener sớm để tránh log Firestore
+      await _roomSub?.cancel();
+      _roomSub = null;
+
+      Get.snackbar(
+        "Mất kết nối",
+        "Đã mất mạng, quay về trang tìm chat",
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+
+      await stopMatching();
+
+      Get.offAllNamed("/main");
+    }
+  }
 
   void startTimer(){
     _timer?.cancel();
@@ -114,7 +150,6 @@ class MatchingController extends GetxController {
 
     _go(snapshot.docs.first.id);
   });
-
   }
 
   // =========================================================
@@ -124,7 +159,7 @@ class MatchingController extends GetxController {
     if (isMatched.value) return;
 
     stopTimer();
-    
+
     isMatched.value = true;
     isSearching.value = false;
     canCancel.value = false;
@@ -169,6 +204,7 @@ class MatchingController extends GetxController {
   // =========================================================
   @override
   void onClose() {
+    _netSub?.cancel();
     stopMatching();
     stopTimer();
     super.onClose();

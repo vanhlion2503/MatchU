@@ -106,16 +106,26 @@ class MatchingService {
 
   // =========================================================
   Future<void> enqueue(QueueUserModel q) async {
-    final ref = _rtdb.child(queuePath).push();
-    await ref.set({
+    final queueRef = _rtdb.child(queuePath).push();
+    final indexRef = _rtdb.child(indexPath).child(q.uid);
+
+    // 1️⃣ set queue
+    await queueRef.set({
       "uid": q.uid,
       "gender": q.gender,
       "targetGender": q.targetGender,
       "createdAt": DateTime.now().millisecondsSinceEpoch,
       "claimedBy": null,
     });
-    await _rtdb.child(indexPath).child(q.uid).set(ref.key);
+
+    // 2️⃣ set index
+    await indexRef.set(queueRef.key);
+
+    // 3️⃣ 🔥 AUTO CLEANUP KHI APP KILL
+    queueRef.onDisconnect().remove();
+    indexRef.onDisconnect().remove();
   }
+
 
   Future<void> dequeue(String uid) async {
     final snap = await _rtdb.child(indexPath).child(uid).get();
@@ -152,6 +162,7 @@ class MatchingService {
       "userB": b,
       "participants": [a, b],
       "createdAt": FieldValue.serverTimestamp(),
+      
       "status": "active",
       "anonymousAvatars": {},
     },);
