@@ -42,36 +42,44 @@ class TempChatView extends StatelessWidget {
           return Row(
             children: [
               /// 👤 Avatar + online dot
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                    child: Icon(
-                      Iconsax.user,
-                      color: theme.colorScheme.primary,
-                      size: 22,
+              Obx(() {
+                final key = controller.otherAnonymousAvatar.value;
+
+                return Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor:
+                          theme.colorScheme.surfaceVariant,
+                      backgroundImage: key == null
+                          ? const AssetImage(
+                              "assets/anonymous/placeholder.png",
+                            )
+                          : AssetImage(
+                              "assets/anonymous/$key.png",
+                            ),
                     ),
-                  ),
-                  Positioned(
-                    right: 2,
-                    bottom: 2,
-                    child: Container(
-                      width: 13,
-                      height: 13,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: theme.colorScheme.surface,
-                          width: 1,
+
+                    /// 🟢 online dot
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Container(
+                        width: 13,
+                        height: 13,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: theme.colorScheme.surface,
+                            width: 1,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-
+                  ],
+                );
+              }),
               const SizedBox(width: 12),
 
               /// 🧾 Name + rating

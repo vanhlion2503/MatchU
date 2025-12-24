@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
@@ -15,6 +16,7 @@ class TempChatController extends GetxController {
 
   final TempChatService service = TempChatService();
   final uid = Get.find<AuthController>().user!.uid;
+  final _db = FirebaseFirestore.instance;
 
   final remainingSeconds = 180.obs;
   final userLiked = RxnBool();
@@ -31,6 +33,8 @@ class TempChatController extends GetxController {
   final showEmoji = false.obs;
   final inputController = TextEditingController();
   final otherRatingCount = RxnInt();
+  final otherAnonymousAvatar = RxnString();
+
 
 
   Timer? _typingTimer;
@@ -43,6 +47,8 @@ class TempChatController extends GetxController {
     _startTimer();
     _listenRoom();
     _loadOtherUserRating();
+    _saveMyAnonymousAvatarToRoom();
+    _listenAnonymousAvatars();
   }
 
   void toggleEmoji() {
@@ -332,6 +338,35 @@ class TempChatController extends GetxController {
       (data["totalChatRatings"] ?? 0) as int;
 
   }
+
+  Future<void> _saveMyAnonymousAvatarToRoom() async {
+    final anonAvatarC = Get.find<AnonymousAvatarController>();
+    final myAvatar = anonAvatarC.selectedAvatar.value;
+
+    if (myAvatar == null) return;
+
+    await _db.collection("tempChats").doc(roomId).update({
+      "anonymousAvatars.$uid": myAvatar,
+    });
+  }
+
+  void _listenAnonymousAvatars() {
+    _roomSub = _db.collection("tempChats").doc(roomId).snapshots().listen((doc) {
+      if (!doc.exists) return;
+
+      final data = doc.data()!;
+      final avatars =
+          Map<String, dynamic>.from(data["anonymousAvatars"] ?? {});
+      final participants = List<String>.from(data["participants"]);
+
+      final otherUid = participants.firstWhere((e) => e != uid);
+
+      otherAnonymousAvatar.value = avatars[otherUid];
+    });
+  }
+
+
+
 
   @override
   void onClose() {

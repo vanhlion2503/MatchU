@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:simple_ripple_animation/simple_ripple_animation.dart';
@@ -17,6 +18,8 @@ class MatchingView extends StatefulWidget {
 class _MatchingViewState extends State<MatchingView> 
     with SingleTickerProviderStateMixin{
   final controller = Get.find<MatchingController>();
+  final anonAvatarC = Get.find<AnonymousAvatarController>();
+
   late final AnimationController? _lineController;
 
   @override
@@ -24,7 +27,6 @@ class _MatchingViewState extends State<MatchingView>
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Nếu đang match hoặc đã match thì chỉ hiển thị UI
       if (controller.isSearching.value ||
           controller.isMatched.value) {
         return;
@@ -207,42 +209,58 @@ class _MatchingViewState extends State<MatchingView>
       children: [
         Stack(
           children: [
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                            ? AppTheme.darkBorder 
-                            : AppTheme.lightBorder, // 👈 màu viền
-                  width: 3,
+            Obx(() {
+              final key = anonAvatarC.selectedAvatar.value;
+
+              return Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppTheme.darkBorder
+                        : AppTheme.lightBorder,
+                    width: 3,
+                  ),
                 ),
-              ),
-              child: const CircleAvatar(
-                radius: 38,
-                backgroundImage: NetworkImage("https://i.pravatar.cc/300"),
-              ),
-            ),
+                child: CircleAvatar(
+                  radius: 42,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceVariant,
+                  backgroundImage: key == null
+                      ? const AssetImage(
+                          "assets/anonymous/placeholder.png",
+                        )
+                      : AssetImage(
+                          "assets/anonymous/$key.png",
+                        ),
+                ),
+              );
+            }),
+
+            /// 🟢 Online dot
             Positioned(
               top: 65,
               right: 2,
               child: Container(
                 width: 15,
-                  height: 15,
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.background,
-                      width: 2,
-                    ),
+                height: 15,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.background,
+                    width: 2,
                   ),
-              ))
+                ),
+              ),
+            ),
           ],
         ),
       ],
     );
   }
+
 
   Widget _centerLine() {
     final color = Theme.of(context).colorScheme;

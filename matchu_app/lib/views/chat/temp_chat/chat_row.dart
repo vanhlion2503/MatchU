@@ -15,6 +15,8 @@ class ChatRow extends StatelessWidget {
   final String messageId;
   final bool highlighted;
   final String type;
+  final String? anonymousAvatarKey;
+
 
   const ChatRow({
     super.key,
@@ -30,6 +32,7 @@ class ChatRow extends StatelessWidget {
     required this.messageId,
     required this.highlighted,
     required this.type,
+    this.anonymousAvatarKey,
   });
 
   @override
@@ -53,7 +56,7 @@ class ChatRow extends StatelessWidget {
             if (!isMe)
               SizedBox(
                 width: 36,
-                child: showAvatar ? const AnonymousAvatar() : const SizedBox(),
+                child: showAvatar ? AnonymousAvatar(avatarKey: anonymousAvatarKey, radius: 16,): const SizedBox(),
               ),
             const SizedBox(width: 6),
 
@@ -100,7 +103,7 @@ class ChatRow extends StatelessWidget {
           if (!isMe)
             SizedBox(
               width: 36,
-              child: showAvatar ? const AnonymousAvatar() : const SizedBox(),
+              child: showAvatar ? AnonymousAvatar(avatarKey: anonymousAvatarKey, radius: 16,) : const SizedBox(),
             ),
           const SizedBox(width: 6),
           Flexible(

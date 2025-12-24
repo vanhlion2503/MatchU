@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/route_manager.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
+import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -36,6 +37,7 @@ void main() async {
   Get.put(AuthController(), permanent: true);
   Get.put(MatchingController(), permanent: true);
   Get.put(AvatarController(), permanent: true);
+  Get.put(AnonymousAvatarController(), permanent: true);
 
 
   runApp(const MyApp());

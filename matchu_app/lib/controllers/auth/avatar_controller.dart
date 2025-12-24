@@ -88,7 +88,7 @@ class AvatarController extends GetxController {
         AndroidUiSettings(
           toolbarTitle: 'Cắt ảnh',
           lockAspectRatio: true,
-          hideBottomControls: true,
+
         ),
         IOSUiSettings(
           title: 'Cắt ảnh',

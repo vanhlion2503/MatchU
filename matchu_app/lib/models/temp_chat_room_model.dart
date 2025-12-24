@@ -14,6 +14,9 @@ class TempChatRoomModel {
   final bool userALiked;
   final bool userBLiked;
 
+  final Map<String, String> anonymousAvatars;
+
+
   final String status;
 
   TempChatRoomModel({
@@ -26,6 +29,7 @@ class TempChatRoomModel {
     this.userALiked = false,
     this.userBLiked = false,
     this.status = "active",
+    this.anonymousAvatars = const {},
   });
 
   // =========================================================
@@ -40,6 +44,7 @@ class TempChatRoomModel {
         "expireAt": Timestamp.fromDate(expireAt),
         "userALiked": userALiked,
         "userBLiked": userBLiked,
+        "anonymousAvatars": anonymousAvatars,
         "status": status,
       };
 
@@ -57,6 +62,8 @@ class TempChatRoomModel {
       userALiked: json["userALiked"] ?? false,
       userBLiked: json["userBLiked"] ?? false,
       status: json["status"] ?? "active",
+      anonymousAvatars:Map<String, String>.from(json["anonymousAvatars"] ?? {}),
+
     );
   }
 }

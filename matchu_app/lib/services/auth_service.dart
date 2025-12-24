@@ -163,6 +163,7 @@ class AuthService {
 
       "role": "user",
       "isProfileCompleted": false,
+      "anonymousAvatar": null,
 
       "lastActiveAt": FieldValue.serverTimestamp(),
       "createdAt": FieldValue.serverTimestamp(),

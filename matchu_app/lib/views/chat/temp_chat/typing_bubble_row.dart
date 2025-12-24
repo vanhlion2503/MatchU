@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/widgets/animated_dots.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
 
 class TypingBubbleRow extends StatelessWidget {
-  const TypingBubbleRow({super.key});
+  final TempChatController controller;
+
+  const TypingBubbleRow({
+    super.key,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -13,20 +20,25 @@ class TypingBubbleRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          // 👤 Avatar
-          const SizedBox(
+          SizedBox(
             width: 36,
-            child: AnonymousAvatar(),
+            child: Obx(() {
+              final key = controller.otherAnonymousAvatar.value;
+              if (key == null) return const SizedBox();
+
+              return AnonymousAvatar(
+                avatarKey: key,
+                radius: 16,
+              );
+            }),
           ),
           const SizedBox(width: 6),
 
-          // ❗ KHÔNG DÙNG Flexible
           Padding(
             padding: const EdgeInsets.only(bottom: 18),
             child: SizedBox(
-              width: 52,  
+              width: 52,
               height: 36,
               child: Container(
                 alignment: Alignment.center,
@@ -48,9 +60,9 @@ class TypingBubbleRow extends StatelessWidget {
               ),
             ),
           ),
-
         ],
       ),
     );
   }
 }
+

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 
 import '../../models/queue_user_model.dart';
 import '../../services/chat/matching_service.dart';
@@ -48,6 +49,17 @@ class MatchingController extends GetxController {
   // =========================================================
   Future<void> startMatching({required String targetGender}) async {
     if (isSearching.value) return;
+
+    final anonAvatarC = Get.find<AnonymousAvatarController>();
+    final myAnonAvatar = anonAvatarC.selectedAvatar.value;
+
+    if (myAnonAvatar == null) {
+      Get.snackbar(
+        "Thiếu avatar ẩn danh",
+        "Vui lòng chọn avatar trước khi tìm chat",
+      );
+      return;
+    }
     this.targetGender.value = targetGender;
     isMatchingActive.value = true;
     canCancel.value = false;
@@ -85,7 +97,7 @@ class MatchingController extends GetxController {
     );
 
     // 1️⃣ Try match immediately
-    final roomId = await _service.matchUser(seeker);
+    final roomId = await _service.matchUser(seeker, myAnonymousAvatar: myAnonAvatar,);
     if (roomId != null) {
       _go(roomId);
       return;

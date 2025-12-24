@@ -74,7 +74,7 @@ class MessagesList extends StatelessWidget {
               if (!controller.otherTyping.value) {
                 return const SizedBox();
               }
-              return const TypingBubbleRow();
+              return TypingBubbleRow(controller: controller);
             });
           }
 
@@ -182,8 +182,8 @@ class MessagesList extends StatelessWidget {
                                     ? () => controller.scrollToMessage(data["replyToId"])
                                     : null,
                                 messageId: doc.id,
-                                highlighted:
-                                    controller.highlightedMessageId.value == doc.id,
+                                highlighted: controller.highlightedMessageId.value == doc.id,
+                                anonymousAvatarKey: isMe? null: controller.otherAnonymousAvatar.value,
                               );
                             }),
                           ),

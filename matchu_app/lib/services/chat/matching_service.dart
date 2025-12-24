@@ -20,12 +20,12 @@ class MatchingService {
   // =========================================================
   // PUBLIC
   // =========================================================
-  Future<String?> matchUser(QueueUserModel seeker) async {
+  Future<String?> matchUser(QueueUserModel seeker,  {required String myAnonymousAvatar,}) async {
     // 🔒 lock nhẹ (chỉ chống spam)
     await _lockSoft(seeker.uid);
 
     // 1️⃣ thử match ngay
-    final room = await _tryMatch(seeker);
+    final room = await _tryMatch(seeker, myAnonymousAvatar);
     if (room != null) {
       await _unlock(seeker.uid);
       return room;
@@ -42,7 +42,7 @@ class MatchingService {
   // =========================================================
   // CORE MATCH
   // =========================================================
-  Future<String?> _tryMatch(QueueUserModel seeker) async {
+  Future<String?> _tryMatch(QueueUserModel seeker, String myAnonymousAvatar,) async {
     final snap = await _rtdb.child(queuePath).get();
     if (!snap.exists || snap.value is! Map) return null;
 
@@ -143,7 +143,7 @@ class MatchingService {
   }
 
   // =========================================================
-  Future<String> _createNewRoom(String a, String b) async {
+  Future<String> _createNewRoom(String a, String b,) async {
 
     final ref = _firestore.collection("tempChats").doc();
     await ref.set({
@@ -153,7 +153,8 @@ class MatchingService {
       "participants": [a, b],
       "createdAt": FieldValue.serverTimestamp(),
       "status": "active",
-    });
+      "anonymousAvatars": {},
+    },);
 
     return ref.id;
   }

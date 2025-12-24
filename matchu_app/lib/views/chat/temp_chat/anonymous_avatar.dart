@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
 
 class AnonymousAvatar extends StatelessWidget {
-  const AnonymousAvatar({super.key});
+  final String? avatarKey; // 👈 avt_01, avt_02...
+  final double radius;
+
+  const AnonymousAvatar({
+    super.key,
+    required this.avatarKey,
+    this.radius = 16,
+  });
 
   @override
   Widget build(BuildContext context) {
     return CircleAvatar(
-      radius: 16,
+      radius: radius,
       backgroundColor:
-          Theme.of(context).colorScheme.primary.withOpacity(0.15),
-      child: Icon(
-        Icons.person,
-        size: 18,
-        color: Theme.of(context).colorScheme.primary,
-      ),
+          Theme.of(context).colorScheme.surfaceVariant,
+      backgroundImage: avatarKey == null
+          ? const AssetImage(
+              "assets/anonymous/placeholder.png",
+            )
+          : AssetImage(
+              "assets/anonymous/$avatarKey.png",
+            ),
     );
   }
 }

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
+import 'package:matchu_app/views/chat/chat_widget/anonymous_avatar_selector.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
@@ -18,6 +20,7 @@ class _RandomChatViewState extends State<RandomChatView>
 
   late final AnimationController _rippleController;
   final controller = Get.find<MatchingController>();
+  final anonAvatarC = Get.find<AnonymousAvatarController>();
   final _matchingService = MatchingService();
   String selectedTarget = "random";
 
@@ -133,10 +136,62 @@ class _RandomChatViewState extends State<RandomChatView>
                           ),
                         ),
                       ),
-                      CircleAvatar(
-                        radius: 45,
-                        backgroundImage:
-                            NetworkImage("https://i.pravatar.cc/300"),
+                      GestureDetector(
+                        onTap: () {
+                          Get.bottomSheet(
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).scaffoldBackgroundColor,
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(20),
+                                ),
+                              ),
+                              child: const AnonymousAvatarSelector(),
+                            ),
+                            isScrollControlled: true,
+                          );
+                        },
+                        child: Obx(() {
+                          final key = anonAvatarC.selectedAvatar.value;
+
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              /// ===== AVATAR =====
+                              CircleAvatar(
+                                radius: 50,
+                                backgroundColor: Theme.of(context).colorScheme.surface,
+                                backgroundImage: key == null
+                                    ? const AssetImage("assets/anonymous/placeholder.png")
+                                    : AssetImage("assets/anonymous/$key.png"),
+                              ),
+
+                              /// ===== ICON CHANGE =====
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Theme.of(context).colorScheme.primary,
+                                    border: Border.all(
+                                      color: Theme.of(context).scaffoldBackgroundColor,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Iconsax.edit_2, // hoặc Iconsax.camera
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
                       ),
                     ],
                   ),
@@ -174,11 +229,21 @@ class _RandomChatViewState extends State<RandomChatView>
                   width: double.infinity,
                   height: 60,
                   child: ElevatedButton(
-                    onPressed:() {
+                    onPressed:() async {
+                      if (!anonAvatarC.isSelected) {
+                        Get.snackbar(
+                          "Thiếu avatar ẩn danh",
+                          "Vui lòng chọn avatar trước khi bắt đầu",
+                        );
+                        return;
+                      }
                       controller.isMinimized.value = false;
                       Get.toNamed(
                         "/matching",
-                        arguments: {"targetGender": selectedTarget},
+                        arguments: {
+                          "targetGender": selectedTarget,
+                          "anonymousAvatar": anonAvatarC.selectedAvatar.value,
+                          },
                       );
                     }, 
                     child: Text("🔍 Bắt đầu tìm kiếm")),
