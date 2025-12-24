@@ -103,9 +103,10 @@ class AppPages {
       name: AppRouter.rating,
       page: () => RatingView(),
       binding: BindingsBuilder(() {
-        Get.put(RatingController());
+        Get.lazyPut<RatingController>(() => RatingController());
       }),
     ),
+
 
     /// TEMP CHAT ROOM
     GetPage(

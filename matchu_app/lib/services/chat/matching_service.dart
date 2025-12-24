@@ -20,29 +20,29 @@ class MatchingService {
   // =========================================================
   // PUBLIC
   // =========================================================
-  Future<String?> matchUser(QueueUserModel seeker,  {required String myAnonymousAvatar,}) async {
-    // 🔒 lock nhẹ (chỉ chống spam)
+  Future<String?> matchUser(
+    QueueUserModel seeker, {
+    required String myAnonymousAvatar,
+    required String sessionId,
+  }) async {
     await _lockSoft(seeker.uid);
 
-    // 1️⃣ thử match ngay
-    final room = await _tryMatch(seeker, myAnonymousAvatar);
+    final room = await _tryMatch(seeker, myAnonymousAvatar, sessionId);
     if (room != null) {
-      await _unlock(seeker.uid);
+      // await _unlock(seeker.uid);
       return room;
     }
 
-    // 2️⃣ luôn enqueue nếu chưa match
     await enqueue(seeker);
-
-    // 3️⃣ unlock để người khác claim
-    await _unlock(seeker.uid);
+    // await _unlock(seeker.uid);
     return null;
   }
+
 
   // =========================================================
   // CORE MATCH
   // =========================================================
-  Future<String?> _tryMatch(QueueUserModel seeker, String myAnonymousAvatar,) async {
+  Future<String?> _tryMatch(QueueUserModel seeker, String myAnonymousAvatar,String sessionId) async {
     final snap = await _rtdb.child(queuePath).get();
     if (!snap.exists || snap.value is! Map) return null;
 
@@ -53,6 +53,7 @@ class MatchingService {
 
       final data = Map<String, dynamic>.from(child.value as Map);
       final oppUid = data["uid"];
+      final oppSessionId = data["sessionId"];
       final createdAt = data["createdAt"] ?? 0;
 
       if (oppUid == null ||
@@ -88,7 +89,12 @@ class MatchingService {
 
       if (putRes.statusCode != 200) continue;
 
-      final roomId = await _createNewRoom(seeker.uid, oppUid);
+      final roomId = await _createNewRoom(
+        seeker.uid,
+        oppUid,
+        sessionId,        // session của A
+        oppSessionId,     // session của B
+      );
 
       await _cleanupAfterMatch(seeker.uid, oppUid, child.key!);
       return roomId;
@@ -116,6 +122,7 @@ class MatchingService {
       "targetGender": q.targetGender,
       "createdAt": DateTime.now().millisecondsSinceEpoch,
       "claimedBy": null,
+      "sessionId": q.sessionId,
     });
 
     // 2️⃣ set index
@@ -153,8 +160,12 @@ class MatchingService {
   }
 
   // =========================================================
-  Future<String> _createNewRoom(String a, String b,) async {
-
+  Future<String> _createNewRoom(
+    String a,
+    String b,
+    String sessionA,
+    String sessionB,
+  ) async {
     final ref = _firestore.collection("tempChats").doc();
     await ref.set({
       "roomId": ref.id,
@@ -162,13 +173,15 @@ class MatchingService {
       "userB": b,
       "participants": [a, b],
       "createdAt": FieldValue.serverTimestamp(),
-      
+      "sessionA": sessionA, // của userA
+      "sessionB": sessionB, // của userB
+      "sessionIds": [sessionA, sessionB],
       "status": "active",
       "anonymousAvatars": {},
-    },);
-
+    });
     return ref.id;
   }
+
 
   Future<void> _cleanupAfterMatch(
       String a, String b, String queueKey) async {

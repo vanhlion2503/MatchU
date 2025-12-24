@@ -41,6 +41,7 @@ class TempChatController extends GetxController {
   Timer? _typingTimer;
   Timer? _timer;
   StreamSubscription? _roomSub;
+  StreamSubscription? _avatarSub;
 
   @override
   void onInit() {
@@ -165,6 +166,7 @@ class TempChatController extends GetxController {
             arguments: {
               "roomId": roomId,
               "toUid": toUid,
+              "anonymousAvatar": otherAnonymousAvatar.value,
             },
           );
         });
@@ -264,9 +266,11 @@ class TempChatController extends GetxController {
     );
     Get.offAllNamed(
       "/rating",
-      arguments: {
+      arguments: 
+      {
         "roomId": roomId,
         "toUid": toUid,
+        "anonymousAvatar": otherAnonymousAvatar.value,
       },
     );
   }
@@ -353,7 +357,7 @@ class TempChatController extends GetxController {
   }
 
   void _listenAnonymousAvatars() {
-    _roomSub = _db.collection("tempChats").doc(roomId).snapshots().listen((doc) {
+    _avatarSub = _db.collection("tempChats").doc(roomId).snapshots().listen((doc) {
       if (!doc.exists) return;
 
       final data = doc.data()!;
@@ -362,6 +366,8 @@ class TempChatController extends GetxController {
       final participants = List<String>.from(data["participants"]);
 
       final otherUid = participants.firstWhere((e) => e != uid);
+
+      final otherAvatarKey = avatars[otherUid];
 
       otherAnonymousAvatar.value = avatars[otherUid];
     });
@@ -380,6 +386,7 @@ class TempChatController extends GetxController {
     _typingTimer?.cancel();
     _timer?.cancel();
     _roomSub?.cancel();
+    _avatarSub?.cancel();
     inputController.dispose();
     super.onClose();
   }

@@ -103,10 +103,12 @@ class ProfileView extends StatelessWidget {
                                     radius: 50,
                                     backgroundColor: Colors.grey.shade200,
                                     backgroundImage: user != null && user.avatarUrl.isNotEmpty
-                                      ? CachedNetworkImageProvider(
-                                          "${user.avatarUrl}?v=${user.updatedAt?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch}",
-                                        )
-                                      : const AssetImage("assets/avatas/avataMd.png"),
+                                    ? CachedNetworkImageProvider(
+                                        user.avatarUrl == AvatarController.defaultAvatarUrl
+                                            ? user.avatarUrl // ❗ placeholder → KHÔNG cache busting
+                                            : "${user.avatarUrl}?v=${user.updatedAt?.millisecondsSinceEpoch ?? 0}",
+                                      )
+                                    : const AssetImage("assets/avatas/avataMd.png"),
                                   ),
                                 ),
                 

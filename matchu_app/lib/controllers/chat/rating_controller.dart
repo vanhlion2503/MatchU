@@ -8,17 +8,27 @@ class RatingController extends GetxController{
   late final String myUid;
   late final String toUid;
 
+  final RxnString otherAnonymousAvatar = RxnString();
+  final RxnString otherGender = RxnString();
+
   final rating = 5.0.obs;
   final isSubmitting = false.obs;
 
+  @override
   void onInit() {
     super.onInit();
-    final args = Get.arguments;
+
+    final args = Get.arguments as Map<String, dynamic>;
+
     roomId = args["roomId"];
     toUid = args["toUid"];
     myUid = Get.find<AuthController>().user!.uid;
+
+    otherAnonymousAvatar.value = args["anonymousAvatar"];
+    otherGender.value = args["gender"];
   }
 
+  
   Future<void> submit() async {
     if (isSubmitting.value) return; // 🔒 chặn double tap
     isSubmitting.value = true;

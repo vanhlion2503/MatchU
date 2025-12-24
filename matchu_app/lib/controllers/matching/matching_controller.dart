@@ -25,6 +25,8 @@ class MatchingController extends GetxController{
   final targetGender = RxnString();
   final bubbleOffset = Offset(20, 200).obs;
 
+  String? currentSessionId;
+
 
   StreamSubscription<QuerySnapshot>? _roomSub;
   StreamSubscription<List<ConnectivityResult>>? _netSub;
@@ -41,6 +43,26 @@ class MatchingController extends GetxController{
         .listen((results) {
       _handleConnectivity(results);
     });
+    _cleanupMyOldRooms();
+  }
+
+  Future<void> _cleanupMyOldRooms() async {
+    final uid = Get.find<AuthController>().user?.uid;
+    if (uid == null) return;
+
+    final snaps = await _firestore
+        .collection("tempChats")
+        .where("participants", arrayContains: uid)
+        .where("status", isEqualTo: "active")
+        .get();
+
+    for (final doc in snaps.docs) {
+      await doc.reference.update({
+        "status": "ended",
+        "endedReason": "app_restarted",
+        "endedAt": FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   void _handleConnectivity(List<ConnectivityResult> results) async {
@@ -96,6 +118,10 @@ class MatchingController extends GetxController{
       );
       return;
     }
+
+    currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    final sessionId = currentSessionId!;
+
     this.targetGender.value = targetGender;
     isMatchingActive.value = true;
     canCancel.value = false;
@@ -127,29 +153,41 @@ class MatchingController extends GetxController{
       uid: fbUser.uid,
       gender: data["gender"],
       targetGender: targetGender,
+      sessionId: sessionId,
       avgChatRating: 0,
       interests: const [],
       createdAt: DateTime.now(),
     );
 
     // 1️⃣ Try match immediately
-    final roomId = await _service.matchUser(seeker, myAnonymousAvatar: myAnonAvatar,);
+    final roomId = await _service.matchUser(
+      seeker,
+      myAnonymousAvatar: myAnonAvatar,
+      sessionId: sessionId,
+    );
     if (roomId != null) {
       _go(roomId);
       return;
     }
+    _roomSub?.cancel();
 
-    // 2️⃣ Wait for room
     _roomSub = _firestore
-      .collection("tempChats")
-      .where("participants", arrayContains: fbUser.uid)
-      .where("status", isEqualTo: "active")
-      .snapshots()
-      .listen((snapshot) {
-    if (snapshot.docs.isEmpty) return;
+        .collection("tempChats")
+        .where("sessionIds", arrayContains: sessionId)
+        .where("status", isEqualTo: "active")
+        .snapshots()
+        .listen((snapshot) {
+      for (final doc in snapshot.docs) {
+        final room = doc.data();
 
-    _go(snapshot.docs.first.id);
-  });
+        if (room["sessionA"] == sessionId ||
+            room["sessionB"] == sessionId) {
+          _go(doc.id);
+          break;
+        }
+      }
+    });
+
   }
 
   // =========================================================
@@ -191,7 +229,7 @@ class MatchingController extends GetxController{
 
     await _roomSub?.cancel();
     _roomSub = null;
-
+    currentSessionId = null;
     isSearching.value = false;
     isMatched.value = false;
     isMatchingActive.value = false;

@@ -71,10 +71,12 @@ void showAvatarBottomSheet(BuildContext context) {
 
             // ===== DELETE =====
             Obx(() {
-              final hasAvatar =
-                  c.user.value != null && c.user.value!.avatarUrl.isNotEmpty;
+              final hasCustomAvatar =
+                  c.user.value != null &&
+                  c.user.value!.avatarUrl.isNotEmpty &&
+                  c.user.value!.avatarUrl != AvatarController.defaultAvatarUrl;
 
-              if (!hasAvatar) return const SizedBox.shrink();
+              if (!hasCustomAvatar) return const SizedBox.shrink();
 
               return _AvatarActionItem(
                 icon: Iconsax.trash,
@@ -86,6 +88,7 @@ void showAvatarBottomSheet(BuildContext context) {
                 },
               );
             }),
+
 
             const SizedBox(height: 8),
           ],

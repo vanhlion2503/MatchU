@@ -19,6 +19,10 @@ class AvatarController extends GetxController {
   final user = Rxn<UserModel>();
   final isUploadingAvatar = false.obs;
 
+  static const String defaultAvatarUrl =
+  "https://firebasestorage.googleapis.com/v0/b/matchu-5bd75.firebasestorage.app/o/avatars%2Fplaceholder.png?alt=media";
+
+
   // ===== SERVICES =====
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
@@ -148,23 +152,29 @@ class AvatarController extends GetxController {
     isUploadingAvatar.value = true;
 
     try {
+      // ❗ Optional: nếu bạn muốn xoá file avatar cũ trên Storage
       await AvatarService.deleteAvatar();
 
+      // ✅ SET avatar mặc định
       await _db.collection("users").doc(_uid).update({
-        "avatarUrl": "",
+        "avatarUrl": defaultAvatarUrl,
         "updatedAt": FieldValue.serverTimestamp(),
       });
 
-      user.value = user.value?.copyWith(avatarUrl: "");
+      // ✅ Update local state
+      user.value = user.value?.copyWith(
+        avatarUrl: defaultAvatarUrl,
+      );
       user.refresh();
 
-      Get.snackbar("Thành công", "Đã xoá avatar");
+      Get.snackbar("Thành công", "Đã khôi phục avatar mặc định");
     } catch (e) {
       Get.snackbar("Lỗi", e.toString());
     } finally {
       isUploadingAvatar.value = false;
     }
   }
+
 
   @override
   void onClose() {

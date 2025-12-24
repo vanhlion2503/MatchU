@@ -88,11 +88,15 @@ class RatingView extends StatelessWidget {
                         width: 2,
                       ),
                     ),
-                    child: CircleAvatar(
-                      radius: 42,
-                      backgroundColor: colorTheme.secondary,
-                      child: const Icon(Iconsax.user, size: 42),
-                    ),
+                    child: Obx(() {
+                      final key = controller.otherAnonymousAvatar.value;
+                      return CircleAvatar(
+                        radius: 50,
+                        backgroundImage: key == null
+                            ? const AssetImage("assets/anonymous/placeholder.png")
+                            : AssetImage("assets/anonymous/$key.png"),
+                      );
+                    }),
                   ),
 
                   Positioned(
