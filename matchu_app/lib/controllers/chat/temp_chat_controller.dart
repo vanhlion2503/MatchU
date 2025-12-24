@@ -34,6 +34,7 @@ class TempChatController extends GetxController {
   final inputController = TextEditingController();
   final otherRatingCount = RxnInt();
   final otherAnonymousAvatar = RxnString();
+  final otherGender = RxnString();
 
 
 
@@ -331,11 +332,12 @@ class TempChatController extends GetxController {
     final data = userSnap.data()!;
 
 
-    otherAvgRating.value =
-      (data["avgChatRating"] ?? 5.0).toDouble();
+    otherAvgRating.value = (data["avgChatRating"] ?? 5.0).toDouble();
 
-  otherRatingCount.value =
-      (data["totalChatRatings"] ?? 0) as int;
+    otherRatingCount.value = (data["totalChatRatings"] ?? 0) as int;
+
+    otherGender.value = data["gender"];
+
 
   }
 

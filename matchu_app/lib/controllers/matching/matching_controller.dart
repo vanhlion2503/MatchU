@@ -123,6 +123,8 @@ class MatchingController extends GetxController {
   void _go(String roomId) async {
     if (isMatched.value) return;
 
+    stopTimer();
+    
     isMatched.value = true;
     isSearching.value = false;
     canCancel.value = false;

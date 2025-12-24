@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
+import 'package:matchu_app/views/chat/chat_widget/gender_icon.dart';
 import 'package:matchu_app/views/chat/temp_chat/bottom_action_bar.dart';
 import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
@@ -88,13 +89,21 @@ class TempChatView extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Người lạ",
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          "Người lạ",
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Obx(() => genderIcon(
+                          controller.otherGender.value,
+                          theme,
+                        )),
+                      ],
                     ),
-
                     if (rating != null) ...[
                       const SizedBox(height: 4),
                       Row(
