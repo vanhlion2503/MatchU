@@ -96,22 +96,74 @@ class TempChatService {
     });
   }
 
-  Future<String> convertToPermanent(String roomId) async {
-    final snap =
-        await _db.collection("tempChats").doc(roomId).get();
+  Future<String> convertToPermanent(String tempRoomId) async {
+    final tempRef = _db.collection("tempChats").doc(tempRoomId);
 
-    final ref = _db.collection("chatRooms").doc();
-    await ref.set({
-      "participants": snap["participants"],
-      "createdAt": FieldValue.serverTimestamp(),
+    return _db.runTransaction<String>((tx) async {
+      final tempSnap = await tx.get(tempRef);
+
+      if (!tempSnap.exists) {
+        throw Exception("Temp room not found");
+      }
+
+      final data = tempSnap.data()!;
+
+      // ✅ ĐÃ CONVERT → TRẢ VỀ LUÔN
+      if (data["status"] == "converted" &&
+          data["permanentRoomId"] != null) {
+        return data["permanentRoomId"];
+      }
+
+      // 🔒 LOCK: CHỈ TRANSACTION ĐẦU TIÊN CHẠY ĐƯỢC TỚI ĐÂY
+      final newRoomRef = _db.collection("chatRooms").doc();
+
+      // 1️⃣ TẠO CHAT ROOM LÂU DÀI
+      tx.set(newRoomRef, {
+        "participants": data["participants"],
+        "createdAt": FieldValue.serverTimestamp(),
+        "fromTempRoom": tempRoomId,
+      });
+
+      // 2️⃣ ĐÁNH DẤU TEMP ROOM ĐÃ CONVERT
+      tx.update(tempRef, {
+        "status": "converted",
+        "permanentRoomId": newRoomRef.id,
+      });
+
+      return newRoomRef.id;
     });
-
-    await _db.collection("tempChats").doc(roomId).update({
-      "status": "converted",
-    });
-
-    return ref.id;
   }
+  
+  Future<void> copyMessagesIfNeeded({
+    required String tempRoomId,
+    required String chatRoomId,
+  }) async {
+    final tempRef = _db.collection("tempChats").doc(tempRoomId);
+    final chatRef = _db.collection("chatRooms").doc(chatRoomId);
+
+    final snap = await chatRef.get();
+
+    // 🔒 đã copy rồi → bỏ
+    if (snap.data()?["messagesCopied"] == true) return;
+
+    final messagesSnap = await tempRef
+        .collection("messages")
+        .orderBy("createdAt")
+        .get();
+
+    for (final doc in messagesSnap.docs) {
+      await chatRef
+          .collection("messages")
+          .add(doc.data());
+    }
+
+    await chatRef.update({
+      "messagesCopied": true,
+    });
+  }
+
+
+
 
   Future<void> sendSystemMessage({
     required String roomId,

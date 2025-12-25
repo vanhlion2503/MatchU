@@ -188,6 +188,12 @@ class TempChatController extends GetxController {
         );
 
         final newRoomId = await service.convertToPermanent(roomId);
+
+        await service.copyMessagesIfNeeded(
+          tempRoomId: roomId,
+          chatRoomId: newRoomId,
+        );
+        
         Get.offNamed("/chat", arguments: {"roomId": newRoomId});
       }
     });
