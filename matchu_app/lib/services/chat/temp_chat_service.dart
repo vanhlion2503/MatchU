@@ -133,37 +133,6 @@ class TempChatService {
       return newRoomRef.id;
     });
   }
-  
-  Future<void> copyMessagesIfNeeded({
-    required String tempRoomId,
-    required String chatRoomId,
-  }) async {
-    final tempRef = _db.collection("tempChats").doc(tempRoomId);
-    final chatRef = _db.collection("chatRooms").doc(chatRoomId);
-
-    final snap = await chatRef.get();
-
-    // 🔒 đã copy rồi → bỏ
-    if (snap.data()?["messagesCopied"] == true) return;
-
-    final messagesSnap = await tempRef
-        .collection("messages")
-        .orderBy("createdAt")
-        .get();
-
-    for (final doc in messagesSnap.docs) {
-      await chatRef
-          .collection("messages")
-          .add(doc.data());
-    }
-
-    await chatRef.update({
-      "messagesCopied": true,
-    });
-  }
-
-
-
 
   Future<void> sendSystemMessage({
     required String roomId,

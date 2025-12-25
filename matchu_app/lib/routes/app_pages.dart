@@ -5,6 +5,7 @@ import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/auth/enroll_phone_view.dart';
 import 'package:matchu_app/views/auth/otp_enroll_view.dart';
 import 'package:matchu_app/views/auth/verify_email_view.dart';
+import 'package:matchu_app/views/chat/chat_view.dart';
 import 'package:matchu_app/views/matching/matching_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
@@ -112,6 +113,11 @@ class AppPages {
     GetPage(
       name: AppRouter.tempChat,
       page: () => TempChatView(),
+    ),
+
+    GetPage(
+      name: AppRouter.chat,
+      page: () => const ChatView(),
     ),
 
   ];

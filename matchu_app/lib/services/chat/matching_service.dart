@@ -177,6 +177,7 @@ class MatchingService {
       "sessionB": sessionB, // của userB
       "sessionIds": [sessionA, sessionB],
       "status": "active",
+      "permanentRoomId": null,
       "anonymousAvatars": {},
     });
     return ref.id;
