@@ -238,7 +238,6 @@ class _MatchingViewState extends State<MatchingView>
               );
             }),
 
-            /// 🟢 Online dot
             Positioned(
               top: 65,
               right: 2,

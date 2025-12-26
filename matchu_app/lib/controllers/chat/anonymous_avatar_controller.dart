@@ -2,27 +2,47 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 
-class AnonymousAvatarController extends GetxController{
+class AnonymousAvatarController extends GetxController {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  
-  final avatars = const [
-    "avt_01",
-    "avt_02",
-    "avt_03",
-    "avt_04",
-    "avt_05",
-    "avt_06",
-    "avt_07",
-    "avt_08",
-    "avt_09",
-    "avt_10",
-    "avt_11",
-    "avt_12",
-  ];
+  /// ===== AVATAR + TÊN (KEY KỸ THUẬT → TÊN HIỂN THỊ) =====
+  static const Map<String, String> male = {
+    "avt_01": "Bạch Dương (Aries)",
+    "avt_02": "Kim Ngưu (Taurus)",
+    "avt_03": "Cự Giải (Cancer)",
+    "avt_04": "Bảo Bình (Aquarius)",
+    "avt_05": "Song Tử (Gemini)",
+    "avt_06": "Thiên Bình (Libra)",
+    "avt_07": "Sư Tử (Leo)",
+    "avt_08": "Song Ngư (Pisces)",
+    "avt_09": "Xử Nữ (Virgo)",
+    "avt_10": "Bọ Cạp (Scorpio)",
+    "avt_11": "Ma Kết (Capricorn)",
+    "avt_12": "Nhân Mã (Sagittarius)",
+  };
 
+  static const Map<String, String> female = {
+    "avt_13": "Bạch Dương (Aries)",
+    "avt_14": "Kim Ngưu (Taurus)",
+    "avt_15": "Cự Giải (Cancer)",
+    "avt_16": "Song Tử (Gemini)",
+    "avt_17": "Song Ngư (Pisces)",
+    "avt_18": "Thiên Bình (Libra)",
+    "avt_19": "Xử Nữ (Virgo)",
+    "avt_20": "Sư Tử (Leo)",
+    "avt_21": "Ma Kết (Capricorn)",
+    "avt_22": "Bọ Cạp (Scorpio)",
+    "avt_23": "Ma Kết (Capricorn)",
+    "avt_24": "Bảo Bình (Aquarius)",
+  };
+
+  /// ===== AVATAR DÙNG TRONG UI =====
+  final RxList<String> avatars = <String>[].obs;
   final selectedAvatar = RxnString();
+  final RxnString gender = RxnString();
+
+  bool get isSelected => selectedAvatar.value != null;
 
   @override
   void onInit() {
@@ -30,23 +50,7 @@ class AnonymousAvatarController extends GetxController{
     load();
   }
 
-  Future<void> selectAndSave(String avatarKey) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-
-    // 1️⃣ Update local state (UI đổi ngay)
-    selectedAvatar.value = avatarKey;
-
-    // 2️⃣ Save Firestore ngay lập tức
-    await _db.collection("users").doc(uid).update({
-      "anonymousAvatar": avatarKey,
-      "updatedAt": FieldValue.serverTimestamp(),
-    });
-  }
-
-
-  bool get isSelected => selectedAvatar.value != null;
-
+  /// ===== LOAD USER + SET AVATAR LIST =====
   Future<void> load() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -54,7 +58,56 @@ class AnonymousAvatarController extends GetxController{
     final snap = await _db.collection("users").doc(uid).get();
     if (!snap.exists) return;
 
-    selectedAvatar.value = snap.data()?["anonymousAvatar"];
+    final data = snap.data()!;
+    final rawGender = data["gender"];
+
+    gender.value = rawGender?.toString().toLowerCase().trim();
+
+    // 🔥 FIX CHUẨN Ở ĐÂY
+    if (gender.value == "male" || gender.value == "nam") {
+      avatars.assignAll(male.keys.toList());
+    } else if (gender.value == "female" ||
+        gender.value == "nữ" ||
+        gender.value == "nu") {
+      avatars.assignAll(female.keys.toList());
+    } else {
+      avatars.assignAll(male.keys.toList()); // fallback
+    }
+
+    // ===== SET AVATAR ĐANG CHỌN =====
+    final savedAvatar = data["anonymousAvatar"];
+    if (savedAvatar != null && avatars.contains(savedAvatar)) {
+      selectedAvatar.value = savedAvatar;
+    } else if (avatars.isNotEmpty) {
+      selectedAvatar.value = avatars.first;
+    }
   }
 
+  /// ===== CHỌN + LƯU AVATAR =====
+  Future<void> selectAndSave(String avatarKey) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    selectedAvatar.value = avatarKey;
+
+    await _db.collection("users").doc(uid).update({
+      "anonymousAvatar": avatarKey,
+      "updatedAt": FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// ===== LẤY TÊN HIỂN THỊ (UI GỌI HÀM NÀY) =====
+  String getAvatarName(String avatarKey) {
+    if (gender.value == "male" || gender.value == "nam") {
+      return male[avatarKey] ?? "Avatar ẩn danh";
+    }
+
+    if (gender.value == "female" ||
+        gender.value == "nữ" ||
+        gender.value == "nu") {
+      return female[avatarKey] ?? "Avatar ẩn danh";
+    }
+
+    return "Avatar ẩn danh";
+  }
 }
