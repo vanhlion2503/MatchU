@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/views/chat/chatInput.dart';
-import '../../controllers/chat/chat_controller.dart';
+import 'package:matchu_app/controllers/chat/chat_controller.dart';
 
 class ChatView extends StatelessWidget {
   const ChatView({super.key});

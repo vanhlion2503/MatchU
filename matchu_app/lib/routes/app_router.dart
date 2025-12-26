@@ -22,4 +22,5 @@ class AppRouter {
   static const String tempChat = '/tempChat';
   static const String rating = '/rating';
   static const String chat = '/chat'; 
+  static const String chatList = '/chat-list';
 }

@@ -107,6 +107,7 @@ class TempChatService {
       }
 
       final data = tempSnap.data()!;
+      final participants = List<String>.from(data["participants"]);
 
       // ✅ ĐÃ CONVERT → TRẢ VỀ LUÔN
       if (data["status"] == "converted" &&
@@ -119,10 +120,22 @@ class TempChatService {
 
       // 1️⃣ TẠO CHAT ROOM LÂU DÀI
       tx.set(newRoomRef, {
-        "participants": data["participants"],
-        "createdAt": FieldValue.serverTimestamp(),
-        "fromTempRoom": tempRoomId,
-      });
+      "participants": participants,
+      "createdAt": FieldValue.serverTimestamp(),
+      "fromTempRoom": tempRoomId,
+
+      // ===============================
+      // 👇 BẮT BUỘC CHO CHAT LIST
+      // ===============================
+      "lastMessage": "💬 Bắt đầu trò chuyện",
+      "lastMessageType": "system",
+      "lastSenderId": null,
+      "lastMessageAt": FieldValue.serverTimestamp(),
+
+      "unread": {
+        for (final uid in participants) uid: 0,
+      },
+    });
 
       // 2️⃣ ĐÁNH DẤU TEMP ROOM ĐÃ CONVERT
       tx.update(tempRef, {

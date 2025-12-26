@@ -90,6 +90,7 @@ class _RandomChatViewState extends State<RandomChatView>
             child: IconButton(
               icon: const Icon(Iconsax.messages, size: 25,),
               onPressed: () {
+                Get.toNamed("/chat-list");
               },
             ),
           ),

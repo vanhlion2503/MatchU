@@ -15,6 +15,14 @@ class ChatService {
     return _db.collection("chatRooms").doc(roomId).snapshots();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> listenChatRooms() {
+    return _db
+        .collection("chatRooms")
+        .where("participants", arrayContains: uid)
+        .orderBy("lastMessageAt", descending: true)
+        .snapshots();
+  }
+
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessagesWithFallback(
     String roomId,
     String? tempRoomId,
@@ -53,19 +61,43 @@ class ChatService {
     String? replyToId,
     String? replyText,
   }) async {
-    final msgRef = _db
-        .collection("chatRooms")
-        .doc(roomId)
-        .collection("messages")
-        .doc();
+    final roomRef = _db.collection("chatRooms").doc(roomId);
+    final msgRef = roomRef.collection("messages").doc();
 
-    await msgRef.set({
+    final roomSnap = await roomRef.get();
+    final participants = List<String>.from(roomSnap["participants"]);
+    final otherUid = participants.firstWhere((e) => e != uid);
+
+    final batch = _db.batch();
+
+    // 1️⃣ message
+    batch.set(msgRef, {
       "senderId": uid,
       "text": text,
       "type": type,
       "replyToId": replyToId,
       "replyText": replyText,
       "createdAt": FieldValue.serverTimestamp(),
+    });
+
+    // 2️⃣ CHAT ROOM METADATA (🔥 QUAN TRỌNG)
+    batch.update(roomRef, {
+      "lastMessage": text,
+      "lastMessageType": type,
+      "lastSenderId": uid,
+      "lastMessageAt": FieldValue.serverTimestamp(),
+
+      "unread.$otherUid": FieldValue.increment(1),
+      "unread.$uid": 0,
+    });
+
+    await batch.commit();
+  }
+
+
+  Future<void> markAsRead(String roomId) async {
+    await _db.collection("chatRooms").doc(roomId).update({
+      "unread.$uid": 0,
     });
   }
 }

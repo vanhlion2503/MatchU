@@ -48,6 +48,22 @@ class AnonymousAvatarController extends GetxController {
   void onInit() {
     super.onInit();
     load();
+
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+    if (user == null) {
+      // logout
+      _reset();
+    } else {
+      // login user mới
+      load();
+    }
+  });
+  }
+
+  void _reset() {
+    avatars.clear();
+    selectedAvatar.value = null;
+    gender.value = null;
   }
 
   /// ===== LOAD USER + SET AVATAR LIST =====
