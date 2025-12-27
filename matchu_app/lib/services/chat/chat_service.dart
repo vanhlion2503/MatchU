@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:matchu_app/models/chat_room_model.dart';
 
 class ChatService {
   final _db = FirebaseFirestore.instance;
@@ -15,12 +16,14 @@ class ChatService {
     return _db.collection("chatRooms").doc(roomId).snapshots();
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> listenChatRooms() {
+  Stream<List<ChatRoomModel>> listenChatRooms() {
     return _db
         .collection("chatRooms")
         .where("participants", arrayContains: uid)
         .orderBy("lastMessageAt", descending: true)
-        .snapshots();
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map(ChatRoomModel.fromDoc).toList());
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessagesWithFallback(

@@ -123,7 +123,7 @@ class AppPages {
     
     GetPage(
       name: AppRouter.chatList, 
-      page: () => const ChatListView(),
+      page: () => ChatListView(),
     ),
 
   ];
