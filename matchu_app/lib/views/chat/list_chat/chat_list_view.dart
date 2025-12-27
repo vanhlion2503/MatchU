@@ -36,7 +36,7 @@ class ChatListView extends StatelessWidget {
               return Stack(
                 children: [
                   CircleAvatar(
-                    radius: 22,
+                    radius: 24,
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                     backgroundImage: avatarU.isNotEmpty ? CachedNetworkImageProvider(avatarU) : null,
                     child: avatarU.isEmpty

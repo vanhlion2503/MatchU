@@ -1,13 +1,13 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
-
-import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
+import 'package:matchu_app/services/chat/chat_service.dart';
 
-class ChatListController extends GetxController {
+class ChatListController extends GetxController
+    with WidgetsBindingObserver {
+
   final ChatService _service = ChatService();
   String get uid => _service.uid;
 
@@ -15,34 +15,68 @@ class ChatListController extends GetxController {
   final RxList<ChatRoomModel> filteredRooms = <ChatRoomModel>[].obs;
 
   final RxString searchText = "".obs;
+
   final textController = TextEditingController();
   final focusNode = FocusNode();
-  
-  StreamSubscription? _sub;
+
+  StreamSubscription<List<ChatRoomModel>>? _sub;
 
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
 
-    _sub = _service.listenChatRooms().listen((newRooms) {
-      _mergeAndReorder(newRooms);
-
-      /// 🔥 QUAN TRỌNG: init filteredRooms
-      applySearch();
+    _sub = _service.listenChatRooms().listen((incoming) {
+      _mergeAndReorder(incoming);
+      _applySearch();
+      _keepAliveVisibleUsers();
     });
 
-    /// ⏱ debounce search
     debounce(
       searchText,
-      (_) => applySearch(),
+      (_) => _applySearch(),
       time: const Duration(milliseconds: 250),
     );
   }
 
-  void _mergeAndReorder(List<ChatRoomModel> incoming) {
-    final filtered = incoming.where((r) => !r.isDeletedFor(uid)).toList();
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sub?.cancel();
+    textController.dispose();
+    focusNode.dispose();
+    super.onClose();
+  }
 
-    filtered.sort((a, b) {
+  /// ========================
+  /// APP LIFECYCLE
+  /// ========================
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reloadVisibleUsers();
+      _keepAliveVisibleUsers();
+      _applySearch();
+    }
+  }
+
+  /// ========================
+  /// CORE
+  /// ========================
+  void _mergeAndReorder(List<ChatRoomModel> incoming) {
+    final userCache = Get.find<ChatUserCacheController>();
+
+    final visible = incoming
+        .where((r) => !r.isDeletedFor(uid))
+        .toList();
+
+    for (final room in visible) {
+      final otherUid =
+          room.participants.firstWhere((e) => e != uid);
+      userCache.loadIfNeeded(otherUid);
+    }
+
+    visible.sort((a, b) {
       final ap = a.isPinned(uid);
       final bp = b.isPinned(uid);
       if (ap != bp) return ap ? -1 : 1;
@@ -52,11 +86,36 @@ class ChatListController extends GetxController {
       return bt.compareTo(at);
     });
 
-    rooms.assignAll(filtered);
+    rooms.assignAll(visible);
   }
 
-  /// 🔍 SEARCH LOGIC (FIX)
-  void applySearch() {
+  /// ========================
+  /// KEEP CACHE ALIVE
+  /// ========================
+  void _keepAliveVisibleUsers() {
+    final userCache = Get.find<ChatUserCacheController>();
+
+    final aliveUids = rooms
+        .map((r) => r.participants.firstWhere((e) => e != uid))
+        .toSet();
+
+    userCache.cleanupExcept(aliveUids);
+  }
+
+  void _reloadVisibleUsers() {
+    final userCache = Get.find<ChatUserCacheController>();
+
+    for (final room in rooms) {
+      final otherUid =
+          room.participants.firstWhere((e) => e != uid);
+      userCache.loadIfNeeded(otherUid);
+    }
+  }
+
+  /// ========================
+  /// SEARCH
+  /// ========================
+  void _applySearch() {
     final q = searchText.value.trim().toLowerCase();
 
     if (q.isEmpty) {
@@ -68,38 +127,45 @@ class ChatListController extends GetxController {
 
     filteredRooms.assignAll(
       rooms.where((room) {
-        final otherUid = room.participants.firstWhere((e) => e != uid);
+        if (room.lastMessage.toLowerCase().contains(q)) {
+          return true;
+        }
+
+        final otherUid =
+            room.participants.firstWhere((e) => e != uid);
+
         final user = userCache.getUser(otherUid);
+        if (user == null) {
+          userCache.loadIfNeeded(otherUid);
+          return false;
+        }
 
-        final name = (user?.fullname ?? "").toLowerCase();
-        final nick = (user?.nickname ?? "").toLowerCase();
-        final msg = room.lastMessage.toLowerCase();
+        final name = (user.fullname ?? "").toLowerCase();
+        final nick = (user.nickname ?? "").toLowerCase();
 
-        return name.contains(q) ||
-            nick.contains(q) ||
-            msg.contains(q);
+        return name.contains(q) || nick.contains(q);
       }),
     );
   }
 
+  /// ========================
+  /// UI
+  /// ========================
   void clearSearch() {
     searchText.value = "";
-    textController.clear();   
+    textController.clear();
     filteredRooms.assignAll(rooms);
-    focusNode.unfocus(); 
+    focusNode.unfocus();
   }
 
+  /// ========================
+  /// ACTIONS
+  /// ========================
   Future<void> pin(ChatRoomModel room) async {
     await _service.setPinned(room.id, !room.isPinned(uid));
   }
 
   Future<void> delete(ChatRoomModel room) async {
     await _service.hideRoom(room.id);
-  }
-
-  @override
-  void onClose() {
-    _sub?.cancel();
-    super.onClose();
   }
 }

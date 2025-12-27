@@ -127,7 +127,7 @@ Widget chatItem({
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(fontSize: 12),
+                          ?.copyWith(fontSize: 13),
                     ),
                     const SizedBox(height: 6),
                     if (unread > 0)
