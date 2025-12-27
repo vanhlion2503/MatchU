@@ -5,6 +5,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
+import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
@@ -42,6 +43,8 @@ void main() async {
   Get.put(AnonymousAvatarController(), permanent: true);
   Get.put(UserController(), permanent: true);
   Get.put(ChatUserCacheController(), permanent: true);
+  Get.put(UnreadController(), permanent: true);
+
 
 
 

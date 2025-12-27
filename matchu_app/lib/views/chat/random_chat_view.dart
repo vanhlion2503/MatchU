@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
+import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/anonymous_avatar_selector.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
@@ -78,21 +79,56 @@ class _RandomChatViewState extends State<RandomChatView>
         ],
       ),
       actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 15),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.6),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+          Stack(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(right: 15),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.6),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+                  ),
+                ),
+                child: IconButton(
+                  icon: const Icon(Iconsax.messages, size: 25,),
+                  onPressed: () {
+                    Get.toNamed("/chat-list");
+                  },
+                ),
               ),
-            ),
-            child: IconButton(
-              icon: const Icon(Iconsax.messages, size: 25,),
-              onPressed: () {
-                Get.toNamed("/chat-list");
-              },
-            ),
+              Obx(() {
+                final unreadC = Get.find<UnreadController>();
+                if (unreadC.totalUnread.value == 0) return const SizedBox();
+
+                return Positioned(
+                  right: 10,
+                  top: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      unreadC.totalUnread.value > 99
+                          ? "99+"
+                          : unreadC.totalUnread.value.toString(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
           ),
         ],
       ),

@@ -6,39 +6,38 @@ class ChatRoomModel {
   final String lastMessage;
   final String lastSenderId;
   final DateTime? lastMessageAt;
-  final Map<String, int> unread;
+  final Map<String, dynamic>? unread;
+  final Map<String, dynamic>? pinned;
+  final Map<String, dynamic>? deletedFor;
 
   ChatRoomModel({
     required this.id,
     required this.participants,
     required this.lastMessage,
     required this.lastSenderId,
-    required this.lastMessageAt,
-    required this.unread,
+    this.lastMessageAt,
+    this.unread,
+    this.pinned,
+    this.deletedFor,
   });
 
-  factory ChatRoomModel.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
-    final data = doc.data()!;
-
+  factory ChatRoomModel.fromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
     return ChatRoomModel(
       id: doc.id,
-      participants: List<String>.from(data["participants"] ?? []),
+      participants: List<String>.from(data["participants"]),
       lastMessage: data["lastMessage"] ?? "",
       lastSenderId: data["lastSenderId"] ?? "",
-      lastMessageAt:
-          (data["lastMessageAt"] as Timestamp?)?.toDate(),
-      unread: Map<String, int>.from(data["unread"] ?? {}),
+      lastMessageAt: (data["lastMessageAt"] as Timestamp?)?.toDate(),
+      unread: data["unread"],
+      pinned: data["pinned"],
+      deletedFor: data["deletedFor"],
     );
   }
 
-  /// 👉 Lấy UID của người còn lại
-  String otherUid(String myUid) {
-    return participants.firstWhere((e) => e != myUid);
-  }
+  bool isPinned(String uid) => pinned?[uid] == true;
+  bool isDeletedFor(String uid) => deletedFor?[uid] == true;
 
-  int unreadCount(String myUid) {
-    return unread[myUid] ?? 0;
-  }
+  int unreadCount(String uid) => unread?[uid] ?? 0;
 }
+

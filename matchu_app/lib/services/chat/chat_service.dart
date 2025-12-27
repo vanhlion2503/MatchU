@@ -89,7 +89,7 @@ class ChatService {
       "lastMessageType": type,
       "lastSenderId": uid,
       "lastMessageAt": FieldValue.serverTimestamp(),
-
+      "deletedFor.$otherUid": FieldValue.delete(),
       "unread.$otherUid": FieldValue.increment(1),
       "unread.$uid": 0,
     });
@@ -103,4 +103,30 @@ class ChatService {
       "unread.$uid": 0,
     });
   }
+
+  Future<void> setPinned(String roomId, bool value) async {
+    await _db.collection("chatRooms").doc(roomId).update({
+      "pinned.$uid": value ? true : FieldValue.delete(),
+    });
+  }
+
+  Future<void> hideRoom(String roomId) async {
+    await _db.collection("chatRooms").doc(roomId).update({
+      "deletedFor.$uid": true,
+    });
+  }
+
+  Stream<int> listenTotalUnread(){
+    return _db.collection("chatRooms").where("participants", arrayContains: uid)
+            .snapshots().map((snap){
+              int total = 0;
+              for (final doc in snap.docs){
+                final data = doc.data();
+                final unread = data["unread"]?[uid] ?? 0;
+                total += unread as int;
+              }
+              return total;
+            });
+  }
+
 }
