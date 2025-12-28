@@ -196,15 +196,17 @@ class TempChatView extends StatelessWidget {
         ],
       ),
 
-      body: SafeArea(child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            Expanded(child: MessagesList(roomId, controller)),
-            BottomActionBar(controller),
-          ],
-        ),
-      )),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              Expanded(child: MessagesList(roomId, controller)),
+              BottomActionBar(controller),
+            ],
+          ),
+        )
+      ),
     );
   }
 }

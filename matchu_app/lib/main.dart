@@ -45,9 +45,6 @@ void main() async {
   Get.put(ChatUserCacheController(), permanent: true);
   Get.put(UnreadController(), permanent: true);
 
-
-
-
   runApp(const MyApp());
 }
 

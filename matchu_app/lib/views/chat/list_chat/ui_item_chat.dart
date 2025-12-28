@@ -22,31 +22,34 @@ Widget chatItem({
 
   userCache.loadIfNeeded(otherUid);
 
-  return Obx((){
+    return Obx(() {
+    // 🔥 BẮT BUỘC đọc RxMap để Obx biết cần rebuild
+    userCache.version.value;
+
     final otherUser = userCache.getUser(otherUid);
-    final online = otherUser != null && isUserOnline(otherUser.lastActiveAt);
+    final online =
+        otherUser != null && isUserOnline(otherUser.lastActiveAt);
 
     return InkWell(
       onTap: onTap,
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
                 Stack(
                   children: [
                     CircleAvatar(
                       radius: 26,
-                      backgroundImage: 
-                        otherUser != null && otherUser.avatarUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(otherUser.avatarUrl) : null,
-                      child: otherUser == null || otherUser.avatarUrl.isEmpty
-                              ? const Icon(Icons.person)
-                              : null,
+                      backgroundImage: otherUser != null &&
+                              otherUser.avatarUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(otherUser.avatarUrl)
+                          : null,
+                      child: otherUser == null ||
+                              otherUser.avatarUrl.isEmpty
+                          ? const Icon(Icons.person)
+                          : null,
                     ),
                     Positioned(
                       bottom: 2,
@@ -58,17 +61,18 @@ Widget chatItem({
                           shape: BoxShape.circle,
                           color: online ? Colors.green : Colors.grey,
                           border: Border.all(
-                            color: Theme.of(context).scaffoldBackgroundColor,
+                            color: Theme.of(context)
+                                .scaffoldBackgroundColor,
                             width: 1.5,
                           ),
                         ),
                       ),
-                    )
+                    ),
                   ],
                 ),
-          
+
                 const SizedBox(width: 12),
-          
+
                 /// NAME + MESSAGE
                 Expanded(
                   child: Column(
@@ -89,7 +93,9 @@ Widget chatItem({
                               .bodyLarge!
                               .copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary,
                               ),
                         ),
                       ),
@@ -102,12 +108,15 @@ Widget chatItem({
                               ? "Bạn: ${room.lastMessage}"
                               : room.lastMessage,
                           query: searchQuery,
-                          normalStyle: Theme.of(context).textTheme.bodyMedium!,
+                          normalStyle:
+                              Theme.of(context).textTheme.bodyMedium!,
                           highlightStyle: Theme.of(context)
                               .textTheme
                               .bodyMedium!
                               .copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
@@ -115,9 +124,9 @@ Widget chatItem({
                     ],
                   ),
                 ),
-          
+
                 const SizedBox(width: 8),
-          
+
                 /// TIME + UNREAD
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -133,9 +142,7 @@ Widget chatItem({
                     if (unread > 0)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
+                            horizontal: 6, vertical: 2),
                         decoration: const BoxDecoration(
                           color: Colors.blue,
                           shape: BoxShape.circle,
@@ -154,20 +161,22 @@ Widget chatItem({
               ],
             ),
           ),
+
           if (room.isPinned(myUid))
-          Positioned(
-            top: 6,
-            right: 12,
-            child: Icon(
-              Icons.push_pin,
-              size: 16,
-              color: Theme.of(context).colorScheme.primary,
+            Positioned(
+              top: 6,
+              right: 12,
+              child: Icon(
+                Icons.push_pin,
+                size: 16,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
-          ),
         ],
       ),
     );
   });
+
 }
 
 String formatChatTime(DateTime? time) {

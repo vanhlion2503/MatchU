@@ -6,10 +6,13 @@ class ChatUserCacheController extends GetxController {
   final UserService _service = UserService();
 
   /// uid → cached user
-  final Map<String, _CachedUser> _cache = {};
+  final RxMap<String, _CachedUser> _cache = <String, _CachedUser>{}.obs;
+
+  final RxInt version = 0.obs;
 
   /// TTL: 5 phút
   static const Duration ttl = Duration(minutes: 5);
+
 
   /// =========================
   /// LOAD USER
@@ -24,6 +27,7 @@ class ChatUserCacheController extends GetxController {
     _service.getUser(uid).then((user) {
       if (user != null) {
         _cache[uid] = _CachedUser(user);
+        version.value++;
       }
     });
   }

@@ -123,10 +123,6 @@ class TempChatService {
       "participants": participants,
       "createdAt": FieldValue.serverTimestamp(),
       "fromTempRoom": tempRoomId,
-
-      // ===============================
-      // 👇 BẮT BUỘC CHO CHAT LIST
-      // ===============================
       "lastMessage": "💬 Bắt đầu trò chuyện",
       "lastMessageType": "system",
       "lastSenderId": null,

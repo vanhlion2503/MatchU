@@ -4,7 +4,7 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
-import 'package:matchu_app/views/chat/chat_widget/anonymous_avatar_selector.dart';
+// import 'package:matchu_app/views/chat/chat_widget/anonymous_avatar_selector.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
 import 'package:iconsax/iconsax.dart';

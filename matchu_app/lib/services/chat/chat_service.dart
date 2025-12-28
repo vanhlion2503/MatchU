@@ -57,6 +57,15 @@ class ChatService {
   }
 
 
+  Future<void> setTyping({
+    required String roomId,
+    required bool isTyping,
+  }) async {
+    await _db.collection("chatRooms").doc(roomId).update({
+      "typing.$uid": isTyping,
+    });
+  }
+
   Future<void> sendMessage({
     required String roomId,
     required String text,
