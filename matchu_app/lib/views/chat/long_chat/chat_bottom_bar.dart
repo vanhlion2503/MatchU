@@ -24,26 +24,6 @@ class ChatBottomBar extends StatelessWidget {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Obx(() {
-              if (!controller.otherTyping.value) {
-                return const SizedBox();
-              }
-
-              return Padding(
-                padding: const EdgeInsets.only(left: 16, bottom: 4),
-                child: Text(
-                  "Đối phương đang nhập...",
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontStyle: FontStyle.italic,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withOpacity(0.6),
-                      ),
-                ),
-              );
-            }),
-
             /// ================= REPLY =================
             Obx(() {
               final reply = controller.replyingMessage.value;

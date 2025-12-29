@@ -300,7 +300,7 @@ class TempChatController extends GetxController {
       return;
     }
 
-    _typingTimer = Timer(const Duration(seconds: 5), () {
+    _typingTimer = Timer(const Duration(seconds: 3), () {
       isTyping.value = false;
       service.setTyping(
         roomId: roomId,

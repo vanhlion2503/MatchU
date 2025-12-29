@@ -57,7 +57,29 @@ class ChatController extends GetxController {
     super.onInit();
     _initRoom();
     _listenScroll();
+    ever<bool>(otherTyping, _onOtherTypingChanged);
   }
+
+  void _onOtherTypingChanged(bool isTyping) {
+    if (!isTyping) return;
+
+    // ❌ user đang đọc lịch sử → KHÔNG auto scroll
+    if (userScrolledUp.value) return;
+
+    // ❌ list chưa attach
+    if (!itemScrollController.isAttached) return;
+
+    // ✅ scroll nhẹ xuống cuối (typing bubble nằm sau last message)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      itemScrollController.scrollTo(
+        index: lastMessageCount, // 👈 typing bubble index
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignment: 0.9,
+      );
+    });
+  }
+
 
   void updateBottomBarHeight() {
     final ctx = ChatBottomBar.bottomBarKey.currentContext;
@@ -94,9 +116,19 @@ class ChatController extends GetxController {
       final data = snap.data()!;
       final typing = data["typing"] ?? {};
 
-      otherTyping.value = typing.entries.any(
+      final isOtherTyping = typing.entries.any(
         (e) => e.key != uid && e.value == true,
       );
+
+      if (isOtherTyping) {
+        otherTyping.value = true;
+      } else {
+        // ⏳ delay để tránh xung đột với message mới
+        Future.delayed(const Duration(milliseconds: 180), () {
+          otherTyping.value = false;
+        });
+      }
+
     });
   }
 
@@ -119,7 +151,9 @@ class ChatController extends GetxController {
     }
     if (_justSentMessage) {
       _justSentMessage = false;
-      _scrollToBottom(newCount - 1);
+      Future.microtask(() {
+        _scrollToBottom(newCount - 1);
+      });
       return;
     }
     // user đang đọc lịch sử → KHÔNG auto scroll
@@ -207,7 +241,7 @@ class ChatController extends GetxController {
     }
 
     _typingTimer?.cancel();
-    _typingTimer = Timer(const Duration(seconds: 5), () {
+    _typingTimer = Timer(const Duration(seconds: 3), () {
       isTyping.value = false;
       _service.setTyping(roomId: roomId, isTyping: false);
     });

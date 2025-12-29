@@ -19,23 +19,25 @@ class ChatMessagesList extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = Get.find<AuthController>().user!.uid;
     final theme = Theme.of(context);
+
     final bottomPadding =
-    controller.bottomBarHeight.value +
-    MediaQuery.of(context).padding.bottom;
+        controller.bottomBarHeight.value +
+        MediaQuery.of(context).padding.bottom;
 
-    return Obx(() {
-      if (controller.otherUid.value == null) {
-        return const Center(child: CircularProgressIndicator());
-      }
+    // ⛔ KHÔNG bọc Obx ở ngoài StreamBuilder
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: controller.listenMessages(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: controller.listenMessages(),
-        builder: (context, snap) {
-          if (!snap.hasData) return const SizedBox();
+        final docs = snap.data!.docs;
+        final count = docs.length;
 
-          final docs = snap.data!.docs;
-
-          final count = docs.length;
+        // 🔥 Obx chỉ bọc phần cần reactive (typing)
+        return Obx(() {
+          final showTyping = controller.otherTyping.value;
 
           if (count != controller.lastMessageCount) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -50,10 +52,16 @@ class ChatMessagesList extends StatelessWidget {
               16,
               16,
               16,
-              bottomPadding // ✅ CHUẨN TUYỆT ĐỐI
+              bottomPadding,
             ),
-            itemCount: docs.length,
+            itemCount: docs.length + (showTyping ? 1 : 0),
             itemBuilder: (_, i) {
+              /// ================= TYPING BUBBLE =================
+              if (showTyping && i == docs.length) {
+                return const TypingBubbleRowPermanent();
+              }
+
+              /// ================= MESSAGE =================
               final doc = docs[i];
               final data = doc.data();
               final isMe = data["senderId"] == uid;
@@ -71,15 +79,11 @@ class ChatMessagesList extends StatelessWidget {
                         final dx = event.delta.dx;
                         final dy = event.delta.dy;
 
-                        // chỉ swipe sang phải
                         if (dx <= 0) return;
-
-                        // ưu tiên swipe ngang
                         if (dx.abs() < dy.abs()) return;
 
                         dragDx += dx;
                         dragDx = dragDx.clamp(0, 80);
-
                         setState(() {});
                       },
                       onPointerUp: (_) {
@@ -114,36 +118,33 @@ class ChatMessagesList extends StatelessWidget {
                             child: Opacity(
                               opacity:
                                   (1 - dragDx / 120).clamp(0.7, 1),
-                              child: Obx(() {
-                                return ChatRowPermanent(
-                                  messageId: doc.id,
-                                  senderId: data["senderId"],
-                                  text: data["text"] ?? "",
-                                  type: data["type"] ?? "text",
-                                  isMe: isMe,
-                                  showAvatar: !isMe && isLastInGroup,
-                                  smallMargin:
-                                      _shouldGroup(docs, i),
-                                  showTime: isLastInGroup,
-                                  time:
-                                      _formatTime(data["createdAt"]),
-                                  replyText: data["replyText"],
-                                  replyToId: data["replyToId"],
-                                  highlighted:
-                                      controller
-                                              .highlightedMessageId
-                                              .value ==
-                                          doc.id,
-                                  onTapReply: data["replyToId"] != null
-                                      ? () => controller
-                                          .scrollToMessage(
-                                            docs: docs,
-                                            messageId:
-                                                data["replyToId"],
-                                          )
-                                      : null,
-                                );
-                              }),
+                              child: ChatRowPermanent(
+                                messageId: doc.id,
+                                senderId: data["senderId"],
+                                text: data["text"] ?? "",
+                                type: data["type"] ?? "text",
+                                isMe: isMe,
+                                showAvatar: !isMe && isLastInGroup,
+                                smallMargin:
+                                    _shouldGroup(docs, i),
+                                showTime: isLastInGroup,
+                                time:
+                                    _formatTime(data["createdAt"]),
+                                replyText: data["replyText"],
+                                replyToId: data["replyToId"],
+                                highlighted:
+                                    controller.highlightedMessageId.value ==
+                                        doc.id,
+                                onTapReply:
+                                    data["replyToId"] != null
+                                        ? () => controller
+                                            .scrollToMessage(
+                                              docs: docs,
+                                              messageId:
+                                                  data["replyToId"],
+                                            )
+                                        : null,
+                              ),
                             ),
                           ),
                         ],
@@ -154,9 +155,9 @@ class ChatMessagesList extends StatelessWidget {
               );
             },
           );
-        },
-      );
-    });
+        });
+      },
+    );
   }
 
   // ================= HELPER =================
