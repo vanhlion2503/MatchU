@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';

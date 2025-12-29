@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/widgets/animated_dots.dart';
 
 class TypingBubbleRowPermanent extends StatelessWidget {
-  const TypingBubbleRowPermanent({super.key});
+  final String senderId;
+  final bool showAvatar;
+  const TypingBubbleRowPermanent({
+    super.key,
+    required this.senderId,
+    this.showAvatar = true,
+    });
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +20,12 @@ class TypingBubbleRowPermanent extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const SizedBox(width: 36), // chừa avatar
+          SizedBox(
+            width: 36,
+            child: showAvatar
+                ? UserAvatar(userId: senderId)
+                : const SizedBox(),
+            ), // chừa avatar
           const SizedBox(width: 6),
           Padding(
             padding: const EdgeInsets.only(bottom: 18),

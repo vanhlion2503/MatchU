@@ -15,7 +15,7 @@ class ChatController extends GetxController {
 
   final RxDouble bottomBarHeight = 0.0.obs;
   bool _justSentMessage = false;
-
+  int get bottomIndex => lastMessageCount;
   // ================= SERVICES =================
   final ChatService _service = ChatService();
   final String uid = Get.find<AuthController>().user!.uid;
@@ -62,23 +62,19 @@ class ChatController extends GetxController {
 
   void _onOtherTypingChanged(bool isTyping) {
     if (!isTyping) return;
-
-    // ❌ user đang đọc lịch sử → KHÔNG auto scroll
     if (userScrolledUp.value) return;
-
-    // ❌ list chưa attach
     if (!itemScrollController.isAttached) return;
 
-    // ✅ scroll nhẹ xuống cuối (typing bubble nằm sau last message)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       itemScrollController.scrollTo(
-        index: lastMessageCount, // 👈 typing bubble index
+        index: bottomIndex,
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         alignment: 0.9,
       );
     });
   }
+
 
 
   void updateBottomBarHeight() {
