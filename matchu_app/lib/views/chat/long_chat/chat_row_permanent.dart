@@ -3,6 +3,10 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
+import 'package:matchu_app/models/message_status.dart';
+import 'package:matchu_app/views/chat/long_chat/seen_avatar_animated.dart';
+
+
 
 class ChatRowPermanent extends StatelessWidget {
   final String messageId;
@@ -23,6 +27,9 @@ class ChatRowPermanent extends StatelessWidget {
 
   final bool highlighted;
 
+  final MessageStatus? status;
+  final String? seenByUid;
+
   const ChatRowPermanent({
     super.key,
     required this.messageId,
@@ -38,6 +45,8 @@ class ChatRowPermanent extends StatelessWidget {
     this.replyToId,
     this.onTapReply,
     this.highlighted = false,
+    this.status,
+    this.seenByUid,
   });
 
   @override
@@ -161,18 +170,42 @@ class ChatRowPermanent extends StatelessWidget {
                           ),
                         ),
                       ),
-
-                      // ===== TIME =====
-                      if (showTime && time.isNotEmpty)
+                      // ===== TIME + STATUS ROW =====
+                      if (showTime && time.isNotEmpty && isMe)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            time,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              // ===== TIME =====
+                              Text(
+                                time,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.outline,
+                                ),
+                              ),
+
+                              const SizedBox(width: 6),
+
+                              // ===== SEEN / SENT =====
+                              if (status == MessageStatus.seen)
+                                SeenAvatarAnimated(
+                                  userId: seenByUid,
+                                  size: 14,
+                                )
+                              else if (status == MessageStatus.sent)
+                                Text(
+                                  "Đã gửi",
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
+
+
                     ],
                   ),
                 );

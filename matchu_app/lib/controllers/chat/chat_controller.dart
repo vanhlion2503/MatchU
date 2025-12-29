@@ -43,6 +43,7 @@ class ChatController extends GetxController {
 
   /// 👉 số lượng message hiện tại
   int lastMessageCount = 0;
+  final RxInt otherUnread = 0.obs;
 
   final replyingMessage = Rxn<Map<String, dynamic>>();
   final highlightedMessageId = RxnString();
@@ -70,7 +71,7 @@ class ChatController extends GetxController {
         index: bottomIndex,
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        alignment: 0.9,
+        alignment: 0.8,
       );
     });
   }
@@ -92,7 +93,7 @@ class ChatController extends GetxController {
     final roomSnap = await _service.getRoom(roomId);
     final data = roomSnap.data();
     if (data == null) return;
-
+    await _service.markAsRead(roomId);
     final participants = List<String>.from(data["participants"]);
     otherUid.value = participants.firstWhere((e) => e != uid);
 
@@ -111,6 +112,9 @@ class ChatController extends GetxController {
 
       final data = snap.data()!;
       final typing = data["typing"] ?? {};
+      final unread = data["unread"] ?? {};
+
+      otherUnread.value = unread[otherUid.value] ?? 0;
 
       final isOtherTyping = typing.entries.any(
         (e) => e.key != uid && e.value == true,
@@ -139,6 +143,8 @@ class ChatController extends GetxController {
   void onNewMessages(int newCount) {
     final oldCount = lastMessageCount;
     lastMessageCount = newCount;
+
+    _service.markAsRead(roomId);
 
     // lần đầu load
     if (oldCount == 0) {

@@ -10,6 +10,8 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_row_permanent.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
+import 'package:matchu_app/models/message_status.dart';
+
 
 class ChatMessagesList extends StatelessWidget {
   final ChatController controller;
@@ -70,6 +72,9 @@ class ChatMessagesList extends StatelessWidget {
             final data = doc.data();
             final isMe = data["senderId"] == uid;
             final isLastInGroup = _isLastInGroup(docs, i);
+            final isLastMessage = i == docs.length - 1;
+            final isMyLast = isMe && isLastMessage;
+            final otherUid = controller.otherUid.value;
 
             double dragDx = 0;
 
@@ -119,33 +124,43 @@ class ChatMessagesList extends StatelessWidget {
                           child: Opacity(
                             opacity:
                                 (1 - dragDx / 120).clamp(0.7, 1),
-                            child: ChatRowPermanent(
-                              messageId: doc.id,
-                              senderId: data["senderId"],
-                              text: data["text"] ?? "",
-                              type: data["type"] ?? "text",
-                              isMe: isMe,
-                              showAvatar: !isMe && isLastInGroup,
-                              smallMargin:
-                                  _shouldGroup(docs, i),
-                              showTime: isLastInGroup,
-                              time:
-                                  _formatTime(data["createdAt"]),
-                              replyText: data["replyText"],
-                              replyToId: data["replyToId"],
-                              highlighted:
-                                  controller.highlightedMessageId.value ==
-                                      doc.id,
-                              onTapReply:
-                                  data["replyToId"] != null
-                                      ? () => controller
-                                          .scrollToMessage(
-                                            docs: docs,
-                                            messageId:
-                                                data["replyToId"],
-                                          )
-                                      : null,
-                            ),
+                            child: Obx(() {
+                              final unread = controller.otherUnread.value;
+                              final otherUid = controller.otherUid.value;
+
+                              return ChatRowPermanent(
+                                messageId: doc.id,
+                                senderId: data["senderId"],
+                                text: data["text"] ?? "",
+                                type: data["type"] ?? "text",
+                                isMe: isMe,
+                                showAvatar: !isMe && isLastInGroup,
+                                status: isMyLast
+                                    ? unread == 0
+                                        ? MessageStatus.seen
+                                        : MessageStatus.sent
+                                    : null,
+                                seenByUid:
+                                    isMyLast && unread == 0 && otherUid != null
+                                        ? otherUid
+                                        : null,
+                                smallMargin: _shouldGroup(docs, i),
+                                showTime: isLastInGroup,
+                                time: _formatTime(data["createdAt"]),
+                                replyText: data["replyText"],
+                                replyToId: data["replyToId"],
+                                highlighted:
+                                    controller.highlightedMessageId.value == doc.id,
+                                onTapReply: data["replyToId"] != null
+                                    ? () => controller.scrollToMessage(
+                                          docs: docs,
+                                          messageId: data["replyToId"],
+                                        )
+                                    : null,
+                              );
+                            }),
+
+
                           ),
                         ),
                       ],
