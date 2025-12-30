@@ -15,7 +15,6 @@ class ChatController extends GetxController {
 
   final RxDouble bottomBarHeight = 0.0.obs;
   bool _justSentMessage = false;
-  int get bottomIndex => lastMessageCount;
   // ================= SERVICES =================
   final ChatService _service = ChatService();
   final String uid = Get.find<AuthController>().user!.uid;
@@ -44,6 +43,12 @@ class ChatController extends GetxController {
   /// 👉 số lượng message hiện tại
   int lastMessageCount = 0;
   final RxInt otherUnread = 0.obs;
+  
+  /// 👉 Pagination state - lưu tất cả messages đã load
+  final RxList<QueryDocumentSnapshot<Map<String, dynamic>>> allMessages = <QueryDocumentSnapshot<Map<String, dynamic>>>[].obs;
+  bool _isLoadingMore = false;
+  bool _hasMoreMessages = true;
+  DocumentSnapshot<Map<String, dynamic>>? _oldestDocument; // Tin nhắn cũ nhất đã load
 
   final replyingMessage = Rxn<Map<String, dynamic>>();
   final highlightedMessageId = RxnString();
@@ -59,6 +64,8 @@ class ChatController extends GetxController {
     _initRoom();
     _listenScroll();
     ever<bool>(otherTyping, _onOtherTypingChanged);
+    // Load messages ban đầu
+    loadInitialMessages();
   }
 
   void _onOtherTypingChanged(bool isTyping) {
@@ -67,11 +74,12 @@ class ChatController extends GetxController {
     if (!itemScrollController.isAttached) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Với reverse: true, index 0 là typing bubble ở đáy
       itemScrollController.scrollTo(
-        index: bottomIndex,
+        index: 0,
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        alignment: 0.8,
+        alignment: 1.0, // Đáy màn hình
       );
     });
   }
@@ -133,39 +141,91 @@ class ChatController extends GetxController {
   }
 
   // ================= MESSAGE STREAM =================
+  // Stream chỉ để listen messages mới nhất (realtime)
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessages() {
-    return _service.listenMessagesWithFallback(roomId, tempRoomId);
+    return _service.listenMessagesWithFallback(
+      roomId, 
+      tempRoomId,
+      limit: 20, // Chỉ lấy 20 tin mới nhất để detect tin mới
+    );
+  }
+  
+  // Load messages ban đầu
+  Future<void> loadInitialMessages() async {
+    try {
+      final snapshot = await _service.listenMessagesWithFallback(
+        roomId,
+        tempRoomId,
+        limit: 20,
+      ).first;
+      
+      final docs = snapshot.docs;
+      if (docs.isEmpty) {
+        _hasMoreMessages = false;
+        return;
+      }
+      
+      allMessages.value = docs;
+      _oldestDocument = docs.last; // Tin cũ nhất
+      lastMessageCount = docs.length;
+      
+      // Nếu load được ít hơn 20, không còn tin nào nữa
+      if (docs.length < 20) {
+        _hasMoreMessages = false;
+      }
+    } catch (e) {
+      print('Error loading initial messages: $e');
+    }
   }
 
   // ================= AUTO SCROLL CORE =================
 
-  /// 🔥 GỌI SAU MỖI LẦN SNAPSHOT ĐỔI
-  void onNewMessages(int newCount) {
-    final oldCount = lastMessageCount;
-    lastMessageCount = newCount;
+  /// 🔥 GỌI SAU MỖI LẦN SNAPSHOT ĐỔI (realtime messages)
+  void onNewMessages(int newCount, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    if (docs.isEmpty) return;
+    
+    final oldCount = allMessages.length;
+    
+    // Merge messages mới vào list (tránh duplicate)
+    final existingIds = allMessages.map((e) => e.id).toSet();
+    final newDocs = docs.where((doc) => !existingIds.contains(doc.id)).toList();
+    
+    if (newDocs.isNotEmpty) {
+      // Thêm messages mới vào đầu list (vì reverse: true, index 0 là mới nhất)
+      allMessages.insertAll(0, newDocs);
+      lastMessageCount = allMessages.length;
+    }
+    
+    final isNewMessage = newDocs.isNotEmpty;
 
-    _service.markAsRead(roomId);
+    if (!userScrolledUp.value) {
+      _service.markAsRead(roomId);
+    }
 
-    // lần đầu load
+    // ❌ KHÔNG auto-scroll khi vào phòng lần đầu
     if (oldCount == 0) {
-      _jumpToBottom(newCount - 1);
       return;
     }
+
+    // ✅ Chỉ scroll khi user vừa gửi tin
     if (_justSentMessage) {
       _justSentMessage = false;
       Future.microtask(() {
-        _scrollToBottom(newCount - 1);
+        _scrollToBottom(0); // Index 0 là tin mới nhất ở đáy
       });
       return;
     }
-    // user đang đọc lịch sử → KHÔNG auto scroll
-    if (userScrolledUp.value) {
-      showNewMessageBtn.value = true;
+
+    // ✅ Chỉ scroll khi có tin nhắn mới realtime VÀ user đang ở đáy
+    if (isNewMessage && !userScrolledUp.value) {
+      _scrollToBottom(0); // Index 0 là tin mới nhất ở đáy
       return;
     }
 
-    // user đang ở đáy → auto scroll
-    _scrollToBottom(newCount - 1);
+    // User đang đọc lịch sử → hiển thị nút scroll
+    if (isNewMessage && userScrolledUp.value) {
+      showNewMessageBtn.value = true;
+    }
   }
 
   void _scrollToBottom(int index) {
@@ -176,21 +236,10 @@ class ChatController extends GetxController {
         index: index,
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
-        alignment: 0.8,
+        alignment: 1.0, // Đáy màn hình (vì reverse: true)
       );
     });
   }
-
-  void _jumpToBottom(int index) {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!itemScrollController.isAttached) return;
-
-    itemScrollController.jumpTo(
-      index: index,
-      alignment: 0.8, // 👈 FIX
-    );
-  });
-}
 
 
   // ================= SCROLL LISTENER =================
@@ -199,18 +248,76 @@ class ChatController extends GetxController {
       final positions = itemPositionsListener.itemPositions.value;
       if (positions.isEmpty) return;
 
-      final maxIndex =
-          positions.map((e) => e.index).reduce((a, b) => a > b ? a : b);
+      // Với reverse: true, index 0 ở đáy màn hình
+      final minIndex =
+          positions.map((e) => e.index).reduce((a, b) => a < b ? a : b);
 
-      final atBottom = maxIndex >= lastMessageCount - 2;
+      // Ở đáy nếu index 0 hoặc 1 đang visible
+      final atBottom = minIndex <= 1;
 
       userScrolledUp.value = !atBottom;
 
       if (atBottom) {
         showNewMessageBtn.value = false;
       }
+
+      // Load more khi scroll đến đầu list (index cao - tin cũ nhất)
+      if (!_isLoadingMore && _hasMoreMessages && _oldestDocument != null) {
+        final maxIndex =
+            positions.map((e) => e.index).reduce((a, b) => a > b ? a : b);
+        
+        // Khi scroll đến 90% của list hiện tại (gần đầu), load more
+        final totalItems = allMessages.length + 1; // +1 cho typing
+        if (maxIndex >= totalItems * 0.9) {
+          // Gọi method trực tiếp để tránh lỗi lookup
+          Future.microtask(() => loadMoreMessages());
+        }
+      }
     });
   }
+
+  // ================= LOAD MORE MESSAGES =================
+  Future<void> loadMoreMessages() async {
+    if (_isLoadingMore || !_hasMoreMessages || _oldestDocument == null) return;
+    
+    _isLoadingMore = true;
+    
+    try {
+      // Lấy thêm 20 tin nhắn cũ hơn
+      final snapshot = await _service.listenMessagesWithFallback(
+        roomId,
+        tempRoomId,
+        limit: 20,
+        startAfter: _oldestDocument,
+      ).first;
+      
+      final newDocs = snapshot.docs;
+      
+      if (newDocs.isEmpty) {
+        _hasMoreMessages = false;
+        _isLoadingMore = false;
+        return;
+      }
+      
+      // Thêm vào cuối list (vì reverse: true, cuối list là tin cũ nhất)
+      allMessages.addAll(newDocs);
+      _oldestDocument = newDocs.last; // Cập nhật tin cũ nhất
+      lastMessageCount = allMessages.length;
+      
+      // Nếu load được ít hơn 20, không còn tin nào nữa
+      if (newDocs.length < 20) {
+        _hasMoreMessages = false;
+      }
+    } catch (e) {
+      print('Error loading more messages: $e');
+    } finally {
+      _isLoadingMore = false;
+    }
+  }
+  
+  // Getter để check loading state
+  bool get isLoadingMore => _isLoadingMore;
+  bool get hasMoreMessages => _hasMoreMessages;
 
   // ================= SEND MESSAGE =================
   Future<void> sendMessage({String type = "text"}) async {
@@ -266,7 +373,7 @@ class ChatController extends GetxController {
   void onTapScrollToBottom() {
     userScrolledUp.value = false;
     showNewMessageBtn.value = false;
-    _scrollToBottom(lastMessageCount - 1);
+    _scrollToBottom(0); // Index 0 là tin mới nhất ở đáy
   }
 
   // ================= SCROLL TO MESSAGE =================

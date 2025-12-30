@@ -29,33 +29,40 @@ class ChatMessagesList extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: controller.listenMessages(),
       builder: (context, snap) {
-        if (!snap.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final docs = snap.data!.docs;
-        final count = docs.length;
-
-        // ❗ Logic này KHÔNG cần Obx
-        if (count != controller.lastMessageCount) {
+        // Listen stream để detect messages mới
+        if (snap.hasData) {
+          final docs = snap.data!.docs;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            controller.onNewMessages(count);
+            controller.onNewMessages(docs.length, docs);
           });
         }
 
-        return ScrollablePositionedList.builder(
-          itemScrollController: controller.itemScrollController,
-          itemPositionsListener: controller.itemPositionsListener,
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            bottomPadding,
-          ),
-          itemCount: docs.length + 1, // slot typing cố định
+        // Sử dụng allMessages từ controller
+        return Obx(() {
+          final docs = controller.allMessages;
+          
+          if (docs.isEmpty && !snap.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          // ✅ Đảm bảo itemCount hợp lệ
+          // +1 cho typing slot, +1 cho loading indicator nếu đang load more
+          final itemCount = docs.length + 1 + (controller.isLoadingMore ? 1 : 0);
+
+          return ScrollablePositionedList.builder(
+            reverse: true, // ✅ Tin mới ở index 0, hiển thị ở đáy
+            itemScrollController: controller.itemScrollController,
+            itemPositionsListener: controller.itemPositionsListener,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              bottomPadding,
+            ),
+            itemCount: itemCount,
           itemBuilder: (_, i) {
-            /// ================= TYPING SLOT =================
-            if (i == docs.length) {
+            /// ================= TYPING SLOT (Ở ĐÁY - index 0) =================
+            if (i == 0) {
               return Obx(() {
                 final otherUid = controller.otherUid.value;
                 if (otherUid == null) return const SizedBox();
@@ -67,13 +74,35 @@ class ChatMessagesList extends StatelessWidget {
               });
             }
 
+            /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
+            if (controller.isLoadingMore && i == itemCount - 1) {
+              return Obx(() {
+                if (!controller.isLoadingMore) return const SizedBox();
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.0,
+                    ),
+                  ),
+                );
+              });
+            }
+
             /// ================= MESSAGE =================
-            final doc = docs[i];
+            // Với reverse: true, index 0 là typing, index 1+ là messages
+            // docs[0] là tin mới nhất
+            final messageIndex = i - 1;
+            
+            // ✅ Kiểm tra bounds để tránh RangeError
+            if (messageIndex < 0 || messageIndex >= docs.length) {
+              return const SizedBox();
+            }
+            
+            final doc = docs[messageIndex];
             final data = doc.data();
             final isMe = data["senderId"] == uid;
-            final isLastInGroup = _isLastInGroup(docs, i);
-            final isLastMessage = i == docs.length - 1;
-            final isMyLast = isMe && isLastMessage;
+            final isLastInGroup = _isLastInGroup(docs, messageIndex);
             final otherUid = controller.otherUid.value;
 
             double dragDx = 0;
@@ -127,6 +156,8 @@ class ChatMessagesList extends StatelessWidget {
                             child: Obx(() {
                               final unread = controller.otherUnread.value;
                               final otherUid = controller.otherUid.value;
+                              final isMyLastMessage = isMe && messageIndex == 0;
+                              final isNewestMessage = messageIndex == 0;
 
                               return ChatRowPermanent(
                                 messageId: doc.id,
@@ -135,17 +166,17 @@ class ChatMessagesList extends StatelessWidget {
                                 type: data["type"] ?? "text",
                                 isMe: isMe,
                                 showAvatar: !isMe && isLastInGroup,
-                                status: isMyLast
+                                status: isMyLastMessage
                                     ? unread == 0
                                         ? MessageStatus.seen
                                         : MessageStatus.sent
                                     : null,
                                 seenByUid:
-                                    isMyLast && unread == 0 && otherUid != null
+                                    isMyLastMessage && unread == 0 && otherUid != null
                                         ? otherUid
                                         : null,
                                 smallMargin: _shouldGroup(docs, i),
-                                showTime: isLastInGroup,
+                                showTime: isLastInGroup && !isNewestMessage,
                                 time: _formatTime(data["createdAt"]),
                                 replyText: data["replyText"],
                                 replyToId: data["replyToId"],
@@ -159,8 +190,6 @@ class ChatMessagesList extends StatelessWidget {
                                     : null,
                               );
                             }),
-
-
                           ),
                         ),
                       ],
@@ -170,7 +199,8 @@ class ChatMessagesList extends StatelessWidget {
               ),
             );
           },
-        );
+          );
+        });
       },
     );
   }
@@ -185,36 +215,53 @@ class ChatMessagesList extends StatelessWidget {
 
   bool _shouldGroup(
       List<QueryDocumentSnapshot> docs, int index) {
-    if (index == 0) return false;
+    // ✅ Kiểm tra bounds
+    if (index < 0 || index >= docs.length) return false;
+    
+    // Với reverse: true, index 0 là tin mới nhất
+    // Tin mới hơn có index nhỏ hơn
+    if (index == docs.length - 1) return false; // Tin cũ nhất
 
-    final prev = docs[index - 1];
-    final curr = docs[index];
-
-    if (prev["senderId"] != curr["senderId"]) return false;
-
-    final prevTime = _getTime(prev["createdAt"]);
-    final currTime = _getTime(curr["createdAt"]);
-
-    if (prevTime == null || currTime == null) return false;
-
-    return currTime.difference(prevTime).inMinutes < 2;
-  }
-
-  bool _isLastInGroup(
-      List<QueryDocumentSnapshot> docs, int index) {
-    if (index == docs.length - 1) return true;
+    // ✅ Kiểm tra bounds cho next
+    if (index + 1 >= docs.length) return false;
 
     final curr = docs[index];
-    final next = docs[index + 1];
+    final next = docs[index + 1]; // Tin cũ hơn
 
-    if (curr["senderId"] != next["senderId"]) return true;
+    if (curr["senderId"] != next["senderId"]) return false;
 
     final currTime = _getTime(curr["createdAt"]);
     final nextTime = _getTime(next["createdAt"]);
 
-    if (currTime == null || nextTime == null) return true;
+    if (currTime == null || nextTime == null) return false;
 
-    return nextTime.difference(currTime).inMinutes >= 2;
+    // currTime mới hơn nextTime (vì reverse)
+    return currTime.difference(nextTime).inMinutes < 2;
+  }
+
+  bool _isLastInGroup(
+      List<QueryDocumentSnapshot> docs, int index) {
+    // ✅ Kiểm tra bounds
+    if (index < 0 || index >= docs.length) return true;
+    
+    // Với reverse: true, index 0 là tin mới nhất
+    if (index == 0) return true; // Tin mới nhất luôn show time
+
+    // ✅ Kiểm tra bounds cho prev
+    if (index - 1 < 0) return true;
+
+    final curr = docs[index];
+    final prev = docs[index - 1]; // Tin mới hơn
+
+    if (curr["senderId"] != prev["senderId"]) return true;
+
+    final currTime = _getTime(curr["createdAt"]);
+    final prevTime = _getTime(prev["createdAt"]);
+
+    if (currTime == null || prevTime == null) return true;
+
+    // prevTime mới hơn currTime (vì reverse)
+    return prevTime.difference(currTime).inMinutes >= 2;
   }
 
   String _formatTime(dynamic value) {

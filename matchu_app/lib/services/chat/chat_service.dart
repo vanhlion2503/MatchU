@@ -28,23 +28,37 @@ class ChatService {
 
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessagesWithFallback(
     String roomId,
-    String? tempRoomId,
-  ) {
-    final chatMessages = _db
+    String? tempRoomId, {
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) {
+    Query<Map<String, dynamic>> chatQuery = _db
         .collection("chatRooms")
         .doc(roomId)
         .collection("messages")
-        .orderBy("createdAt")
-        .snapshots();
+        .orderBy("createdAt", descending: true)
+        .limit(limit);
+
+    if (startAfter != null) {
+      chatQuery = chatQuery.startAfterDocument(startAfter);
+    }
+
+    final chatMessages = chatQuery.snapshots();
 
     if (tempRoomId == null) return chatMessages;
 
-    final tempMessages = _db
+    Query<Map<String, dynamic>> tempQuery = _db
         .collection("tempChats")
         .doc(tempRoomId)
         .collection("messages")
-        .orderBy("createdAt")
-        .snapshots();
+        .orderBy("createdAt", descending: true)
+        .limit(limit);
+
+    if (startAfter != null) {
+      tempQuery = tempQuery.startAfterDocument(startAfter);
+    }
+
+    final tempMessages = tempQuery.snapshots();
 
     return chatMessages.asyncMap((chatSnap) async {
       if (chatSnap.docs.isNotEmpty) {
