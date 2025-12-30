@@ -170,7 +170,7 @@ class ChatRowPermanent extends StatelessWidget {
                           ),
                         ),
                       ),
-                      // ===== TIME
+                      // ===== TIME =======
                       if (showTime)
                       Text(
                         time,

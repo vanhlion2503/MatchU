@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/utils/format_date_lable.dart';
+import 'package:matchu_app/views/chat/long_chat/date_separator.dart';
 import 'package:matchu_app/views/chat/long_chat/messenger_typing_bubble.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -104,99 +106,110 @@ class ChatMessagesList extends StatelessWidget {
             final isMe = data["senderId"] == uid;
             final isLastInGroup = _isLastInGroup(docs, messageIndex);
             final otherUid = controller.otherUid.value;
+            final createdAt = _getTime(data["createdAt"]);
 
             double dragDx = 0;
 
-            return AnimatedMessageBubble(
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  return Listener(
-                    onPointerMove: (event) {
-                      if (isMe) return;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (createdAt != null && _shouldShowDateSeparator(docs, messageIndex))
+                DateSeparator(
+                  text: formatDateLabel(createdAt),
+                ),
 
-                      final dx = event.delta.dx;
-                      final dy = event.delta.dy;
-
-                      if (dx <= 0) return;
-                      if (dx.abs() < dy.abs()) return;
-
-                      dragDx += dx;
-                      dragDx = dragDx.clamp(0, 80);
-                      setState(() {});
-                    },
-                    onPointerUp: (_) {
-                      if (dragDx > 32) {
-                        HapticFeedback.lightImpact();
-                        controller.startReply({
-                          "id": doc.id,
-                          "text": data["text"],
-                        });
-                      }
-                      setState(() => dragDx = 0);
-                    },
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        Positioned(
-                          left: 12 + dragDx * 0.5,
-                          child: Opacity(
-                            opacity: (dragDx / 40).clamp(0, 1),
-                            child: Icon(
-                              Iconsax.redo,
-                              color: theme.colorScheme.primary,
-                              size: 24,
+                AnimatedMessageBubble(
+                  child: StatefulBuilder(
+                    builder: (context, setState) {
+                      return Listener(
+                        onPointerMove: (event) {
+                          if (isMe) return;
+                
+                          final dx = event.delta.dx;
+                          final dy = event.delta.dy;
+                
+                          if (dx <= 0) return;
+                          if (dx.abs() < dy.abs()) return;
+                
+                          dragDx += dx;
+                          dragDx = dragDx.clamp(0, 80);
+                          setState(() {});
+                        },
+                        onPointerUp: (_) {
+                          if (dragDx > 32) {
+                            HapticFeedback.lightImpact();
+                            controller.startReply({
+                              "id": doc.id,
+                              "text": data["text"],
+                            });
+                          }
+                          setState(() => dragDx = 0);
+                        },
+                        child: Stack(
+                          alignment: Alignment.centerLeft,
+                          children: [
+                            Positioned(
+                              left: 12 + dragDx * 0.5,
+                              child: Opacity(
+                                opacity: (dragDx / 40).clamp(0, 1),
+                                child: Icon(
+                                  Iconsax.redo,
+                                  color: theme.colorScheme.primary,
+                                  size: 24,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        Transform.translate(
-                          offset: Offset(dragDx, 0),
-                          child: Opacity(
-                            opacity:
-                                (1 - dragDx / 120).clamp(0.7, 1),
-                            child: Obx(() {
-                              final unread = controller.otherUnread.value;
-                              final otherUid = controller.otherUid.value;
-                              final isMyLastMessage = isMe && messageIndex == 0;
-                              final isNewestMessage = messageIndex == 0;
-
-                              return ChatRowPermanent(
-                                messageId: doc.id,
-                                senderId: data["senderId"],
-                                text: data["text"] ?? "",
-                                type: data["type"] ?? "text",
-                                isMe: isMe,
-                                showAvatar: !isMe && isLastInGroup,
-                                status: isMyLastMessage
-                                    ? unread == 0
-                                        ? MessageStatus.seen
-                                        : MessageStatus.sent
-                                    : null,
-                                seenByUid:
-                                    isMyLastMessage && unread == 0 && otherUid != null
-                                        ? otherUid
+                            Transform.translate(
+                              offset: Offset(dragDx, 0),
+                              child: Opacity(
+                                opacity:
+                                    (1 - dragDx / 120).clamp(0.7, 1),
+                                child: Obx(() {
+                                  final unread = controller.otherUnread.value;
+                                  final otherUid = controller.otherUid.value;
+                                  final isMyLastMessage = isMe && messageIndex == 0;
+                                  final isNewestMessage = messageIndex == 0;
+                
+                                  return ChatRowPermanent(
+                                    messageId: doc.id,
+                                    senderId: data["senderId"],
+                                    text: data["text"] ?? "",
+                                    type: data["type"] ?? "text",
+                                    isMe: isMe,
+                                    showAvatar: !isMe && isLastInGroup,
+                                    status: isMyLastMessage
+                                        ? unread == 0
+                                            ? MessageStatus.seen
+                                            : MessageStatus.sent
                                         : null,
-                                smallMargin: _shouldGroup(docs, i),
-                                showTime: isLastInGroup && !isNewestMessage,
-                                time: _formatTime(data["createdAt"]),
-                                replyText: data["replyText"],
-                                replyToId: data["replyToId"],
-                                highlighted:
-                                    controller.highlightedMessageId.value == doc.id,
-                                onTapReply: data["replyToId"] != null
-                                    ? () => controller.scrollToMessage(
-                                          docs: docs,
-                                          messageId: data["replyToId"],
-                                        )
-                                    : null,
-                              );
-                            }),
-                          ),
+                                    seenByUid:
+                                        isMyLastMessage && unread == 0 && otherUid != null
+                                            ? otherUid
+                                            : null,
+                                    smallMargin: _shouldGroup(docs, i),
+                                    showTime: isLastInGroup && !isNewestMessage,
+                                    time: _formatTime(data["createdAt"]),
+                                    replyText: data["replyText"],
+                                    replyToId: data["replyToId"],
+                                    highlighted:
+                                        controller.highlightedMessageId.value == doc.id,
+                                    onTapReply: data["replyToId"] != null
+                                        ? () => controller.scrollToMessage(
+                                              docs: docs,
+                                              messageId: data["replyToId"],
+                                            )
+                                        : null,
+                                  );
+                                }),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             );
           },
           );
@@ -268,5 +281,22 @@ class ChatMessagesList extends StatelessWidget {
     final dt = _getTime(value);
     if (dt == null) return "";
     return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+
+  bool _shouldShowDateSeparator(
+    List<QueryDocumentSnapshot> docs,
+    int index,
+  ) {
+    // index là messageIndex (0 → mới nhất)
+    if (index == docs.length - 1) return true; // tin cũ nhất → luôn show
+
+    final curr = _getTime(docs[index]["createdAt"]);
+    final next = _getTime(docs[index + 1]["createdAt"]); // tin cũ hơn
+
+    if (curr == null || next == null) return false;
+
+    return curr.year != next.year ||
+          curr.month != next.month ||
+          curr.day != next.day;
   }
 }
