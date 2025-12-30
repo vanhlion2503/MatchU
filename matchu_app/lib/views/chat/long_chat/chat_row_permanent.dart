@@ -171,13 +171,16 @@ class ChatRowPermanent extends StatelessWidget {
                         ),
                       ),
                       // ===== TIME =======
-                      if (showTime)
-                      Text(
-                        time,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.outline,
+                      if (showTime && time.isNotEmpty)
+                      Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            time,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
                         ),
-                      ),
 
                       // ===== TIME + STATUS ROW =====
                       if (isMe && status != null)

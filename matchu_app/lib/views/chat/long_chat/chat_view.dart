@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
+import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/utils/presence_utils.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_body.dart';
@@ -45,16 +46,19 @@ class ChatView extends StatelessWidget {
           if (otherUid == null) {
             return const Text("Đang tải...");
           }
+
+          final userCache = Get.find<ChatUserCacheController>();
+          final presence = Get.find<PresenceController>();
+
           final otherUser = userCache.getUser(otherUid);
-          final online =
-              otherUser != null && isUserOnline(otherUser.lastActiveAt);
+          final online = presence.isOnline(otherUid);
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
               Get.to(
                 () => OtherProfileView(userId: otherUid),
-                transition: Transition.cupertino, // mượt, giống iOS
+                transition: Transition.cupertino,
               );
             },
             child: Row(
@@ -91,9 +95,9 @@ class ChatView extends StatelessWidget {
                     ),
                   ],
                 ),
-            
+
                 const SizedBox(width: 10),
-            
+
                 /// ===== NAME + STATUS =====
                 Expanded(
                   child: Column(
@@ -106,14 +110,14 @@ class ChatView extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w600,
-                        )
+                        ),
                       ),
                       Text(
                         online
                             ? "Đang hoạt động"
                             : formatLastActive(otherUser?.lastActiveAt),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -123,6 +127,7 @@ class ChatView extends StatelessWidget {
             ),
           );
         }),
+
 
         actions: [
           IconButton(

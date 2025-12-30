@@ -8,6 +8,8 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
+import 'package:matchu_app/controllers/user/presence_controller.dart';
+
 
 class ChatController extends GetxController {
   final String roomId;
@@ -56,11 +58,14 @@ class ChatController extends GetxController {
   StreamSubscription? _roomSub;
   Timer? _typingTimer;
   String? tempRoomId;
+  late final PresenceController _presence;
+  String? _listeningUid;
 
   // ================= INIT =================
   @override
   void onInit() {
     super.onInit();
+    _presence = Get.find<PresenceController>();
     _initRoom();
     _listenScroll();
     ever<bool>(otherTyping, _onOtherTypingChanged);
@@ -101,17 +106,24 @@ class ChatController extends GetxController {
     final roomSnap = await _service.getRoom(roomId);
     final data = roomSnap.data();
     if (data == null) return;
-    await _service.markAsRead(roomId);
-    final participants = List<String>.from(data["participants"]);
-    otherUid.value = participants.firstWhere((e) => e != uid);
 
-    tempRoomId = data["fromTempRoom"];
+    await _service.markAsRead(roomId);
+
+    final participants = List<String>.from(data["participants"]);
+    final uidOther = participants.firstWhere((e) => e != uid);
+
+    otherUid.value = uidOther;
+    _listeningUid = uidOther;
+
+    // 🔥 LISTEN PRESENCE Ở ĐÂY (CHUẨN)
+    _presence.listen(uidOther);
 
     Get.find<ChatUserCacheController>()
-        .loadIfNeeded(otherUid.value!);
+        .loadIfNeeded(uidOther);
 
     _listenRoomTyping();
   }
+
 
   // ================= ROOM LISTENER =================
   void _listenRoomTyping() {
@@ -411,6 +423,9 @@ class ChatController extends GetxController {
     _roomSub?.cancel();
     inputController.dispose();
     _service.setTyping(roomId: roomId, isTyping: false);
+    if (_listeningUid != null) {
+      _presence.unlistenExcept({});
+    }
     super.onClose();
   }
 }
