@@ -6,13 +6,14 @@ import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
+import 'package:matchu_app/controllers/system/app_lifecycle_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
-import 'package:matchu_app/controllers/theme_controller.dart';
+import 'package:matchu_app/controllers/system/theme_controller.dart';
 import 'package:matchu_app/widgets/global_matching_bubble.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -38,6 +39,7 @@ void main() async {
   // ✅ 4. GLOBAL CONTROLLERS
   Get.put(ThemeController(), permanent: true);
   Get.put(AuthController(), permanent: true);
+  Get.put(AppLifecycleController(), permanent: true);
   Get.put(MatchingController(), permanent: true);
   Get.put(AvatarController(), permanent: true);
   Get.put(AnonymousAvatarController(), permanent: true);
