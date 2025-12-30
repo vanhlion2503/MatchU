@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
+import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 
@@ -24,8 +25,10 @@ class ChatListController extends GetxController
   @override
   void onInit() {
     super.onInit();
-    WidgetsBinding.instance.addObserver(this);
 
+    final presence = Get.put(PresenceController(), permanent: true);
+    
+    WidgetsBinding.instance.addObserver(this);
     _sub = _service.listenChatRooms().listen((incoming) {
       _mergeAndReorder(incoming);
       _applySearch();
@@ -65,16 +68,23 @@ class ChatListController extends GetxController
   /// ========================
   void _mergeAndReorder(List<ChatRoomModel> incoming) {
     final userCache = Get.find<ChatUserCacheController>();
+    final presence = Get.find<PresenceController>();
 
     final visible = incoming
         .where((r) => !r.isDeletedFor(uid))
         .toList();
 
+    final aliveUids = <String>{};
+
     for (final room in visible) {
       final otherUid =
           room.participants.firstWhere((e) => e != uid);
       userCache.loadIfNeeded(otherUid);
+      presence.listen(otherUid);
+      aliveUids.add(otherUid);
     }
+
+    presence.unlistenExcept(aliveUids);
 
     visible.sort((a, b) {
       final ap = a.isPinned(uid);

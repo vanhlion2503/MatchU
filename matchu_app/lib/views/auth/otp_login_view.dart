@@ -81,6 +81,7 @@ class OtpLoginView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      width: 2,
                     ),
                   ),
                 ),
@@ -93,7 +94,7 @@ class OtpLoginView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: Theme.of(context).colorScheme.primary,
-                      width: 2,
+                      width: 2
                     ),
                   ),
                 ),
@@ -106,6 +107,7 @@ class OtpLoginView extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: Theme.of(context).colorScheme.primary,
+                      width: 2,
                     ),
                   ),
                 ),

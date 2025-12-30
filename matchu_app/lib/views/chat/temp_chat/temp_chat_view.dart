@@ -93,7 +93,7 @@ class TempChatView extends StatelessWidget {
                       children: [
                         Text(
                           "Người lạ",
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -177,7 +177,7 @@ class TempChatView extends StatelessWidget {
                     color: isDanger
                         ? theme.colorScheme.error
                         : theme.colorScheme.primary,
-                    width: 0.6,
+                    width: 2,
                   ),
                 ),
                 child: Text(

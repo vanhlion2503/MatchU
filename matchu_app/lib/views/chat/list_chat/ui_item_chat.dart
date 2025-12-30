@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -27,8 +28,12 @@ Widget chatItem({
     userCache.version.value;
 
     final otherUser = userCache.getUser(otherUid);
-    final online =
-        otherUser != null && isUserOnline(otherUser.lastActiveAt);
+    final presence = Get.find<PresenceController>();
+
+    presence.listen(otherUid);
+
+    final online = presence.isOnline(otherUid);
+
 
     return InkWell(
       onTap: onTap,

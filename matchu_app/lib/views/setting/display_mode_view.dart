@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:matchu_app/controllers/theme_controller.dart';
+import 'package:matchu_app/controllers/system/theme_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 
 class DisplayModeView extends StatelessWidget {
