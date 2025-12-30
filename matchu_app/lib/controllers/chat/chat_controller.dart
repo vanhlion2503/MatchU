@@ -193,52 +193,63 @@ class ChatController extends GetxController {
   // ================= AUTO SCROLL CORE =================
 
   /// 🔥 GỌI SAU MỖI LẦN SNAPSHOT ĐỔI (realtime messages)
-  void onNewMessages(int newCount, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+  void onNewMessages(
+    int newCount,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
     if (docs.isEmpty) return;
-    
-    final oldCount = allMessages.length;
-    
-    // Merge messages mới vào list (tránh duplicate)
-    final existingIds = allMessages.map((e) => e.id).toSet();
-    final newDocs = docs.where((doc) => !existingIds.contains(doc.id)).toList();
-    
-    if (newDocs.isNotEmpty) {
-      // Thêm messages mới vào đầu list (vì reverse: true, index 0 là mới nhất)
-      allMessages.insertAll(0, newDocs);
-      lastMessageCount = allMessages.length;
+
+    final newestIncomingId = docs.first.id;
+    final newestExistingId =
+        allMessages.isNotEmpty ? allMessages.first.id : null;
+
+    if (newestIncomingId == newestExistingId) {
+      return; // ❌ snapshot cũ → không làm gì
     }
+
+    final oldCount = allMessages.length;
+
+    final newestIncoming = docs.first;
+    final newestExisting =
+        allMessages.isNotEmpty ? allMessages.first.id : null;
+
     
-    final isNewMessage = newDocs.isNotEmpty;
+    // ✅ chỉ add khi có message mới thật sự
+    if (newestIncoming.id != newestExisting) {
+      allMessages.insert(0, newestIncoming);
+      lastMessageCount = allMessages.length;
+    } else {
+      return; // ❌ không làm gì → không rebuild
+    }
+
+    final isFromMe = newestIncoming["senderId"] == uid;
 
     if (!userScrolledUp.value) {
       _service.markAsRead(roomId);
     }
 
-    // ❌ KHÔNG auto-scroll khi vào phòng lần đầu
-    if (oldCount == 0) {
-      return;
-    }
+    // ❌ KHÔNG scroll khi mới vào phòng
+    if (oldCount == 0) return;
 
-    // ✅ Chỉ scroll khi user vừa gửi tin
-    if (_justSentMessage) {
+    // ✅ chỉ scroll khi message là của mình
+    if (_justSentMessage && isFromMe) {
       _justSentMessage = false;
-      Future.microtask(() {
-        _scrollToBottom(0); // Index 0 là tin mới nhất ở đáy
-      });
+      _scrollToBottom(0);
       return;
     }
 
-    // ✅ Chỉ scroll khi có tin nhắn mới realtime VÀ user đang ở đáy
-    if (isNewMessage && !userScrolledUp.value) {
-      _scrollToBottom(0); // Index 0 là tin mới nhất ở đáy
+    // ✅ message của người khác + đang ở đáy
+    if (!isFromMe && !userScrolledUp.value) {
+      _scrollToBottom(0);
       return;
     }
 
-    // User đang đọc lịch sử → hiển thị nút scroll
-    if (isNewMessage && userScrolledUp.value) {
+    // 👀 user đang đọc lịch sử
+    if (userScrolledUp.value) {
       showNewMessageBtn.value = true;
     }
   }
+
 
   void _scrollToBottom(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) {

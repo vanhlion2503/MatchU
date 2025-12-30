@@ -32,13 +32,13 @@ class ChatMessagesList extends StatelessWidget {
       stream: controller.listenMessages(),
       builder: (context, snap) {
         // Listen stream để detect messages mới
-        if (snap.hasData) {
-          final docs = snap.data!.docs;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            controller.onNewMessages(docs.length, docs);
-          });
+        if (snap.connectionState == ConnectionState.active && snap.hasData) {
+          controller.onNewMessages(
+            snap.data!.docs.length,
+            snap.data!.docs,
+          );
         }
-
+        
         // Sử dụng allMessages từ controller
         return Obx(() {
           final docs = controller.allMessages;
@@ -105,110 +105,111 @@ class ChatMessagesList extends StatelessWidget {
             final data = doc.data();
             final isMe = data["senderId"] == uid;
             final isLastInGroup = _isLastInGroup(docs, messageIndex);
-            final otherUid = controller.otherUid.value;
             final createdAt = _getTime(data["createdAt"]);
+            final isNewestMessage = messageIndex == 0;
 
             double dragDx = 0;
 
+            final bubbleContent = StatefulBuilder(
+              builder: (context, setState) {
+                return Listener(
+                  onPointerMove: (event) {
+                    if (isMe) return;
+
+                    final dx = event.delta.dx;
+                    final dy = event.delta.dy;
+
+                    if (dx <= 0) return;
+                    if (dx.abs() < dy.abs()) return;
+
+                    dragDx += dx;
+                    dragDx = dragDx.clamp(0, 80);
+                    setState(() {});
+                  },
+                  onPointerUp: (_) {
+                    if (dragDx > 32) {
+                      HapticFeedback.lightImpact();
+                      controller.startReply({
+                        "id": doc.id,
+                        "text": data["text"],
+                      });
+                    }
+                    setState(() => dragDx = 0);
+                  },
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Positioned(
+                        left: 12 + dragDx * 0.5,
+                        child: Opacity(
+                          opacity: (dragDx / 40).clamp(0, 1),
+                          child: Icon(
+                            Iconsax.redo,
+                            color: theme.colorScheme.primary,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                      Transform.translate(
+                        offset: Offset(dragDx, 0),
+                        child: Opacity(
+                          opacity: (1 - dragDx / 120).clamp(0.7, 1),
+                          child: Obx(() {
+                            final unread = controller.otherUnread.value;
+                            final otherUid = controller.otherUid.value;
+                            final isMyLastMessage = isMe && messageIndex == 0;
+
+                            return ChatRowPermanent(
+                              key: ValueKey(doc.id), // 🔥 BẮT BUỘC
+                              messageId: doc.id,
+                              senderId: data["senderId"],
+                              text: data["text"] ?? "",
+                              type: data["type"] ?? "text",
+                              isMe: isMe,
+                              showAvatar: !isMe && isLastInGroup,
+                              status: isMyLastMessage
+                                  ? unread == 0
+                                      ? MessageStatus.seen
+                                      : MessageStatus.sent
+                                  : null,
+                              seenByUid:
+                                  isMyLastMessage && unread == 0 && otherUid != null
+                                      ? otherUid
+                                      : null,
+                              smallMargin: _shouldGroup(docs, messageIndex),
+                              showTime: isLastInGroup && messageIndex != 0,
+                              time: _formatTime(data["createdAt"]),
+                              replyText: data["replyText"],
+                              replyToId: data["replyToId"],
+                              highlighted:
+                                  controller.highlightedMessageId.value == doc.id,
+                              onTapReply: data["replyToId"] != null
+                                  ? () => controller.scrollToMessage(
+                                        docs: docs,
+                                        messageId: data["replyToId"],
+                                      )
+                                  : null,
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (createdAt != null && _shouldShowDateSeparator(docs, messageIndex))
-                DateSeparator(
-                  text: formatDateLabel(createdAt),
-                ),
-
-                AnimatedMessageBubble(
-                  child: StatefulBuilder(
-                    builder: (context, setState) {
-                      return Listener(
-                        onPointerMove: (event) {
-                          if (isMe) return;
-                
-                          final dx = event.delta.dx;
-                          final dy = event.delta.dy;
-                
-                          if (dx <= 0) return;
-                          if (dx.abs() < dy.abs()) return;
-                
-                          dragDx += dx;
-                          dragDx = dragDx.clamp(0, 80);
-                          setState(() {});
-                        },
-                        onPointerUp: (_) {
-                          if (dragDx > 32) {
-                            HapticFeedback.lightImpact();
-                            controller.startReply({
-                              "id": doc.id,
-                              "text": data["text"],
-                            });
-                          }
-                          setState(() => dragDx = 0);
-                        },
-                        child: Stack(
-                          alignment: Alignment.centerLeft,
-                          children: [
-                            Positioned(
-                              left: 12 + dragDx * 0.5,
-                              child: Opacity(
-                                opacity: (dragDx / 40).clamp(0, 1),
-                                child: Icon(
-                                  Iconsax.redo,
-                                  color: theme.colorScheme.primary,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                            Transform.translate(
-                              offset: Offset(dragDx, 0),
-                              child: Opacity(
-                                opacity:
-                                    (1 - dragDx / 120).clamp(0.7, 1),
-                                child: Obx(() {
-                                  final unread = controller.otherUnread.value;
-                                  final otherUid = controller.otherUid.value;
-                                  final isMyLastMessage = isMe && messageIndex == 0;
-                                  final isNewestMessage = messageIndex == 0;
-                
-                                  return ChatRowPermanent(
-                                    messageId: doc.id,
-                                    senderId: data["senderId"],
-                                    text: data["text"] ?? "",
-                                    type: data["type"] ?? "text",
-                                    isMe: isMe,
-                                    showAvatar: !isMe && isLastInGroup,
-                                    status: isMyLastMessage
-                                        ? unread == 0
-                                            ? MessageStatus.seen
-                                            : MessageStatus.sent
-                                        : null,
-                                    seenByUid:
-                                        isMyLastMessage && unread == 0 && otherUid != null
-                                            ? otherUid
-                                            : null,
-                                    smallMargin: _shouldGroup(docs, i),
-                                    showTime: isLastInGroup && !isNewestMessage,
-                                    time: _formatTime(data["createdAt"]),
-                                    replyText: data["replyText"],
-                                    replyToId: data["replyToId"],
-                                    highlighted:
-                                        controller.highlightedMessageId.value == doc.id,
-                                    onTapReply: data["replyToId"] != null
-                                        ? () => controller.scrollToMessage(
-                                              docs: docs,
-                                              messageId: data["replyToId"],
-                                            )
-                                        : null,
-                                  );
-                                }),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                if (createdAt != null &&
+                    _shouldShowDateSeparator(docs, messageIndex))
+                  DateSeparator(
+                    text: formatDateLabel(createdAt),
                   ),
-                ),
+
+                isNewestMessage
+                    ? AnimatedMessageBubble(child: bubbleContent)
+                    : bubbleContent,
               ],
             );
           },
