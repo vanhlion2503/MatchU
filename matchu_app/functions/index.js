@@ -42,6 +42,10 @@ exports.migrateTempChatMessages = onDocumentCreated(
     for (const doc of tempMessagesSnap.docs) {
       const data = doc.data();
 
+      if (data.type === "system" || data.code) {
+        continue;
+      }
+
       const newMsgRef = snap.ref.collection("messages").doc();
 
       batch.set(newMsgRef, {
