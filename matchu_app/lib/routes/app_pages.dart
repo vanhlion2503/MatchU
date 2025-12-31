@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
+import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/auth/enroll_phone_view.dart';
 import 'package:matchu_app/views/auth/otp_enroll_view.dart';
@@ -119,6 +120,9 @@ class AppPages {
     GetPage(
       name: AppRouter.chat,
       page: () => ChatView(),
+      binding: BindingsBuilder(() {
+        Get.put(PresenceController());
+      }),
     ),
     
     GetPage(

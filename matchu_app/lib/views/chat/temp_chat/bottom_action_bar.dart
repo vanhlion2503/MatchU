@@ -14,8 +14,6 @@ class BottomActionBar extends StatelessWidget {
   final TempChatController controller;
   BottomActionBar(this.controller, {super.key});
 
-  final TextEditingController _ctrl = TextEditingController();
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -123,7 +121,7 @@ class BottomActionBar extends StatelessWidget {
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 120),
                       child: TextField(
-                        controller: _ctrl,
+                        controller: controller.inputController,
                         minLines: 1,
                         maxLines: null,
                         onChanged: controller.onTypingChanged,
@@ -189,7 +187,7 @@ class BottomActionBar extends StatelessWidget {
                         ? ActionIcon(
                             key: const ValueKey("send"),
                             onTap: () {
-                              final text = _ctrl.text.trim();
+                              final text = controller.inputController.text.trim();
                               if (text.isEmpty) return;
 
                               final isEmojiOnly = _isEmojiOnly(text);
@@ -199,7 +197,7 @@ class BottomActionBar extends StatelessWidget {
                                 type: isEmojiOnly ? "emoji" : "text",
                               );
 
-                              _ctrl.clear();
+                              controller.inputController.clear();
                               controller.stopTyping();
                               controller.hideEmoji();
                             },
@@ -258,9 +256,10 @@ class BottomActionBar extends StatelessWidget {
                           height: 280,
                           width: MediaQuery.of(context).size.width,
                             child: EmojiPicker(
-                              onEmojiSelected: (category, emoji) {
-                                final text = _ctrl.text;
-                                final selection = _ctrl.selection;
+                              onEmojiSelected: (_, emoji) {
+                                final ctrl = controller.inputController;
+                                final text = ctrl.text;
+                                final selection = ctrl.selection;
 
                                 final newText = text.replaceRange(
                                   selection.start,
@@ -268,8 +267,8 @@ class BottomActionBar extends StatelessWidget {
                                   emoji.emoji,
                                 );
 
-                                _ctrl.text = newText;
-                                _ctrl.selection = TextSelection.collapsed(
+                                ctrl.text = newText;
+                                ctrl.selection = TextSelection.collapsed(
                                   offset: selection.start + emoji.emoji.length,
                                 );
 

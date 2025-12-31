@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
+import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
+import 'package:matchu_app/utils/reaction_registry.dart';
+
 class ChatRow extends StatelessWidget {
   final String text;
   final bool isMe;
@@ -14,7 +17,10 @@ class ChatRow extends StatelessWidget {
   final bool highlighted;
   final String type;
   final String? anonymousAvatarKey;
-
+  final Map<String, String>? reactions;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onDoubleTap;
+  final GlobalKey? bubbleKey;
 
   const ChatRow({
     super.key,
@@ -31,6 +37,10 @@ class ChatRow extends StatelessWidget {
     required this.highlighted,
     required this.type,
     this.anonymousAvatarKey,
+    this.reactions,
+    this.onLongPress,
+    this.onDoubleTap,
+    this.bubbleKey,
   });
 
   @override
@@ -50,39 +60,19 @@ class ChatRow extends StatelessWidget {
         child: Row(
           mainAxisAlignment:
               isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!isMe)
               SizedBox(
                 width: 36,
                 child: showAvatar ? AnonymousAvatar(avatarKey: anonymousAvatarKey, radius: 16,): const SizedBox(),
               ),
-            const SizedBox(width: 6),
+            if (!isMe) const SizedBox(width: 6),
 
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: highlighted ? 1 : 0),
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                final shake = highlighted
-                    ? (value < 0.5 ? value : (1 - value)) * 4
-                    : 0;
-
-                return Transform.translate(
-                  offset: Offset(shake * (isMe ? -1 : 1), 0),
-                  child: AnimatedScale(
-                    scale: highlighted ? 1.12 : 1.0,
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutBack,
-                    child: child,
-                  ),
-                );
-              },
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 42,
-                ),
-              ),
+            AnimatedEmoji(
+              text: text,
+              highlighted: highlighted,
+              isMe: isMe,
             ),
           ],
         ),
@@ -147,61 +137,84 @@ class ChatRow extends StatelessWidget {
                         ),
 
                       // ===== MESSAGE BUBBLE (CHÍNH) =====
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(
-                          begin: 0,
-                          end: highlighted ? 1 : 0,
-                        ),
-                        duration: const Duration(milliseconds: 420),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, value, child) {
-                          // 🔥 rung rất nhẹ ±2px
-                          final shake = highlighted
-                              ? (value < 0.5 ? value : (1 - value)) * 4
-                              : 0;
-
-                          return Transform.translate(
-                            offset: Offset(shake * (isMe ? -1 : 1), 0),
-                            child: AnimatedScale(
-                              scale: highlighted ? 1.04 : 1.0,
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOutBack,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 320),
-                                curve: Curves.easeOutCubic,
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: bubbleColor, // ✅ KHÔNG đổi màu
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(16),
-                                    topRight: const Radius.circular(16),
-                                    bottomLeft:
-                                        isMe ? const Radius.circular(16) : const Radius.circular(4),
-                                    bottomRight:
-                                        isMe ? const Radius.circular(4) : const Radius.circular(16),
-                                  ),
-                                  boxShadow: highlighted
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.14),
-                                            blurRadius: 18,
-                                            offset: const Offset(0, 6),
-                                          ),
-                                        ]
-                                      : [],
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            onLongPress: onLongPress,
+                            onDoubleTap: onDoubleTap,
+                            child: Container(
+                              key: bubbleKey,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(
+                                  begin: 0,
+                                  end: highlighted ? 1 : 0,
                                 ),
-                                child: child,
+                                duration: const Duration(milliseconds: 420),
+                                curve: Curves.easeOutCubic,
+                                builder: (context, value, child) {
+                                  // 🔥 rung rất nhẹ ±2px
+                                  final shake = highlighted
+                                      ? (value < 0.5 ? value : (1 - value)) * 4
+                                      : 0;
+
+                                  return Transform.translate(
+                                    offset: Offset(shake * (isMe ? -1 : 1), 0),
+                                    child: AnimatedScale(
+                                      scale: highlighted ? 1.04 : 1.0,
+                                      duration: const Duration(milliseconds: 220),
+                                      curve: Curves.easeOutBack,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 320),
+                                        curve: Curves.easeOutCubic,
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: bubbleColor, // ✅ KHÔNG đổi màu
+                                          borderRadius: BorderRadius.only(
+                                            topLeft: const Radius.circular(16),
+                                            topRight: const Radius.circular(16),
+                                            bottomLeft:
+                                                isMe ? const Radius.circular(16) : const Radius.circular(4),
+                                            bottomRight:
+                                                isMe ? const Radius.circular(4) : const Radius.circular(16),
+                                          ),
+                                          boxShadow: highlighted
+                                              ? [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(0.14),
+                                                    blurRadius: 18,
+                                                    offset: const Offset(0, 6),
+                                                  ),
+                                                ]
+                                              : [],
+                                        ),
+                                        child: child,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  text,
+                                  softWrap: true,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: textColor,
+                                  ),
+                                ),
                               ),
                             ),
-                          );
-                        },
-                        child: Text(
-                          text,
-                          softWrap: true,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: textColor,
                           ),
-                        ),
+
+                          if (reactions != null && reactions!.isNotEmpty)
+                            Positioned(
+                              bottom: -10,
+                              right: isMe ? -6 : null,
+                              left: isMe ? null : -6,
+                              child: _MessengerReactionBadge(
+                                reactions: reactions!,
+                                isMe: isMe,
+                              ),
+                            ),
+                        ],
                       ),
 
 
@@ -224,6 +237,66 @@ class ChatRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Map<String, int> _groupReactions(Map<String, String> reactions) {
+  final Map<String, int> result = {};
+  for (final id in reactions.values) {
+    result[id] = (result[id] ?? 0) + 1;
+  }
+  return result;
+}
+
+class _MessengerReactionBadge extends StatelessWidget {
+  final Map<String, String> reactions;
+  final bool isMe;
+
+  const _MessengerReactionBadge({
+    required this.reactions,
+    required this.isMe,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = _groupReactions(reactions);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: grouped.entries.map((e) {
+        final reaction = ReactionRegistry.get(e.key);
+        if (reaction == null) return const SizedBox();
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 4,
+                  color: Colors.black.withOpacity(0.15),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                reaction.icon,
+                if (e.value > 1) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    e.value.toString(),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

@@ -178,4 +178,33 @@ class TempChatService {
       "typing.${isA ? 'userA' : 'userB'}": typing,
     });
   }
+
+  Future<void> toggleReaction({
+    required String roomId,
+    required String messageId,
+    required String uid,
+    required String reactionId,
+  }) async {
+    final msgRef = _db
+        .collection("tempChats")
+        .doc(roomId)
+        .collection("messages")
+        .doc(messageId);
+
+    final snap = await msgRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final current = data["reactions"]?[uid];
+
+    if (current == reactionId) {
+      await msgRef.update({
+        "reactions.$uid": FieldValue.delete(),
+      });
+    } else {
+      await msgRef.update({
+        "reactions.$uid": reactionId,
+      });
+    }
+  }
 }

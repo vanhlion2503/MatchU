@@ -66,3 +66,32 @@ class TypingBubbleRow extends StatelessWidget {
   }
 }
 
+/// Typing bubble với animation như long_chat
+class MessengerTypingBubbleTemp extends StatelessWidget {
+  final bool show;
+  final TempChatController controller;
+
+  const MessengerTypingBubbleTemp({
+    super.key,
+    required this.show,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        opacity: show ? 1 : 0,
+        child: show
+            ? TypingBubbleRow(controller: controller)
+            : const SizedBox(height: 0),
+      ),
+    );
+  }
+}
+

@@ -35,8 +35,8 @@ class TempChatController extends GetxController {
   final otherRatingCount = RxnInt();
   final otherAnonymousAvatar = RxnString();
   final otherGender = RxnString();
-
-
+  final _justSentMessage = false.obs;
+  int _lastMessageCount = 0;
 
   Timer? _typingTimer;
   Timer? _timer;
@@ -51,6 +51,23 @@ class TempChatController extends GetxController {
     _loadOtherUserRating();
     _saveMyAnonymousAvatarToRoom();
     _listenAnonymousAvatars();
+    // Listen typing để auto scroll
+    ever<bool>(otherTyping, _onOtherTypingChanged);
+  }
+
+  void _onOtherTypingChanged(bool isTyping) {
+    if (!isTyping) return;
+    if (!scrollController.hasClients) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!scrollController.hasClients) return;
+      
+      scrollController.animateTo(
+        scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   void toggleEmoji() {
@@ -197,6 +214,8 @@ class TempChatController extends GetxController {
   Future<void> send(String text, {String type = "text"}) async {
     final reply = replyingMessage.value;
 
+    _justSentMessage.value = true;
+
     await service.sendMessages(
       roomId,
       TempMessageModel(
@@ -217,6 +236,38 @@ class TempChatController extends GetxController {
       scrollController.animateTo(
         scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  /// Auto scroll khi có tin nhắn mới (giống long_chat)
+  void onNewMessages(int newCount, List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    if (docs.isEmpty) return;
+
+    final hasNewMessage = newCount > _lastMessageCount;
+    _lastMessageCount = newCount;
+
+    if (!hasNewMessage) return;
+
+    final newest = docs.last; // Vì orderBy createdAt, tin mới nhất ở cuối
+    final isFromMe = newest["senderId"] == uid;
+
+    if (_justSentMessage.value && isFromMe) {
+      _justSentMessage.value = false;
+      _scrollToBottom();
+    } else if (!isFromMe) {
+      _scrollToBottom();
+    }
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!scrollController.hasClients) return;
+
+      scrollController.animateTo(
+        scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
       );
     });
@@ -320,6 +371,19 @@ class TempChatController extends GetxController {
       roomId: roomId,
       uid: uid,
       typing: false,
+    );
+  }
+
+  // ================= REACTION =================
+  void onReactMessage({
+    required String messageId,
+    required String reactionId,
+  }) {
+    service.toggleReaction(
+      roomId: roomId,
+      messageId: messageId,
+      uid: uid,
+      reactionId: reactionId,
     );
   }
 

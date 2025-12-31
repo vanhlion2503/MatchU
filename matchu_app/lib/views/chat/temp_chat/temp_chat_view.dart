@@ -25,6 +25,8 @@ class TempChatView extends StatelessWidget {
         automaticallyImplyLeading: false,
         toolbarHeight: 72,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         backgroundColor: theme.colorScheme.surface.withOpacity(0.95),
 
         bottom: PreferredSize(
@@ -177,7 +179,7 @@ class TempChatView extends StatelessWidget {
                     color: isDanger
                         ? theme.colorScheme.error
                         : theme.colorScheme.primary,
-                    width: 2,
+                    width: 1,
                   ),
                 ),
                 child: Text(

@@ -12,17 +12,29 @@ import 'package:matchu_app/views/chat/temp_chat/chat_row.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/system_message_event.dart';
 import 'package:matchu_app/views/chat/temp_chat/typing_bubble_row.dart';
+import 'package:matchu_app/views/chat/chat_widget/reaction_picker.dart';
 
-class MessagesList extends StatelessWidget {
+class MessagesList extends StatefulWidget {
   final String roomId;
   final TempChatController controller;
 
   const MessagesList(this.roomId, this.controller, {super.key});
 
   @override
+  State<MessagesList> createState() => _MessagesListState();
+}
+
+class _MessagesListState extends State<MessagesList> {
+  OverlayEntry? _reactionEntry;
+  // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
+  final Map<String, GlobalKey> _bubbleKeys = {};
+
+  @override
   Widget build(BuildContext context) {
     final uid = Get.find<AuthController>().user!.uid;
     final theme = Theme.of(context);
+    final controller = widget.controller;
+    final roomId = widget.roomId;
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -32,6 +44,17 @@ class MessagesList extends StatelessWidget {
           .orderBy("createdAt")
           .snapshots(),
       builder: (context, snap) {
+        // Auto scroll khi có tin nhắn mới
+        if (snap.connectionState == ConnectionState.active && snap.hasData) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final docs = snap.data!.docs;
+            controller.onNewMessages(
+              docs.length,
+              docs.cast<QueryDocumentSnapshot<Map<String, dynamic>>>(),
+            );
+          });
+        }
+
         if (!snap.hasData) return const SizedBox();
 
         final docs = snap.data!.docs;
@@ -71,10 +94,10 @@ class MessagesList extends StatelessWidget {
           // ================= TYPING BUBBLE (CUỐI LIST) =================
           if (i == docs.length + 1) {
             return Obx(() {
-              if (!controller.otherTyping.value) {
-                return const SizedBox();
-              }
-              return TypingBubbleRow(controller: controller);
+              return MessengerTypingBubbleTemp(
+                show: controller.otherTyping.value,
+                controller: controller,
+              );
             });
           }
 
@@ -115,6 +138,12 @@ class MessagesList extends StatelessWidget {
           final showTime = _isLastInGroup(docs, index);
           
           final key = controller.messageKeys.putIfAbsent(
+            doc.id,
+            () => GlobalKey(),
+          );
+
+          // ✅ Lưu bubbleKey để show reaction picker
+          final bubbleKey = _bubbleKeys.putIfAbsent(
             doc.id,
             () => GlobalKey(),
           );
@@ -168,6 +197,8 @@ class MessagesList extends StatelessWidget {
                           child: Opacity(
                             opacity: (1 - dragDx / 120).clamp(0.7, 1),
                             child: Obx(() {
+                              final reactions = Map<String, String>.from(data["reactions"] ?? {});
+                              
                               return ChatRow(
                                 text: data["text"] ?? "",
                                 type: messageType,
@@ -184,6 +215,25 @@ class MessagesList extends StatelessWidget {
                                 messageId: doc.id,
                                 highlighted: controller.highlightedMessageId.value == doc.id,
                                 anonymousAvatarKey: isMe? null: controller.otherAnonymousAvatar.value,
+                                reactions: reactions.isNotEmpty ? reactions : null,
+                                bubbleKey: bubbleKey,
+                                // ❤️ DOUBLE TAP = LOVE
+                                onDoubleTap: () {
+                                  if (reactions[uid] == "love") return;
+                                  controller.onReactMessage(
+                                    messageId: doc.id,
+                                    reactionId: "love",
+                                  );
+                                },
+                                onLongPress: () {
+                                  _showReactionPicker(
+                                    context: context,
+                                    controller: controller,
+                                    messageId: doc.id,
+                                    bubbleKey: bubbleKey,
+                                    isMe: isMe,
+                                  );
+                                },
                               );
                             }),
                           ),
@@ -251,5 +301,70 @@ class MessagesList extends StatelessWidget {
     final dt = _getTime(value);
     if (dt == null) return "";
     return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+
+  void _showReactionPicker({
+    required BuildContext context,
+    required TempChatController controller,
+    required String messageId,
+    required GlobalKey bubbleKey,
+    required bool isMe,
+  }) {
+    // Nếu đang mở → đóng cái cũ
+    _reactionEntry?.remove();
+
+    final box =
+        bubbleKey.currentContext!.findRenderObject() as RenderBox;
+    final pos = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    const pickerWidth = 270.0;
+    const pickerHeight = 40.0;
+    const verticalGap = 10.0;
+
+    final left = isMe
+        ? pos.dx + size.width - pickerWidth
+        : pos.dx;
+
+    final top = pos.dy - pickerHeight - verticalGap;
+
+    _reactionEntry = OverlayEntry(
+      builder: (_) => GestureDetector(
+        behavior: HitTestBehavior.translucent, // 👈 BẮT BUỘC
+        onTap: () {
+          _reactionEntry?.remove();
+          _reactionEntry = null;
+        },
+        child: Stack(
+          children: [
+            Positioned(
+              left: left.clamp(
+                8.0,
+                MediaQuery.of(context).size.width - pickerWidth - 8,
+              ),
+              top: top,
+              child: ReactionPicker(
+                onSelect: (reactionId) {
+                  controller.onReactMessage(
+                    messageId: messageId,
+                    reactionId: reactionId,
+                  );
+                  _reactionEntry?.remove();
+                  _reactionEntry = null;
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_reactionEntry!);
+  }
+
+  @override
+  void dispose() {
+    _reactionEntry?.remove();
+    super.dispose();
   }
 }
