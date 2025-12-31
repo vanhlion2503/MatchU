@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
-import 'package:matchu_app/utils/presence_utils.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
+import 'package:matchu_app/utils/presence_utils.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_body.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 

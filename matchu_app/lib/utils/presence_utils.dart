@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 bool isUserOnline(DateTime? lastActiveAt){
   if(lastActiveAt == null) return false;
 

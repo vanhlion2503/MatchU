@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
-import 'package:matchu_app/theme/app_theme.dart';
-
 class ChatRow extends StatelessWidget {
   final String text;
   final bool isMe;
