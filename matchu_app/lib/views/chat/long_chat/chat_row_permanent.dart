@@ -30,6 +30,12 @@ class ChatRowPermanent extends StatelessWidget {
   final MessageStatus? status;
   final String? seenByUid;
 
+  final Map<String, dynamic>? reactions;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onDoubleTap;
+
+  final GlobalKey bubbleKey;
+
   const ChatRowPermanent({
     super.key,
     required this.messageId,
@@ -41,12 +47,16 @@ class ChatRowPermanent extends StatelessWidget {
     required this.smallMargin,
     required this.showTime,
     required this.time,
+    required this.bubbleKey,
     this.replyText,
     this.replyToId,
     this.onTapReply,
     this.highlighted = false,
     this.status,
     this.seenByUid,
+    this.reactions,
+    this.onLongPress,
+    this.onDoubleTap,
   });
 
   @override
@@ -158,18 +168,43 @@ class ChatRowPermanent extends StatelessWidget {
                         ),
 
                       // ===== MESSAGE BUBBLE =====
-                      AnimatedBubble(
-                        isMe: isMe,
-                        highlighted: highlighted,
-                        bubbleColor: bubbleColor,
-                        child: Text(
-                          text,
-                          softWrap: true,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: textColor,
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            onLongPress: onLongPress,
+                            onDoubleTap: onDoubleTap,
+                            child: Container(
+                              key: bubbleKey,
+                              child: AnimatedBubble(
+                                isMe: isMe,
+                                highlighted: highlighted,
+                                bubbleColor: bubbleColor,
+                                child: Text(
+                                  text,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+
+                          if (reactions != null && reactions!.isNotEmpty)
+                            Positioned(
+                              bottom: -10,
+                              right: isMe ? -6 : null,
+                              left: isMe ? null : -6,
+                              child: _MessengerReactionBadge(
+                                reactions: reactions!,
+                                bubbleColor: bubbleColor,
+                                isMe: isMe,
+                              ),
+                            ),
+                        ],
                       ),
+
+
                       // ===== TIME
                       if (showTime && time.isNotEmpty)
                       Padding(
@@ -231,3 +266,64 @@ bool _isEmojiOnly(String text) {
 
   return emojiRegex.hasMatch(trimmed);
 }
+
+Map<String, int> _groupReactions(Map<String, dynamic> reactions) {
+  final Map<String, int> result = {};
+  for (final emoji in reactions.values) {
+    result[emoji] = (result[emoji] ?? 0) + 1;
+  }
+  return result;
+}
+
+class _MessengerReactionBadge extends StatelessWidget {
+  final Map<String, dynamic> reactions;
+  final Color bubbleColor;
+  final bool isMe;
+
+  const _MessengerReactionBadge({
+    required this.reactions,
+    required this.bubbleColor,
+    required this.isMe,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = _groupReactions(reactions);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(12),
+          topRight: const Radius.circular(12),
+          bottomLeft: isMe ? const Radius.circular(12) : const Radius.circular(4),
+          bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(12),
+        ),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 8,
+            color: Colors.black.withOpacity(0.12),
+            offset: const Offset(0, 2),
+          )
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: grouped.entries.map((e) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Text(
+              e.value > 1 ? "${e.key} ${e.value}" : e.key,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+

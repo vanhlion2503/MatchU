@@ -61,6 +61,8 @@ class ChatController extends GetxController {
   late final PresenceController _presence;
   String? _listeningUid;
 
+  final Map<String, int> _messageIndexMap = {};
+
   // ================= INIT =================
   @override
   void onInit() {
@@ -88,8 +90,6 @@ class ChatController extends GetxController {
       );
     });
   }
-
-
 
   void updateBottomBarHeight() {
     final ctx = ChatBottomBar.bottomBarKey.currentContext;
@@ -178,6 +178,7 @@ class ChatController extends GetxController {
       }
       
       allMessages.value = docs;
+      _rebuildIndexMap();
       _oldestDocument = docs.last; // Tin cũ nhất
       lastMessageCount = docs.length;
       
@@ -190,6 +191,13 @@ class ChatController extends GetxController {
     }
   }
 
+  void _rebuildIndexMap() {
+    _messageIndexMap.clear();
+    for (int i = 0; i < allMessages.length; i++) {
+      _messageIndexMap[allMessages[i].id] = i;
+    }
+  }
+
   // ================= AUTO SCROLL CORE =================
 
   /// 🔥 GỌI SAU MỖI LẦN SNAPSHOT ĐỔI (realtime messages)
@@ -199,56 +207,71 @@ class ChatController extends GetxController {
   ) {
     if (docs.isEmpty) return;
 
-    final newestIncomingId = docs.first.id;
-    final newestExistingId =
-        allMessages.isNotEmpty ? allMessages.first.id : null;
+    bool hasChange = false;
 
-    if (newestIncomingId == newestExistingId) {
-      return; // ❌ snapshot cũ → không làm gì
+    for (final snap in docs) {
+      final id = snap.id;
+      final index = _messageIndexMap[id];
+
+      if (index == null) {
+        // ✅ MESSAGE MỚI
+        allMessages.insert(0, snap);
+
+        // shift index map
+        for (final key in _messageIndexMap.keys) {
+          _messageIndexMap[key] = _messageIndexMap[key]! + 1;
+        }
+
+        _messageIndexMap[id] = 0;
+        hasChange = true;
+      } else {
+        // ✅ UPDATE MESSAGE (reaction / edit)
+        final oldData = allMessages[index].data();
+        final newData = snap.data();
+
+        if (!_mapEquals(oldData, newData)) {
+          allMessages[index] = snap;
+          hasChange = true;
+        }
+      }
     }
 
-    final oldCount = allMessages.length;
+    if (!hasChange) return;
 
-    final newestIncoming = docs.first;
-    final newestExisting =
-        allMessages.isNotEmpty ? allMessages.first.id : null;
+    lastMessageCount = allMessages.length;
 
-    
-    // ✅ chỉ add khi có message mới thật sự
-    if (newestIncoming.id != newestExisting) {
-      allMessages.insert(0, newestIncoming);
-      lastMessageCount = allMessages.length;
-    } else {
-      return; // ❌ không làm gì → không rebuild
-    }
-
-    final isFromMe = newestIncoming["senderId"] == uid;
+    final newest = docs.first;
+    final isFromMe = newest["senderId"] == uid;
 
     if (!userScrolledUp.value) {
       _service.markAsRead(roomId);
     }
 
-    // ❌ KHÔNG scroll khi mới vào phòng
-    if (oldCount == 0) return;
-
-    // ✅ chỉ scroll khi message là của mình
     if (_justSentMessage && isFromMe) {
       _justSentMessage = false;
       _scrollToBottom(0);
-      return;
-    }
-
-    // ✅ message của người khác + đang ở đáy
-    if (!isFromMe && !userScrolledUp.value) {
+    } else if (!isFromMe && !userScrolledUp.value) {
       _scrollToBottom(0);
-      return;
-    }
-
-    // 👀 user đang đọc lịch sử
-    if (userScrolledUp.value) {
+    } else if (userScrolledUp.value) {
       showNewMessageBtn.value = true;
     }
   }
+
+
+  bool _mapEquals(Map a, Map b) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (!b.containsKey(key)) return false;
+      if (a[key] is Map && b[key] is Map) {
+        if (!_mapEquals(a[key], b[key])) return false;
+      } else if (a[key] != b[key]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+
 
 
   void _scrollToBottom(int index) {
@@ -324,6 +347,11 @@ class ChatController extends GetxController {
       
       // Thêm vào cuối list (vì reverse: true, cuối list là tin cũ nhất)
       allMessages.addAll(newDocs);
+
+      final startIndex = allMessages.length - newDocs.length;
+      for (int i = 0; i < newDocs.length; i++) {
+        _messageIndexMap[newDocs[i].id] = startIndex + i;
+      }
       _oldestDocument = newDocs.last; // Cập nhật tin cũ nhất
       lastMessageCount = allMessages.length;
       
@@ -425,6 +453,17 @@ class ChatController extends GetxController {
         }
       });
     });
+  }
+
+  void onReactMessage({
+    required String messageId,
+    required String emoji,
+  }) {
+    _service.toggleReaction(
+      roomId: roomId,
+      messageId: messageId,
+      emoji: emoji,
+    );
   }
 
   // ================= CLEAN UP =================

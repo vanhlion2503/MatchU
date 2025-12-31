@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/utils/format_date_lable.dart';
+import 'package:matchu_app/views/chat/chat_widget/reaction_picker.dart';
 import 'package:matchu_app/views/chat/long_chat/date_separator.dart';
 import 'package:matchu_app/views/chat/long_chat/messenger_typing_bubble.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -15,9 +16,18 @@ import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
 
 
-class ChatMessagesList extends StatelessWidget {
+class ChatMessagesList extends StatefulWidget {
   final ChatController controller;
   const ChatMessagesList({super.key, required this.controller});
+
+  @override
+  State<ChatMessagesList> createState() => _ChatMessagesListState();
+}
+
+class _ChatMessagesListState extends State<ChatMessagesList> {
+  // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
+  final Map<String, GlobalKey> _bubbleKeys = {};
+  OverlayEntry? _reactionEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -25,23 +35,27 @@ class ChatMessagesList extends StatelessWidget {
     final theme = Theme.of(context);
 
     final bottomPadding =
-        controller.bottomBarHeight.value +
+        widget.controller.bottomBarHeight.value +
         MediaQuery.of(context).padding.bottom;
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: controller.listenMessages(),
+      stream: widget.controller.listenMessages(),
       builder: (context, snap) {
         // Listen stream để detect messages mới
         if (snap.connectionState == ConnectionState.active && snap.hasData) {
-          controller.onNewMessages(
-            snap.data!.docs.length,
-            snap.data!.docs,
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            widget.controller.onNewMessages(
+              snap.data!.docs.length,
+              snap.data!.docs,
+            );
+          });
         }
+
         
         // Sử dụng allMessages từ controller
         return Obx(() {
-          final docs = controller.allMessages;
+          final docs = widget.controller.allMessages;
           
           if (docs.isEmpty && !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -49,12 +63,12 @@ class ChatMessagesList extends StatelessWidget {
 
           // ✅ Đảm bảo itemCount hợp lệ
           // +1 cho typing slot, +1 cho loading indicator nếu đang load more
-          final itemCount = docs.length + 1 + (controller.isLoadingMore ? 1 : 0);
+          final itemCount = docs.length + 1 + (widget.controller.isLoadingMore ? 1 : 0);
 
           return ScrollablePositionedList.builder(
             reverse: true, // ✅ Tin mới ở index 0, hiển thị ở đáy
-            itemScrollController: controller.itemScrollController,
-            itemPositionsListener: controller.itemPositionsListener,
+            itemScrollController: widget.controller.itemScrollController,
+            itemPositionsListener: widget.controller.itemPositionsListener,
             padding: EdgeInsets.fromLTRB(
               16,
               16,
@@ -66,20 +80,20 @@ class ChatMessagesList extends StatelessWidget {
             /// ================= TYPING SLOT (Ở ĐÁY - index 0) =================
             if (i == 0) {
               return Obx(() {
-                final otherUid = controller.otherUid.value;
+                final otherUid = widget.controller.otherUid.value;
                 if (otherUid == null) return const SizedBox();
 
                 return MessengerTypingBubble(
-                  show: controller.otherTyping.value,
+                  show: widget.controller.otherTyping.value,
                   senderId: otherUid,
                 );
               });
             }
 
             /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
-            if (controller.isLoadingMore && i == itemCount - 1) {
+            if (widget.controller.isLoadingMore && i == itemCount - 1) {
               return Obx(() {
-                if (!controller.isLoadingMore) return const SizedBox();
+                if (!widget.controller.isLoadingMore) return const SizedBox();
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16.0),
                   child: Center(
@@ -108,6 +122,12 @@ class ChatMessagesList extends StatelessWidget {
             final createdAt = _getTime(data["createdAt"]);
             final isNewestMessage = messageIndex == 0;
 
+            // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
+            final bubbleKey = _bubbleKeys.putIfAbsent(
+              doc.id,
+              () => GlobalKey(),
+            );
+
             double dragDx = 0;
 
             final bubbleContent = StatefulBuilder(
@@ -129,7 +149,7 @@ class ChatMessagesList extends StatelessWidget {
                   onPointerUp: (_) {
                     if (dragDx > 32) {
                       HapticFeedback.lightImpact();
-                      controller.startReply({
+                      widget.controller.startReply({
                         "id": doc.id,
                         "text": data["text"],
                       });
@@ -155,10 +175,9 @@ class ChatMessagesList extends StatelessWidget {
                         child: Opacity(
                           opacity: (1 - dragDx / 120).clamp(0.7, 1),
                           child: Obx(() {
-                            final unread = controller.otherUnread.value;
-                            final otherUid = controller.otherUid.value;
+                            final unread = widget.controller.otherUnread.value;
+                            final otherUid = widget.controller.otherUid.value;
                             final isMyLastMessage = isMe && messageIndex == 0;
-
                             return ChatRowPermanent(
                               key: ValueKey(doc.id), // 🔥 BẮT BUỘC
                               messageId: doc.id,
@@ -182,13 +201,38 @@ class ChatMessagesList extends StatelessWidget {
                               replyText: data["replyText"],
                               replyToId: data["replyToId"],
                               highlighted:
-                                  controller.highlightedMessageId.value == doc.id,
+                                  widget.controller.highlightedMessageId.value == doc.id,
                               onTapReply: data["replyToId"] != null
-                                  ? () => controller.scrollToMessage(
+                                  ? () => widget.controller.scrollToMessage(
                                         docs: docs,
                                         messageId: data["replyToId"],
                                       )
                                   : null,
+                              reactions: Map<String, dynamic>.from(
+                                data["reactions"] ?? {},
+                              ),
+                              bubbleKey: bubbleKey,
+                              // ❤️ DOUBLE TAP = LOVE
+                              onDoubleTap: () {
+                                final reactions = Map<String, dynamic>.from(
+                                  data["reactions"] ?? {},
+                                );
+                                if (reactions[uid] == "❤️") return;
+
+                                widget.controller.onReactMessage(
+                                  messageId: doc.id,
+                                  emoji: "❤️",
+                                );
+                              },
+                              onLongPress: () {
+                                _showReactionPicker(
+                                  context: context,
+                                  controller: widget.controller,
+                                  messageId: doc.id,
+                                  bubbleKey: bubbleKey,
+                                  isMe: isMe, 
+                                );
+                              },
                             );
                           }),
                         ),
@@ -300,4 +344,65 @@ class ChatMessagesList extends StatelessWidget {
           curr.month != next.month ||
           curr.day != next.day;
   }
+
+  void _showReactionPicker({
+    required BuildContext context,
+    required ChatController controller,
+    required String messageId,
+    required GlobalKey bubbleKey,
+    required bool isMe,
+  }) {
+    // Nếu đang mở → đóng cái cũ
+    _reactionEntry?.remove();
+
+    final box =
+        bubbleKey.currentContext!.findRenderObject() as RenderBox;
+    final pos = box.localToGlobal(Offset.zero);
+    final size = box.size;
+
+    const pickerWidth = 270.0;
+    const pickerHeight = 40.0;
+    const verticalGap = 10.0;
+
+    final left = isMe
+        ? pos.dx + size.width - pickerWidth
+        : pos.dx;
+
+    final top = pos.dy - pickerHeight - verticalGap;
+
+    _reactionEntry = OverlayEntry(
+      builder: (_) => GestureDetector(
+        behavior: HitTestBehavior.translucent, // 👈 BẮT BUỘC
+        onTap: () {
+          _reactionEntry?.remove();
+          _reactionEntry = null;
+        },
+        child: Stack(
+          children: [
+            Positioned(
+              left: left.clamp(
+                8.0,
+                MediaQuery.of(context).size.width - pickerWidth - 8,
+              ),
+              top: top,
+              child: ReactionPicker(
+                onSelect: (emoji) {
+                  controller.onReactMessage(
+                    messageId: messageId,
+                    emoji: emoji,
+                  );
+                  _reactionEntry?.remove();
+                  _reactionEntry = null;
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_reactionEntry!);
+  }
+
+
 }

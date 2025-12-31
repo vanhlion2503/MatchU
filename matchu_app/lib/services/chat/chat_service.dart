@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get/get_connect/http/src/utils/utils.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 
 class ChatService {
@@ -151,5 +152,36 @@ class ChatService {
               return total;
             });
   }
+
+  Future<void> toggleReaction({
+    required String roomId,
+    required String messageId,
+    required String emoji,
+  }) async {
+    final msgRef = _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("messages")
+        .doc(messageId);
+
+    final snap = await msgRef.get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final current = data["reactions"]?[uid];
+
+    if (current == emoji) {
+      // ❌ gỡ reaction
+      await msgRef.update({
+        "reactions.$uid": FieldValue.delete(),
+      });
+    } else {
+      // ✅ set / đổi reaction
+      await msgRef.update({
+        "reactions.$uid": emoji,
+      });
+    }
+  }
+
 
 }
