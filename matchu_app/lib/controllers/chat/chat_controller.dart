@@ -457,14 +457,16 @@ class ChatController extends GetxController {
 
   void onReactMessage({
     required String messageId,
-    required String emoji,
+    required String reactionId,
   }) {
     _service.toggleReaction(
       roomId: roomId,
       messageId: messageId,
-      emoji: emoji,
+      reactionId: reactionId,
     );
   }
+
+
 
   // ================= CLEAN UP =================
   @override

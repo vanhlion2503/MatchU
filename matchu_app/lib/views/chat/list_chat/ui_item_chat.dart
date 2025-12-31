@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/utils/highlight_text.dart';
-import 'package:matchu_app/utils/presence_utils.dart';
 
 Widget chatItem({
   required BuildContext context,
@@ -48,7 +47,7 @@ Widget chatItem({
                   Stack(
                     children: [
                       CircleAvatar(
-                        radius: 26,
+                        radius: 30,
                         backgroundImage: otherUser != null &&
                                 otherUser.avatarUrl.isNotEmpty
                             ? CachedNetworkImageProvider(otherUser.avatarUrl)
@@ -62,8 +61,8 @@ Widget chatItem({
                         bottom: 2,
                         right: 2,
                         child: Container(
-                          width: 10,
-                          height: 10,
+                          width: 13,
+                          height: 13,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: online ? Colors.green : Colors.grey,

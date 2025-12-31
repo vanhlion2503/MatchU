@@ -156,7 +156,7 @@ class ChatService {
   Future<void> toggleReaction({
     required String roomId,
     required String messageId,
-    required String emoji,
+    required String reactionId,
   }) async {
     final msgRef = _db
         .collection("chatRooms")
@@ -170,18 +170,17 @@ class ChatService {
 
     final current = data["reactions"]?[uid];
 
-    if (current == emoji) {
-      // ❌ gỡ reaction
+    if (current == reactionId) {
       await msgRef.update({
         "reactions.$uid": FieldValue.delete(),
       });
     } else {
-      // ✅ set / đổi reaction
       await msgRef.update({
-        "reactions.$uid": emoji,
+        "reactions.$uid": reactionId,
       });
     }
   }
+
 
 
 }

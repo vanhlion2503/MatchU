@@ -14,7 +14,6 @@ class AvatarCarousel extends StatefulWidget {
 class _AvatarCarouselState extends State<AvatarCarousel> {
   late final PageController _pageController;
   final c = Get.find<AnonymousAvatarController>();
-
   final ValueNotifier<double> _page = ValueNotifier(0);
 
   @override

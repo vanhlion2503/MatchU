@@ -164,9 +164,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                         child: Opacity(
                           opacity: (dragDx / 40).clamp(0, 1),
                           child: Icon(
-                            Iconsax.redo,
+                            Iconsax.rotate_right,
                             color: theme.colorScheme.primary,
-                            size: 24,
+                            size: 26,
                           ),
                         ),
                       ),
@@ -208,21 +208,19 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                         messageId: data["replyToId"],
                                       )
                                   : null,
-                              reactions: Map<String, dynamic>.from(
-                                data["reactions"] ?? {},
-                              ),
+                              reactions: Map<String, String>.from(data["reactions"] ?? {}),
                               bubbleKey: bubbleKey,
                               // ❤️ DOUBLE TAP = LOVE
                               onDoubleTap: () {
-                                final reactions = Map<String, dynamic>.from(
+                                final reactions = Map<String, String>.from(
                                   data["reactions"] ?? {},
                                 );
-                                if (reactions[uid] == "❤️") return;
+                                if (reactions[uid] == "love") return;
 
-                                widget.controller.onReactMessage(
-                                  messageId: doc.id,
-                                  emoji: "❤️",
-                                );
+                                  widget.controller.onReactMessage(
+                                    messageId: doc.id,
+                                    reactionId: "love",
+                                  );
                               },
                               onLongPress: () {
                                 _showReactionPicker(
@@ -386,10 +384,10 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
               ),
               top: top,
               child: ReactionPicker(
-                onSelect: (emoji) {
+                onSelect: (reactionId) {
                   controller.onReactMessage(
                     messageId: messageId,
-                    emoji: emoji,
+                    reactionId: reactionId,
                   );
                   _reactionEntry?.remove();
                   _reactionEntry = null;

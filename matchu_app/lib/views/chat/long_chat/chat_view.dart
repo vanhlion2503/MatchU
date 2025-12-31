@@ -22,8 +22,10 @@ class ChatView extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        toolbarHeight: 60,
+        toolbarHeight: 58,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         backgroundColor: theme.colorScheme.surface.withOpacity(0.95),
 
         /// ================= LEADING (RIÊNG) =================
@@ -108,8 +110,8 @@ class ChatView extends StatelessWidget {
                         otherUser?.fullname ?? "Người dùng",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
@@ -117,6 +119,7 @@ class ChatView extends StatelessWidget {
                             ? "Đang hoạt động"
                             : formatLastActive(otherUser?.lastActiveAt),
                         style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -132,7 +135,7 @@ class ChatView extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(
-              Iconsax.more_circle,
+              Iconsax.more,
               size: 32,
               ),
             onPressed: () {

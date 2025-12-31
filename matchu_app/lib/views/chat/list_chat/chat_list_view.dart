@@ -47,8 +47,8 @@ class ChatListView extends StatelessWidget {
                     bottom: 1,
                     right: 1,
                     child: Container(
-                      width: 18,
-                      height: 18,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         color: Colors.green,
                         shape: BoxShape.circle,

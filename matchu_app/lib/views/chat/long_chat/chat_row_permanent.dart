@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/utils/reaction_registry.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
 import 'package:matchu_app/models/message_status.dart';
 import 'package:matchu_app/views/chat/long_chat/seen_avatar_animated.dart';
-
-
 
 class ChatRowPermanent extends StatelessWidget {
   final String messageId;
@@ -30,7 +29,7 @@ class ChatRowPermanent extends StatelessWidget {
   final MessageStatus? status;
   final String? seenByUid;
 
-  final Map<String, dynamic>? reactions;
+  final Map<String, String>? reactions;
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
 
@@ -197,7 +196,6 @@ class ChatRowPermanent extends StatelessWidget {
                               left: isMe ? null : -6,
                               child: _MessengerReactionBadge(
                                 reactions: reactions!,
-                                bubbleColor: bubbleColor,
                                 isMe: isMe,
                               ),
                             ),
@@ -267,22 +265,21 @@ bool _isEmojiOnly(String text) {
   return emojiRegex.hasMatch(trimmed);
 }
 
-Map<String, int> _groupReactions(Map<String, dynamic> reactions) {
+Map<String, int> _groupReactions(Map<String, String> reactions) {
   final Map<String, int> result = {};
-  for (final emoji in reactions.values) {
-    result[emoji] = (result[emoji] ?? 0) + 1;
+  for (final id in reactions.values) {
+    result[id] = (result[id] ?? 0) + 1;
   }
   return result;
 }
 
+
 class _MessengerReactionBadge extends StatelessWidget {
-  final Map<String, dynamic> reactions;
-  final Color bubbleColor;
+  final Map<String, String> reactions;
   final bool isMe;
 
   const _MessengerReactionBadge({
     required this.reactions,
-    required this.bubbleColor,
     required this.isMe,
   });
 
@@ -293,25 +290,34 @@ class _MessengerReactionBadge extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: grouped.entries.map((e) {
+        final reaction = ReactionRegistry.get(e.key);
+        if (reaction == null) return const SizedBox();
+
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: Container(
-            width: 22,
-            height: 22,
-            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Theme.of(context).cardColor, // nền tròn
+              color: Theme.of(context).cardColor,
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  blurRadius: 5,
+                  blurRadius: 4,
                   color: Colors.black.withOpacity(0.15),
                 )
               ],
             ),
-            child: Text(
-              e.key,
-              style: const TextStyle(fontSize: 16),
+            child: Row(
+              children: [
+                reaction.icon,
+                if (e.value > 1) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    e.value.toString(),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ],
+              ],
             ),
           ),
         );
