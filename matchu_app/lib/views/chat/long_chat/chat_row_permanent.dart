@@ -204,7 +204,7 @@ class ChatRowPermanent extends StatelessWidget {
                         ],
                       ),
 
-
+                      SizedBox(height: 3),
                       // ===== TIME
                       if (showTime && time.isNotEmpty)
                       Padding(
@@ -290,40 +290,34 @@ class _MessengerReactionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final grouped = _groupReactions(reactions);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bubbleColor,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(12),
-          topRight: const Radius.circular(12),
-          bottomLeft: isMe ? const Radius.circular(12) : const Radius.circular(4),
-          bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(12),
-        ),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 8,
-            color: Colors.black.withOpacity(0.12),
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: grouped.entries.map((e) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: Text(
-              e.value > 1 ? "${e.key} ${e.value}" : e.key,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: grouped.entries.map((e) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Theme.of(context).cardColor, // nền tròn
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 5,
+                  color: Colors.black.withOpacity(0.15),
+                )
+              ],
             ),
-          );
-        }).toList(),
-      ),
+            child: Text(
+              e.key,
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
+
 
