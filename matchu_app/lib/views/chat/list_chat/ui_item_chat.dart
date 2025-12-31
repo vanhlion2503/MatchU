@@ -35,149 +35,152 @@ Widget chatItem({
     final online = presence.isOnline(otherUid);
 
 
-    return InkWell(
-      onTap: onTap,
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundImage: otherUser != null &&
-                              otherUser.avatarUrl.isNotEmpty
-                          ? CachedNetworkImageProvider(otherUser.avatarUrl)
-                          : null,
-                      child: otherUser == null ||
-                              otherUser.avatarUrl.isEmpty
-                          ? const Icon(Icons.person)
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 2,
-                      right: 2,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: online ? Colors.green : Colors.grey,
-                          border: Border.all(
-                            color: Theme.of(context)
-                                .scaffoldBackgroundColor,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(width: 12),
-
-                /// NAME + MESSAGE
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Stack(
                     children: [
-                      RichText(
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        text: highlightText(
-                          text: otherUser?.fullname ?? "",
-                          query: searchQuery,
-                          normalStyle: Theme.of(context)
-                              .textTheme
-                              .bodyLarge!
-                              .copyWith(fontWeight: FontWeight.w600),
-                          highlightStyle: Theme.of(context)
-                              .textTheme
-                              .bodyLarge!
-                              .copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary,
-                              ),
-                        ),
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundImage: otherUser != null &&
+                                otherUser.avatarUrl.isNotEmpty
+                            ? CachedNetworkImageProvider(otherUser.avatarUrl)
+                            : null,
+                        child: otherUser == null ||
+                                otherUser.avatarUrl.isEmpty
+                            ? const Icon(Icons.person)
+                            : null,
                       ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        text: highlightText(
-                          text: isMe
-                              ? "Bạn: ${room.lastMessage}"
-                              : room.lastMessage,
-                          query: searchQuery,
-                          normalStyle:
-                              Theme.of(context).textTheme.bodyMedium!,
-                          highlightStyle: Theme.of(context)
-                              .textTheme
-                              .bodyMedium!
-                              .copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      Positioned(
+                        bottom: 2,
+                        right: 2,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: online ? Colors.green : Colors.grey,
+                            border: Border.all(
+                              color: Theme.of(context)
+                                  .scaffoldBackgroundColor,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(width: 8),
-
-                /// TIME + UNREAD
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatChatTime(room.lastMessageAt),
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(fontSize: 13),
-                    ),
-                    const SizedBox(height: 6),
-                    if (unread > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: const BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          unread.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+      
+                  const SizedBox(width: 12),
+      
+                  /// NAME + MESSAGE
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          text: highlightText(
+                            text: otherUser?.fullname ?? "",
+                            query: searchQuery,
+                            normalStyle: Theme.of(context)
+                                .textTheme
+                                .bodyLarge!
+                                .copyWith(fontWeight: FontWeight.w600),
+                            highlightStyle: Theme.of(context)
+                                .textTheme
+                                .bodyLarge!
+                                .copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary,
+                                ),
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        RichText(
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          text: highlightText(
+                            text: isMe
+                                ? "Bạn: ${room.lastMessage}"
+                                : room.lastMessage,
+                            query: searchQuery,
+                            normalStyle:
+                                Theme.of(context).textTheme.bodyMedium!,
+                            highlightStyle: Theme.of(context)
+                                .textTheme
+                                .bodyMedium!
+                                .copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+      
+                  const SizedBox(width: 8),
+      
+                  /// TIME + UNREAD
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatChatTime(room.lastMessageAt),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(fontSize: 13),
                       ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          if (room.isPinned(myUid))
-            Positioned(
-              top: 6,
-              right: 12,
-              child: Icon(
-                Icons.push_pin,
-                size: 16,
-                color: Theme.of(context).colorScheme.primary,
+                      const SizedBox(height: 6),
+                      if (unread > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: const BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            unread.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
-        ],
+      
+            if (room.isPinned(myUid))
+              Positioned(
+                top: 6,
+                right: 12,
+                child: Icon(
+                  Icons.push_pin,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   });

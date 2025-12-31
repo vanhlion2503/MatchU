@@ -154,14 +154,15 @@ class ChatListView extends StatelessWidget {
                     itemCount: rooms.length,
                     itemBuilder: (context, index) {
                       final room = rooms[index];
-                      return SwipeChatItem(
-                        room: room,
-                        uid: myUid,
+                      return SwipeChatItemMessage(
                         onPin: () => controller.pin(room),
                         onDelete: () {
                           showConfirmDeleteChat(
                             onConfirm: () => controller.delete(room),
                           );
+                        },
+                        onMore: () {
+                          // TODO: mở bottom sheet / dialog
                         },
                         child: chatItem(
                           context: context,
@@ -177,6 +178,7 @@ class ChatListView extends StatelessWidget {
                           },
                         ),
                       );
+
                     },
                   );
                 }
@@ -189,14 +191,15 @@ class ChatListView extends StatelessWidget {
                     final room = rooms[index];
                     return SizeTransition(
                       sizeFactor: animation,
-                      child: SwipeChatItem(
-                        room: room,
-                        uid: myUid,
+                      child: SwipeChatItemMessage(
                         onPin: () => controller.pin(room),
                         onDelete: () {
                           showConfirmDeleteChat(
                             onConfirm: () => controller.delete(room),
                           );
+                        },
+                        onMore: () {
+                          // TODO: show options
                         },
                         child: chatItem(
                           context: context,
@@ -212,6 +215,7 @@ class ChatListView extends StatelessWidget {
                           },
                         ),
                       ),
+
                     );
                   },
                 );
