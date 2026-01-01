@@ -6,6 +6,7 @@ import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
+import 'package:matchu_app/views/matching/match_transition_view.dart';
 import '../auth/auth_controller.dart';
 import 'dart:async';
 import 'package:flutter/services.dart'; 
@@ -37,6 +38,8 @@ class TempChatController extends GetxController {
   final otherGender = RxnString();
   final _justSentMessage = false.obs;
   int _lastMessageCount = 0;
+  bool _hasNavigatedToMatch = false;
+
 
   Timer? _typingTimer;
   Timer? _timer;
@@ -162,6 +165,9 @@ class TempChatController extends GetxController {
 
       if (data["status"] == "ended") {
 
+        if (_hasNavigatedToMatch) return;
+        if (hasLeft.value == true) return;
+
         final matchController = Get.find<MatchingController>();
         matchController.isMatched.value = false;
         if (hasLeft.value == true) {
@@ -178,6 +184,7 @@ class TempChatController extends GetxController {
         );
 
         Future.delayed(const Duration(seconds: 2), () {
+          if (isClosed) return;
           Get.offNamed(
             "/rating",
             arguments: {
@@ -203,10 +210,21 @@ class TempChatController extends GetxController {
           fromUid: myUid,
           toUid: toUid,
         );
+        if (_hasNavigatedToMatch) return;
+        _hasNavigatedToMatch = true;
 
-        final newRoomId = await service.convertToPermanent(roomId);
+        await _roomSub?.cancel();
 
-        Get.offNamed("/chat", arguments: {"roomId": newRoomId});
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Get.off(
+            () => MatchTransitionView(
+              tempRoomId: roomId, // 👈 CHỈ TRUYỀN TEMP ROOM
+              myAvatar: Get.find<AnonymousAvatarController>()
+                  .selectedAvatar.value!,
+              otherAvatar: otherAnonymousAvatar.value!,
+            ),
+          );
+        });
       }
     });
   }
