@@ -4,7 +4,13 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 
 class UserAvatar extends StatelessWidget {
   final String userId;
-  const UserAvatar({required this.userId});
+  final double radius;
+
+  const UserAvatar({
+    super.key,
+    required this.userId,
+    this.radius = 16,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,20 +22,26 @@ class UserAvatar extends StatelessWidget {
     return Obx(() {
       final user = cache.getUser(userId);
 
-      if (user == null) {
-        return const CircleAvatar(
-          radius: 16,
-          child: Icon(Icons.person, size: 14),
-        );
-      }
-
       return CircleAvatar(
-        radius: 16,
-        backgroundImage:
-            user.avatarUrl.isNotEmpty ? NetworkImage(user.avatarUrl) : null,
-        child: user.avatarUrl.isEmpty
-            ? const Icon(Icons.person, size: 14)
-            : null,
+        radius: radius,
+        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+        child: ClipOval(
+          child: FadeInImage(
+            width: radius * 2,
+            height: radius * 2,
+            fit: BoxFit.cover,
+
+            /// 👉 ảnh mặc định luôn hiển thị trước
+            placeholder:
+                const AssetImage('assets/avatas/avataMd.png'),
+
+            /// 👉 nếu có avatarUrl thì load network
+            image: user != null && user.avatarUrl.isNotEmpty
+                ? NetworkImage(user.avatarUrl)
+                : const AssetImage('assets/avatas/avataMd.png')
+                    as ImageProvider,
+          ),
+        ),
       );
     });
   }

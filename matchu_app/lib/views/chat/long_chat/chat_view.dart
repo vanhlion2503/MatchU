@@ -70,14 +70,21 @@ class ChatView extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 23,
-                      backgroundImage: otherUser != null &&
-                              otherUser.avatarUrl.isNotEmpty
-                          ? NetworkImage(otherUser.avatarUrl)
-                          : null,
-                      child: otherUser == null ||
-                              otherUser.avatarUrl.isEmpty
-                          ? const Icon(Icons.person, size: 16)
-                          : null,
+                      backgroundColor: theme.colorScheme.surfaceVariant,
+                      child: ClipOval(
+                        child: FadeInImage(
+                          width: 46,
+                          height: 46,
+                          fit: BoxFit.cover,
+                          placeholder:
+                              const AssetImage('assets/avatas/avataMd.png'),
+                          image: otherUser != null &&
+                                  otherUser.avatarUrl.isNotEmpty
+                              ? NetworkImage(otherUser.avatarUrl)
+                              : const AssetImage('assets/avatas/avataMd.png')
+                                  as ImageProvider,
+                        ),
+                      ),
                     ),
                     Positioned(
                       bottom: 0,

@@ -21,6 +21,9 @@ class ChatListController extends GetxController
   final focusNode = FocusNode();
 
   StreamSubscription<List<ChatRoomModel>>? _sub;
+  final isLoading = true.obs;
+  bool _hasFirstData = false;
+  bool _hasAnimated = false;
 
   @override
   void onInit() {
@@ -29,11 +32,26 @@ class ChatListController extends GetxController
     final presence = Get.put(PresenceController(), permanent: true);
     
     WidgetsBinding.instance.addObserver(this);
-    _sub = _service.listenChatRooms().listen((incoming) {
-      _mergeAndReorder(incoming);
-      _applySearch();
-      _keepAliveVisibleUsers();
-    });
+    _sub = _service.listenChatRooms().listen(
+      (incoming) {
+        _mergeAndReorder(incoming);
+        _applySearch();
+        _keepAliveVisibleUsers();
+
+        if (!_hasFirstData) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (!isClosed) {
+              isLoading.value = false;
+            }
+          });
+          _hasFirstData = true;
+        }
+      },
+      onError: (e) {
+        isLoading.value = false;
+      },
+    );
+
 
     debounce(
       searchText,

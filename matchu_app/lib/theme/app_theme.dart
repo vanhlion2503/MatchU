@@ -23,6 +23,14 @@ class AppTheme {
   static const Color errorColor = Color.fromARGB(255, 241, 28, 28);
   static const Color successColor = Color(0xFF00B894);
 
+  // ===================== SHIMMER =====================
+  static const Color shimmerLightBase = Color(0xFFE0E6ED);
+  static const Color shimmerLightHighlight = Color(0xFFF2F5F9);
+
+  static const Color shimmerDarkBase = Color(0xFF2A2A2A);
+  static const Color shimmerDarkHighlight = Color(0xFF3A3A3A);
+
+
   // =======================================================
   //                     LIGHT THEME
   // =======================================================
