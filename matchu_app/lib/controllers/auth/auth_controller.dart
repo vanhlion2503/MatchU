@@ -68,6 +68,17 @@ class AuthController extends GetxController {
     // Lắng nghe trạng thái đăng nhập nhưng KHÔNG redirect
     _userRx.bindStream(_auth.authStateChanges);
 
+    // 🔐 Auto refill preKeys khi user login / app resume
+    ever<User?>(_userRx, (user) async {
+      if (user == null) return;
+
+      try {
+        await SignalKeyService.refillPreKeysIfNeeded(user.uid);
+      } catch (e) {
+        debugPrint("Signal preKey refill error: $e");
+      }
+    });
+
     // checkInitialLogin();
   }
 
@@ -410,6 +421,8 @@ class AuthController extends GetxController {
 
       if (completed) {
         await SignalKeyService.initSignalForUser(user.uid);
+
+        await SignalKeyService.refillPreKeysIfNeeded(user.uid);
 
         Get.offAllNamed('/main');
       } else {
