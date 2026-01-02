@@ -8,6 +8,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:matchu_app/services/auth_service.dart';
+import 'package:matchu_app/services/crypto/signal_key_service.dart';
 import 'package:matchu_app/services/user/avatar_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
@@ -408,6 +409,8 @@ class AuthController extends GetxController {
           snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
 
       if (completed) {
+        await SignalKeyService.initSignalForUser(user.uid);
+
         Get.offAllNamed('/main');
       } else {
         Get.toNamed('/complete-profile');
@@ -522,7 +525,6 @@ class AuthController extends GetxController {
     await _auth.logout();
     Get.offAllNamed('/');
   }
-
   // =============================================================
   //                        DISPOSE
   // =============================================================
