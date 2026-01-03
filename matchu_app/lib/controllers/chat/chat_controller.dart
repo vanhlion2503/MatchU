@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/services/crypto/double_ratchet_service.dart';
+import 'package:matchu_app/services/crypto/secure_session_store.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_bottom_bar.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -9,6 +12,10 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
+
+import 'package:matchu_app/services/crypto/signal_key_service.dart';
+import 'package:matchu_app/services/crypto/x3dh_service.dart';
+
 
 
 class ChatController extends GetxController {
@@ -63,6 +70,12 @@ class ChatController extends GetxController {
 
   final Map<String, int> _messageIndexMap = {};
 
+  final encryptionReady = false.obs;
+
+  final Map<String, String> _decryptedCache = {};
+
+  bool _processingMessages = false;
+
   // ================= INIT =================
   @override
   void onInit() {
@@ -115,14 +128,46 @@ class ChatController extends GetxController {
     otherUid.value = uidOther;
     _listeningUid = uidOther;
 
-    // 🔥 LISTEN PRESENCE Ở ĐÂY (CHUẨN)
-    _presence.listen(uidOther);
+    // 1️⃣ INIT SIGNAL (CHỈ 1 LẦN)
+    await SignalKeyService.initSignalForUser(uid);
 
-    Get.find<ChatUserCacheController>()
-        .loadIfNeeded(uidOther);
+    // 2️⃣ ENSURE SESSION (X3DH)
+    await ensureSession(uidOther);
 
+    // 3️⃣ MARK READY (CHỈ CHO UID HIỆN TẠI)
+    await _service.markEncryptionReady(roomId);
+
+    // 4️⃣ LISTEN ROOM
     _listenRoomTyping();
+
+    // 5️⃣ PRESENCE + CACHE
+    _presence.listen(uidOther);
+    Get.find<ChatUserCacheController>().loadIfNeeded(uidOther);
   }
+
+
+  Future<void> ensureSession(String otherUid) async {
+    if (await SecureSessionStore.has(otherUid)) return;
+
+    final remoteKeys =
+        await SignalKeyService.fetchRemoteKeys(otherUid);
+
+    final isInitiator = uid.compareTo(otherUid) < 0;
+
+    await X3dhService.establishSession(
+      remoteUid: otherUid,
+      remote: remoteKeys,
+      initiator: isInitiator,
+    );
+
+    await FirebaseFunctions.instance
+      .httpsCallable("consumePreKey")
+      .call({
+        "targetUid": otherUid,
+        "preKeyId": remoteKeys.oneTimePreKeyId,
+      });
+  }
+
 
 
   // ================= ROOM LISTENER =================
@@ -131,6 +176,16 @@ class ChatController extends GetxController {
       if (!snap.exists) return;
 
       final data = snap.data()!;
+
+      final ready = data["encryptionReady"];
+
+      if (ready is Map) {
+        encryptionReady.value =
+            ready[uid] == true && ready[otherUid.value] == true;
+      } else {
+        encryptionReady.value = false;
+      }
+      
       final typing = data["typing"] ?? {};
       final unread = data["unread"] ?? {};
 
@@ -201,62 +256,76 @@ class ChatController extends GetxController {
   // ================= AUTO SCROLL CORE =================
 
   /// 🔥 GỌI SAU MỖI LẦN SNAPSHOT ĐỔI (realtime messages)
-  void onNewMessages(
+  Future<void> onNewMessages(
     int newCount,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) {
-    if (docs.isEmpty) return;
+  ) async {
+    if (_processingMessages) return;
+    _processingMessages = true;
 
-    bool hasChange = false;
+    try {
+      if (docs.isEmpty) return;
 
-    for (final snap in docs) {
-      final id = snap.id;
-      final index = _messageIndexMap[id];
+      bool hasChange = false;
 
-      if (index == null) {
-        // ✅ MESSAGE MỚI
-        allMessages.insert(0, snap);
+      for (final snap in docs) {
+        final id = snap.id;
+        final index = _messageIndexMap[id];
+        final data = snap.data();
 
-        // shift index map
-        for (final key in _messageIndexMap.keys) {
-          _messageIndexMap[key] = _messageIndexMap[key]! + 1;
-        }
-
-        _messageIndexMap[id] = 0;
-        hasChange = true;
-      } else {
-        // ✅ UPDATE MESSAGE (reaction / edit)
-        final oldData = allMessages[index].data();
-        final newData = snap.data();
-
-        if (!_mapEquals(oldData, newData)) {
+        // ADD / UPDATE
+        if (index == null) {
+          allMessages.insert(0, snap);
+          for (final key in _messageIndexMap.keys) {
+            _messageIndexMap[key] = _messageIndexMap[key]! + 1;
+          }
+          _messageIndexMap[id] = 0;
+          hasChange = true;
+        } else if (!_mapEquals(allMessages[index].data(), data)) {
           allMessages[index] = snap;
           hasChange = true;
         }
+
+        // 🔐 DECRYPT (1 LẦN DUY NHẤT)
+        if (_decryptedCache.containsKey(id)) continue;
+
+        if (!data.containsKey("ciphertext")) {
+          _decryptedCache[id] = data["text"] ?? "";
+          continue;
+        }
+
+        final senderId = data["senderId"];
+        final remoteUid = senderId == uid ? otherUid.value : senderId;
+        if (remoteUid == null) continue;
+
+        try {
+          _decryptedCache[id] = await DoubleRatchetService.decrypt(
+            remoteUid: remoteUid,
+            payload: {
+              "ciphertext": data["ciphertext"],
+              "nonce": data["nonce"],
+              "mac": data["mac"],
+              "count": data["count"],
+            },
+          );
+        } catch (_) {
+          _decryptedCache[id] = "⚠️ Không giải mã được";
+        }
       }
-    }
 
-    if (!hasChange) return;
+      if (!hasChange) return;
 
-    lastMessageCount = allMessages.length;
-
-    final newest = docs.first;
-    final isFromMe = newest["senderId"] == uid;
-
-    if (!userScrolledUp.value) {
-      _service.markAsRead(roomId);
-    }
-
-    if (_justSentMessage && isFromMe) {
-      _justSentMessage = false;
-      _scrollToBottom(0);
-    } else if (!isFromMe && !userScrolledUp.value) {
-      _scrollToBottom(0);
-    } else if (userScrolledUp.value) {
-      showNewMessageBtn.value = true;
+      lastMessageCount = allMessages.length;
+      update();
+    } finally {
+      _processingMessages = false;
     }
   }
 
+
+  String decryptedTextOf(String messageId) {
+    return _decryptedCache[messageId] ?? "…";
+  }
 
   bool _mapEquals(Map a, Map b) {
     if (a.length != b.length) return false;
@@ -372,6 +441,15 @@ class ChatController extends GetxController {
 
   // ================= SEND MESSAGE =================
   Future<void> sendMessage({String type = "text"}) async {
+    if (!encryptionReady.value) {
+      Get.snackbar(
+        "Đang thiết lập bảo mật",
+        "Vui lòng chờ một chút...",
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
     final text = inputController.text.trim();
     if (text.isEmpty) return;
     _justSentMessage = true; 

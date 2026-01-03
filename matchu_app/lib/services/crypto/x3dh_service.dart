@@ -3,7 +3,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matchu_app/services/crypto/remote_signal_key.dart';
 import 'session_state.dart';
-import 'session_store.dart';
+import 'secure_session_store.dart';
 
 class X3dhService {
   static final X25519 _algo = X25519();
@@ -79,6 +79,7 @@ class X3dhService {
       receivingChainKey: initiator ? rootKey : chainKey,
     );
 
-    SessionStore.save(remoteUid, session);
+
+    await SecureSessionStore.save(remoteUid, session);
   }
 }

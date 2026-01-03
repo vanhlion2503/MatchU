@@ -10,9 +10,12 @@ class RemoteSignalKeys {
   /// One-time PreKey (X25519)
   final SimplePublicKey oneTimePreKey;
 
+  final int oneTimePreKeyId;
+
   RemoteSignalKeys({
     required this.identityDhKey,
     required this.signedPreKey,
     required this.oneTimePreKey,
+     required this.oneTimePreKeyId,
   });
 }

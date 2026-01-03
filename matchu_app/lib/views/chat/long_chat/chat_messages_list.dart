@@ -15,7 +15,6 @@ import 'package:matchu_app/views/chat/long_chat/chat_row_permanent.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
 
-
 class ChatMessagesList extends StatefulWidget {
   final ChatController controller;
   const ChatMessagesList({super.key, required this.controller});
@@ -151,7 +150,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                       HapticFeedback.lightImpact();
                       widget.controller.startReply({
                         "id": doc.id,
-                        "text": data["text"],
+                        "text": widget.controller.decryptedTextOf(doc.id),
                       });
                     }
                     setState(() => dragDx = 0);
@@ -178,11 +177,14 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                             final unread = widget.controller.otherUnread.value;
                             final otherUid = widget.controller.otherUid.value;
                             final isMyLastMessage = isMe && messageIndex == 0;
+
+                            final text =widget.controller.decryptedTextOf(doc.id);
+
                             return ChatRowPermanent(
-                              key: ValueKey(doc.id), // 🔥 BẮT BUỘC
+                              key: ValueKey(doc.id),
                               messageId: doc.id,
                               senderId: data["senderId"],
-                              text: data["text"] ?? "",
+                              text: text, // ✅ plaintext đã cache
                               type: data["type"] ?? "text",
                               isMe: isMe,
                               showAvatar: !isMe && isLastInGroup,
@@ -208,19 +210,15 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                         messageId: data["replyToId"],
                                       )
                                   : null,
-                              reactions: Map<String, String>.from(data["reactions"] ?? {}),
+                              reactions: Map<String, String>.from(
+                                data["reactions"] ?? {},
+                              ),
                               bubbleKey: bubbleKey,
-                              // ❤️ DOUBLE TAP = LOVE
                               onDoubleTap: () {
-                                final reactions = Map<String, String>.from(
-                                  data["reactions"] ?? {},
+                                widget.controller.onReactMessage(
+                                  messageId: doc.id,
+                                  reactionId: "love",
                                 );
-                                if (reactions[uid] == "love") return;
-
-                                  widget.controller.onReactMessage(
-                                    messageId: doc.id,
-                                    reactionId: "love",
-                                  );
                               },
                               onLongPress: () {
                                 _showReactionPicker(
@@ -228,11 +226,13 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                   controller: widget.controller,
                                   messageId: doc.id,
                                   bubbleKey: bubbleKey,
-                                  isMe: isMe, 
+                                  isMe: isMe,
                                 );
                               },
                             );
+
                           }),
+
                         ),
                       ),
                     ],
@@ -401,6 +401,4 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
 
     Overlay.of(context).insert(_reactionEntry!);
   }
-
-
 }

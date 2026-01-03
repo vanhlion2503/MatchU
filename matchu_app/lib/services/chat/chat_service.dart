@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get_connect/http/src/utils/utils.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
+import 'package:matchu_app/services/crypto/double_ratchet_service.dart';
 
 class ChatService {
   final _db = FirebaseFirestore.instance;
@@ -95,22 +96,34 @@ class ChatService {
     final participants = List<String>.from(roomSnap["participants"]);
     final otherUid = participants.firstWhere((e) => e != uid);
 
+    // 🔐 ENCRYPT MESSAGE (❗ BẠN THIẾU DÒNG NÀY)
+    final encrypted = await DoubleRatchetService.encrypt(
+      remoteUid: otherUid,
+      plaintext: text,
+    );
+
     final batch = _db.batch();
 
-    // 1️⃣ message
+    // 1️⃣ SAVE MESSAGE
     batch.set(msgRef, {
       "senderId": uid,
-      "text": text,
-      "type": type,
+
+      // 🔐 Signal payload
+      "ciphertext": encrypted["ciphertext"],
+      "nonce": encrypted["nonce"],
+      "mac": encrypted["mac"],
+      "count": encrypted["count"],
+
+      "type": "encrypted",
       "replyToId": replyToId,
       "replyText": replyText,
       "createdAt": FieldValue.serverTimestamp(),
     });
 
-    // 2️⃣ CHAT ROOM METADATA (🔥 QUAN TRỌNG)
+    // 2️⃣ UPDATE ROOM META
     batch.update(roomRef, {
-      "lastMessage": text,
-      "lastMessageType": type,
+      "lastMessage": "🔒 Tin nhắn đã mã hóa",
+      "lastMessageType": "encrypted",
       "lastSenderId": uid,
       "lastMessageAt": FieldValue.serverTimestamp(),
       "deletedFor.$otherUid": FieldValue.delete(),
@@ -120,6 +133,7 @@ class ChatService {
 
     await batch.commit();
   }
+
 
 
   Future<void> markAsRead(String roomId) async {
@@ -180,7 +194,11 @@ class ChatService {
       });
     }
   }
-
-
+  
+  Future<void> markEncryptionReady(String roomId) async {
+    await _db.collection("chatRooms").doc(roomId).update({
+      "encryptionReady.$uid": true,
+    });
+  }
 
 }

@@ -1,5 +1,6 @@
 const { setGlobalOptions } = require("firebase-functions");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 setGlobalOptions({ maxInstances: 10 });
@@ -74,3 +75,45 @@ exports.migrateTempChatMessages = onDocumentCreated(
     });
   }
 );
+
+exports.consumePreKey = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  const { targetUid, preKeyId } = request.data;
+
+  if (!callerUid) {
+    throw new Error("Unauthenticated");
+  }
+
+  if (!targetUid || !preKeyId) {
+    throw new Error("Missing parameters");
+  }
+
+  const ref = db
+    .collection("users")
+    .doc(targetUid)
+    .collection("encryptionKeys")
+    .doc("signal");
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+
+    if (!snap.exists) {
+      throw new Error("Signal keys not found");
+    }
+
+    const data = snap.data();
+    const preKeys = data.preKeys || [];
+
+    const exists = preKeys.find((p) => p.id === preKeyId);
+
+    // ✅ idempotent — đã consume thì thôi
+    if (!exists) return;
+
+    const updated = preKeys.filter((p) => p.id !== preKeyId);
+
+    tx.update(ref, { preKeys: updated });
+  });
+
+  return { ok: true };
+});
+

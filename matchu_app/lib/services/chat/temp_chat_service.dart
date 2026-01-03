@@ -122,6 +122,9 @@ class TempChatService {
       tx.set(newRoomRef, {
       "participants": participants,
       "createdAt": FieldValue.serverTimestamp(),
+
+      "encryptionReady": {},
+
       "fromTempRoom": tempRoomId,
       "lastMessage": "💬 Bắt đầu trò chuyện",
       "lastMessageType": "system",
