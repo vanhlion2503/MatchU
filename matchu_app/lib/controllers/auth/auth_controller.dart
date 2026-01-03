@@ -68,17 +68,6 @@ class AuthController extends GetxController {
     // Lắng nghe trạng thái đăng nhập nhưng KHÔNG redirect
     _userRx.bindStream(_auth.authStateChanges);
 
-    // 🔐 Auto refill preKeys khi user login / app resume
-    ever<User?>(_userRx, (user) async {
-      if (user == null) return;
-
-      try {
-        await SignalKeyService.refillPreKeysIfNeeded(user.uid);
-      } catch (e) {
-        debugPrint("Signal preKey refill error: $e");
-      }
-    });
-
     // checkInitialLogin();
   }
 
@@ -420,10 +409,6 @@ class AuthController extends GetxController {
           snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
 
       if (completed) {
-        await SignalKeyService.initSignalForUser(user.uid);
-
-        await SignalKeyService.refillPreKeysIfNeeded(user.uid);
-
         Get.offAllNamed('/main');
       } else {
         Get.toNamed('/complete-profile');
@@ -514,13 +499,19 @@ class AuthController extends GetxController {
         avatarUrl: avatarUrl,
       );
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
-        await _auth.db
-            .collection("users")
-            .doc(uid)
-            .update({"isProfileCompleted": true});
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        throw Exception("User chưa đăng nhập");
       }
+
+      // 1️⃣ Đánh dấu profile xong TRƯỚC
+      await _auth.db
+          .collection("users")
+          .doc(user.uid)
+          .update({"isProfileCompleted": true});
+      
+      await SignalKeyService.initSignalForUser(user.uid);
 
       isLoadingRegister.value = false;
 
