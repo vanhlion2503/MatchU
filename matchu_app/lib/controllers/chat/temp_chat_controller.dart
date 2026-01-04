@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
+import 'package:matchu_app/models/quick_message.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
@@ -10,6 +11,11 @@ import 'package:matchu_app/views/matching/match_transition_view.dart';
 import '../auth/auth_controller.dart';
 import 'dart:async';
 import 'package:flutter/services.dart'; 
+
+enum QuickMessagePhase {
+  intro,       // 👋 Xin chào
+  iceBreaker,  // 💬 Câu hỏi
+}
 
 class TempChatController extends GetxController {
   final String roomId;
@@ -37,6 +43,8 @@ class TempChatController extends GetxController {
   final otherAnonymousAvatar = RxnString();
   final otherGender = RxnString();
   final _justSentMessage = false.obs;
+  final showQuickMessages = true.obs;
+  final quickPhase = QuickMessagePhase.intro.obs;
   
   bool _shownOtherLikeEffect = false;
   bool _isEnding = false;
@@ -50,6 +58,28 @@ class TempChatController extends GetxController {
   StreamSubscription? _roomSub;
   StreamSubscription? _avatarSub;
   VoidCallback? onOtherLiked;
+  final currentQuickMessages = <QuickMessage>[].obs;
+
+  final _introMessages = [
+    QuickMessage(id: "vanTay", text: "👋", type: "emoji"),
+    QuickMessage(id: "wave", text: "👋 Xin chào!"),
+    QuickMessage(id: "hello", text: "😊 Hello~"),
+    QuickMessage(id: "nice", text: "✨ Rất vui được gặp bạn"),
+  ];
+
+  final _iceBreakerPool = <QuickMessage>[
+    QuickMessage(id: "day", text: "💬 Hôm nay của bạn thế nào?"),
+    QuickMessage(id: "music", text: "🎧 Bạn hay nghe nhạc gì?"),
+    QuickMessage(id: "coffee", text: "☕ Cà phê hay trà?"),
+    QuickMessage(id: "travel", text: "🌍 Nếu được đi du lịch, bạn muốn đi đâu?"),
+    QuickMessage(id: "food", text: "🍜 Món bạn thích nhất là gì?"),
+    QuickMessage(id: "movie", text: "🎬 Bộ phim bạn xem gần đây nhất?"),
+    QuickMessage(id: "pet", text: "🐶 Bạn thích chó hay mèo?"),
+    QuickMessage(id: "hobby", text: "🎯 Lúc rảnh bạn hay làm gì?"),
+    QuickMessage(id: "sleep", text: "🌙 Bạn là cú đêm hay dậy sớm?"),
+    QuickMessage(id: "music2", text: "🎵 Bài hát bạn nghe nhiều nhất gần đây?"),
+    QuickMessage(id: "sport", text: "⚽ Bạn có chơi thể thao không?"),
+  ];
 
   @override
   void onInit() {
@@ -60,8 +90,32 @@ class TempChatController extends GetxController {
     _saveMyAnonymousAvatarToRoom();
     _listenAnonymousAvatars();
     // Listen typing để auto scroll
-    ever<bool>(otherTyping, _onOtherTypingChanged);
+    currentQuickMessages.assignAll(_introMessages);
+
+    // Sau 20s đổi sang câu hỏi
+    quickPhase.value = QuickMessagePhase.intro;
+    currentQuickMessages.assignAll(_introMessages);
+      ever<bool>(otherTyping, _onOtherTypingChanged);
   }
+
+  List<QuickMessage> _pickRandomIceBreakers({int min = 6, int max = 7}) {
+    final pool = List<QuickMessage>.from(_iceBreakerPool)..shuffle();
+
+    final count = min + (DateTime.now().millisecondsSinceEpoch % (max - min + 1));
+    return pool.take(count).toList();
+  }
+
+
+  void switchToIceBreaker() {
+    if (quickPhase.value == QuickMessagePhase.iceBreaker) return;
+
+    quickPhase.value = QuickMessagePhase.iceBreaker;
+
+    // 🔥 RANDOM 6–7 CÂU CHO PHIÊN CHAT NÀY
+    currentQuickMessages.assignAll(_pickRandomIceBreakers());
+  }
+
+
 
   void _onOtherTypingChanged(bool isTyping) {
     if (!isTyping) return;
@@ -270,6 +324,9 @@ class TempChatController extends GetxController {
   }
 
   Future<void> send(String text, {String type = "text"}) async {
+
+    switchToIceBreaker();
+
     if (!await _isRoomActive()) return;
     
     final reply = replyingMessage.value;
@@ -289,6 +346,13 @@ class TempChatController extends GetxController {
 
     // 🔥 clear reply SAU KHI GỬI
     replyingMessage.value = null;
+
+    // 🔥 FIX CỐT LÕI: bật lại QuickMessageBar nếu input trống
+    Future.microtask(() {
+      if (inputController.text.trim().isEmpty) {
+        showQuickMessages.value = true;
+      }
+    });
 
     Future.delayed(const Duration(milliseconds: 120), () {
       if (!scrollController.hasClients) return;
@@ -397,6 +461,13 @@ class TempChatController extends GetxController {
     if (!await _isRoomActive()) return;
     final hasText = text.trim().isNotEmpty;
 
+    if (hasText) {
+      showQuickMessages.value = false;
+    } else {
+      // Chỉ hiện nếu đã ở iceBreaker hoặc intro
+      showQuickMessages.value = true;
+    }
+
     if (hasText && !isTyping.value) {
       isTyping.value = true;
       service.setTyping(
@@ -501,9 +572,6 @@ class TempChatController extends GetxController {
       final participants = List<String>.from(data["participants"]);
 
       final otherUid = participants.firstWhere((e) => e != uid);
-
-      final otherAvatarKey = avatars[otherUid];
-
       otherAnonymousAvatar.value = avatars[otherUid];
     });
   }

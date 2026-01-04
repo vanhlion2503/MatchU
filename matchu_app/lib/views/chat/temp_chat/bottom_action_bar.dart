@@ -6,8 +6,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/icon_action.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:matchu_app/views/chat/temp_chat/widget/quick_message_bar.dart';
 
 
 class BottomActionBar extends StatelessWidget {
@@ -41,6 +41,7 @@ class BottomActionBar extends StatelessWidget {
                           : const Color(0xFFF1F3F5),
                       borderRadius: BorderRadius.circular(20),
                     ),
+                    
                     child: Row(
                       children: [
                         // VẠCH TRÁI
@@ -99,6 +100,9 @@ class BottomActionBar extends StatelessWidget {
                 
                 }),
               ),
+              
+              QuickMessageBar(controller: controller),
+
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [

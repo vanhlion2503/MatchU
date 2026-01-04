@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:get/get_connect/http/src/utils/utils.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 
 class ChatService {

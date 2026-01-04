@@ -2,12 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
-
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-
 import 'package:matchu_app/views/chat/temp_chat/chat_row.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/system_message_event.dart';

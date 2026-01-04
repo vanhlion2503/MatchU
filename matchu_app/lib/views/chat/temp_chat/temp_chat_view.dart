@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/views/chat/chat_widget/gender_icon.dart';
 import 'package:matchu_app/views/chat/temp_chat/bottom_action_bar.dart';
-import 'package:matchu_app/views/chat/temp_chat/widget/floating_heart_overlay.dart';
 import 'package:matchu_app/views/chat/temp_chat/widget/heart_rain_overlay.dart';
 import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
