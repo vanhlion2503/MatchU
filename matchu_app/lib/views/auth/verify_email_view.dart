@@ -36,17 +36,18 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
     return '$visibleStart***$visibleEnd@$domain';
   }
   Future<void> openGmail() async {
-    final Uri emailUri = Uri.parse("mailto:");
+    final Uri gmailWeb = Uri.parse("https://mail.google.com/");
 
-    if (await canLaunchUrl(emailUri)) {
+    if (await canLaunchUrl(gmailWeb)) {
       await launchUrl(
-        emailUri,
-        mode: LaunchMode.externalApplication, 
+        gmailWeb,
+        mode: LaunchMode.externalApplication, // 👉 bắt buộc
       );
     } else {
-      Get.snackbar("Lỗi", "Không mở được ứng dụng email");
+      Get.snackbar("Lỗi", "Không mở được Gmail");
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

@@ -240,15 +240,17 @@ class AuthController extends GetxController {
       Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
       return;
     }
-
-    // Kiểm tra sdt có bị trùng không
+    // Kiểm tra số điện thoại được dùng tối đa 2 lần
     final phoneQuery = await _auth.db
         .collection('users')
         .where("phonenumber", isEqualTo: phone)
         .get();
 
-    if (phoneQuery.docs.isNotEmpty) {
-      Get.snackbar("Lỗi", "Số điện thoại đã có người sử dụng");
+    if (phoneQuery.docs.length >= 2) {
+      Get.snackbar(
+        "Lỗi",
+        "Số điện thoại này đã được sử dụng cho tối đa 2 tài khoản",
+      );
       return;
     }
 

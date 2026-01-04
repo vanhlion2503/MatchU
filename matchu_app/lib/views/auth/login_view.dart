@@ -95,9 +95,18 @@ class _LoginViewState extends State<LoginView> {
                       fontWeight: FontWeight.w700,
                     )
                     ),
-                    Text(
-                      "Quên mật khẩu"
-                    )
+                    GestureDetector(
+                      onTap: () {
+                        Get.toNamed('/forgot-password');
+                      },
+                      child: Text(
+                        "Quên mật khẩu",
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               const SizedBox(height: 12),

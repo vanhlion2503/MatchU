@@ -30,9 +30,9 @@ void main() async {
 
   // ✅ 2. ACTIVATE APP CHECK (SAU FIREBASE)
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-    appleProvider: AppleProvider.debug,
-  );
+  androidProvider: AndroidProvider.playIntegrity,
+  appleProvider: AppleProvider.appAttest,
+);
 
   // ✅ 3. LOCAL STORAGE
   await GetStorage.init();

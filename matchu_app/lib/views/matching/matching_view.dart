@@ -119,22 +119,11 @@ class _MatchingViewState extends State<MatchingView>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _meAvatar(),
-                      SizedBox(width: 8,),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          // Khoảng cách giữa 2 avatar
-                          final lineWidth = MediaQuery.of(context).size.width * 0.4;
-        
-                          return SizedBox(
-                            width: lineWidth,
-                            height: 60,
-                            child: _centerLine(),
-                          );
-                        },
-                      ),
-                      SizedBox(width: 8,),
-                      _strangerRipple(theme),
+                      Flexible(flex: 3, child: _meAvatar()),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 4, child: _centerLine()),
+                      const SizedBox(width: 8),
+                      Flexible(flex: 3, child: _strangerRipple(theme)),
                     ],
                   ),
                   const SizedBox(height: 100),

@@ -51,8 +51,15 @@ class EnrollPhoneView extends StatelessWidget {
                         hintText: 'Nhập số điện thoại',
                     ),
                     onChanged: (phone) {
-                    c.fullPhoneNumber.value = phone.completeNumber;
-                },
+                      String number = phone.completeNumber;
+
+                      // 🇻🇳 Fix riêng cho VN: +840xxx → +84xxx
+                      if (number.startsWith('+840')) {
+                        number = '+84' + number.substring(4);
+                      }
+
+                      c.fullPhoneNumber.value = number;
+                    },
                 ),
                 const SizedBox(height: 24),
                 Text('Chúng tôi sẽ mã OTP qua tin nhắn SMS',
