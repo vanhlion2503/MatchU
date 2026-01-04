@@ -45,6 +45,7 @@ class RightSideMenu {
                         icon: Icons.person_outline,
                         text: "Chỉnh sửa hồ sơ",
                         onTap: () {
+                          Get.back(); 
                           Get.toNamed("/edit-profile");
                         },
                       ),
@@ -103,7 +104,7 @@ class RightSideMenu {
                         icon: Icons.brightness_6_outlined,
                         text: "Chế độ",
                         onTap: (){
-                          Navigator.pop(context);
+                          Get.back(); 
                           Get.toNamed("/display-mode");
                           },
                       ),

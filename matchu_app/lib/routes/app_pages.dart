@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
+import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/auth/enroll_phone_view.dart';
@@ -13,6 +14,7 @@ import 'package:matchu_app/views/matching/matching_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
+import 'package:matchu_app/views/setting/edit_profile_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
 import 'package:matchu_app/views/auth/login_view.dart';
 import 'package:matchu_app/views/auth/register_view.dart';
@@ -133,6 +135,13 @@ class AppPages {
     ),
 
     
+    GetPage(
+      name: AppRouter.editProfile, 
+      page: () => EditProfileView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<AccountSettingsController>(() => AccountSettingsController());
+      }),
+    ),
 
   ];
 }
