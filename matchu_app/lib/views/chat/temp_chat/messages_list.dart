@@ -29,6 +29,11 @@ class _MessagesListState extends State<MessagesList> {
   // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
   final Map<String, GlobalKey> _bubbleKeys = {};
 
+  void _cleanupBubbleKeys(Set<String> aliveIds) {
+    _bubbleKeys.removeWhere((key, _) => !aliveIds.contains(key));
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final uid = Get.find<AuthController>().user!.uid;
@@ -45,9 +50,10 @@ class _MessagesListState extends State<MessagesList> {
           .snapshots(),
       builder: (context, snap) {
         // Auto scroll khi có tin nhắn mới
-        if (snap.connectionState == ConnectionState.active && snap.hasData) {
+        if (snap.hasData) {
+          final docs = snap.data!.docs;
+
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            final docs = snap.data!.docs;
             controller.onNewMessages(
               docs.length,
               docs.cast<QueryDocumentSnapshot<Map<String, dynamic>>>(),
@@ -58,6 +64,10 @@ class _MessagesListState extends State<MessagesList> {
         if (!snap.hasData) return const SizedBox();
 
         final docs = snap.data!.docs;
+
+        final aliveIds = docs.map((e) => e.id).toSet();
+        controller.cleanupMessageKeys(aliveIds);
+        _cleanupBubbleKeys(aliveIds);
 
         return ListView.builder(
           controller: controller.scrollController,

@@ -37,7 +37,11 @@ class TempChatController extends GetxController {
   final otherAnonymousAvatar = RxnString();
   final otherGender = RxnString();
   final _justSentMessage = false.obs;
+  
+  bool _shownOtherLikeEffect = false;
+  bool _isEnding = false;
   int _lastMessageCount = 0;
+  int? _lastHapticSecond;
   bool _hasNavigatedToMatch = false;
 
 
@@ -45,6 +49,7 @@ class TempChatController extends GetxController {
   Timer? _timer;
   StreamSubscription? _roomSub;
   StreamSubscription? _avatarSub;
+  VoidCallback? onOtherLiked;
 
   @override
   void onInit() {
@@ -117,6 +122,14 @@ class TempChatController extends GetxController {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       remainingSeconds.value--;
+
+      if (remainingSeconds.value <= 10 &&
+          remainingSeconds.value > 0 &&
+          _lastHapticSecond != remainingSeconds.value) {
+        _lastHapticSecond = remainingSeconds.value;
+        HapticFeedback.lightImpact();
+      }
+
       if (remainingSeconds.value == 30 &&
         hasSent30sWarning.value == false) {
 
@@ -142,13 +155,28 @@ class TempChatController extends GetxController {
   }
 
   Future<void> endRoom(String reason) async {
+    if (_isEnding) return;
+    _isEnding = true;
+
     _timer?.cancel();
-    await service.endRoom(
-      roomId: roomId, 
-      uid: uid, 
-      reason: reason
+
+    try {
+      final room = await service.getRoom(roomId);
+
+      // 🔒 GUARD SERVER STATE
+      if (room["status"] != "active") return;
+
+      await service.endRoom(
+        roomId: roomId,
+        uid: uid,
+        reason: reason,
       );
+    } catch (e) {
+      _isEnding = false; // cho retry nếu lỗi network
+      rethrow;
+    }
   }
+
 
   void _listenRoom(){
     _roomSub = service.listenRoom(roomId).listen((doc) async {
@@ -161,7 +189,19 @@ class TempChatController extends GetxController {
 
 
       userLiked.value = isA ? data["userALiked"] : data["userBLiked"];
-      otherLiked.value = isA ? data["userBLiked"] : data["userALiked"];
+      final newOtherLiked = isA ? data["userBLiked"] : data["userALiked"];
+
+      if (newOtherLiked == true &&
+          otherLiked.value != true &&
+          !_shownOtherLikeEffect) {
+        _shownOtherLikeEffect = true;
+
+        // 🔔 THÔNG BÁO UI
+        onOtherLiked?.call();
+      }
+
+      otherLiked.value = newOtherLiked;
+
 
       if (data["status"] == "ended") {
 
@@ -230,6 +270,8 @@ class TempChatController extends GetxController {
   }
 
   Future<void> send(String text, {String type = "text"}) async {
+    if (!await _isRoomActive()) return;
+    
     final reply = replyingMessage.value;
 
     _justSentMessage.value = true;
@@ -257,6 +299,11 @@ class TempChatController extends GetxController {
         curve: Curves.easeOutCubic,
       );
     });
+  }
+
+  Future<bool> _isRoomActive() async {
+    final room = await service.getRoom(roomId);
+    return room["status"] == "active";
   }
 
   /// Auto scroll khi có tin nhắn mới (giống long_chat)
@@ -345,7 +392,9 @@ class TempChatController extends GetxController {
     );
   }
 
-  void onTypingChanged(String text) {
+  void onTypingChanged(String text) async {
+
+    if (!await _isRoomActive()) return;
     final hasText = text.trim().isNotEmpty;
 
     if (hasText && !isTyping.value) {
@@ -396,7 +445,10 @@ class TempChatController extends GetxController {
   void onReactMessage({
     required String messageId,
     required String reactionId,
-  }) {
+  }) async {
+
+    if (!await _isRoomActive()) return;
+
     service.toggleReaction(
       roomId: roomId,
       messageId: messageId,
@@ -454,6 +506,10 @@ class TempChatController extends GetxController {
 
       otherAnonymousAvatar.value = avatars[otherUid];
     });
+  }
+
+  void cleanupMessageKeys(Set<String> aliveIds) {
+    messageKeys.removeWhere((key, _) => !aliveIds.contains(key));
   }
 
   @override
