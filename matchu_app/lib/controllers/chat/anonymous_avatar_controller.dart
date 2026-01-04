@@ -47,7 +47,20 @@ class AnonymousAvatarController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    load();
+
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user == null) {
+        _reset();
+      } else {
+        load();
+      }
+    });
+
+    ever<String?>(gender, (g) {
+      if (g == null) return;
+
+      _applyGender(g);
+    });
 
     FirebaseAuth.instance.authStateChanges().listen((user) {
     if (user == null) {
@@ -59,6 +72,24 @@ class AnonymousAvatarController extends GetxController {
     }
   });
   }
+
+  void _applyGender(String g) {
+    avatars.clear();
+    selectedAvatar.value = null;
+
+    if (g == "male" || g == "nam") {
+      avatars.assignAll(male.keys.toList());
+    } else if (g == "female" || g == "nữ" || g == "nu") {
+      avatars.assignAll(female.keys.toList());
+    } else {
+      avatars.assignAll(male.keys.toList()); // fallback
+    }
+
+    if (avatars.isNotEmpty) {
+      selectedAvatar.value = avatars.first;
+    }
+  }
+
 
   void _reset() {
     avatars.clear();
@@ -74,30 +105,19 @@ class AnonymousAvatarController extends GetxController {
     final snap = await _db.collection("users").doc(uid).get();
     if (!snap.exists) return;
 
-    final data = snap.data()!;
-    final rawGender = data["gender"];
+    final rawGender = snap.data()?["gender"];
+    final newGender = rawGender?.toString().toLowerCase().trim();
 
-    gender.value = rawGender?.toString().toLowerCase().trim();
-
-    // 🔥 FIX CHUẨN Ở ĐÂY
-    if (gender.value == "male" || gender.value == "nam") {
-      avatars.assignAll(male.keys.toList());
-    } else if (gender.value == "female" ||
-        gender.value == "nữ" ||
-        gender.value == "nu") {
-      avatars.assignAll(female.keys.toList());
-    } else {
-      avatars.assignAll(male.keys.toList()); // fallback
+    if (newGender != null && newGender != gender.value) {
+      gender.value = newGender; // 🔥 trigger ever()
     }
 
-    // ===== SET AVATAR ĐANG CHỌN =====
-    final savedAvatar = data["anonymousAvatar"];
+    final savedAvatar = snap.data()?["anonymousAvatar"];
     if (savedAvatar != null && avatars.contains(savedAvatar)) {
       selectedAvatar.value = savedAvatar;
-    } else if (avatars.isNotEmpty) {
-      selectedAvatar.value = avatars.first;
     }
   }
+
 
   /// ===== CHỌN + LƯU AVATAR =====
   Future<void> selectAndSave(String avatarKey) async {

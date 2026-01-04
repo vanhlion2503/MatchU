@@ -7,6 +7,7 @@ import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/system/app_lifecycle_controller.dart';
+import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
@@ -46,6 +47,7 @@ void main() async {
   Get.put(UserController(), permanent: true);
   Get.put(ChatUserCacheController(), permanent: true);
   Get.put(UnreadController(), permanent: true);
+  Get.put(PresenceController(), permanent: true);
 
   runApp(const MyApp());
 }

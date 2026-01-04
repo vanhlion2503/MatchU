@@ -181,6 +181,39 @@ class ChatService {
     }
   }
 
+  Future<String> getOrCreateRoom(String otherUid) async {
+    final myUid = uid;
+
+    final query = await _db
+        .collection("chatRooms")
+        .where("participants", arrayContains: myUid)
+        .get();
+
+    for (final doc in query.docs) {
+      final participants = List<String>.from(doc["participants"]);
+      if (participants.contains(otherUid)) {
+        return doc.id;
+      }
+    }
+
+    // ❌ chưa có → tạo mới
+    final roomRef = _db.collection("chatRooms").doc();
+
+    await roomRef.set({
+      "participants": [myUid, otherUid],
+      "createdAt": FieldValue.serverTimestamp(),
+      "lastMessage": "",
+      "lastMessageAt": FieldValue.serverTimestamp(),
+      "typing": {},
+      "unread": {
+        myUid: 0,
+        otherUid: 0,
+      },
+    });
+
+    return roomRef.id;
+  }
+
 
 
 }

@@ -6,10 +6,12 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/profile/avatar_fullscreen_view.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
-import 'package:matchu_app/widgets/profile_widget/profile_widget.dart';
+import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
 
 class OtherProfileView extends StatelessWidget {
   final String userId;
@@ -63,21 +65,43 @@ class OtherProfileView extends StatelessWidget {
                           bottomRight: Radius.circular(30),
                         ),
                       ),
-                      child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(
+                      child: SizedBox(
+                        height: 240,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            // ================= BACKGROUND =================
+                            Container(
+                              height: 180,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [colorScheme.primary, colorScheme.secondary],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(30),
+                                  bottomRight: Radius.circular(30),
+                                ),
+                              ),
+                            ),
+
+                            // ================= BACK BUTTON (🔥 ĐÚNG CHỖ) =================
+                            Positioned(
+                              top: MediaQuery.of(context).padding.top + 4, // 👈 sát status bar
+                              left: 8,
+                              child: IconButton(
                                 onPressed: () => Get.back(),
                                 icon: const Icon(Icons.arrow_back_ios_new),
                                 color: colorScheme.onPrimary,
                               ),
-                            ],
-                          ),
+                            ),
+
+                        
+                          ],
                         ),
                       ),
+
                     ),
                 
                     // ================= AVATAR =================
@@ -138,52 +162,98 @@ class OtherProfileView extends StatelessWidget {
               if (!isMe)
                 Obx(() {
                   final followed = c.isFollowing.value;
+                  final canMessage = c.canMessage.value;
 
-                  if (followed) {
-                    // ------------------ NÚT ĐANG THEO DÕI ------------------
-                    return OutlinedButton(
-                      onPressed: () => c.unfollow(),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 1.5,
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        foregroundColor: Theme.of(context).colorScheme.primary,
+                  const double buttonHeight = 45;
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      /// ================= FOLLOW BUTTON =================
+                      SizedBox(
+                        height: buttonHeight,
+                        child: followed
+                            ? Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(30),
+                                  color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppTheme.darkBorder 
+                                          : AppTheme.lightBorder,
+                                ),
+                                child: OutlinedButton(
+                                  onPressed: () => c.unfollow(),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide.none,
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    "Đang theo dõi",
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ),
+                              )
+                            : ElevatedButton(
+                                onPressed: () => c.follow(),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                                child: Text(
+                                  "Theo dõi",
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
                       ),
-                      child: const Text(
-                        "Đang theo dõi",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+
+                      /// ================= MESSAGE BUTTON =================
+                      if (canMessage) ...[
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          height: buttonHeight,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _openChat(userId);
+                            },
+                            icon: Icon(
+                              Iconsax.message, 
+                              size: 22,
+                              color: Theme.of(context).brightness == Brightness.dark 
+                                          ? AppTheme.lightBorder
+                                          : AppTheme.darkBorder,
+                                          
+                            ),
+                            label: Text(
+                              "Nhắn tin",
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).brightness == Brightness.dark 
+                                                ? AppTheme.darkBorder 
+                                                : AppTheme.lightBorder,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-                  } else {
-                    // ------------------ NÚT THEO DÕI ------------------
-                    return ElevatedButton(
-                      onPressed: () => c.follow(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text(
-                        "Theo dõi",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    );
-                  }
+                      ],
+                    ],
+                  );
+
                 }),
+
 
 
               const SizedBox(height: 20),
@@ -289,4 +359,20 @@ class OtherProfileView extends StatelessWidget {
       ),
     );
   }
+
+  void _openChat(String otherUid) async {
+    final chatService = ChatService();
+
+    // 🔥 Tạo hoặc lấy roomId (nên làm ở service)
+    final roomId = await chatService.getOrCreateRoom(otherUid);
+
+    Get.to(
+      () => const ChatView(),
+      arguments: {
+        "roomId": roomId,
+      },
+      transition: Transition.cupertino,
+    );
+  }
+
 }

@@ -13,6 +13,9 @@ class OtherProfileController extends GetxController{
   OtherProfileController(this.userId);
   String get currentUid => _userService.uid;
 
+  RxBool canMessage = false.obs;
+
+
   @override
   void onInit(){
     super.onInit();
@@ -26,6 +29,7 @@ class OtherProfileController extends GetxController{
 
       if(userdata != null){
         isFollowing.value = await _userService.isFollowing(userId);
+        canMessage.value = userdata.followers.contains(currentUid);
       }
     });
   }

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
-import 'package:matchu_app/widgets/profile_widget/profile_widget.dart';
+import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:get/get.dart';
-import 'package:matchu_app/widgets/profile_widget/popup_profile_widget.dart';
+import 'package:matchu_app/views/profile/profile_widget/popup_profile_widget.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:matchu_app/widgets/profile_widget/right_side_menu.dart';
+import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 

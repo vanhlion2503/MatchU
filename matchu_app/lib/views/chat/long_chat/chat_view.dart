@@ -15,48 +15,42 @@ class ChatView extends StatelessWidget {
   Widget build(BuildContext context) {
     final roomId = Get.arguments["roomId"] as String;
 
-    final ChatController controller = Get.put(ChatController(roomId), tag: roomId);
+    // ✅ Controller theo room (tagged)
+    final ChatController controller =
+        Get.put(ChatController(roomId), tag: roomId);
+
+    // ✅ Global controllers (đã put ở main)
     final userCache = Get.find<ChatUserCacheController>();
+    final presence = Get.find<PresenceController>();
+
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         toolbarHeight: 58,
         elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
         backgroundColor: theme.colorScheme.surface.withOpacity(0.95),
 
-        /// ================= LEADING (RIÊNG) =================
         leading: GestureDetector(
           onTap: () => Get.back(),
-          behavior: HitTestBehavior.opaque,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(
-              Icons.arrow_back_ios_new, // 👈 icon bạn chọn
-              size: 20,
-              color: theme.colorScheme.onSurface,
-            ),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Icon(Icons.arrow_back_ios_new, size: 20),
           ),
         ),
-        titleSpacing: 0, 
-        /// ================= TITLE (AVATAR + TÊN = 1 BỘ) =================
+
+        titleSpacing: 0,
         title: Obx(() {
           final otherUid = controller.otherUid.value;
           if (otherUid == null) {
             return const Text("Đang tải...");
           }
 
-          final userCache = Get.find<ChatUserCacheController>();
-          final presence = Get.find<PresenceController>();
-
           final otherUser = userCache.getUser(otherUid);
           final online = presence.isOnline(otherUid);
 
           return GestureDetector(
-            behavior: HitTestBehavior.opaque,
             onTap: () {
               Get.to(
                 () => OtherProfileView(userId: otherUid),
@@ -76,12 +70,13 @@ class ChatView extends StatelessWidget {
                           width: 46,
                           height: 46,
                           fit: BoxFit.cover,
-                          placeholder:
-                              const AssetImage('assets/avatas/avataMd.png'),
+                          placeholder: const AssetImage(
+                              'assets/avatas/avataMd.png'),
                           image: otherUser != null &&
                                   otherUser.avatarUrl.isNotEmpty
                               ? NetworkImage(otherUser.avatarUrl)
-                              : const AssetImage('assets/avatas/avataMd.png')
+                              : const AssetImage(
+                                      'assets/avatas/avataMd.png')
                                   as ImageProvider,
                         ),
                       ),
@@ -90,8 +85,8 @@ class ChatView extends StatelessWidget {
                       bottom: 0,
                       right: 0,
                       child: Container(
-                        width: 15,
-                        height: 15,
+                        width: 14,
+                        height: 14,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: online ? Colors.green : Colors.grey,
@@ -117,9 +112,8 @@ class ChatView extends StatelessWidget {
                         otherUser?.fullname ?? "Người dùng",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
                         online
@@ -138,20 +132,13 @@ class ChatView extends StatelessWidget {
           );
         }),
 
-
         actions: [
           IconButton(
-            icon: const Icon(
-              Iconsax.more,
-              size: 32,
-              ),
-            onPressed: () {
-              debugPrint("More");
-            },
+            icon: const Icon(Iconsax.more, size: 30),
+            onPressed: () {},
           ),
         ],
 
-        /// ================= DIVIDER =================
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(0.5),
           child: Divider(
@@ -162,7 +149,6 @@ class ChatView extends StatelessWidget {
         ),
       ),
 
-      /// ================= BODY =================
       body: SafeArea(
         child: ChatBody(controller: controller),
       ),
