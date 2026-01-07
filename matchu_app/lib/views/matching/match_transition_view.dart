@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
+import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/views/matching/widgets/animated_progress_bar.dart';
 import 'package:matchu_app/views/matching/widgets/floating_avatar.dart';
 import 'package:matchu_app/views/matching/widgets/heart_ripple.dart';
@@ -48,19 +51,58 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
   Future<void> _startConvert() async {
     try {
       final service = TempChatService();
+
+      // ===============================
+      // 1️⃣ CONVERT TEMP → PERMANENT
+      // ===============================
       final newRoomId =
           await service.convertToPermanent(widget.tempRoomId);
 
+      // ===============================
+      // 2️⃣ INIT E2EE SESSION KEY
+      // ===============================
+      final tempSnap = await FirebaseFirestore.instance
+          .collection("tempChats")
+          .doc(widget.tempRoomId)
+          .get();
+
+      final participants =
+          List<String>.from(tempSnap.data()!["participants"]);
+
+      final myUid = FirebaseAuth.instance.currentUser!.uid;
+      final otherUid = participants.firstWhere((e) => e != myUid);
+
+      // 🔐 CHỈ 1 CLIENT TẠO SESSION KEY (DETERMINISTIC)
+      if (myUid.compareTo(otherUid) < 0) {
+        await SessionKeyService.createAndSendSessionKey(
+          roomId: newRoomId,
+          receiverUid: otherUid,
+        );
+      }
+
+
+      // ===============================
+      // 3️⃣ GIỮ ANIMATION MƯỢT
+      // ===============================
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
 
-      Get.offNamed("/chat", arguments: {"roomId": newRoomId});
-    } catch (_) {
+      // ===============================
+      // 4️⃣ ĐI SANG CHAT LÂU DÀI
+      // ===============================
+      Get.offNamed(
+        "/chat",
+        arguments: {
+          "roomId": newRoomId,
+        },
+      );
+    } catch (e) {
       if (!mounted) return;
       Get.snackbar("Lỗi", "Không thể tạo phòng chat");
       Get.back();
     }
   }
+
 
   @override
   void dispose() {

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_bottom_bar.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -68,6 +69,9 @@ class ChatController extends GetxController {
   void onInit() {
     super.onInit();
     _presence = Get.find<PresenceController>();
+
+    SessionKeyService.receiveSessionKey(roomId: roomId);
+
     _initRoom();
     _listenScroll();
     ever<bool>(otherTyping, _onOtherTypingChanged);

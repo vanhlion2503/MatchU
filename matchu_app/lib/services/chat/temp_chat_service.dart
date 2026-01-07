@@ -120,18 +120,19 @@ class TempChatService {
 
       // 1️⃣ TẠO CHAT ROOM LÂU DÀI
       tx.set(newRoomRef, {
-      "participants": participants,
-      "createdAt": FieldValue.serverTimestamp(),
-      "fromTempRoom": tempRoomId,
-      "lastMessage": "💬 Bắt đầu trò chuyện",
-      "lastMessageType": "system",
-      "lastSenderId": null,
-      "lastMessageAt": FieldValue.serverTimestamp(),
+        "participants": participants,
+        "createdAt": FieldValue.serverTimestamp(),
+        "fromTempRoom": tempRoomId,
+        "e2ee": true,
+        "lastMessage": "💬 Bắt đầu trò chuyện",
+        "lastMessageType": "system",
+        "lastSenderId": null,
+        "lastMessageAt": FieldValue.serverTimestamp(),
 
-      "unread": {
-        for (final uid in participants) uid: 0,
-      },
-    });
+        "unread": {
+          for (final uid in participants) uid: 0,
+        },
+      });
 
       // 2️⃣ ĐÁNH DẤU TEMP ROOM ĐÃ CONVERT
       tx.update(tempRef, {
