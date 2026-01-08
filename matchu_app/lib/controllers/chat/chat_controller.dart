@@ -72,13 +72,11 @@ class ChatController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+
     _presence = Get.find<PresenceController>();
 
-    // 🔔 listen key rotate
     _sessionKeySub =
         SessionKeyService.onSessionKeyUpdated(roomId).listen((_) {
-      debugPrint("🔑 Session key updated → clear decrypt cache");
-
       decryptedCache.clear();
       _decrypting.clear();
 
@@ -87,16 +85,18 @@ class ChatController extends GetxController {
       }
     });
 
-    _initRoom(); // 👈 PHẢI GỌI TRƯỚC (để có otherUid)
-
-    _listenScroll();
     ever<bool>(otherTyping, _onOtherTypingChanged);
+    _listenScroll();
 
-    // 🔐 ĐẢM BẢO SESSION KEY → RỒI MỚI LOAD MESSAGE
-    _ensureSessionKey().then((_) {
-      loadInitialMessages();
-    });
+    _bootstrap();
   }
+
+  Future<void> _bootstrap() async {
+    await _initRoom();        // ⬅️ đảm bảo có otherUid
+    await _ensureSessionKey();// ⬅️ đảm bảo có AES key
+    await loadInitialMessages();
+  }
+
 
 
   void _onOtherTypingChanged(bool isTyping) {
@@ -533,6 +533,12 @@ class ChatController extends GetxController {
     _decrypting.add(messageId);
 
     try {
+      final hasKey = await SessionKeyService.hasLocalSessionKey(roomId);
+      if (!hasKey) {
+        decryptedCache[messageId] = "🔐 Đang thiết lập mã hóa…";
+        return;
+      }
+
       final ciphertext = data["ciphertext"];
       final iv = data["iv"];
 

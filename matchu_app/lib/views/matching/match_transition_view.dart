@@ -145,154 +145,165 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
               );
             },
           ),
-
           /// ===== CONTENT =====
           SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final maxW = constraints.maxWidth;
-                final maxH = constraints.maxHeight;
+            child: Center(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxW = MediaQuery.of(context).size.width;
+                    final maxH = MediaQuery.of(context).size.height;
+                    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-                final avatarSize =
-                    (maxW * 0.22).clamp(60.0, 92.0);
-                final avatarOffset =
-                    (maxW * 0.18).clamp(40.0, 90.0);
+                    final avatarSize =
+                        (maxW * 0.22).clamp(60.0, 92.0);
+                    final avatarOffset =
+                        (maxW * 0.18).clamp(40.0, 90.0);
 
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(height: isLandscape ? 24 : 56),
-
-                    /// ===== AVATARS =====
-                    SizedBox(
-                      height: avatarSize * 2,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          FloatingAvatar(
-                            image:
-                                "assets/anonymous/${widget.myAvatar}.png",
-                            offsetX: -avatarOffset,
-                            delay: 0,
-                            size: avatarSize,
-                            badge: Iconsax.like_15,
-                            badgeColor: Colors.blue,
-                          ),
-                          FloatingAvatar(
-                            image:
-                                "assets/anonymous/${widget.otherAvatar}.png",
-                            offsetX: avatarOffset,
-                            delay: 1,
-                            size: avatarSize,
-                            badge: Iconsax.heart5,
-                            badgeColor: Colors.pink,
-                          ),
-                          const HeartRipple(),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: isLandscape ? 16 : 32),
-
-                    /// ===== TEXT =====
-                    Text(
-                      "🎉 Kết nối thành công!",
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "Hai bạn đã thích nhau",
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    /// ===== PROGRESS CARD =====
-                    Container(
-                      width: maxW * 0.9,
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            blurRadius: 20,
-                            color: theme.colorScheme.primary
-                                .withOpacity(0.12),
-                          )
-                        ],
+                    return ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: maxH * 0.85, // 👈 giữ tâm chuẩn
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  "ĐANG TẠO PHÒNG",
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall
-                                      ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          /// ===== AVATARS =====
+                          SizedBox(
+                            height: avatarSize * 2,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                FloatingAvatar(
+                                  image:
+                                      "assets/anonymous/${widget.myAvatar}.png",
+                                  offsetX: -avatarOffset,
+                                  delay: 0,
+                                  size: avatarSize,
+                                  badge: Iconsax.like_15,
+                                  badgeColor: Colors.blue,
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                "Đang chuyển hướng…",
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color:
-                                      theme.colorScheme.primary,
-                                  fontWeight: FontWeight.w700,
+                                FloatingAvatar(
+                                  image:
+                                      "assets/anonymous/${widget.otherAvatar}.png",
+                                  offsetX: avatarOffset,
+                                  delay: 1,
+                                  size: avatarSize,
+                                  badge: Iconsax.heart5,
+                                  badgeColor: Colors.pink,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: AnimatedProgressBar(
-                              controller: _progressController,
+                                const HeartRipple(),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Iconsax.lock,
-                                size: 14,
-                                color: theme.colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "Đang thiết lập kết nối an toàn",
-                                style: theme.textTheme.labelMedium
-                                    ?.copyWith(
-                                  color: theme.colorScheme
-                                      .onSurfaceVariant,
+
+                          const SizedBox(height: 24),
+
+                          /// ===== TEXT =====
+                          Text(
+                            "🎉 Kết nối thành công!",
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "Hai bạn đã thích nhau",
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          /// ===== PROGRESS CARD =====
+                          Container(
+                            width: maxW * 0.9,
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color:
+                                  theme.colorScheme.surface.withOpacity(0.95),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  blurRadius: 20,
+                                  color: theme.colorScheme.primary
+                                      .withOpacity(0.12),
+                                )
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        "ĐANG TẠO PHÒNG",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "Đang chuyển hướng…",
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                        color:
+                                            theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 16),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: AnimatedProgressBar(
+                                    controller: _progressController,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Iconsax.lock,
+                                      size: 14,
+                                      color: theme.colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "Đang thiết lập kết nối an toàn",
+                                      style: theme.textTheme.labelMedium
+                                          ?.copyWith(
+                                        color: theme.colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-
-                    SizedBox(height: isLandscape ? 24 : 64),
-                  ],
-                );
-              },
+                    );
+                  },
+                ),
+              ),
             ),
           ),
+
         ],
       ),
     );
