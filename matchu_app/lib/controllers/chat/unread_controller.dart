@@ -42,9 +42,18 @@ class UnreadController extends GetxController {
     });
   }
 
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void cleanup() {
+    _sub?.cancel();
+    _sub = null;
+    totalUnread.value = 0;
+  }
+
   @override
   void onClose() {
-    _sub?.cancel();
+    cleanup();
     super.onClose();
   }
 }

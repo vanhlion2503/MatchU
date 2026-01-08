@@ -12,7 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/user/avatar_service.dart';
-import 'package:matchu_app/services/auth_service.dart';
+import 'package:matchu_app/services/auth/auth_service.dart';
 
 class AvatarController extends GetxController {
   // ===== STATE =====

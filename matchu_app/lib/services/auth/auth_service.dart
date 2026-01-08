@@ -271,6 +271,5 @@ class AuthService {
 
   Future<void> logout() async {
     await setOnlineStatus(false);
-    await _auth.signOut();
   }
 }

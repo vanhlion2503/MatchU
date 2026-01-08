@@ -48,6 +48,7 @@ class AnonymousAvatarController extends GetxController {
   void onInit() {
     super.onInit();
 
+    // ✅ CHỈ MỘT LISTENER DUY NHẤT
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user == null) {
         _reset();
@@ -61,16 +62,6 @@ class AnonymousAvatarController extends GetxController {
 
       _applyGender(g);
     });
-
-    FirebaseAuth.instance.authStateChanges().listen((user) {
-    if (user == null) {
-      // logout
-      _reset();
-    } else {
-      // login user mới
-      load();
-    }
-  });
   }
 
   void _applyGender(String g) {
@@ -95,6 +86,13 @@ class AnonymousAvatarController extends GetxController {
     avatars.clear();
     selectedAvatar.value = null;
     gender.value = null;
+  }
+
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void reset() {
+    _reset();
   }
 
   /// ===== LOAD USER + SET AVATAR LIST =====

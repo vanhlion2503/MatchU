@@ -35,12 +35,20 @@ class PresenceController extends GetxController{
     }
   }
 
-  @override
-  void onClose() {
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void cleanup() {
     for (final s in _subs.values) {
       s.cancel();
     }
     _subs.clear();
+    _onlineMap.clear();
+  }
+
+  @override
+  void onClose() {
+    cleanup();
     super.onClose();
   }
 }

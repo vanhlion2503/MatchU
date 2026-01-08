@@ -8,7 +8,8 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
-import 'package:matchu_app/services/auth_service.dart';
+import 'package:matchu_app/services/auth/auth_service.dart';
+import 'package:matchu_app/services/auth/logout_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/user/avatar_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
@@ -527,8 +528,7 @@ class AuthController extends GetxController {
   //                        LOGOUT
   // =============================================================
   Future<void> logoutC() async {
-    await _auth.logout();
-    Get.offAllNamed('/');
+    await LogoutService.logout();
   }
   // =============================================================
   //                        DISPOSE

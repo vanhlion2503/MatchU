@@ -36,14 +36,17 @@ class UserController extends GetxController {
       if (u == null) {
         userRx.value = null;
         _userSub?.cancel();
-      if (Get.isRegistered<ChatUserCacheController>()) {
-        Get.find<ChatUserCacheController>().clearAll();
-      }
+        _heartbeat?.cancel();
+
+        if (Get.isRegistered<ChatUserCacheController>()) {
+          Get.find<ChatUserCacheController>().clearAll();
+        }
       } else {
         _bindUser(u.uid);
         startHeartbeat();
       }
     });
+
   }
 
   void startHeartbeat() {
@@ -108,10 +111,19 @@ class UserController extends GetxController {
     return _service.isFollowing(targetUid);
   }
 
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void stopHeartbeatAndSubscriptions() {
+    _heartbeat?.cancel();
+    _heartbeat = null;
+    _userSub?.cancel();
+    _userSub = null;
+  }
+
   @override
   void onClose() {
-    _userSub?.cancel();
-    _heartbeat?.cancel();
+    stopHeartbeatAndSubscriptions();
     super.onClose();
   }
 }
