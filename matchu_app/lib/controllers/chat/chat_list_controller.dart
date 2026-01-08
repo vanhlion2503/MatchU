@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
+import 'package:matchu_app/services/security/message_crypto_service.dart';
 
 class ChatListController extends GetxController
     with WidgetsBindingObserver {
@@ -14,7 +15,8 @@ class ChatListController extends GetxController
 
   final RxList<ChatRoomModel> rooms = <ChatRoomModel>[].obs;
   final RxList<ChatRoomModel> filteredRooms = <ChatRoomModel>[].obs;
-
+  final RxMap<String, String> lastMessagePreviewCache = <String, String>{}.obs;
+ 
   final RxString searchText = "".obs;
 
   final textController = TextEditingController();
@@ -60,15 +62,6 @@ class ChatListController extends GetxController
     );
   }
 
-  @override
-  void onClose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _sub?.cancel();
-    textController.dispose();
-    focusNode.dispose();
-    super.onClose();
-  }
-
   /// ========================
   /// APP LIFECYCLE
   /// ========================
@@ -95,11 +88,10 @@ class ChatListController extends GetxController
     final aliveUids = <String>{};
 
     for (final room in visible) {
-      final otherUid =
-          room.participants.firstWhere((e) => e != uid);
+      final otherUid = room.participants.firstWhere((e) => e != uid);
       userCache.loadIfNeeded(otherUid);
       presence.listen(otherUid);
-      aliveUids.add(otherUid);
+      _loadLastMessagePreview(room);
     }
 
     presence.unlistenExcept(aliveUids);
@@ -155,7 +147,9 @@ class ChatListController extends GetxController
 
     filteredRooms.assignAll(
       rooms.where((room) {
-        if (room.lastMessage.toLowerCase().contains(q)) {
+        final preview = lastMessagePreviewCache[room.id] ?? room.lastMessage;
+
+        if (preview.toLowerCase().contains(q)) {
           return true;
         }
 
@@ -195,5 +189,39 @@ class ChatListController extends GetxController
 
   Future<void> delete(ChatRoomModel room) async {
     await _service.hideRoom(room.id);
+  }
+
+  Future<void> _loadLastMessagePreview(ChatRoomModel room) async {
+    if(lastMessagePreviewCache.containsKey(room.id)) return;
+
+    if(room.lastMessageCipher == null || room.lastMessageIv == null) {
+      lastMessagePreviewCache[room.id] = room.lastMessage;
+      return;
+    }
+
+    try{
+      final text = await MessageCryptoService.decrypt(
+        roomId: room.id, 
+        ciphertext: room.lastMessageCipher!, 
+        iv: room.lastMessageIv!,
+      );
+
+      lastMessagePreviewCache[room.id] = text;
+    }catch(e){
+      lastMessagePreviewCache[room.id] = room.lastMessage;
+    }
+  }
+
+  void clearPreviewCache() {
+    lastMessagePreviewCache.clear();
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sub?.cancel();
+    textController.dispose();
+    focusNode.dispose();
+    super.onClose();
   }
 }

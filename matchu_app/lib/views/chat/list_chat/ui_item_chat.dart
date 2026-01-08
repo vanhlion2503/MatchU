@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:get/get.dart';
@@ -28,6 +29,9 @@ Widget chatItem({
 
     final otherUser = userCache.getUser(otherUid);
     final presence = Get.find<PresenceController>();
+    
+    final listC = Get.find<ChatListController>();
+    final preview = listC.lastMessagePreviewCache[room.id] ?? room.lastMessage;
 
     presence.listen(otherUid);
 
@@ -110,9 +114,7 @@ Widget chatItem({
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           text: highlightText(
-                            text: isMe
-                                ? "Bạn: ${room.lastMessage}"
-                                : room.lastMessage,
+                            text: isMe ? "Bạn: $preview" : preview,
                             query: searchQuery,
                             normalStyle:
                                 Theme.of(context).textTheme.bodyMedium!,

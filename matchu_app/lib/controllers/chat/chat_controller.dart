@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_bottom_bar.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -64,20 +65,39 @@ class ChatController extends GetxController {
 
   final Map<String, int> _messageIndexMap = {};
 
-  // ================= INIT =================
+  final RxMap<String, String> decryptedCache = <String, String>{}.obs;
+  final Set<String> _decrypting = {};
+  StreamSubscription? _sessionKeySub;
+
   @override
   void onInit() {
     super.onInit();
     _presence = Get.find<PresenceController>();
 
-    SessionKeyService.receiveSessionKey(roomId: roomId);
+    // 🔔 listen key rotate
+    _sessionKeySub =
+        SessionKeyService.onSessionKeyUpdated(roomId).listen((_) {
+      debugPrint("🔑 Session key updated → clear decrypt cache");
 
-    _initRoom();
+      decryptedCache.clear();
+      _decrypting.clear();
+
+      for (final doc in allMessages) {
+        getDecryptedText(doc.id, doc.data());
+      }
+    });
+
+    _initRoom(); // 👈 PHẢI GỌI TRƯỚC (để có otherUid)
+
     _listenScroll();
     ever<bool>(otherTyping, _onOtherTypingChanged);
-    // Load messages ban đầu
-    loadInitialMessages();
+
+    // 🔐 ĐẢM BẢO SESSION KEY → RỒI MỚI LOAD MESSAGE
+    _ensureSessionKey().then((_) {
+      loadInitialMessages();
+    });
   }
+
 
   void _onOtherTypingChanged(bool isTyping) {
     if (!isTyping) return;
@@ -183,6 +203,10 @@ class ChatController extends GetxController {
       
       allMessages.value = docs;
       _rebuildIndexMap();
+
+      for (final doc in docs) {
+        getDecryptedText(doc.id, doc.data());
+      }
       _oldestDocument = docs.last; // Tin cũ nhất
       lastMessageCount = docs.length;
       
@@ -215,10 +239,13 @@ class ChatController extends GetxController {
 
     for (final snap in docs) {
       final id = snap.id;
+      final data = snap.data();
       final index = _messageIndexMap[id];
 
       if (index == null) {
-        // ✅ MESSAGE MỚI
+        // ===============================
+        // 🆕 MESSAGE MỚI
+        // ===============================
         allMessages.insert(0, snap);
 
         // shift index map
@@ -228,14 +255,31 @@ class ChatController extends GetxController {
 
         _messageIndexMap[id] = 0;
         hasChange = true;
+
+        // 🔐 PRELOAD DECRYPT (ASYNC – KHÔNG BLOCK UI)
+        getDecryptedText(id, data);
       } else {
-        // ✅ UPDATE MESSAGE (reaction / edit)
+        // ===============================
+        // ♻️ UPDATE MESSAGE (reaction / edit)
+        // ===============================
         final oldData = allMessages[index].data();
-        final newData = snap.data();
+        final newData = data;
 
         if (!_mapEquals(oldData, newData)) {
           allMessages[index] = snap;
           hasChange = true;
+
+          // 🔥 CHỈ decrypt lại nếu ciphertext / iv đổi
+          final oldCipher = oldData["ciphertext"];
+          final newCipher = newData["ciphertext"];
+          final oldIv = oldData["iv"];
+          final newIv = newData["iv"];
+
+          if (oldCipher != newCipher || oldIv != newIv) {
+            // ❗ key rotate / message re-encrypted
+            decryptedCache.remove(id);
+            getDecryptedText(id, newData);
+          }
         }
       }
     }
@@ -251,6 +295,9 @@ class ChatController extends GetxController {
       _service.markAsRead(roomId);
     }
 
+    // ===============================
+    // 🧭 SCROLL LOGIC (GIỮ NGUYÊN)
+    // ===============================
     if (_justSentMessage && isFromMe) {
       _justSentMessage = false;
       _scrollToBottom(0);
@@ -260,6 +307,7 @@ class ChatController extends GetxController {
       showNewMessageBtn.value = true;
     }
   }
+
 
 
   bool _mapEquals(Map a, Map b) {
@@ -275,9 +323,6 @@ class ChatController extends GetxController {
     return true;
   }
 
-
-
-
   void _scrollToBottom(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!itemScrollController.isAttached) return;
@@ -290,7 +335,6 @@ class ChatController extends GetxController {
       );
     });
   }
-
 
   // ================= SCROLL LISTENER =================
   void _listenScroll() {
@@ -351,6 +395,10 @@ class ChatController extends GetxController {
       
       // Thêm vào cuối list (vì reverse: true, cuối list là tin cũ nhất)
       allMessages.addAll(newDocs);
+
+      for (final doc in newDocs) {
+        getDecryptedText(doc.id, doc.data());
+      }
 
       final startIndex = allMessages.length - newDocs.length;
       for (int i = 0; i < newDocs.length; i++) {
@@ -470,6 +518,73 @@ class ChatController extends GetxController {
     );
   }
 
+  Future<void> getDecryptedText(
+    String messageId,
+    Map<String, dynamic> data,
+  ) async {
+
+    if (!data.containsKey("ciphertext") || !data.containsKey("iv")) {
+      return;
+    }
+
+    if (decryptedCache.containsKey(messageId)) return;
+    if (_decrypting.contains(messageId)) return;
+
+    _decrypting.add(messageId);
+
+    try {
+      final ciphertext = data["ciphertext"];
+      final iv = data["iv"];
+
+      if (ciphertext == null || iv == null) {
+        throw Exception("Missing encrypted fields");
+      }
+
+      final text = await MessageCryptoService.decrypt(
+        roomId: roomId,
+        ciphertext: ciphertext,
+        iv: iv,
+      );
+
+      decryptedCache[messageId] = text;
+    } catch (e) {
+      debugPrint("❌ Decrypt failed [$messageId]: $e");
+      decryptedCache[messageId] = "⚠️ Không thể giải mã tin nhắn";
+    } finally {
+      _decrypting.remove(messageId);
+    }
+  }
+
+  Future<void> _ensureSessionKey() async {
+    // 1️⃣ đã có local key → xong
+    if (await SessionKeyService.hasLocalSessionKey(roomId)) {
+      debugPrint("🔐 Session key exists locally");
+      return;
+    }
+
+    // 2️⃣ thử nhận key từ Firestore
+    final received = await SessionKeyService.receiveSessionKey(
+      roomId: roomId,
+    );
+
+    if (received == true) {
+      debugPrint("📥 Session key received from Firestore");
+      return;
+    }
+
+    // 3️⃣ chưa có → tạo mới (chỉ khi biết otherUid)
+    final other = otherUid.value;
+    if (other == null) {
+      debugPrint("⏳ otherUid not ready, skip session key creation");
+      return;
+    }
+
+    debugPrint("🔐 Creating & sending session key");
+    await SessionKeyService.createAndSendSessionKey(
+      roomId: roomId,
+      receiverUid: other,
+    );
+  }
 
 
   // ================= CLEAN UP =================
@@ -482,6 +597,7 @@ class ChatController extends GetxController {
     if (_listeningUid != null) {
       _presence.unlistenExcept({});
     }
+    _sessionKeySub?.cancel();
     super.onClose();
   }
 }

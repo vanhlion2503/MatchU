@@ -5,6 +5,8 @@ class ChatRoomModel {
   final List<String> participants;
   final String lastMessage;
   final String lastSenderId;
+  final String? lastMessageCipher;
+  final String? lastMessageIv;
   final DateTime? lastMessageAt;
   final Map<String, dynamic>? unread;
   final Map<String, dynamic>? pinned;
@@ -15,6 +17,8 @@ class ChatRoomModel {
     required this.participants,
     required this.lastMessage,
     required this.lastSenderId,
+    this.lastMessageCipher,
+    this.lastMessageIv,
     this.lastMessageAt,
     this.unread,
     this.pinned,
@@ -28,6 +32,8 @@ class ChatRoomModel {
       participants: List<String>.from(data["participants"]),
       lastMessage: data["lastMessage"] ?? "",
       lastSenderId: data["lastSenderId"] ?? "",
+      lastMessageCipher: data["lastMessageCipher"],
+      lastMessageIv: data["lastMessageIv"],
       lastMessageAt: (data["lastMessageAt"] as Timestamp?)?.toDate(),
       unread: data["unread"],
       pinned: data["pinned"],

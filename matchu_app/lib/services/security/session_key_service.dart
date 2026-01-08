@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pointycastle/asn1/primitives/asn1_integer.dart';
 import 'package:pointycastle/asn1/primitives/asn1_sequence.dart';
@@ -18,6 +18,13 @@ class SessionKeyService {
   static final _storage = FlutterSecureStorage();
 
   static String get uid => _auth.currentUser!.uid;
+  static final Map<String, StreamController<void>> _keyUpdateControllers = {};
+
+  static Stream<void> onSessionKeyUpdated(String roomId) {
+    return _keyUpdateControllers
+        .putIfAbsent(roomId, () => StreamController.broadcast())
+        .stream;
+  }
 
   /// ===============================
   /// STEP 1 — CREATE AES KEY
@@ -65,38 +72,35 @@ class SessionKeyService {
     required String roomId,
     required String receiverUid,
   }) async {
-    // 🔐 tạo AES key
-    final sessionKey = _generateAESKey();
-
-    // 🔑 load public key
-    final publicKey = await _loadPublicKey(receiverUid);
-
-    // 🔒 encrypt
-    final encrypted = _rsaEncrypt(sessionKey, publicKey);
-
-    // ☁ upload
-    await _db
+    final ref = _db
         .collection("chatRooms")
         .doc(roomId)
         .collection("sessionKeys")
-        .doc(receiverUid)
-        .set({
+        .doc(receiverUid);
+
+    if ((await ref.get()).exists) return;
+
+    final sessionKey = _generateAESKey();
+    final publicKey = await _loadPublicKey(receiverUid);
+    final encrypted = _rsaEncrypt(sessionKey, publicKey);
+
+    await ref.set({
       "from": uid,
       "encryptedKey": base64Encode(encrypted),
       "createdAt": FieldValue.serverTimestamp(),
     });
 
-    // 🔐 lưu local cho sender
     await _storage.write(
       key: "chat_${roomId}_session_key",
       value: base64Encode(sessionKey),
     );
   }
 
+
   /// ===============================
   /// STEP 5 — RECEIVE & DECRYPT
   /// ===============================
-  static Future<void> receiveSessionKey({
+  static Future<bool> receiveSessionKey({
     required String roomId,
   }) async {
     final snap = await _db
@@ -106,17 +110,20 @@ class SessionKeyService {
         .doc(uid)
         .get();
 
-    if (!snap.exists) return;
+    // ❌ chưa có key
+    if (!snap.exists) return false;
 
     final encrypted = base64Decode(snap["encryptedKey"]);
 
     final privateKeyPem = await IdentityKeyService.readPrivateKey();
+    if (privateKeyPem == null) {
+      throw Exception("Identity private key not found");
+    }
 
-
-    final privateKey = _decodePrivateKeyFromPem(privateKeyPem!);
+    final privateKey = _decodePrivateKeyFromPem(privateKeyPem);
 
     final cipher = OAEPEncoding.withSHA256(RSAEngine())
-    ..init(false, PrivateKeyParameter<RSAPrivateKey>(privateKey));
+      ..init(false, PrivateKeyParameter<RSAPrivateKey>(privateKey));
 
     final sessionKey = _processInBlocks(cipher, encrypted);
 
@@ -125,7 +132,13 @@ class SessionKeyService {
       key: "chat_${roomId}_session_key",
       value: base64Encode(sessionKey),
     );
+
+    // 🔔 notify listeners
+    _keyUpdateControllers[roomId]?.add(null);
+
+    return true; // ✅ CỰC KỲ QUAN TRỌNG
   }
+
 
   /// ===============================
   /// UTILS
@@ -149,25 +162,32 @@ class SessionKeyService {
   }
 
   static RSAPublicKey _decodePublicKeyFromPem(String pem) {
-    final lines = pem.split('\n')
-      ..removeWhere((l) => l.contains('BEGIN') || l.contains('END'));
+    final clean = pem
+        .replaceAll('-----BEGIN RSA PUBLIC KEY-----', '')
+        .replaceAll('-----END RSA PUBLIC KEY-----', '')
+        .replaceAll(RegExp(r'\s'), '');
 
-    final bytes = base64Decode(lines.join());
+    final bytes = base64Decode(clean);
     final seq = ASN1Sequence.fromBytes(bytes);
 
-    final modulus =
-        (seq.elements![0] as ASN1Integer).integer!;
-    final exponent =
-        (seq.elements![1] as ASN1Integer).integer!;
+    final modulus = (seq.elements![0] as ASN1Integer).integer!;
+    final exponent = (seq.elements![1] as ASN1Integer).integer!;
 
     return RSAPublicKey(modulus, exponent);
   }
 
-  static RSAPrivateKey _decodePrivateKeyFromPem(String pem) {
-    final lines = pem.split('\n')
-      ..removeWhere((l) => l.contains('BEGIN') || l.contains('END'));
 
-    final bytes = base64Decode(lines.join());
+  static RSAPrivateKey _decodePrivateKeyFromPem(String pem) {
+    // 1️⃣ loại bỏ header / footer
+    final clean = pem
+        .replaceAll('-----BEGIN RSA PRIVATE KEY-----', '')
+        .replaceAll('-----END RSA PRIVATE KEY-----', '')
+        .replaceAll(RegExp(r'\s'), '');
+
+    // 2️⃣ base64 decode
+    final bytes = base64Decode(clean);
+
+    // 3️⃣ parse ASN1
     final seq = ASN1Sequence.fromBytes(bytes);
 
     return RSAPrivateKey(
@@ -177,5 +197,12 @@ class SessionKeyService {
       (seq.elements![5] as ASN1Integer).integer!, // q
     );
   }
+
+
+  static Future<bool> hasLocalSessionKey(String roomId) async {
+    final key = await _storage.read(key: "chat_${roomId}_session_key");
+    return key != null;
+  }
+
 
 }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
+import 'package:matchu_app/services/security/message_crypto_service.dart';
 
 class ChatService {
   final _db = FirebaseFirestore.instance;
@@ -94,12 +95,18 @@ class ChatService {
     final participants = List<String>.from(roomSnap["participants"]);
     final otherUid = participants.firstWhere((e) => e != uid);
 
+    final encrypted = await MessageCryptoService.encrypt(
+      roomId: roomId,
+      plaintext: text,
+    );
+
     final batch = _db.batch();
 
     // 1️⃣ message
     batch.set(msgRef, {
       "senderId": uid,
-      "text": text,
+      "ciphertext": encrypted["ciphertext"],
+      "iv": encrypted["iv"],
       "type": type,
       "replyToId": replyToId,
       "replyText": replyText,
@@ -108,8 +115,12 @@ class ChatService {
 
     // 2️⃣ CHAT ROOM METADATA (🔥 QUAN TRỌNG)
     batch.update(roomRef, {
-      "lastMessage": text,
-      "lastMessageType": type,
+      "lastMessage": "🔐 Tin nhắn được mã hóa",
+      "lastMessageType": "encrypted",
+
+      "lastMessageCipher": encrypted["ciphertext"],
+      "lastMessageIv": encrypted["iv"],
+      
       "lastSenderId": uid,
       "lastMessageAt": FieldValue.serverTimestamp(),
       "deletedFor.$otherUid": FieldValue.delete(),

@@ -30,6 +30,8 @@ class ChatView extends StatelessWidget {
       appBar: AppBar(
         toolbarHeight: 58,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         backgroundColor: theme.colorScheme.surface.withOpacity(0.95),
 
         leading: GestureDetector(

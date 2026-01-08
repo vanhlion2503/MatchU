@@ -151,7 +151,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                       HapticFeedback.lightImpact();
                       widget.controller.startReply({
                         "id": doc.id,
-                        "text": data["text"],
+                        "text": widget.controller.decryptedCache[doc.id] ?? "…",
                       });
                     }
                     setState(() => dragDx = 0);
@@ -178,11 +178,14 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                             final unread = widget.controller.otherUnread.value;
                             final otherUid = widget.controller.otherUid.value;
                             final isMyLastMessage = isMe && messageIndex == 0;
+
+                            final decryptedText = widget.controller.decryptedCache[doc.id] ?? "…";
+
                             return ChatRowPermanent(
                               key: ValueKey(doc.id), // 🔥 BẮT BUỘC
                               messageId: doc.id,
                               senderId: data["senderId"],
-                              text: data["text"] ?? "",
+                              text: decryptedText,
                               type: data["type"] ?? "text",
                               isMe: isMe,
                               showAvatar: !isMe && isLastInGroup,
