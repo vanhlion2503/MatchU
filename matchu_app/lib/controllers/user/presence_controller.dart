@@ -1,21 +1,24 @@
 import 'dart:async';
-import 'package:get/get.dart';
-import 'package:firebase_database/firebase_database.dart';
 
-class PresenceController extends GetxController{
+import 'package:firebase_database/firebase_database.dart';
+import 'package:get/get.dart';
+
+class PresenceController extends GetxController {
   final _db = FirebaseDatabase.instance.ref();
 
   final RxMap<String, bool> _onlineMap = <String, bool>{}.obs;
-  final Map<String, StreamSubscription> _subs = {};
+  final Map<String, StreamSubscription<DatabaseEvent>> _subs = {};
 
   void listen(String uid) {
+    if (uid.isEmpty) return;
     if (_subs.containsKey(uid)) return;
 
     final sub = _db
         .child('status/$uid/online')
         .onValue
         .listen((event) {
-      _onlineMap[uid] = event.snapshot.value == true;
+      final val = event.snapshot.value;
+      _onlineMap[uid] = val == true;
     });
 
     _subs[uid] = sub;
@@ -35,12 +38,10 @@ class PresenceController extends GetxController{
     }
   }
 
-  // ====================================================
-  // 🔥 CLEANUP FOR LOGOUT
-  // ====================================================
+  /// 🔥 CALL WHEN LOGOUT / SWITCH ACCOUNT
   void cleanup() {
-    for (final s in _subs.values) {
-      s.cancel();
+    for (final sub in _subs.values) {
+      sub.cancel();
     }
     _subs.clear();
     _onlineMap.clear();

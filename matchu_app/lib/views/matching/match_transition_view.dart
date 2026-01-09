@@ -72,15 +72,6 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
       final myUid = FirebaseAuth.instance.currentUser!.uid;
       final otherUid = participants.firstWhere((e) => e != myUid);
 
-      // 🔐 CHỈ 1 CLIENT TẠO SESSION KEY (DETERMINISTIC)
-      if (myUid.compareTo(otherUid) < 0) {
-        await SessionKeyService.createAndSendSessionKey(
-          roomId: newRoomId,
-          receiverUid: otherUid,
-        );
-      }
-
-
       // ===============================
       // 3️⃣ GIỮ ANIMATION MƯỢT
       // ===============================

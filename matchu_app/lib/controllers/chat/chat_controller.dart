@@ -573,24 +573,33 @@ class ChatController extends GetxController {
       roomId: roomId,
     );
 
-    if (received == true) {
+    if (received) {
       debugPrint("📥 Session key received from Firestore");
       return;
     }
 
-    // 3️⃣ chưa có → tạo mới (chỉ khi biết otherUid)
+    // 3️⃣ chỉ LEADER mới được tạo key
     final other = otherUid.value;
     if (other == null) {
-      debugPrint("⏳ otherUid not ready, skip session key creation");
+      debugPrint("⏳ otherUid not ready");
       return;
     }
 
-    debugPrint("🔐 Creating & sending session key");
+    // ✅ deterministic leader
+    final amILeader = uid.compareTo(other) < 0;
+
+    if (!amILeader) {
+      debugPrint("⏳ Waiting for session key from leader");
+      return;
+    }
+
+    debugPrint("🔐 I am leader → create session key");
     await SessionKeyService.createAndSendSessionKey(
       roomId: roomId,
       receiverUid: other,
     );
   }
+
 
 
   // ================= CLEAN UP =================
