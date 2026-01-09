@@ -7,6 +7,9 @@ import '../../controllers/chat/anonymous_avatar_controller.dart';
 import '../../controllers/chat/chat_user_cache_controller.dart';
 import '../../controllers/user/presence_controller.dart';
 import '../../controllers/chat/unread_controller.dart';
+import '../../controllers/chat/chat_list_controller.dart';
+import '../../controllers/profile/profile_controller.dart';
+import '../../controllers/auth/avatar_controller.dart';
 
 class LogoutService {
   static final _auth = FirebaseAuth.instance;
@@ -50,6 +53,33 @@ class LogoutService {
       if (Get.isRegistered<UnreadController>()) {
         try {
           Get.find<UnreadController>().cleanup();
+        } catch (e) {
+          // Ignore errors - continue with logout
+        }
+      }
+
+      // 4️⃣.5️⃣ DỪNG CHAT LIST STREAM
+      if (Get.isRegistered<ChatListController>()) {
+        try {
+          Get.find<ChatListController>().cleanup();
+        } catch (e) {
+          // Ignore errors - continue with logout
+        }
+      }
+
+      // 4️⃣.6️⃣ DỪNG PROFILE STREAM
+      if (Get.isRegistered<ProfileController>()) {
+        try {
+          Get.find<ProfileController>().cleanup();
+        } catch (e) {
+          // Ignore errors - continue with logout
+        }
+      }
+
+      // 4️⃣.7️⃣ DỪNG AVATAR STREAM
+      if (Get.isRegistered<AvatarController>()) {
+        try {
+          Get.find<AvatarController>().cleanup();
         } catch (e) {
           // Ignore errors - continue with logout
         }

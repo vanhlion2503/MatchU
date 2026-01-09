@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/models/user_model.dart';
@@ -11,23 +12,38 @@ class ProfileController extends GetxController{
   final Rx<UserModel?> user = Rxn<UserModel>();
   final isLoading = true.obs;
   
+  StreamSubscription<DocumentSnapshot>? _userSub;
+  
   void onInit(){
     super.onInit();
      _listenUserProfile();
   }
 
   void _listenUserProfile(){
+    _userSub?.cancel();
+    
     final firebaseUser = _auth.currentUser;
     if (firebaseUser == null) {
       isLoading.value = false;
       return;
     }
-    _db.collection('users').doc(firebaseUser.uid).snapshots().listen((doc) {
-      if (doc.data() != null) {
-        user.value = UserModel.fromJson(doc.data()!, doc.id);
-      }
-      isLoading.value = false;
-    });
+    
+    _userSub = _db.collection('users').doc(firebaseUser.uid).snapshots().listen(
+      (doc) {
+        if (doc.data() != null) {
+          user.value = UserModel.fromJson(doc.data()!, doc.id);
+        }
+        isLoading.value = false;
+      },
+      onError: (error) {
+        // 🔒 Handle permission denied và các lỗi khác
+        _userSub?.cancel();
+        _userSub = null;
+        user.value = null;
+        isLoading.value = false;
+      },
+      cancelOnError: false,
+    );
   }
 
   String get fullName{
@@ -97,5 +113,21 @@ class ProfileController extends GetxController{
       "bio": newBio.trim(),
       "updatedAt": FieldValue.serverTimestamp(),
     });
+  }
+
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void cleanup() {
+    _userSub?.cancel();
+    _userSub = null;
+    user.value = null;
+    isLoading.value = false;
+  }
+
+  @override
+  void onClose() {
+    cleanup();
+    super.onClose();
   }
 }

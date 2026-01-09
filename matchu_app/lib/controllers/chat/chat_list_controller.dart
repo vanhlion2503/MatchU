@@ -216,10 +216,21 @@ class ChatListController extends GetxController
     lastMessagePreviewCache.clear();
   }
 
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void cleanup() {
+    _sub?.cancel();
+    _sub = null;
+    rooms.clear();
+    filteredRooms.clear();
+    lastMessagePreviewCache.clear();
+  }
+
   @override
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
-    _sub?.cancel();
+    cleanup();
     textController.dispose();
     focusNode.dispose();
     super.onClose();

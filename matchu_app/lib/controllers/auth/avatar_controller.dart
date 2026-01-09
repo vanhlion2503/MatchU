@@ -52,14 +52,23 @@ class AvatarController extends GetxController {
         .collection("users")
         .doc(_uid)
         .snapshots()
-        .listen((snap) {
-      if (!snap.exists) return;
+        .listen(
+      (snap) {
+        if (!snap.exists) return;
 
-      user.value = UserModel.fromJson(
-        snap.data()!,
-        snap.id,
-      );
-    });
+        user.value = UserModel.fromJson(
+          snap.data()!,
+          snap.id,
+        );
+      },
+      onError: (error) {
+        // 🔒 Handle permission denied và các lỗi khác
+        _userSub?.cancel();
+        _userSub = null;
+        user.value = null;
+      },
+      cancelOnError: false,
+    );
   }
 
 
@@ -176,9 +185,18 @@ class AvatarController extends GetxController {
   }
 
 
+  // ====================================================
+  // 🔥 CLEANUP FOR LOGOUT
+  // ====================================================
+  void cleanup() {
+    _userSub?.cancel();
+    _userSub = null;
+    user.value = null;
+  }
+
   @override
   void onClose() {
-    _userSub?.cancel();
+    cleanup();
     super.onClose();
   }
 }

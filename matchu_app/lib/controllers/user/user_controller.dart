@@ -68,13 +68,45 @@ class UserController extends GetxController {
   // ====================================================
   // 🔥 BIND USER REALTIME
   // ====================================================
-  void _bindUser(String uid) {
+  void _bindUser(String uid) async {
     _userSub?.cancel();
 
-    _userSub = _service.streamUser(uid).listen((user) {
-      userRx.value = user;
-    });
+    // 🔒 Kiểm tra user còn đăng nhập không
+    if (_auth.currentUser == null) return;
+
+    // 🔒 thử get 1 lần trước
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (!snap.exists) return;
+    } catch (e) {
+      return;
+    }
+
+    _userSub = _service.streamUser(uid).listen(
+      (user) {
+        // 🔒 Kiểm tra lại user còn đăng nhập không khi nhận data
+        if (_auth.currentUser == null) {
+          _userSub?.cancel();
+          userRx.value = null;
+          return;
+        }
+        userRx.value = user;
+      },
+      onError: (error) {
+        // 🔒 Handle permission denied và các lỗi khác
+        // Không crash app, chỉ cancel stream và clear state
+        _userSub?.cancel();
+        _userSub = null;
+        userRx.value = null;
+      },
+      cancelOnError: false, // Không tự động cancel để có thể handle
+    );
   }
+
 
   // ====================================================
   // GETTERS TIỆN DÙNG CHO UI
