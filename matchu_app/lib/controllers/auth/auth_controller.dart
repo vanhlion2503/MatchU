@@ -118,7 +118,37 @@ class AuthController extends GetxController {
     try {
       final snap = await _auth.db.collection('users').doc(u.uid).get();
 
-      final completed = snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
+      if (!snap.exists) {
+        Get.offAllNamed('/complete-profile');
+        return;
+      }
+
+      final data = snap.data()!;
+      
+      // ✅ Check flag isProfileCompleted trước (nếu đã set thì coi như completed)
+      final isProfileCompletedFlag = data['isProfileCompleted'] == true;
+      
+      // ✅ Check các fields cần thiết (nếu có đủ fields thì coi như completed)
+      final hasFullname = data['fullname'] != null && (data['fullname'] as String).isNotEmpty;
+      final hasNickname = data['nickname'] != null && (data['nickname'] as String).isNotEmpty;
+      final hasBirthday = data['birthday'] != null;
+      final hasGender = data['gender'] != null && (data['gender'] as String).isNotEmpty;
+      
+      // Completed nếu flag = true HOẶC có đủ fields
+      final completed = isProfileCompletedFlag || (hasFullname && hasNickname && hasBirthday && hasGender);
+
+      // 🔍 Debug logging
+      if (!completed) {
+        print("🔍 Profile not completed:");
+        print("  - isProfileCompletedFlag: $isProfileCompletedFlag");
+        print("  - hasFullname: $hasFullname (${data['fullname']})");
+        print("  - hasNickname: $hasNickname (${data['nickname']})");
+        print("  - hasBirthday: $hasBirthday (${data['birthday']})");
+        print("  - hasGender: $hasGender (${data['gender']})");
+      }
+
+      // 🔐 Generate identity key cho thiết bị mới (nếu chưa có)
+      await IdentityKeyService.generateIfNotExists();
 
       if (completed) {
         Get.offAllNamed('/main');
@@ -126,6 +156,7 @@ class AuthController extends GetxController {
         Get.offAllNamed('/complete-profile');
       }
     } catch (e) {
+      print("❌ Error checking profile: $e");
       Get.offAllNamed('/welcome');
     }
   }
@@ -408,8 +439,39 @@ class AuthController extends GetxController {
       final snap =
           await _auth.db.collection('users').doc(user.uid).get();
 
-      final completed =
-          snap.exists && (snap.data()?['isProfileCompleted'] ?? false);
+      if (!snap.exists) {
+        // 🔐 Generate identity key cho thiết bị mới (nếu chưa có)
+        await IdentityKeyService.generateIfNotExists();
+        Get.toNamed('/complete-profile');
+        return;
+      }
+
+      final data = snap.data()!;
+      
+      // ✅ Check flag isProfileCompleted trước (nếu đã set thì coi như completed)
+      final isProfileCompletedFlag = data['isProfileCompleted'] == true;
+      
+      // ✅ Check các fields cần thiết (nếu có đủ fields thì coi như completed)
+      final hasFullname = data['fullname'] != null && (data['fullname'] as String).isNotEmpty;
+      final hasNickname = data['nickname'] != null && (data['nickname'] as String).isNotEmpty;
+      final hasBirthday = data['birthday'] != null;
+      final hasGender = data['gender'] != null && (data['gender'] as String).isNotEmpty;
+      
+      // Completed nếu flag = true HOẶC có đủ fields
+      final completed = isProfileCompletedFlag || (hasFullname && hasNickname && hasBirthday && hasGender);
+
+      // 🔍 Debug logging
+      if (!completed) {
+        print("🔍 Profile not completed (confirmLogOtp):");
+        print("  - isProfileCompletedFlag: $isProfileCompletedFlag");
+        print("  - hasFullname: $hasFullname (${data['fullname']})");
+        print("  - hasNickname: $hasNickname (${data['nickname']})");
+        print("  - hasBirthday: $hasBirthday (${data['birthday']})");
+        print("  - hasGender: $hasGender (${data['gender']})");
+      }
+
+      // 🔐 Generate identity key cho thiết bị mới (nếu chưa có)
+      await IdentityKeyService.generateIfNotExists();
 
       if (completed) {
         Get.offAllNamed('/main');

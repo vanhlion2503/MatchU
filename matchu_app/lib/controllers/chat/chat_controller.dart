@@ -68,6 +68,7 @@ class ChatController extends GetxController {
   final RxMap<String, String> decryptedCache = <String, String>{}.obs;
   final Set<String> _decrypting = {};
   StreamSubscription? _sessionKeySub;
+  StreamSubscription? _sessionKeyListenerSub; // Realtime listener cho session key
 
   @override
   void onInit() {
@@ -433,6 +434,12 @@ class ChatController extends GetxController {
 
     final reply = replyingMessage.value;
 
+    final hasKey = await SessionKeyService.hasLocalSessionKey(roomId);
+    if (!hasKey) {
+      Get.snackbar("🔐", "Đang thiết lập mã hóa, vui lòng đợi...");
+      return;
+    }
+
     await _service.sendMessage(
       roomId: roomId,
       text: text,
@@ -555,6 +562,10 @@ class ChatController extends GetxController {
       decryptedCache[messageId] = text;
     } catch (e) {
       debugPrint("❌ Decrypt failed [$messageId]: $e");
+      // 🔍 Debug: Kiểm tra session key có tồn tại không
+      final hasKey = await SessionKeyService.hasLocalSessionKey(roomId);
+      debugPrint("🔍 Session key exists: $hasKey");
+      
       decryptedCache[messageId] = "⚠️ Không thể giải mã tin nhắn";
     } finally {
       _decrypting.remove(messageId);
@@ -562,42 +573,73 @@ class ChatController extends GetxController {
   }
 
   Future<void> _ensureSessionKey() async {
-    // 1️⃣ đã có local key → xong
+    // 1️⃣ load room state để lấy participants
+    final roomSnap = await _service.getRoom(roomId);
+    final data = roomSnap.data()!;
+    final participants = List<String>.from(data["participants"] ?? []);
+
+    // 2️⃣ nếu đã có local key → đảm bảo phân phối cho tất cả thiết bị
     if (await SessionKeyService.hasLocalSessionKey(roomId)) {
-      debugPrint("🔐 Session key exists locally");
+      await SessionKeyService.ensureDistributedToAllDevices(
+        roomId: roomId,
+        participantUids: participants,
+      );
+      // 🔒 FIX VẤN ĐỀ 3: Notify listeners khi đã có key (app restart, storage đã có key)
+      SessionKeyService.notifyUpdated(roomId);
       return;
     }
 
-    // 2️⃣ thử nhận key từ Firestore
-    final received = await SessionKeyService.receiveSessionKey(
-      roomId: roomId,
-    );
-
+    // 3️⃣ try receive key từ server
+    final received = await SessionKeyService.receiveSessionKey(roomId: roomId);
     if (received) {
-      debugPrint("📥 Session key received from Firestore");
+      // Sau khi nhận key, đảm bảo phân phối cho các thiết bị khác
+      await SessionKeyService.ensureDistributedToAllDevices(
+        roomId: roomId,
+        participantUids: participants,
+      );
+      // notifyUpdated đã được gọi trong receiveSessionKey
       return;
     }
 
-    // 3️⃣ chỉ LEADER mới được tạo key
-    final other = otherUid.value;
-    if (other == null) {
-      debugPrint("⏳ otherUid not ready");
-      return;
-    }
-
-    // ✅ deterministic leader
-    final amILeader = uid.compareTo(other) < 0;
-
-    if (!amILeader) {
-      debugPrint("⏳ Waiting for session key from leader");
-      return;
-    }
-
-    debugPrint("🔐 I am leader → create session key");
+    // 4️⃣ chưa có key → tạo key mới (chỉ leader được phép tạo)
     await SessionKeyService.createAndSendSessionKey(
       roomId: roomId,
-      receiverUid: other,
+      participantUids: participants,
     );
+
+    // 5️⃣ 🔒 FIX VẤN ĐỀ 2: Nếu room đã có keys nhưng thiết bị mới chưa có key,
+    // listen realtime để nhận key khi thiết bị khác phân phối
+    if (!await SessionKeyService.hasLocalSessionKey(roomId)) {
+      final hasAnyKeys = await SessionKeyService.hasAnySessionKeys(roomId);
+      if (hasAnyKeys) {
+        print("🔒 Room đã có keys, listen realtime để nhận key...");
+        
+        // Cancel listener cũ nếu có
+        _sessionKeyListenerSub?.cancel();
+        
+        // Listen realtime cho session key (KHÔNG timeout - chờ device khác online)
+        _sessionKeyListenerSub = await SessionKeyService.listenForSessionKey(
+          roomId: roomId,
+          onKeyReceived: (success) async {
+            if (success) {
+              print("🔒 Đã nhận session key từ realtime listener");
+              _sessionKeyListenerSub?.cancel();
+              _sessionKeyListenerSub = null;
+              
+              // Đảm bảo phân phối cho các thiết bị khác
+              await SessionKeyService.ensureDistributedToAllDevices(
+                roomId: roomId,
+                participantUids: participants,
+              );
+            }
+          },
+        );
+        
+        // ⚠️ KHÔNG timeout - Device mới sẽ tiếp tục listen
+        // Khi device khác online và mở room, nó sẽ tự động phân phối key
+        print("🔒 Đang chờ device khác online để phân phối key...");
+      }
+    }
   }
 
 
@@ -613,6 +655,10 @@ class ChatController extends GetxController {
       _presence.unlistenExcept({});
     }
     _sessionKeySub?.cancel();
+    _sessionKeyListenerSub?.cancel();
+    decryptedCache.clear();
+    _decrypting.clear();
+    allMessages.clear();
     super.onClose();
   }
 }

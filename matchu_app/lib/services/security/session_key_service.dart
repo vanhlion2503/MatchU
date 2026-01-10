@@ -27,6 +27,11 @@ class SessionKeyService {
         .stream;
   }
 
+  /// Notify listeners that session key is available/updated
+  static void notifyUpdated(String roomId) {
+    _keyUpdateControllers[roomId]?.add(null);
+  }
+
   /// ===============================
   /// STEP 1 — CREATE AES KEY
   /// ===============================
@@ -38,22 +43,7 @@ class SessionKeyService {
   }
 
   /// ===============================
-  /// STEP 2 — LOAD PUBLIC KEY
-  /// ===============================
-  static Future<RSAPublicKey> _loadPublicKey(String otherUid) async {
-    final snap = await _db
-        .collection("users")
-        .doc(otherUid)
-        .collection("encryptionKeys")
-        .doc("identity")
-        .get();
-
-    final pem = snap.data()!["publicKey"] as String;
-    return _decodePublicKeyFromPem(pem);
-  }
-
-  /// ===============================
-  /// STEP 3 — RSA ENCRYPT
+  /// STEP 2 — RSA ENCRYPT
   /// ===============================
   static Uint8List _rsaEncrypt(
     Uint8List data,
@@ -67,39 +57,58 @@ class SessionKeyService {
   }
 
   /// ===============================
-  /// STEP 4 — SEND SESSION KEY
+  /// STEP 4 — SEND SESSION KEY (MULTI-DEVICE)
   /// ===============================
   static Future<void> createAndSendSessionKey({
     required String roomId,
-    required String receiverUid,
+    required List<String> participantUids,
   }) async {
-    final sessionKey = _generateAESKey();
-    final devices = await _getDevices(receiverUid);
-
-    for (final d in devices) {
-      final deviceId = d['deviceId'];
-      final publicKey = _decodePublicKeyFromPem(d['publicKey']);
-
-      final encrypted = _rsaEncrypt(sessionKey, publicKey);
-
-      await _db
-          .collection("chatRooms")
-          .doc(roomId)
-          .collection("sessionKeys")
-          .doc(deviceId)
-          .set({
-        "userId": receiverUid,
-        "encryptedKey": base64Encode(encrypted),
-        "createdAt": FieldValue.serverTimestamp(),
-      });
+    // 🔒 Kiểm tra xem đã có session key local chưa (không rotate key)
+    if (await hasLocalSessionKey(roomId)) {
+      // Nếu đã có key, chỉ đảm bảo phân phối cho tất cả thiết bị
+      await ensureDistributedToAllDevices(
+        roomId: roomId,
+        participantUids: participantUids,
+      );
+      return;
     }
 
-    // lưu local cho device hiện tại
+    // 🔒 QUAN TRỌNG: Kiểm tra xem room đã có session keys trong Firestore chưa
+    // Nếu đã có → không tạo key mới (vì tất cả thiết bị phải dùng cùng 1 key)
+    // Thiết bị khác sẽ phân phối lại key cho thiết bị mới qua ensureDistributedToAllDevices
+    if (await hasAnySessionKeys(roomId)) {
+      print("🔒 Room $roomId đã có session keys, không tạo key mới");
+      return;
+    }
+
+    // 🔒 FIX RACE CONDITION: Chỉ cho phép leader (uid nhỏ nhất) tạo key
+    final sorted = [...participantUids]..sort();
+    final leaderUid = sorted.first;
+
+    if (uid != leaderUid) {
+      // Không phải leader → chỉ receive, không tạo key
+      print("🔒 Không phải leader ($leaderUid), không tạo key mới");
+      return;
+    }
+
+    // Room chưa có key nào → leader tạo key mới
+    print("🔒 Leader tạo session key cho room $roomId");
+    final sessionKey = _generateAESKey();
+    await _distributeSessionKeyToDevices(
+      roomId: roomId,
+      sessionKey: sessionKey,
+      participantUids: participantUids,
+    );
+
     await _storage.write(
       key: "chat_${roomId}_session_key",
       value: base64Encode(sessionKey),
     );
+
+    // Notify listeners
+    notifyUpdated(roomId);
   }
+
 
 
 
@@ -120,6 +129,14 @@ class SessionKeyService {
 
     if (!snap.exists) return false;
 
+    return await _decryptAndSaveSessionKey(roomId: roomId, snap: snap);
+  }
+
+  /// Decrypt và save session key từ snapshot
+  static Future<bool> _decryptAndSaveSessionKey({
+    required String roomId,
+    required DocumentSnapshot<Map<String, dynamic>> snap,
+  }) async {
     final encrypted = base64Decode(snap["encryptedKey"]);
     final privateKeyPem = await IdentityKeyService.readPrivateKey();
     if (privateKeyPem == null) return false;
@@ -129,15 +146,54 @@ class SessionKeyService {
     final cipher = OAEPEncoding.withSHA256(RSAEngine())
       ..init(false, PrivateKeyParameter<RSAPrivateKey>(privateKey));
 
-    final sessionKey = _processInBlocks(cipher, encrypted);
+    try {
+      final sessionKey = _processInBlocks(cipher, encrypted);
 
-    await _storage.write(
-      key: "chat_${roomId}_session_key",
-      value: base64Encode(sessionKey),
-    );
+      // 🔒 Validate session key length (AES-256 = 32 bytes)
+      if (sessionKey.length != 32) {
+        print("❌ Invalid session key length: ${sessionKey.length}, expected 32");
+        print("🔍 Encrypted key length: ${encrypted.length}");
+        return false;
+      }
 
-    _keyUpdateControllers[roomId]?.add(null);
-    return true;
+      await _storage.write(
+        key: "chat_${roomId}_session_key",
+        value: base64Encode(sessionKey),
+      );
+
+      notifyUpdated(roomId);
+      return true;
+    } catch (e) {
+      print("❌ RSA decrypt failed: $e");
+      return false;
+    }
+  }
+
+  /// Listen realtime cho session key của device hiện tại
+  /// Return StreamSubscription, cancel khi không cần nữa
+  static Future<StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>> listenForSessionKey({
+    required String roomId,
+    required Function(bool success) onKeyReceived,
+  }) async {
+    final deviceId = await DeviceService.getDeviceId();
+    
+    final stream = _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("sessionKeys")
+        .doc(deviceId)
+        .snapshots();
+
+    return stream.listen((snap) async {
+      if (snap.exists && snap.data() != null) {
+        print("🔒 Session key document created/updated for device $deviceId");
+        final success = await _decryptAndSaveSessionKey(roomId: roomId, snap: snap);
+        onKeyReceived(success);
+      }
+    }, onError: (e) {
+      print("❌ Error listening for session key: $e");
+      onKeyReceived(false);
+    });
   }
 
 
@@ -204,6 +260,91 @@ class SessionKeyService {
   static Future<bool> hasLocalSessionKey(String roomId) async {
     final key = await _storage.read(key: "chat_${roomId}_session_key");
     return key != null;
+  }
+
+  /// Kiểm tra xem room đã có session keys trong Firestore chưa
+  static Future<bool> hasAnySessionKeys(String roomId) async {
+    final snap = await _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("sessionKeys")
+        .limit(1)
+        .get();
+    return snap.docs.isNotEmpty;
+  }
+
+  static Future<Uint8List?> _readLocalSessionKey(String roomId) async {
+    final key = await _storage.read(key: "chat_${roomId}_session_key");
+    if (key == null) return null;
+    return base64Decode(key);
+  }
+
+  /// Đảm bảo session key được phân phối cho tất cả thiết bị của participants
+  static Future<void> ensureDistributedToAllDevices({
+    required String roomId,
+    required List<String> participantUids,
+  }) async {
+    final sessionKey = await _readLocalSessionKey(roomId);
+    if (sessionKey == null) return;
+
+    await _distributeSessionKeyToDevices(
+      roomId: roomId,
+      sessionKey: sessionKey,
+      participantUids: participantUids,
+    );
+  }
+
+  /// Phân phối session key cho tất cả thiết bị của participants
+  static Future<void> _distributeSessionKeyToDevices({
+    required String roomId,
+    required Uint8List sessionKey,
+    required List<String> participantUids,
+  }) async {
+    final uniqueParticipants = participantUids.toSet();
+    int distributedCount = 0;
+    int skippedCount = 0;
+
+    for (final participantUid in uniqueParticipants) {
+      final devices = await _getDevices(participantUid);
+
+      for (final d in devices) {
+        final deviceId = d['deviceId'];
+        final publicKeyPem = d['publicKey'];
+        if (deviceId == null || publicKeyPem == null) continue;
+
+        final docRef = _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .doc(deviceId);
+
+        // 🔒 Kiểm tra xem device đã có session key chưa (không ghi đè)
+        final existing = await docRef.get();
+        if (existing.exists) {
+          skippedCount++;
+          continue; // Đã có key, bỏ qua
+        }
+
+        try {
+          await docRef.set({
+            "userId": participantUid,
+            "encryptedKey": base64Encode(
+              _rsaEncrypt(sessionKey, _decodePublicKeyFromPem(publicKeyPem)),
+            ),
+            "createdAt": FieldValue.serverTimestamp(),
+          });
+          distributedCount++;
+          print("🔒 Distributed session key to device $deviceId (user: $participantUid)");
+        } catch (e) {
+          // Log error nhưng không throw - tiếp tục với device khác
+          print("🔒 sessionKey write error for $deviceId: $e");
+        }
+      }
+    }
+
+    if (distributedCount > 0 || skippedCount > 0) {
+      print("🔒 Distribution summary: $distributedCount distributed, $skippedCount skipped");
+    }
   }
 
   static Future<List<Map<String, dynamic>>> _getDevices(String uid) async {

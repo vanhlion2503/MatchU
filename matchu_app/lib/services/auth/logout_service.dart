@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:matchu_app/controllers/chat/chat_controller.dart';
 
 import '../../controllers/user/user_controller.dart';
 import '../../controllers/chat/anonymous_avatar_controller.dart';
@@ -10,6 +11,7 @@ import '../../controllers/chat/unread_controller.dart';
 import '../../controllers/chat/chat_list_controller.dart';
 import '../../controllers/profile/profile_controller.dart';
 import '../../controllers/auth/avatar_controller.dart';
+import '../../services/user/presence_service.dart';
 
 class LogoutService {
   static final _auth = FirebaseAuth.instance;
@@ -17,13 +19,35 @@ class LogoutService {
 
   /// 🔥 LOGOUT CHUẨN – DÙNG CHO TOÀN APP
   static Future<void> logout() async {
+    // 🔥 LẤY UID TRƯỚC KHI LOGOUT (QUAN TRỌNG!)
+    final currentUser = _auth.currentUser;
+    final uid = currentUser?.uid;
+    
     try {
-      // 1️⃣ Update offline (Firestore) - TRƯỚC KHI DỪNG CÁC SERVICES
-      if (_auth.currentUser != null) {
+      // 1️⃣ Update offline (Firestore + Realtime Database) - TRƯỚC KHI DỪNG CÁC SERVICES
+      if (currentUser != null && uid != null) {
         try {
+          // 1️⃣.1️⃣ Update Firestore offline
           if (Get.isRegistered<UserController>()) {
-            await Get.find<UserController>()
-                .updateProfile({"activeStatus": "offline"});
+            try {
+              await Get.find<UserController>()
+                  .updateProfile({"activeStatus": "offline"});
+            } catch (e) {
+              // Ignore errors - continue
+            }
+          }
+          
+          // 1️⃣.2️⃣ Update Realtime Database offline (QUAN TRỌNG!)
+          // 🔥 PHẢI SET OFFLINE TRƯỚC KHI SIGN OUT!
+          try {
+            await PresenceService.setOffline();
+          } catch (e) {
+            // Nếu có lỗi, thử set offline với uid trực tiếp
+            try {
+              await PresenceService.setOfflineForUid(uid);
+            } catch (_) {
+              // Ignore - đã cố gắng hết cách
+            }
           }
         } catch (e) {
           // Ignore errors - continue with logout
@@ -111,6 +135,12 @@ class LogoutService {
           // Ignore errors - continue with logout
         }
       }
+
+      // 7️⃣.5️⃣ 🔥 HUỶ TẤT CẢ CHAT CONTROLLERS
+      try {
+        Get.delete<ChatController>(force: true);
+      } catch (_) {}
+
 
       // 8️⃣ ❗ CLEAR SESSION KEYS (KHÔNG XOÁ IDENTITY KEY)
       try {

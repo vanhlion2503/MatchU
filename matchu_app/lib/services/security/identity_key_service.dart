@@ -14,15 +14,18 @@ class IdentityKeyService {
   static final _storage = FlutterSecureStorage();
   static final _db = FirebaseFirestore.instance;
 
-  static String _privateKeyKey(String deviceId)=> 'identity_private_key_$deviceId';
-
+  static String _privateKeyKey(String uid, String deviceId) => 'identity_${uid}_$deviceId';
 
   /// ===============================
   /// CHECK EXIST
   /// ===============================
   static Future<bool> hasIdentityKey() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
     final deviceId = await DeviceService.getDeviceId();
-    final key = await _storage.read(key: _privateKeyKey(deviceId));
+
+    final key = await _storage.read(
+      key: _privateKeyKey(uid, deviceId),
+    );
     return key != null;
   }
 
@@ -31,40 +34,33 @@ class IdentityKeyService {
   /// GENERATE RSA 2048
   /// ===============================
   static Future<void> generateIfNotExists() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
     final deviceId = await DeviceService.getDeviceId();
-    final keyKey = _privateKeyKey(deviceId);
+    final keyKey = _privateKeyKey(uid, deviceId);
 
     final exists = await _storage.read(key: keyKey);
     if (exists != null) return;
 
     final pair = _generateRSAKeyPair();
 
-    final privatePem =
-        _encodePrivateKeyToPem(pair.privateKey as RSAPrivateKey);
-    final publicPem =
-        _encodePublicKeyToPem(pair.publicKey as RSAPublicKey);
-
-    // 🔐 lưu private key THEO DEVICE
     await _storage.write(
       key: keyKey,
-      value: privatePem,
+      value: _encodePrivateKeyToPem(pair.privateKey as RSAPrivateKey),
     );
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-
-    // 🌍 upload public key THEO DEVICE
     await _db
         .collection('users')
         .doc(uid)
         .collection('devices')
         .doc(deviceId)
         .set({
-      'publicKey': publicPem,
+      'publicKey': _encodePublicKeyToPem(pair.publicKey as RSAPublicKey),
       'algorithm': 'RSA-2048',
       'createdAt': FieldValue.serverTimestamp(),
       'lastActiveAt': FieldValue.serverTimestamp(),
     });
   }
+
 
 
   /// ===============================
@@ -137,9 +133,14 @@ class IdentityKeyService {
   }
 
   static Future<String?> readPrivateKey() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
     final deviceId = await DeviceService.getDeviceId();
-    return _storage.read(key: _privateKeyKey(deviceId));
+
+    return _storage.read(
+      key: _privateKeyKey(uid, deviceId),
+    );
   }
+
 
 
 }

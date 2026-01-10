@@ -59,20 +59,30 @@ class MessageCryptoService {
   }) async {
     final key = await _loadSessionKey(roomId);
 
-    final cipher = GCMBlockCipher(AESFastEngine())
-      ..init(
-        false,
-        AEADParameters(
-          KeyParameter(key),
-          128,
-          base64Decode(iv),
-          Uint8List(0),
-        ),
-      );
-    
-    final decrypted = cipher.process(base64Decode(ciphertext));
+    // 🔒 Validate key length
+    if (key.length != 32) {
+      throw Exception("Invalid session key length: ${key.length}, expected 32");
+    }
 
-    return utf8.decode(decrypted);
+    try {
+      final cipher = GCMBlockCipher(AESFastEngine())
+        ..init(
+          false,
+          AEADParameters(
+            KeyParameter(key),
+            128,
+            base64Decode(iv),
+            Uint8List(0),
+          ),
+        );
+      
+      final decrypted = cipher.process(base64Decode(ciphertext));
+
+      return utf8.decode(decrypted);
+    } catch (e) {
+      // Re-throw với thông tin chi tiết hơn
+      throw Exception("AES-GCM decrypt failed: $e");
+    }
   }
 
   static Uint8List _randomBytes(int length){
