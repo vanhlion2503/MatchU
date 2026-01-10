@@ -37,9 +37,18 @@ class UnreadController extends GetxController {
   void _bindUnread() {
     _sub?.cancel();
 
-    _sub = _service.listenTotalUnread().listen((count) {
-      totalUnread.value = count;
-    });
+    _sub = _service.listenTotalUnread().listen(
+      (count) {
+        totalUnread.value = count;
+      },
+      onError: (error) {
+        // 🔒 Handle permission denied và các lỗi khác (có thể xảy ra khi logout)
+        _sub?.cancel();
+        _sub = null;
+        totalUnread.value = 0;
+      },
+      cancelOnError: false,
+    );
   }
 
   // ====================================================

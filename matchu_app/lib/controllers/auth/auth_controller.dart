@@ -4,9 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/services/auth/auth_service.dart';
 import 'package:matchu_app/services/auth/logout_service.dart';
@@ -32,6 +34,8 @@ class AuthController extends GetxController {
   final RxString fullPhoneNumber = ''.obs;
   final Rx<DateTime?> selectedBirthday = Rx<DateTime?>(null);
   final RxString selectedGender = ''.obs;
+  final _box = GetStorage();
+
 
   // ========= UI STATE =========
   final isPasswordHidden = true.obs;
@@ -66,10 +70,8 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-
     // Lắng nghe trạng thái đăng nhập nhưng KHÔNG redirect
     _userRx.bindStream(_auth.authStateChanges);
-    // checkInitialLogin();
   }
 
   void updateBirthdayIfReady() {
@@ -107,65 +109,11 @@ class AuthController extends GetxController {
     updateBirthdayIfReady();
   }
 
-  Future<void> checkInitialLogin() async {
-    final u = FirebaseAuth.instance.currentUser;
-
-    if (u == null) {
-      Get.offAllNamed('/welcome');
-      return;
-    }
-
-    try {
-      final snap = await _auth.db.collection('users').doc(u.uid).get();
-
-      if (!snap.exists) {
-        Get.offAllNamed('/complete-profile');
-        return;
-      }
-
-      final data = snap.data()!;
-      
-      // ✅ Check flag isProfileCompleted trước (nếu đã set thì coi như completed)
-      final isProfileCompletedFlag = data['isProfileCompleted'] == true;
-      
-      // ✅ Check các fields cần thiết (nếu có đủ fields thì coi như completed)
-      final hasFullname = data['fullname'] != null && (data['fullname'] as String).isNotEmpty;
-      final hasNickname = data['nickname'] != null && (data['nickname'] as String).isNotEmpty;
-      final hasBirthday = data['birthday'] != null;
-      final hasGender = data['gender'] != null && (data['gender'] as String).isNotEmpty;
-      
-      // Completed nếu flag = true HOẶC có đủ fields
-      final completed = isProfileCompletedFlag || (hasFullname && hasNickname && hasBirthday && hasGender);
-
-      // 🔍 Debug logging
-      if (!completed) {
-        print("🔍 Profile not completed:");
-        print("  - isProfileCompletedFlag: $isProfileCompletedFlag");
-        print("  - hasFullname: $hasFullname (${data['fullname']})");
-        print("  - hasNickname: $hasNickname (${data['nickname']})");
-        print("  - hasBirthday: $hasBirthday (${data['birthday']})");
-        print("  - hasGender: $hasGender (${data['gender']})");
-      }
-
-      // 🔐 Generate identity key cho thiết bị mới (nếu chưa có)
-      await IdentityKeyService.generateIfNotExists();
-
-      if (completed) {
-        Get.offAllNamed('/main');
-      } else {
-        Get.offAllNamed('/complete-profile');
-      }
-    } catch (e) {
-      print("❌ Error checking profile: $e");
-      Get.offAllNamed('/welcome');
-    }
-  }
-
-
   // =============================================================
   //                      REGISTER ACCOUNT
   // =============================================================
   Future<void> register() async {
+    _box.write('isRegistering', true); 
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
@@ -337,6 +285,7 @@ class AuthController extends GetxController {
       isLoadingRegister.value = false;
 
       await logoutC();
+      _box.remove('isRegistering');
       Get.offAllNamed('/');
 
     } on FirebaseAuthException catch (e) {
@@ -422,68 +371,26 @@ class AuthController extends GetxController {
     isLoadingLogin.value = true;
 
     try {
-      // Xác thực MFA OTP
+      // ✅ CHỈ XÁC THỰC OTP
       await _auth.confirmLoginOtp(
         e: _mfaException!,
         verificationId: loginVerificationId!,
         smsCode: otpC.text.trim(),
       );
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        Get.snackbar("Lỗi", "Đăng nhập thất bại");
-        return;
-      }
+      // ❌ KHÔNG kiểm tra currentUser
+      // ❌ KHÔNG Get.to / Get.off ở đây
+      // ✅ AuthGateController sẽ tự xử lý authStateChanges
 
-      // Kiểm tra hồ sơ
-      final snap =
-          await _auth.db.collection('users').doc(user.uid).get();
-
-      if (!snap.exists) {
-        // 🔐 Generate identity key cho thiết bị mới (nếu chưa có)
-        await IdentityKeyService.generateIfNotExists();
-        Get.toNamed('/complete-profile');
-        return;
-      }
-
-      final data = snap.data()!;
-      
-      // ✅ Check flag isProfileCompleted trước (nếu đã set thì coi như completed)
-      final isProfileCompletedFlag = data['isProfileCompleted'] == true;
-      
-      // ✅ Check các fields cần thiết (nếu có đủ fields thì coi như completed)
-      final hasFullname = data['fullname'] != null && (data['fullname'] as String).isNotEmpty;
-      final hasNickname = data['nickname'] != null && (data['nickname'] as String).isNotEmpty;
-      final hasBirthday = data['birthday'] != null;
-      final hasGender = data['gender'] != null && (data['gender'] as String).isNotEmpty;
-      
-      // Completed nếu flag = true HOẶC có đủ fields
-      final completed = isProfileCompletedFlag || (hasFullname && hasNickname && hasBirthday && hasGender);
-
-      // 🔍 Debug logging
-      if (!completed) {
-        print("🔍 Profile not completed (confirmLogOtp):");
-        print("  - isProfileCompletedFlag: $isProfileCompletedFlag");
-        print("  - hasFullname: $hasFullname (${data['fullname']})");
-        print("  - hasNickname: $hasNickname (${data['nickname']})");
-        print("  - hasBirthday: $hasBirthday (${data['birthday']})");
-        print("  - hasGender: $hasGender (${data['gender']})");
-      }
-
-      // 🔐 Generate identity key cho thiết bị mới (nếu chưa có)
-      await IdentityKeyService.generateIfNotExists();
-
-      if (completed) {
-        Get.offAllNamed('/main');
-      } else {
-        Get.toNamed('/complete-profile');
-      }
+    } on FirebaseAuthException catch (e) {
+      Get.snackbar("OTP sai", e.message ?? "Xác thực thất bại");
     } catch (e) {
-      Get.snackbar("OTP sai", e.toString());
+      Get.snackbar("Lỗi", e.toString());
     } finally {
       isLoadingLogin.value = false;
     }
   }
+
 
   Future<void> pickTempAvatar(ImageSource source) async {
     final picker = ImagePicker();
@@ -590,8 +497,13 @@ class AuthController extends GetxController {
   //                        LOGOUT
   // =============================================================
   Future<void> logoutC() async {
+    if (Get.isRegistered<AuthGateController>()) {
+      Get.find<AuthGateController>().reset();
+    }
+
     await LogoutService.logout();
   }
+
   // =============================================================
   //                        DISPOSE
   // =============================================================

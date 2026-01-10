@@ -2,13 +2,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/route_manager.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:matchu_app/controllers/auth/avatar_controller.dart';
+import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
-import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
-import 'package:matchu_app/controllers/chat/unread_controller.dart';
+import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/controllers/system/app_lifecycle_controller.dart';
-import 'package:matchu_app/controllers/user/presence_controller.dart';
-import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -16,7 +13,6 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/system/theme_controller.dart';
 import 'package:matchu_app/widgets/global_matching_bubble.dart';
-import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 
 
@@ -30,9 +26,9 @@ void main() async {
 
   // ✅ 2. ACTIVATE APP CHECK (SAU FIREBASE)
   await FirebaseAppCheck.instance.activate(
-  androidProvider: AndroidProvider.playIntegrity,
-  appleProvider: AppleProvider.appAttest,
-);
+    androidProvider: AndroidProvider.debug,
+    appleProvider: AppleProvider.debug,
+  );
 
   // ✅ 3. LOCAL STORAGE
   await GetStorage.init();
@@ -40,14 +36,10 @@ void main() async {
   // ✅ 4. GLOBAL CONTROLLERS
   Get.put(ThemeController(), permanent: true);
   Get.put(AuthController(), permanent: true);
+  Get.put(AuthGateController(), permanent: true);
   Get.put(AppLifecycleController(), permanent: true);
-  Get.put(MatchingController(), permanent: true);
-  Get.put(AvatarController(), permanent: true);
   Get.put(AnonymousAvatarController(), permanent: true);
-  Get.put(UserController(), permanent: true);
-  Get.put(ChatUserCacheController(), permanent: true);
-  Get.put(UnreadController(), permanent: true);
-  Get.put(PresenceController(), permanent: true);
+  Get.put(MatchingController(), permanent: true);
 
   runApp(const MyApp());
 }

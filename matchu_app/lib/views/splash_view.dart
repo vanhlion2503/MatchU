@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 
 class SplashView extends StatefulWidget {
@@ -30,11 +31,14 @@ class _SplashViewState extends State<SplashView>
 
     _controller.forward();
 
-    Future.delayed(const Duration(milliseconds: 1200), () async {
-      final authC = Get.put(AuthController(), permanent: true);
-      await authC.checkInitialLogin();
+    // 🔥 SAU FRAME ĐẦU TIÊN → UI SẴN SÀNG
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!Get.isRegistered<AuthGateController>()) {
+        Get.put(AuthGateController(), permanent: true);
+      }
     });
   }
+
 
   @override
   void dispose() {

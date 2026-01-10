@@ -154,14 +154,13 @@ class LogoutService {
         // Ignore errors - continue with logout
       }
 
+      // 8️⃣.5️⃣ 🔥 ĐỢI MỘT CHÚT ĐỂ ĐẢM BẢO TẤT CẢ LISTENERS ĐÃ ĐƯỢC CANCEL
+      // Tránh race condition khi signOut() được gọi trong khi listeners còn active
+      await Future.delayed(const Duration(milliseconds: 100));
+
       // 9️⃣ Firebase sign out
       await _auth.signOut();
-
-      // 🔟 Điều hướng
-      Get.offAllNamed('/');
     } catch (e) {
-      // Đảm bảo luôn điều hướng ngay cả khi có lỗi
-      Get.offAllNamed('/');
     }
   }
 }

@@ -1,8 +1,12 @@
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/auth/avatar_controller.dart';
+import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
+import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
+import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/auth/enroll_phone_view.dart';
 import 'package:matchu_app/views/auth/forgot_password_view.dart';
@@ -83,6 +87,17 @@ class AppPages {
       page: ()=> MainView(),
       binding: BindingsBuilder((){
         Get.put(MainController());
+
+        // 🔹 User-related (CHỈ INIT SAU LOGIN)
+        Get.put(UserController());
+        Get.put(PresenceController());
+        Get.put(UnreadController());
+
+        // 🔹 Chat / cache
+        Get.put(ChatUserCacheController());
+
+        // 🔹 Feature
+        Get.put(AvatarController());
       })
     ),
     GetPage(

@@ -19,8 +19,7 @@ class AvatarController extends GetxController {
   final user = Rxn<UserModel>();
   final isUploadingAvatar = false.obs;
 
-  static const String defaultAvatarUrl =
-  "https://firebasestorage.googleapis.com/v0/b/matchu-5bd75.firebasestorage.app/o/avatars%2Fplaceholder.png?alt=media";
+  static const String defaultAvatarUrl = "https://firebasestorage.googleapis.com/v0/b/matchu-5bd75.firebasestorage.app/o/avatars%2Fplaceholder.png?alt=media";
 
 
   // ===== SERVICES =====
