@@ -16,6 +16,15 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
   final c = Get.find<AnonymousAvatarController>();
   final ValueNotifier<double> _page = ValueNotifier(0);
 
+  int _safeInitialIndex() {
+    if (c.avatars.isEmpty) return 0;
+    final selected = c.selectedAvatar.value;
+    if (selected == null) return 0;
+    final index = c.avatars.indexOf(selected);
+    if (index < 0) return 0;
+    return index;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -23,29 +32,29 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
     ever<List<String>>(c.avatars, (_) {
       if (c.avatars.isEmpty) return;
 
-      final index = c.selectedAvatar.value == null
-          ? 0
-          : c.avatars.indexOf(c.selectedAvatar.value!);
+      final index = _safeInitialIndex();
+      final maxIndex = c.avatars.length - 1;
+      final targetIndex = maxIndex < 0 ? 0 : index.clamp(0, maxIndex);
 
-      _pageController.jumpToPage(
-        index.clamp(0, c.avatars.length - 1),
-      );
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(targetIndex);
+      }
 
-      _page.value = index.toDouble();
+      _page.value = targetIndex.toDouble();
     });
 
 
-    final initialIndex = c.selectedAvatar.value == null
-        ? 0
-        : c.avatars.indexOf(c.selectedAvatar.value!);
+    final initialIndex = _safeInitialIndex();
+    final maxIndex = c.avatars.length - 1;
+    final targetIndex = maxIndex < 0 ? 0 : initialIndex.clamp(0, maxIndex);
 
     _pageController = PageController(
-      initialPage: initialIndex.clamp(0, c.avatars.length - 1),
+      initialPage: targetIndex,
       viewportFraction: 0.55,
     );
 
-    // 🔥 DÒNG QUAN TRỌNG
-    _page.value = initialIndex.toDouble();
+    // ?? DONG QUAN TR?NG
+    _page.value = targetIndex.toDouble();
 
     _pageController.addListener(() {
       _page.value = _pageController.page ?? _page.value;
@@ -69,81 +78,88 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
         children: [
           SizedBox(
             height: 230,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: c.avatars.length,
-              onPageChanged: (i) {
-                c.selectAndSave(c.avatars[i]);
-              },
-              itemBuilder: (context, index) {
-                return ValueListenableBuilder<double>(
-                  valueListenable: _page,
-                  builder: (_, page, __) {
-                    final diff = (page - index).abs();
-                    final scale = (1 - diff * 0.35).clamp(0.75, 1.0);
-                    final opacity = (1 - diff * 0.6).clamp(0.4, 1.0);
+            child: Obx(() {
+              if (c.avatars.isEmpty) {
+                return const SizedBox();
+              }
+
+              return PageView.builder(
+                controller: _pageController,
+                itemCount: c.avatars.length,
+                onPageChanged: (i) {
+                  if (i < 0 || i >= c.avatars.length) return;
+                  c.selectAndSave(c.avatars[i]);
+                },
+                itemBuilder: (context, index) {
+                  return ValueListenableBuilder<double>(
+                    valueListenable: _page,
+                    builder: (_, page, __) {
+                      final diff = (page - index).abs();
+                      final scale = (1 - diff * 0.35).clamp(0.75, 1.0);
+                      final opacity = (1 - diff * 0.6).clamp(0.4, 1.0);
       
-                    final isSelected =
-                        c.selectedAvatar.value == c.avatars[index];
+                      final isSelected =
+                          c.selectedAvatar.value == c.avatars[index];
       
-                    return Center(
-                      child: Opacity(
-                        opacity: opacity,
-                        child: Transform.scale(
-                          scale: scale,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              if (isSelected)
-                                Container(
-                                  width: 150,
-                                  height: 150,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.cyanAccent.withOpacity(0.8),
-                                        blurRadius: 30,
-                                        spreadRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-      
-                              CircleAvatar(
-                                radius: isSelected ? 70 : 55,
-                                backgroundImage: AssetImage(
-                                  "assets/anonymous/${c.avatars[index]}.png",
-                                ),
-                              ),
-      
-                              if (isSelected)
-                                Positioned(
-                                  bottom: 8,
-                                  right: 8,
-                                  child: Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF2ED8FF),
+                      return Center(
+                        child: Opacity(
+                          opacity: opacity,
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (isSelected)
+                                  Container(
+                                    width: 150,
+                                    height: 150,
+                                    decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      color: Colors.black,
-                                      size: 18,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.cyanAccent.withOpacity(0.8),
+                                          blurRadius: 30,
+                                          spreadRadius: 6,
+                                        ),
+                                      ],
                                     ),
                                   ),
+      
+                                CircleAvatar(
+                                  radius: isSelected ? 70 : 55,
+                                  backgroundImage: AssetImage(
+                                    "assets/anonymous/${c.avatars[index]}.png",
+                                  ),
                                 ),
-                            ],
+      
+                                if (isSelected)
+                                  Positioned(
+                                    bottom: 8,
+                                    right: 8,
+                                    child: Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF2ED8FF),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.check,
+                                        color: Colors.black,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                      );
+                    },
+                  );
+                },
+              );
+            }),
           ),
           /// ===== NAME =====
           Obx(() {

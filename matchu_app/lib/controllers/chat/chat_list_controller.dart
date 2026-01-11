@@ -6,6 +6,7 @@ import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
+import 'package:matchu_app/services/security/session_key_service.dart';
 
 class ChatListController extends GetxController
     with WidgetsBindingObserver {
@@ -16,6 +17,8 @@ class ChatListController extends GetxController
   final RxList<ChatRoomModel> rooms = <ChatRoomModel>[].obs;
   final RxList<ChatRoomModel> filteredRooms = <ChatRoomModel>[].obs;
   final RxMap<String, String> lastMessagePreviewCache = <String, String>{}.obs;
+  final Map<String, _PreviewMeta> _previewMeta = {};
+  final Map<String, StreamSubscription<void>> _sessionKeySubs = {};
  
   final RxString searchText = "".obs;
 
@@ -86,15 +89,19 @@ class ChatListController extends GetxController
         .toList();
 
     final aliveUids = <String>{};
+    final visibleRoomIds = <String>{};
 
     for (final room in visible) {
       final otherUid = room.participants.firstWhere((e) => e != uid);
       userCache.loadIfNeeded(otherUid);
       presence.listen(otherUid);
+      visibleRoomIds.add(room.id);
+      _ensureSessionKeyListener(room.id);
       _loadLastMessagePreview(room);
     }
 
     presence.unlistenExcept(aliveUids);
+    _cleanupSessionKeyListeners(visibleRoomIds);
 
     visible.sort((a, b) {
       final ap = a.isPinned(uid);
@@ -192,29 +199,80 @@ class ChatListController extends GetxController
   }
 
   Future<void> _loadLastMessagePreview(ChatRoomModel room) async {
-    if(lastMessagePreviewCache.containsKey(room.id)) return;
+    await _loadLastMessagePreviewInternal(room);
+  }
 
-    if(room.lastMessageCipher == null || room.lastMessageIv == null) {
-      lastMessagePreviewCache[room.id] = room.lastMessage;
+  void _ensureSessionKeyListener(String roomId) {
+    if (_sessionKeySubs.containsKey(roomId)) return;
+
+    _sessionKeySubs[roomId] =
+        SessionKeyService.onSessionKeyUpdated(roomId).listen((_) async {
+      ChatRoomModel? room;
+      for (final r in rooms) {
+        if (r.id == roomId) {
+          room = r;
+          break;
+        }
+      }
+      if (room == null) return;
+      await _loadLastMessagePreviewInternal(room, force: true);
+    });
+  }
+
+  void _cleanupSessionKeyListeners(Set<String> aliveRoomIds) {
+    final toRemove = _sessionKeySubs.keys
+        .where((roomId) => !aliveRoomIds.contains(roomId))
+        .toList();
+
+    for (final roomId in toRemove) {
+      _sessionKeySubs[roomId]?.cancel();
+      _sessionKeySubs.remove(roomId);
+    }
+  }
+
+  Future<void> _loadLastMessagePreviewInternal(
+    ChatRoomModel room, {
+    bool force = false,
+  }) async {
+    final meta = _previewMeta[room.id];
+    final isSame = meta?.matches(room) == true;
+
+    if (!force &&
+        isSame &&
+        lastMessagePreviewCache.containsKey(room.id)) {
       return;
     }
 
-    try{
+    if (room.lastMessageCipher == null || room.lastMessageIv == null) {
+      lastMessagePreviewCache[room.id] = room.lastMessage;
+      _previewMeta[room.id] = _PreviewMeta.fromRoom(room);
+      if (searchText.value.trim().isNotEmpty) {
+        _applySearch();
+      }
+      return;
+    }
+
+    try {
       final text = await MessageCryptoService.decrypt(
-        roomId: room.id, 
-        ciphertext: room.lastMessageCipher!, 
+        roomId: room.id,
+        ciphertext: room.lastMessageCipher!,
         iv: room.lastMessageIv!,
         keyId: room.lastMessageKeyId,
       );
-
       lastMessagePreviewCache[room.id] = text;
-    }catch(e){
+    } catch (e) {
       lastMessagePreviewCache[room.id] = room.lastMessage;
+    } finally {
+      _previewMeta[room.id] = _PreviewMeta.fromRoom(room);
+      if (searchText.value.trim().isNotEmpty) {
+        _applySearch();
+      }
     }
   }
 
   void clearPreviewCache() {
     lastMessagePreviewCache.clear();
+    _previewMeta.clear();
   }
 
   Future<void> refreshLastMessagePreviews() async {
@@ -236,6 +294,11 @@ class ChatListController extends GetxController
     rooms.clear();
     filteredRooms.clear();
     lastMessagePreviewCache.clear();
+    _previewMeta.clear();
+    for (final sub in _sessionKeySubs.values) {
+      sub.cancel();
+    }
+    _sessionKeySubs.clear();
   }
 
   @override
@@ -245,5 +308,35 @@ class ChatListController extends GetxController
     textController.dispose();
     focusNode.dispose();
     super.onClose();
+  }
+}
+
+class _PreviewMeta {
+  final String? lastMessageCipher;
+  final String? lastMessageIv;
+  final int lastMessageKeyId;
+  final String lastMessage;
+
+  const _PreviewMeta({
+    required this.lastMessageCipher,
+    required this.lastMessageIv,
+    required this.lastMessageKeyId,
+    required this.lastMessage,
+  });
+
+  factory _PreviewMeta.fromRoom(ChatRoomModel room) {
+    return _PreviewMeta(
+      lastMessageCipher: room.lastMessageCipher,
+      lastMessageIv: room.lastMessageIv,
+      lastMessageKeyId: room.lastMessageKeyId,
+      lastMessage: room.lastMessage,
+    );
+  }
+
+  bool matches(ChatRoomModel room) {
+    return lastMessageCipher == room.lastMessageCipher &&
+        lastMessageIv == room.lastMessageIv &&
+        lastMessageKeyId == room.lastMessageKeyId &&
+        lastMessage == room.lastMessage;
   }
 }

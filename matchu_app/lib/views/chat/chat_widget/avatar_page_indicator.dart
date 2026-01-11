@@ -25,7 +25,11 @@ class AvatarPageIndicator extends StatelessWidget {
     // ===== offset theo page (continuous) =====
     double offset = -page * dotSpacing;
     final double maxOffset = trackWidth - viewportWidth;
-    offset = offset.clamp(-maxOffset, 0);
+    if (maxOffset <= 0) {
+      offset = 0;
+    } else {
+      offset = offset.clamp(-maxOffset, 0);
+    }
 
     return SizedBox(
       width: viewportWidth,

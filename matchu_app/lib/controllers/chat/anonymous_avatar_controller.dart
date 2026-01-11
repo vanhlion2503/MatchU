@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -41,6 +42,8 @@ class AnonymousAvatarController extends GetxController {
   final RxList<String> avatars = <String>[].obs;
   final selectedAvatar = RxnString();
   final RxnString gender = RxnString();
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSub;
+  String? _pendingAvatarKey;
 
   bool get isSelected => selectedAvatar.value != null;
 
@@ -66,7 +69,6 @@ class AnonymousAvatarController extends GetxController {
 
   void _applyGender(String g) {
     avatars.clear();
-    selectedAvatar.value = null;
 
     if (g == "male" || g == "nam") {
       avatars.assignAll(male.keys.toList());
@@ -77,7 +79,10 @@ class AnonymousAvatarController extends GetxController {
     }
 
     if (avatars.isNotEmpty) {
-      selectedAvatar.value = avatars.first;
+      final current = selectedAvatar.value;
+      if (current == null || !avatars.contains(current)) {
+        selectedAvatar.value = avatars.first;
+      }
     }
   }
 
@@ -86,6 +91,9 @@ class AnonymousAvatarController extends GetxController {
     avatars.clear();
     selectedAvatar.value = null;
     gender.value = null;
+    _pendingAvatarKey = null;
+    _userSub?.cancel();
+    _userSub = null;
   }
 
   // ====================================================
@@ -114,15 +122,25 @@ class AnonymousAvatarController extends GetxController {
     if (savedAvatar != null && avatars.contains(savedAvatar)) {
       selectedAvatar.value = savedAvatar;
     }
+
+    if (_pendingAvatarKey != null) {
+      await _commitPendingAvatar(uid);
+    }
+
+    _listenUserDoc(uid);
   }
 
 
   /// ===== CHỌN + LƯU AVATAR =====
   Future<void> selectAndSave(String avatarKey) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-
     selectedAvatar.value = avatarKey;
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) {
+      _pendingAvatarKey = avatarKey;
+      return;
+    }
+
+    _pendingAvatarKey = null;
 
     await _db.collection("users").doc(uid).update({
       "anonymousAvatar": avatarKey,
@@ -131,6 +149,45 @@ class AnonymousAvatarController extends GetxController {
   }
 
   /// ===== LẤY TÊN HIỂN THỊ (UI GỌI HÀM NÀY) =====
+
+  void _listenUserDoc(String uid) {
+    _userSub?.cancel();
+    _userSub = _db
+        .collection("users")
+        .doc(uid)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists) return;
+      final data = snap.data();
+      if (data == null) return;
+
+      final rawGender = data["gender"];
+      final newGender = rawGender?.toString().toLowerCase().trim();
+      if (newGender != null && newGender != gender.value) {
+        gender.value = newGender;
+      }
+
+      final savedAvatar = data["anonymousAvatar"];
+      if (savedAvatar != null && avatars.contains(savedAvatar)) {
+        selectedAvatar.value = savedAvatar;
+      }
+    });
+  }
+
+  Future<void> _commitPendingAvatar(String uid) async {
+    final pending = _pendingAvatarKey;
+    if (pending == null) return;
+
+    _pendingAvatarKey = null;
+    selectedAvatar.value = pending;
+
+    await _db.collection("users").doc(uid).update({
+      "anonymousAvatar": pending,
+      "updatedAt": FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Display name for avatar key
   String getAvatarName(String avatarKey) {
     if (gender.value == "male" || gender.value == "nam") {
       return male[avatarKey] ?? "Avatar ẩn danh";

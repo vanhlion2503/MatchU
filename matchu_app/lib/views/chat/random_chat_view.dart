@@ -60,6 +60,9 @@ class _RandomChatViewState extends State<RandomChatView>
     return Scaffold(
       backgroundColor: color.background,
       appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

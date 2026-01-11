@@ -25,6 +25,7 @@ class ChatRowPermanent extends StatelessWidget {
   final VoidCallback? onTapReply;
 
   final bool highlighted;
+  final bool isPressed;
 
   final MessageStatus? status;
   final String? seenByUid;
@@ -51,6 +52,7 @@ class ChatRowPermanent extends StatelessWidget {
     this.replyToId,
     this.onTapReply,
     this.highlighted = false,
+    this.isPressed = false,
     this.status,
     this.seenByUid,
     this.reactions,
@@ -91,10 +93,18 @@ class ChatRowPermanent extends StatelessWidget {
               ),
             if (!isMe) const SizedBox(width: 6),
 
-            AnimatedEmoji(
-              text: text,
-              highlighted: highlighted,
-              isMe: isMe,
+            GestureDetector(
+              onLongPress: onLongPress,
+              onDoubleTap: onDoubleTap,
+              child: Container(
+                key: bubbleKey,
+                child: AnimatedEmoji(
+                  text: text,
+                  highlighted: highlighted,
+                  pressed: isPressed,
+                  isMe: isMe,
+                ),
+              ),
             ),
           ],
         ),
@@ -178,6 +188,7 @@ class ChatRowPermanent extends StatelessWidget {
                               child: AnimatedBubble(
                                 isMe: isMe,
                                 highlighted: highlighted,
+                                pressed: isPressed,
                                 bubbleColor: bubbleColor,
                                 child: Text(
                                   text,
@@ -325,5 +336,3 @@ class _MessengerReactionBadge extends StatelessWidget {
     );
   }
 }
-
-

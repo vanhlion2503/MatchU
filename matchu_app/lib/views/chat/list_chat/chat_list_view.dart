@@ -90,7 +90,7 @@ class _ChatListViewState extends State<ChatListView> {
       final passcode = result.passcode ?? '';
       final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
       if (!unlocked) {
-        errorText = 'Ma PIN khong dung';
+        errorText = 'Mã pin không đúng';
         continue;
       }
 

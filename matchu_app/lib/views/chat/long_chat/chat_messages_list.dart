@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,6 +29,20 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
   // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
   final Map<String, GlobalKey> _bubbleKeys = {};
   OverlayEntry? _reactionEntry;
+  String? _activeReactionMessageId;
+
+  void _dismissReactionPicker({bool notify = true}) {
+    _reactionEntry?.remove();
+    _reactionEntry = null;
+
+    if (_activeReactionMessageId == null) return;
+
+    if (notify && mounted) {
+      setState(() => _activeReactionMessageId = null);
+    } else {
+      _activeReactionMessageId = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,6 +195,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                             final isMyLastMessage = isMe && messageIndex == 0;
 
                             final decryptedText = widget.controller.decryptedCache[doc.id] ?? "…";
+                            final isPressed = _activeReactionMessageId == doc.id;
 
                             return ChatRowPermanent(
                               key: ValueKey(doc.id), // 🔥 BẮT BUỘC
@@ -205,6 +221,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                               replyToId: data["replyToId"],
                               highlighted:
                                   widget.controller.highlightedMessageId.value == doc.id,
+                              isPressed: isPressed,
                               onTapReply: data["replyToId"] != null
                                   ? () => widget.controller.scrollToMessage(
                                         docs: docs,
@@ -354,12 +371,25 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     required bool isMe,
   }) {
     // Nếu đang mở → đóng cái cũ
-    _reactionEntry?.remove();
+    _dismissReactionPicker();
 
-    final box =
-        bubbleKey.currentContext!.findRenderObject() as RenderBox;
+    final bubbleContext = bubbleKey.currentContext;
+    if (bubbleContext == null) return;
+
+    setState(() => _activeReactionMessageId = messageId);
+
+    final box = bubbleContext.findRenderObject() as RenderBox;
     final pos = box.localToGlobal(Offset.zero);
     final size = box.size;
+
+    const holePadding = 8.0;
+    final holeRect = Rect.fromLTWH(
+      pos.dx - holePadding,
+      pos.dy - holePadding,
+      size.width + holePadding * 2,
+      size.height + holePadding * 2,
+    );
+    const holeRadius = 20.0;
 
     const pickerWidth = 270.0;
     const pickerHeight = 40.0;
@@ -372,14 +402,28 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     final top = pos.dy - pickerHeight - verticalGap;
 
     _reactionEntry = OverlayEntry(
-      builder: (_) => GestureDetector(
-        behavior: HitTestBehavior.translucent, // 👈 BẮT BUỘC
-        onTap: () {
-          _reactionEntry?.remove();
-          _reactionEntry = null;
-        },
+      builder: (_) => Material(
+        color: Colors.transparent,
         child: Stack(
           children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent, // ?? B?T BU?C
+                onTap: _dismissReactionPicker,
+                child: ClipPath(
+                  clipper: _HoleClipper(
+                    holeRect: holeRect,
+                    radius: holeRadius,
+                  ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                    child: Container(
+                      color: Colors.black.withOpacity(0.25),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               left: left.clamp(
                 8.0,
@@ -392,8 +436,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                     messageId: messageId,
                     reactionId: reactionId,
                   );
-                  _reactionEntry?.remove();
-                  _reactionEntry = null;
+                  _dismissReactionPicker();
                 },
               ),
             ),
@@ -405,5 +448,40 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     Overlay.of(context).insert(_reactionEntry!);
   }
 
+  @override
+  void dispose() {
+    _dismissReactionPicker(notify: false);
+    super.dispose();
+  }
 
+
+}
+
+class _HoleClipper extends CustomClipper<Path> {
+  final Rect holeRect;
+  final double radius;
+
+  const _HoleClipper({
+    required this.holeRect,
+    required this.radius,
+  });
+
+  @override
+  Path getClip(Size size) {
+    final path = Path()..fillType = PathFillType.evenOdd;
+    path.addRect(Offset.zero & size);
+    path.addRRect(
+      RRect.fromRectAndRadius(
+        holeRect,
+        Radius.circular(radius),
+      ),
+    );
+    return path;
+  }
+
+  @override
+  bool shouldReclip(_HoleClipper oldClipper) {
+    return oldClipper.holeRect != holeRect ||
+        oldClipper.radius != radius;
+  }
 }

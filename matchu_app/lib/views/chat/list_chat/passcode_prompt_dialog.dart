@@ -44,10 +44,10 @@ Future<String?> showPasscodeSetupDialog(BuildContext context) {
         builder: (context, setState) {
           final controller = confirmStep ? secondController : firstController;
           final title =
-              confirmStep ? 'Xac nhan ma PIN' : 'Thiet lap ma PIN';
+              confirmStep ? 'Xác nhận mã PIN' : 'Thiết lập mã PIN';
           final description = confirmStep
-              ? 'Nhap lai ma PIN de xac nhan.'
-              : 'Tao ma PIN de khoi phuc tin nhan tren thiet bi moi.';
+              ? 'Nhập lại mã PIN để xác nhận'
+              : 'Tạo mã PIN để khôi phục tin nhắn trên thiết bị mới';
 
           return AlertDialog(
             title: Text(title),
@@ -90,14 +90,14 @@ Future<String?> showPasscodeSetupDialog(BuildContext context) {
                       errorText = null;
                     });
                   },
-                  child: const Text('Quay lai'),
+                  child: const Text('Quay lại'),
                 ),
               ElevatedButton(
                 onPressed: () {
                   final pin = controller.text.trim();
                   if (pin.length != 6) {
                     setState(() {
-                      errorText = 'Ma PIN phai du 6 chu so';
+                      errorText = 'Mã PIN phải đủ 6 số';
                     });
                     return;
                   }
@@ -113,14 +113,14 @@ Future<String?> showPasscodeSetupDialog(BuildContext context) {
 
                   if (pin != firstController.text.trim()) {
                     setState(() {
-                      errorText = 'Ma PIN khong khop';
+                      errorText = 'Mã PIN không khớp';
                     });
                     return;
                   }
 
                   Navigator.of(context).pop(pin);
                 },
-                child: Text(confirmStep ? 'Xac nhan' : 'Tiep tuc'),
+                child: Text(confirmStep ? 'Xác nhận' : 'Tiếp tục'),
               ),
             ],
           );
@@ -167,8 +167,8 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Nhap ma PIN de khoi phuc tin nhan cu tren thiet bi nay. '
-                  'Neu khong co ma PIN, ban van co the chat nhung khong xem lich su.',
+                  'Nhập mã PIN để khôi phục tin nhắn cũ trên thiết bị này. '
+                  'Nếu không có mã PIN bạn vẫn có thể chat nhưng không có lịch sử',
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
@@ -199,7 +199,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                     action: PasscodePromptAction.skipped,
                   ));
                 },
-                child: const Text('Tiep tuc (khong xem lich su)'),
+                child: const Text('Tiếp tục (Không xem lại lịch sửa)'),
               ),
               TextButton(
                 onPressed: () {
@@ -207,14 +207,14 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                     action: PasscodePromptAction.reset,
                   ));
                 },
-                child: const Text('Quen ma? Dat lai'),
+                child: const Text('Quên mã? Đặt lại'),
               ),
               ElevatedButton(
                 onPressed: () {
                   final pin = controller.text.trim();
                   if (pin.length != 6) {
                     setState(() {
-                      localError = 'Ma PIN phai du 6 chu so';
+                      localError = 'Mã PIN phải đủ 6 chữ số';
                     });
                     return;
                   }
@@ -224,7 +224,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                     passcode: pin,
                   ));
                 },
-                child: const Text('Mo khoa'),
+                child: const Text('Mở khóa'),
               ),
             ],
           );
@@ -240,18 +240,18 @@ Future<bool> showPasscodeResetConfirmDialog(BuildContext context) async {
     barrierDismissible: false,
     builder: (context) {
       return AlertDialog(
-        title: const Text('Dat lai ma PIN?'),
+        title: const Text('Đặt lại mã PIN'),
         content: const Text(
-          'Viec nay se xoa toan bo tin nhan da ma hoa cu tren thiet bi nay.',
+          'Việc nãy sẽ xóa toàn bộ tin nhắn đã mã hóa cũ trên thiết bị này',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Huy'),
+            child: const Text('Hủy'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Dat lai'),
+            child: const Text('Đặt lại'),
           ),
         ],
       );
