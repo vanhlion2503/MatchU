@@ -23,6 +23,7 @@ class ChatController extends GetxController {
   // ================= SERVICES =================
   final ChatService _service = ChatService();
   final String uid = Get.find<AuthController>().user!.uid;
+  static const int _pageSize = 20;
 
   // ================= SCROLL =================
   final ItemScrollController itemScrollController = ItemScrollController();
@@ -53,6 +54,8 @@ class ChatController extends GetxController {
   final RxList<QueryDocumentSnapshot<Map<String, dynamic>>> allMessages = <QueryDocumentSnapshot<Map<String, dynamic>>>[].obs;
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
+  bool _initialLoadComplete = false;
+  String? _messageSourceRoot;
   DocumentSnapshot<Map<String, dynamic>>? _oldestDocument; // Tin nhắn cũ nhất đã load
 
   final replyingMessage = Rxn<Map<String, dynamic>>();
@@ -137,6 +140,11 @@ class ChatController extends GetxController {
 
     await _service.markAsRead(roomId);
 
+    final fromTempRoom = data["fromTempRoom"];
+    if (fromTempRoom is String && fromTempRoom.isNotEmpty) {
+      tempRoomId = fromTempRoom;
+    }
+
     final participants = List<String>.from(data["participants"]);
     final uidOther = participants.firstWhere((e) => e != uid);
 
@@ -191,38 +199,30 @@ class ChatController extends GetxController {
     return _service.listenMessagesWithFallback(
       roomId, 
       tempRoomId,
-      limit: 20, // Chỉ lấy 20 tin mới nhất để detect tin mới
+      limit: _pageSize, // Chỉ lấy 20 tin mới nhất để detect tin mới
     );
   }
   
   // Load messages ban đầu
   Future<void> loadInitialMessages() async {
+    if (_initialLoadComplete) return;
     try {
       final snapshot = await _service.listenMessagesWithFallback(
         roomId,
         tempRoomId,
-        limit: 20,
+        limit: _pageSize,
       ).first;
+
+      if (_initialLoadComplete) return;
       
       final docs = snapshot.docs;
       if (docs.isEmpty) {
         _hasMoreMessages = false;
+        _initialLoadComplete = true;
         return;
       }
       
-      allMessages.value = docs;
-      _rebuildIndexMap();
-
-      for (final doc in docs) {
-        getDecryptedText(doc.id, doc.data());
-      }
-      _oldestDocument = docs.last; // Tin cũ nhất
-      lastMessageCount = docs.length;
-      
-      // Nếu load được ít hơn 20, không còn tin nào nữa
-      if (docs.length < 20) {
-        _hasMoreMessages = false;
-      }
+      _applySnapshotAsBaseline(docs, _resolveSourceRoot(docs.first));
     } catch (e) {
       print('Error loading initial messages: $e');
     }
@@ -235,6 +235,30 @@ class ChatController extends GetxController {
     }
   }
 
+  String _resolveSourceRoot(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final segments = doc.reference.path.split('/');
+    return segments.isNotEmpty ? segments.first : "";
+  }
+
+  void _applySnapshotAsBaseline(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    String sourceRoot,
+  ) {
+    _messageSourceRoot = sourceRoot.isNotEmpty ? sourceRoot : _messageSourceRoot;
+    allMessages.value = docs;
+    _rebuildIndexMap();
+
+    for (final doc in docs) {
+      getDecryptedText(doc.id, doc.data());
+    }
+    _oldestDocument = docs.isNotEmpty ? docs.last : null;
+    lastMessageCount = docs.length;
+    _hasMoreMessages = docs.length >= _pageSize;
+    _initialLoadComplete = true;
+  }
+
   // ================= AUTO SCROLL CORE =================
 
   /// 🔥 GỌI SAU MỖI LẦN SNAPSHOT ĐỔI (realtime messages)
@@ -243,6 +267,24 @@ class ChatController extends GetxController {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
     if (docs.isEmpty) return;
+
+    final sourceRoot = _resolveSourceRoot(docs.first);
+
+    if (!_initialLoadComplete) {
+      _applySnapshotAsBaseline(docs, sourceRoot);
+      return;
+    }
+
+    if (_messageSourceRoot != null &&
+        sourceRoot.isNotEmpty &&
+        sourceRoot != _messageSourceRoot) {
+      _applySnapshotAsBaseline(docs, sourceRoot);
+      return;
+    }
+
+    if (_messageSourceRoot == null && sourceRoot.isNotEmpty) {
+      _messageSourceRoot = sourceRoot;
+    }
 
     bool hasChange = false;
 
@@ -390,7 +432,7 @@ class ChatController extends GetxController {
       final snapshot = await _service.listenMessagesWithFallback(
         roomId,
         tempRoomId,
-        limit: 20,
+        limit: _pageSize,
         startAfter: _oldestDocument,
       ).first;
       
@@ -417,7 +459,7 @@ class ChatController extends GetxController {
       lastMessageCount = allMessages.length;
       
       // Nếu load được ít hơn 20, không còn tin nào nữa
-      if (newDocs.length < 20) {
+      if (newDocs.length < _pageSize) {
         _hasMoreMessages = false;
       }
     } catch (e) {
@@ -550,6 +592,10 @@ class ChatController extends GetxController {
   ) async {
 
     if (!data.containsKey("ciphertext") || !data.containsKey("iv")) {
+      final rawText = data["text"];
+      if (rawText is String) {
+        decryptedCache[messageId] = rawText;
+      }
       return;
     }
 
@@ -593,7 +639,12 @@ class ChatController extends GetxController {
       );
       debugPrint("🔍 Session key exists: $hasKey");
       
-      decryptedCache[messageId] = "⚠️ Không thể giải mã tin nhắn";
+      final fallbackText = data["text"];
+      if (fallbackText is String && fallbackText.isNotEmpty) {
+        decryptedCache[messageId] = fallbackText;
+      } else {
+        decryptedCache[messageId] = "⚠️ Không thể giải mã tin nhắn";
+      }
     } finally {
       _decrypting.remove(messageId);
     }
