@@ -204,6 +204,7 @@ class ChatListController extends GetxController
         roomId: room.id, 
         ciphertext: room.lastMessageCipher!, 
         iv: room.lastMessageIv!,
+        keyId: room.lastMessageKeyId,
       );
 
       lastMessagePreviewCache[room.id] = text;
@@ -214,6 +215,16 @@ class ChatListController extends GetxController
 
   void clearPreviewCache() {
     lastMessagePreviewCache.clear();
+  }
+
+  Future<void> refreshLastMessagePreviews() async {
+    lastMessagePreviewCache.clear();
+
+    for (final room in rooms) {
+      await _loadLastMessagePreview(room);
+    }
+
+    _applySearch();
   }
 
   // ====================================================

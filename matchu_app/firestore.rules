@@ -43,6 +43,18 @@ service cloud.firestore {
 
     }
 
+    match /users/{userId}/security/backup {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/sessionKeyBackups/{roomId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/sessionKeyBackups/{roomId}/keys/{keyId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
     // ================= TEMP CHAT ROOM =================
     match /tempChats/{roomId} {
 
@@ -152,12 +164,15 @@ service cloud.firestore {
             "lastMessageType",
             "lastMessageCipher",
             "lastMessageIv",
+            "lastMessageKeyId",
             "lastSenderId",
             "lastMessageAt",
             "unread",
             "pinned",
             "deletedFor",
-            "typing"
+            "typing",
+            "currentKeyId",
+            "currentKeyUpdatedAt"
           ]);
       
        // ===============================
@@ -174,13 +189,25 @@ service cloud.firestore {
 
         // ✅ BỎ epoch - chỉ cần userId, encryptedKey, createdAt
         allow create, update: if isRoomParticipant()
-          && request.resource.data.keys().hasOnly([
-            "userId",
-            "encryptedKey",
-            "createdAt"
-          ])
+          && (
+            request.resource.data.keys().hasOnly([
+              "userId",
+              "encryptedKey",
+              "createdAt"
+            ])
+            || request.resource.data.keys().hasOnly([
+              "userId",
+              "encryptedKey",
+              "createdAt",
+              "keyId"
+            ])
+          )
           && request.resource.data.userId is string
-          && request.resource.data.encryptedKey is string;
+          && request.resource.data.encryptedKey is string
+          && (
+            !("keyId" in request.resource.data)
+            || request.resource.data.keyId is int
+          );
 
         // cho phép participant đọc
         allow read: if isRoomParticipant();

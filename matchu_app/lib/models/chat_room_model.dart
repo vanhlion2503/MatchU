@@ -7,6 +7,7 @@ class ChatRoomModel {
   final String lastSenderId;
   final String? lastMessageCipher;
   final String? lastMessageIv;
+  final int lastMessageKeyId;
   final DateTime? lastMessageAt;
   final Map<String, dynamic>? unread;
   final Map<String, dynamic>? pinned;
@@ -19,6 +20,7 @@ class ChatRoomModel {
     required this.lastSenderId,
     this.lastMessageCipher,
     this.lastMessageIv,
+    this.lastMessageKeyId = 0,
     this.lastMessageAt,
     this.unread,
     this.pinned,
@@ -34,6 +36,7 @@ class ChatRoomModel {
       lastSenderId: data["lastSenderId"] ?? "",
       lastMessageCipher: data["lastMessageCipher"],
       lastMessageIv: data["lastMessageIv"],
+      lastMessageKeyId: (data["lastMessageKeyId"] ?? 0) as int,
       lastMessageAt: (data["lastMessageAt"] as Timestamp?)?.toDate(),
       unread: data["unread"],
       pinned: data["pinned"],

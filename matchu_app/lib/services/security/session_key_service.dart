@@ -12,6 +12,7 @@ import 'package:pointycastle/asn1/primitives/asn1_sequence.dart';
 import 'package:pointycastle/export.dart';
 
 import 'identity_key_service.dart';
+import 'passcode_backup_service.dart';
 
 class SessionKeyService {
   static final _db = FirebaseFirestore.instance;
@@ -30,6 +31,18 @@ class SessionKeyService {
   /// Notify listeners that session key is available/updated
   static void notifyUpdated(String roomId) {
     _keyUpdateControllers[roomId]?.add(null);
+  }
+
+  static String _localSessionKeyKey(String roomId, int keyId) {
+    if (keyId == 0) {
+      return "chat_${roomId}_session_key";
+    }
+    return "chat_${roomId}_session_key_$keyId";
+  }
+
+  static String _sessionKeyDocId(String deviceId, int keyId) {
+    if (keyId == 0) return deviceId;
+    return "${deviceId}_$keyId";
   }
 
   /// ===============================
@@ -62,13 +75,15 @@ class SessionKeyService {
   static Future<void> createAndSendSessionKey({
     required String roomId,
     required List<String> participantUids,
+    int keyId = 0,
   }) async {
     // 🔒 Kiểm tra xem đã có session key local chưa (không rotate key)
-    if (await hasLocalSessionKey(roomId)) {
+    if (await hasLocalSessionKey(roomId, keyId: keyId)) {
       // Nếu đã có key, chỉ đảm bảo phân phối cho tất cả thiết bị
       await ensureDistributedToAllDevices(
         roomId: roomId,
         participantUids: participantUids,
+        keyId: keyId,
       );
       return;
     }
@@ -76,7 +91,10 @@ class SessionKeyService {
     // 🔒 QUAN TRỌNG: Kiểm tra xem room đã có session keys trong Firestore chưa
     // Nếu đã có → không tạo key mới (vì tất cả thiết bị phải dùng cùng 1 key)
     // Thiết bị khác sẽ phân phối lại key cho thiết bị mới qua ensureDistributedToAllDevices
-    if (await hasAnySessionKeys(roomId)) {
+    final hasAnyKeys = keyId == 0
+        ? await hasAnySessionKeys(roomId)
+        : await hasAnySessionKeysForKeyId(roomId, keyId);
+    if (hasAnyKeys) {
       print("🔒 Room $roomId đã có session keys, không tạo key mới");
       return;
     }
@@ -98,15 +116,85 @@ class SessionKeyService {
       roomId: roomId,
       sessionKey: sessionKey,
       participantUids: participantUids,
+      keyId: keyId,
     );
 
     await _storage.write(
-      key: "chat_${roomId}_session_key",
+      key: _localSessionKeyKey(roomId, keyId),
       value: base64Encode(sessionKey),
     );
 
+    try {
+      await PasscodeBackupService.backupSessionKey(
+        roomId: roomId,
+        sessionKey: sessionKey,
+        keyId: keyId,
+      );
+    } catch (e) {
+      print("Passcode backup failed: $e");
+    }
+
+    final roomUpdate = <String, dynamic>{
+      "currentKeyId": keyId,
+    };
+    if (keyId > 0) {
+      roomUpdate["currentKeyUpdatedAt"] = FieldValue.serverTimestamp();
+    }
+    await _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .set(roomUpdate, SetOptions(merge: true));
+
     // Notify listeners
     notifyUpdated(roomId);
+  }
+
+  static Future<int> rotateSessionKey({
+    required String roomId,
+    required List<String> participantUids,
+  }) async {
+    final newKeyId = await _incrementCurrentKeyId(roomId);
+    final sessionKey = _generateAESKey();
+
+    await _distributeSessionKeyToDevices(
+      roomId: roomId,
+      sessionKey: sessionKey,
+      participantUids: participantUids,
+      keyId: newKeyId,
+    );
+
+    await _storage.write(
+      key: _localSessionKeyKey(roomId, newKeyId),
+      value: base64Encode(sessionKey),
+    );
+
+    try {
+      await PasscodeBackupService.backupSessionKey(
+        roomId: roomId,
+        sessionKey: sessionKey,
+        keyId: newKeyId,
+      );
+    } catch (e) {
+      print("Passcode backup failed: $e");
+    }
+
+    notifyUpdated(roomId);
+    return newKeyId;
+  }
+
+  static Future<int> _incrementCurrentKeyId(String roomId) {
+    final ref = _db.collection("chatRooms").doc(roomId);
+    return _db.runTransaction<int>((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data();
+      final current = (data?["currentKeyId"] ?? 0) as int;
+      final next = current + 1;
+      tx.set(ref, {
+        "currentKeyId": next,
+        "currentKeyUpdatedAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return next;
+    });
   }
 
 
@@ -117,26 +205,50 @@ class SessionKeyService {
   /// ===============================
   static Future<bool> receiveSessionKey({
     required String roomId,
+    int keyId = 0,
   }) async {
     final deviceId = await DeviceService.getDeviceId();
+    final docId = _sessionKeyDocId(deviceId, keyId);
 
-    final snap = await _db
+    var snap = await _db
         .collection("chatRooms")
         .doc(roomId)
         .collection("sessionKeys")
-        .doc(deviceId)
+        .doc(docId)
         .get();
+
+    if (!snap.exists && keyId == 0) {
+      final fallback = await _db
+          .collection("chatRooms")
+          .doc(roomId)
+          .collection("sessionKeys")
+          .doc("${deviceId}_0")
+          .get();
+      if (fallback.exists) {
+        snap = fallback;
+      }
+    }
 
     if (!snap.exists) return false;
 
-    return await _decryptAndSaveSessionKey(roomId: roomId, snap: snap);
+    return await _decryptAndSaveSessionKey(
+      roomId: roomId,
+      snap: snap,
+      keyId: keyId,
+    );
   }
 
   /// Decrypt và save session key từ snapshot
   static Future<bool> _decryptAndSaveSessionKey({
     required String roomId,
     required DocumentSnapshot<Map<String, dynamic>> snap,
+    int keyId = 0,
   }) async {
+    final data = snap.data();
+    if (data != null && data["keyId"] is int) {
+      keyId = data["keyId"] as int;
+    }
+
     final encrypted = base64Decode(snap["encryptedKey"]);
     final privateKeyPem = await IdentityKeyService.readPrivateKey();
     if (privateKeyPem == null) return false;
@@ -157,9 +269,19 @@ class SessionKeyService {
       }
 
       await _storage.write(
-        key: "chat_${roomId}_session_key",
+        key: _localSessionKeyKey(roomId, keyId),
         value: base64Encode(sessionKey),
       );
+
+      try {
+        await PasscodeBackupService.backupSessionKey(
+          roomId: roomId,
+          sessionKey: sessionKey,
+          keyId: keyId,
+        );
+      } catch (e) {
+        print("Passcode backup failed: $e");
+      }
 
       notifyUpdated(roomId);
       return true;
@@ -174,20 +296,26 @@ class SessionKeyService {
   static Future<StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>> listenForSessionKey({
     required String roomId,
     required Function(bool success) onKeyReceived,
+    int keyId = 0,
   }) async {
     final deviceId = await DeviceService.getDeviceId();
+    final docId = _sessionKeyDocId(deviceId, keyId);
     
     final stream = _db
         .collection("chatRooms")
         .doc(roomId)
         .collection("sessionKeys")
-        .doc(deviceId)
+        .doc(docId)
         .snapshots();
 
     return stream.listen((snap) async {
       if (snap.exists && snap.data() != null) {
         print("🔒 Session key document created/updated for device $deviceId");
-        final success = await _decryptAndSaveSessionKey(roomId: roomId, snap: snap);
+        final success = await _decryptAndSaveSessionKey(
+          roomId: roomId,
+          snap: snap,
+          keyId: keyId,
+        );
         onKeyReceived(success);
       }
     }, onError: (e) {
@@ -257,8 +385,13 @@ class SessionKeyService {
   }
 
 
-  static Future<bool> hasLocalSessionKey(String roomId) async {
-    final key = await _storage.read(key: "chat_${roomId}_session_key");
+  static Future<bool> hasLocalSessionKey(
+    String roomId, {
+    int keyId = 0,
+  }) async {
+    final key = await _storage.read(
+      key: _localSessionKeyKey(roomId, keyId),
+    );
     return key != null;
   }
 
@@ -273,8 +406,27 @@ class SessionKeyService {
     return snap.docs.isNotEmpty;
   }
 
-  static Future<Uint8List?> _readLocalSessionKey(String roomId) async {
-    final key = await _storage.read(key: "chat_${roomId}_session_key");
+  static Future<bool> hasAnySessionKeysForKeyId(
+    String roomId,
+    int keyId,
+  ) async {
+    final snap = await _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("sessionKeys")
+        .where("keyId", isEqualTo: keyId)
+        .limit(1)
+        .get();
+    return snap.docs.isNotEmpty;
+  }
+
+  static Future<Uint8List?> _readLocalSessionKey(
+    String roomId, {
+    int keyId = 0,
+  }) async {
+    final key = await _storage.read(
+      key: _localSessionKeyKey(roomId, keyId),
+    );
     if (key == null) return null;
     return base64Decode(key);
   }
@@ -283,14 +435,16 @@ class SessionKeyService {
   static Future<void> ensureDistributedToAllDevices({
     required String roomId,
     required List<String> participantUids,
+    int keyId = 0,
   }) async {
-    final sessionKey = await _readLocalSessionKey(roomId);
+    final sessionKey = await _readLocalSessionKey(roomId, keyId: keyId);
     if (sessionKey == null) return;
 
     await _distributeSessionKeyToDevices(
       roomId: roomId,
       sessionKey: sessionKey,
       participantUids: participantUids,
+      keyId: keyId,
     );
   }
 
@@ -299,6 +453,7 @@ class SessionKeyService {
     required String roomId,
     required Uint8List sessionKey,
     required List<String> participantUids,
+    int keyId = 0,
   }) async {
     final uniqueParticipants = participantUids.toSet();
     int distributedCount = 0;
@@ -316,7 +471,7 @@ class SessionKeyService {
             .collection("chatRooms")
             .doc(roomId)
             .collection("sessionKeys")
-            .doc(deviceId);
+            .doc(_sessionKeyDocId(deviceId, keyId));
 
         // 🔒 Kiểm tra xem device đã có session key chưa (không ghi đè)
         final existing = await docRef.get();
@@ -331,6 +486,7 @@ class SessionKeyService {
             "encryptedKey": base64Encode(
               _rsaEncrypt(sessionKey, _decodePublicKeyFromPem(publicKeyPem)),
             ),
+            "keyId": keyId,
             "createdAt": FieldValue.serverTimestamp(),
           });
           distributedCount++;

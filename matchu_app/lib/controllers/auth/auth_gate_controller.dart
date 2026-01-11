@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/services/auth/auth_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 
 class AuthGateController extends GetxController {
   final AuthService _auth = AuthService();
+  final _box = GetStorage();
 
   StreamSubscription<User?>? _sub;
   bool _navigated = false;
@@ -32,6 +34,32 @@ class AuthGateController extends GetxController {
     if (user == null) {
       _navigated = false;
       Get.offAllNamed('/welcome');
+      return;
+    }
+
+    final isRegistering = _box.read('isRegistering') == true;
+    if (isRegistering) {
+      await user.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser ?? user;
+      final currentRoute = Get.currentRoute;
+
+      if (!refreshedUser.emailVerified) {
+        if (currentRoute != '/verify-email') {
+          Get.offAllNamed('/verify-email');
+        }
+        return;
+      }
+
+      final enrolledFactors =
+          await refreshedUser.multiFactor.getEnrolledFactors();
+      final hasMfa = enrolledFactors.isNotEmpty;
+      if (!hasMfa) {
+        if (currentRoute != '/enroll-phone' && currentRoute != '/otp-enroll') {
+          Get.offAllNamed('/enroll-phone');
+        }
+        return;
+      }
+
       return;
     }
 

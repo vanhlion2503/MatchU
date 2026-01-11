@@ -87,6 +87,7 @@ class ChatService {
     String type = "text",
     String? replyToId,
     String? replyText,
+    int keyId = 0,
   }) async {
     final roomRef = _db.collection("chatRooms").doc(roomId);
     final msgRef = roomRef.collection("messages").doc();
@@ -98,6 +99,7 @@ class ChatService {
     final encrypted = await MessageCryptoService.encrypt(
       roomId: roomId,
       plaintext: text,
+      keyId: keyId,
     );
 
     final batch = _db.batch();
@@ -107,6 +109,7 @@ class ChatService {
       "senderId": uid,
       "ciphertext": encrypted["ciphertext"],
       "iv": encrypted["iv"],
+      "keyId": keyId,
       "type": type,
       "replyToId": replyToId,
       "replyText": replyText,
@@ -120,6 +123,7 @@ class ChatService {
 
       "lastMessageCipher": encrypted["ciphertext"],
       "lastMessageIv": encrypted["iv"],
+      "lastMessageKeyId": keyId,
       
       "lastSenderId": uid,
       "lastMessageAt": FieldValue.serverTimestamp(),

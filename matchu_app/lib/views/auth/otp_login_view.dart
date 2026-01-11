@@ -126,7 +126,7 @@ class OtpLoginView extends StatelessWidget {
               const SizedBox(height: 8),
               Obx(() => TextButton(
                 onPressed: c.resendLoginOtpSeconds.value == 0
-                    ? c.sendEnrollOtp
+                    ? c.sendLoginOtp
                     : null,
                 child: Text(
                   c.resendLoginOtpSeconds.value == 0

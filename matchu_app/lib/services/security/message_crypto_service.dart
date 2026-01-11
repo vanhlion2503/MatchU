@@ -10,10 +10,18 @@ class MessageCryptoService {
 
   // LOAD SESSION KEY
 
-  static Future<Uint8List> _loadSessionKey(String roomId) async {
-    final b64 = await _storage.read(key: "chat_${roomId}_session_key");
+  static Future<Uint8List> _loadSessionKey(
+    String roomId, {
+    int keyId = 0,
+  }) async {
+    final storageKey = keyId == 0
+        ? "chat_${roomId}_session_key"
+        : "chat_${roomId}_session_key_$keyId";
+    final b64 = await _storage.read(key: storageKey);
     if (b64 == null) {
-      throw Exception("Session key not found for room $roomId");
+      throw Exception(
+        "Session key not found for room $roomId (keyId=$keyId)",
+      );
     }
     return base64Decode(b64);
   }
@@ -23,8 +31,9 @@ class MessageCryptoService {
   static Future<Map<String, String>> encrypt({
     required String roomId,
     required String plaintext,
+    int keyId = 0,
   }) async {
-    final key = await _loadSessionKey(roomId);
+    final key = await _loadSessionKey(roomId, keyId: keyId);
 
     final iv = _randomBytes(12);
 
@@ -56,8 +65,9 @@ class MessageCryptoService {
     required String roomId,
     required String ciphertext,
     required String iv,
+    int keyId = 0,
   }) async {
-    final key = await _loadSessionKey(roomId);
+    final key = await _loadSessionKey(roomId, keyId: keyId);
 
     // 🔒 Validate key length
     if (key.length != 32) {

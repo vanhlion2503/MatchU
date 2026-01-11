@@ -146,7 +146,7 @@ class LogoutService {
       try {
         final keys = await _storage.readAll();
         for (final k in keys.keys) {
-          if (k.startsWith("chat_") && k.endsWith("_session_key")) {
+          if (k.startsWith("chat_") && k.contains("_session_key")) {
             await _storage.delete(key: k);
           }
         }
