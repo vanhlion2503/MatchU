@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -148,6 +149,18 @@ class ChatBottomBar extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  /// CAMERA
+                  IconButton(
+                    icon: const Icon(Iconsax.camera, size: 22),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      controller.hideEmoji();
+                      controller.pickAndSendImage(
+                        source: ImageSource.camera,
+                      );
+                    },
+                  ),
+
                   /// IMAGE
                   IconButton(
                     icon: const Icon(Iconsax.gallery, size: 22),

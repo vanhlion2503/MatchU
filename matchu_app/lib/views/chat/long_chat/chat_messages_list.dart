@@ -375,7 +375,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.image_outlined,
+                                Iconsax.gallery,
                                 size: 20,
                                 color: textColor,
                               ),
