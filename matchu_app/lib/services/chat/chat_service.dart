@@ -195,6 +195,30 @@ class ChatService {
     }
   }
 
+  Future<void> updateMessage({
+    required String roomId,
+    required String messageId,
+    required Map<String, dynamic> messageUpdate,
+    Map<String, dynamic>? roomUpdate,
+  }) async {
+    final msgRef = _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("messages")
+        .doc(messageId);
+
+    if (roomUpdate == null) {
+      await msgRef.update(messageUpdate);
+      return;
+    }
+
+    final roomRef = _db.collection("chatRooms").doc(roomId);
+    final batch = _db.batch();
+    batch.update(msgRef, messageUpdate);
+    batch.update(roomRef, roomUpdate);
+    await batch.commit();
+  }
+
   Future<String> getOrCreateRoom(String otherUid) async {
     final myUid = uid;
 

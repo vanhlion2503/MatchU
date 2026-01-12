@@ -28,12 +28,12 @@ class ChatMessagesList extends StatefulWidget {
 class _ChatMessagesListState extends State<ChatMessagesList> {
   // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
   final Map<String, GlobalKey> _bubbleKeys = {};
-  OverlayEntry? _reactionEntry;
+  OverlayEntry? _actionsEntry;
   String? _activeReactionMessageId;
 
-  void _dismissReactionPicker({bool notify = true}) {
-    _reactionEntry?.remove();
-    _reactionEntry = null;
+  void _dismissMessageActions({bool notify = true}) {
+    _actionsEntry?.remove();
+    _actionsEntry = null;
 
     if (_activeReactionMessageId == null) return;
 
@@ -136,6 +136,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             final isLastInGroup = _isLastInGroup(docs, messageIndex);
             final createdAt = _getTime(data["createdAt"]);
             final isNewestMessage = messageIndex == 0;
+            final messageType = data["type"] ?? "text";
+            final isDeleted = messageType == "deleted" ||
+                widget.controller.deletedMessageIds.contains(doc.id);
 
             // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
             final bubbleKey = _bubbleKeys.putIfAbsent(
@@ -196,13 +199,16 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
 
                             final decryptedText = widget.controller.decryptedCache[doc.id] ?? "…";
                             final isPressed = _activeReactionMessageId == doc.id;
+                            final reactions = Map<String, String>.from(
+                              data["reactions"] ?? {},
+                            );
 
                             return ChatRowPermanent(
                               key: ValueKey(doc.id), // 🔥 BẮT BUỘC
                               messageId: doc.id,
                               senderId: data["senderId"],
                               text: decryptedText,
-                              type: data["type"] ?? "text",
+                              type: isDeleted ? "deleted" : messageType,
                               isMe: isMe,
                               showAvatar: !isMe && isLastInGroup,
                               status: isMyLastMessage
@@ -228,27 +234,28 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                         messageId: data["replyToId"],
                                       )
                                   : null,
-                              reactions: Map<String, String>.from(data["reactions"] ?? {}),
+                              reactions: isDeleted ? null : reactions,
                               bubbleKey: bubbleKey,
                               // ❤️ DOUBLE TAP = LOVE
                               onDoubleTap: () {
-                                final reactions = Map<String, String>.from(
-                                  data["reactions"] ?? {},
-                                );
+                                if (isDeleted) return;
                                 if (reactions[uid] == "love") return;
 
-                                  widget.controller.onReactMessage(
-                                    messageId: doc.id,
-                                    reactionId: "love",
-                                  );
+                                widget.controller.onReactMessage(
+                                  messageId: doc.id,
+                                  reactionId: "love",
+                                );
                               },
                               onLongPress: () {
-                                _showReactionPicker(
+                                _showMessageActions(
                                   context: context,
                                   controller: widget.controller,
                                   messageId: doc.id,
+                                  messageText: decryptedText,
                                   bubbleKey: bubbleKey,
-                                  isMe: isMe, 
+                                  isMe: isMe,
+                                  messageType: messageType,
+                                  isDeleted: isDeleted,
                                 );
                               },
                             );
@@ -363,24 +370,75 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
           curr.day != next.day;
   }
 
-  void _showReactionPicker({
+  void _showMessageActions({
     required BuildContext context,
     required ChatController controller,
     required String messageId,
+    required String messageText,
     required GlobalKey bubbleKey,
     required bool isMe,
+    required String messageType,
+    required bool isDeleted,
   }) {
-    // Nếu đang mở → đóng cái cũ
-    _dismissReactionPicker();
+    if (!mounted) return;
+
+    final canCopy = messageText.trim().isNotEmpty && !isDeleted;
+    final canEdit = isMe && !isDeleted && messageType == "text";
+    final canDelete = isMe && !isDeleted;
+    final canReact = !isDeleted;
+
+    if (!canCopy && !canEdit && !canDelete && !canReact) {
+      return;
+    }
 
     final bubbleContext = bubbleKey.currentContext;
     if (bubbleContext == null) return;
 
+    _dismissMessageActions();
     setState(() => _activeReactionMessageId = messageId);
 
     final box = bubbleContext.findRenderObject() as RenderBox;
     final pos = box.localToGlobal(Offset.zero);
     final size = box.size;
+
+    final screenSize = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+
+    final actions = <_MessageActionItem>[
+      if (canCopy)
+        _MessageActionItem(
+          icon: Icons.copy,
+          label: "Sao chép",
+          onTap: () {
+            _dismissMessageActions();
+            Clipboard.setData(ClipboardData(text: messageText));
+          },
+        ),
+      if (canEdit)
+        _MessageActionItem(
+          icon: Icons.edit,
+          label: "Chỉnh sửa",
+          onTap: () {
+            _dismissMessageActions();
+            controller.startEdit(
+              messageId: messageId,
+              text: messageText,
+            );
+          },
+        ),
+      if (canDelete)
+        _MessageActionItem(
+          icon: Icons.delete,
+          label: "Xóa",
+          color: Theme.of(context).colorScheme.error,
+          onTap: () async {
+            _dismissMessageActions();
+            final confirmed = await _confirmDelete(context);
+            if (!confirmed) return;
+            await controller.deleteMessage(messageId: messageId);
+          },
+        ),
+    ];
 
     const holePadding = 8.0;
     final holeRect = Rect.fromLTWH(
@@ -394,22 +452,54 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     const pickerWidth = 270.0;
     const pickerHeight = 40.0;
     const verticalGap = 10.0;
+    const actionWidth = 200.0;
+    const actionRowHeight = 44.0;
 
-    final left = isMe
-        ? pos.dx + size.width - pickerWidth
-        : pos.dx;
+    final actionHeight = actions.isEmpty
+        ? 0.0
+        : actions.length * actionRowHeight + 12.0;
 
-    final top = pos.dy - pickerHeight - verticalGap;
+    final pickerLeft = (isMe
+            ? pos.dx + size.width - pickerWidth
+            : pos.dx)
+        .clamp(8.0, screenSize.width - pickerWidth - 8.0);
 
-    _reactionEntry = OverlayEntry(
+    double pickerTop = pos.dy - pickerHeight - verticalGap;
+    final safeTop = padding.top + 8.0;
+    if (pickerTop < safeTop) {
+      pickerTop = safeTop;
+    }
+
+    final actionLeft = (isMe
+            ? pos.dx + size.width - actionWidth
+            : pos.dx)
+        .clamp(8.0, screenSize.width - actionWidth - 8.0);
+
+    double actionsTop = pos.dy + size.height + verticalGap;
+    final safeBottom = padding.bottom + 8.0;
+    final maxActionsTop = screenSize.height - safeBottom - actionHeight;
+    if (actionsTop > maxActionsTop) {
+      actionsTop = maxActionsTop;
+    }
+    if (actionsTop < safeTop) {
+      actionsTop = safeTop;
+    }
+
+    final minActionsTop = pickerTop + pickerHeight + 8.0;
+    if (actionsTop < minActionsTop &&
+        minActionsTop + actionHeight <= screenSize.height - safeBottom) {
+      actionsTop = minActionsTop;
+    }
+
+    _actionsEntry = OverlayEntry(
       builder: (_) => Material(
         color: Colors.transparent,
         child: Stack(
           children: [
             Positioned.fill(
               child: GestureDetector(
-                behavior: HitTestBehavior.translucent, // ?? B?T BU?C
-                onTap: _dismissReactionPicker,
+                behavior: HitTestBehavior.translucent,
+                onTap: _dismissMessageActions,
                 child: ClipPath(
                   clipper: _HoleClipper(
                     holeRect: holeRect,
@@ -424,37 +514,156 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                 ),
               ),
             ),
-            Positioned(
-              left: left.clamp(
-                8.0,
-                MediaQuery.of(context).size.width - pickerWidth - 8,
+            if (canReact)
+              Positioned(
+                left: pickerLeft,
+                top: pickerTop,
+                child: ReactionPicker(
+                  onSelect: (reactionId) {
+                    controller.onReactMessage(
+                      messageId: messageId,
+                      reactionId: reactionId,
+                    );
+                    _dismissMessageActions();
+                  },
+                ),
               ),
-              top: top,
-              child: ReactionPicker(
-                onSelect: (reactionId) {
-                  controller.onReactMessage(
-                    messageId: messageId,
-                    reactionId: reactionId,
-                  );
-                  _dismissReactionPicker();
-                },
+            if (actions.isNotEmpty)
+              Positioned(
+                left: actionLeft,
+                top: actionsTop,
+                child: SizedBox(
+                  width: actionWidth,
+                  child: _MessageActionList(actions: actions),
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
 
-    Overlay.of(context).insert(_reactionEntry!);
+    final overlay = Overlay.of(context);
+    if (overlay == null) return;
+    overlay.insert(_actionsEntry!);
+  }
+
+  Future<bool> _confirmDelete(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text("Xóa tin nhắn?"),
+          content: const Text("Bạn có chắc muốn xóa tin nhắn này?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text("Hủy"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text("Xóa"),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   @override
   void dispose() {
-    _dismissReactionPicker(notify: false);
+    _dismissMessageActions(notify: false);
     super.dispose();
   }
 
 
+}
+
+class _MessageActionItem {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? color;
+
+  const _MessageActionItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color,
+  });
+}
+
+class _MessageActionList extends StatelessWidget {
+  final List<_MessageActionItem> actions;
+
+  const _MessageActionList({
+    required this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 12,
+              color: Colors.black.withOpacity(0.2),
+            )
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(actions.length, (index) {
+            final action = actions[index];
+            final resolvedColor = action.color ?? theme.colorScheme.onSurface;
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: action.onTap,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(action.icon, size: 20, color: resolvedColor),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            action.label,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: resolvedColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (index != actions.length - 1)
+                  Divider(
+                    height: 1,
+                    thickness: 0.6,
+                    color: theme.dividerColor.withOpacity(0.4),
+                  ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
 }
 
 class _HoleClipper extends CustomClipper<Path> {

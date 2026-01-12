@@ -20,12 +20,73 @@ class ChatBottomBar extends StatelessWidget {
     return SafeArea(
       child: Obx(() {
         final isTyping = controller.isTyping.value;
+        final isEditing = controller.editingMessage.value != null;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            /// ================= EDIT =================
+            Obx(() {
+              final edit = controller.editingMessage.value;
+              if (edit == null) return const SizedBox();
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.brightness == Brightness.dark
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFF1F3F5),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 3,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Đang sửa",
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            edit["text"] ?? "",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: controller.cancelEdit,
+                      child: const Icon(Icons.close, size: 18),
+                    ),
+                  ],
+                ),
+              );
+            }),
+
             /// ================= REPLY =================
             Obx(() {
+              if (controller.editingMessage.value != null) {
+                return const SizedBox();
+              }
               final reply = controller.replyingMessage.value;
               if (reply == null) return const SizedBox();
 
@@ -103,6 +164,7 @@ class ChatBottomBar extends StatelessWidget {
                       constraints: const BoxConstraints(maxHeight: 120),
                       child: TextField(
                         controller: controller.inputController,
+                        focusNode: controller.inputFocusNode,
                         minLines: 1,
                         maxLines: null,
                         onChanged: controller.onTypingChanged,
@@ -136,8 +198,9 @@ class ChatBottomBar extends StatelessWidget {
                   /// SEND
                   IconButton(
                     icon: Icon(
-                      Iconsax.send_1,
-                      color: isTyping ? color.primary : color.outline,
+                      isEditing ? Icons.check : Iconsax.send_1,
+                      color:
+                          (isTyping || isEditing) ? color.primary : color.outline,
                       size: 26,
                     ),
                     onPressed: () {

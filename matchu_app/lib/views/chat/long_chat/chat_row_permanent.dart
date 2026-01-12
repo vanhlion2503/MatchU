@@ -72,6 +72,10 @@ class ChatRowPermanent extends StatelessWidget {
 
     final textColor =
         isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+    final isDeleted = type == "deleted";
+    final resolvedTextColor = isDeleted
+        ? theme.colorScheme.onSurface.withOpacity(0.6)
+        : textColor;
 
     // ================= EMOJI ONLY =================
     final isEmojiOnly = _isEmojiOnly(text);
@@ -193,7 +197,9 @@ class ChatRowPermanent extends StatelessWidget {
                                 child: Text(
                                   text,
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: textColor,
+                                    color: resolvedTextColor,
+                                    fontStyle:
+                                        isDeleted ? FontStyle.italic : null,
                                   ),
                                 ),
                               ),

@@ -32,6 +32,7 @@ class ChatController extends GetxController {
 
   // ================= INPUT =================
   final inputController = TextEditingController();
+  final inputFocusNode = FocusNode();
 
   // ================= STATE =================
   final otherUid = RxnString();
@@ -59,7 +60,9 @@ class ChatController extends GetxController {
   DocumentSnapshot<Map<String, dynamic>>? _oldestDocument; // Tin nhắn cũ nhất đã load
 
   final replyingMessage = Rxn<Map<String, dynamic>>();
+  final editingMessage = Rxn<Map<String, dynamic>>();
   final highlightedMessageId = RxnString();
+  final RxSet<String> deletedMessageIds = <String>{}.obs;
 
   StreamSubscription? _roomSub;
   Timer? _typingTimer;
@@ -75,6 +78,10 @@ class ChatController extends GetxController {
   StreamSubscription? _sessionKeyListenerSub; // Realtime listener cho session key
   int _currentKeyId = 0;
   bool _isEnsuringKey = false;
+
+  static const String _encryptedPlaceholder = "Tin nhan duoc ma hoa";
+  static const String _deletedPlaceholder = "Tin nhan da bi xoa";
+  static const String _deletedType = "deleted";
 
   @override
   void onInit() {
@@ -235,6 +242,17 @@ class ChatController extends GetxController {
     }
   }
 
+  void _updateDeletedFlag(
+    String messageId,
+    Map<String, dynamic> data,
+  ) {
+    if (data["type"] == _deletedType) {
+      deletedMessageIds.add(messageId);
+    } else {
+      deletedMessageIds.remove(messageId);
+    }
+  }
+
   String _resolveSourceRoot(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
@@ -252,6 +270,7 @@ class ChatController extends GetxController {
 
     for (final doc in docs) {
       getDecryptedText(doc.id, doc.data());
+      _updateDeletedFlag(doc.id, doc.data());
     }
     _oldestDocument = docs.isNotEmpty ? docs.last : null;
     lastMessageCount = docs.length;
@@ -309,6 +328,7 @@ class ChatController extends GetxController {
 
         // 🔐 PRELOAD DECRYPT (ASYNC – KHÔNG BLOCK UI)
         getDecryptedText(id, data);
+        _updateDeletedFlag(id, data);
       } else {
         // ===============================
         // ♻️ UPDATE MESSAGE (reaction / edit)
@@ -319,6 +339,7 @@ class ChatController extends GetxController {
         if (!_mapEquals(oldData, newData)) {
           allMessages[index] = snap;
           hasChange = true;
+          _updateDeletedFlag(id, newData);
 
           // 🔥 CHỈ decrypt lại nếu ciphertext / iv đổi
           final oldCipher = oldData["ciphertext"];
@@ -449,6 +470,7 @@ class ChatController extends GetxController {
 
       for (final doc in newDocs) {
         getDecryptedText(doc.id, doc.data());
+        _updateDeletedFlag(doc.id, doc.data());
       }
 
       final startIndex = allMessages.length - newDocs.length;
@@ -477,6 +499,16 @@ class ChatController extends GetxController {
   Future<void> sendMessage({String type = "text"}) async {
     final text = inputController.text.trim();
     if (text.isEmpty) return;
+
+    final editing = editingMessage.value;
+    if (editing != null) {
+      await _submitEdit(
+        messageId: editing["id"] as String,
+        newText: text,
+      );
+      return;
+    }
+
     _justSentMessage = true; 
     _typingTimer?.cancel();
     isTyping.value = false;
@@ -513,6 +545,151 @@ class ChatController extends GetxController {
     inputController.clear();
   }
 
+  bool _isLatestMessage(String messageId) {
+    final index = _messageIndexMap[messageId];
+    return index == 0;
+  }
+
+  Map<String, dynamic> _buildRoomPreviewUpdate({
+    required String ciphertext,
+    required String iv,
+    required int keyId,
+    required String messageType,
+  }) {
+    return {
+      "lastMessage": messageType == _deletedType
+          ? _deletedPlaceholder
+          : _encryptedPlaceholder,
+      "lastMessageType": messageType == _deletedType ? _deletedType : "encrypted",
+      "lastMessageCipher": ciphertext,
+      "lastMessageIv": iv,
+      "lastMessageKeyId": keyId,
+      "lastSenderId": uid,
+    };
+  }
+
+  Future<bool> _ensureEditableKey() async {
+    var hasKey = await SessionKeyService.hasLocalSessionKey(
+      roomId,
+      keyId: _currentKeyId,
+    );
+    if (!hasKey) {
+      await _ensureSessionKey();
+      hasKey = await SessionKeyService.hasLocalSessionKey(
+        roomId,
+        keyId: _currentKeyId,
+      );
+    }
+
+    if (!hasKey) {
+      Get.snackbar(
+        "Loi",
+        "Dang thiet lap ma hoa, vui long thu lai.",
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _submitEdit({
+    required String messageId,
+    required String newText,
+  }) async {
+    _typingTimer?.cancel();
+    isTyping.value = false;
+    await _service.setTyping(roomId: roomId, isTyping: false);
+
+    final trimmed = newText.trim();
+    if (trimmed.isEmpty) return;
+
+    if (!await _ensureEditableKey()) return;
+
+    final encrypted = await MessageCryptoService.encrypt(
+      roomId: roomId,
+      plaintext: trimmed,
+      keyId: _currentKeyId,
+    );
+
+    final messageUpdate = {
+      "ciphertext": encrypted["ciphertext"],
+      "iv": encrypted["iv"],
+      "keyId": _currentKeyId,
+      "type": "text",
+      "editedAt": FieldValue.serverTimestamp(),
+      "editedBy": uid,
+    };
+
+    final roomUpdate = _isLatestMessage(messageId)
+        ? _buildRoomPreviewUpdate(
+            ciphertext: encrypted["ciphertext"]!,
+            iv: encrypted["iv"]!,
+            keyId: _currentKeyId,
+            messageType: "text",
+          )
+        : null;
+
+    try {
+      await _service.updateMessage(
+        roomId: roomId,
+        messageId: messageId,
+        messageUpdate: messageUpdate,
+        roomUpdate: roomUpdate,
+      );
+      decryptedCache[messageId] = trimmed;
+      deletedMessageIds.remove(messageId);
+      editingMessage.value = null;
+      inputController.clear();
+    } catch (e) {
+      Get.snackbar("Loi", "Khong the cap nhat tin nhan.");
+    }
+  }
+
+  Future<void> deleteMessage({
+    required String messageId,
+  }) async {
+    if (!await _ensureEditableKey()) return;
+
+    final encrypted = await MessageCryptoService.encrypt(
+      roomId: roomId,
+      plaintext: _deletedPlaceholder,
+      keyId: _currentKeyId,
+    );
+
+    final messageUpdate = {
+      "ciphertext": encrypted["ciphertext"],
+      "iv": encrypted["iv"],
+      "keyId": _currentKeyId,
+      "type": _deletedType,
+      "deletedAt": FieldValue.serverTimestamp(),
+      "deletedBy": uid,
+    };
+
+    final roomUpdate = _isLatestMessage(messageId)
+        ? _buildRoomPreviewUpdate(
+            ciphertext: encrypted["ciphertext"]!,
+            iv: encrypted["iv"]!,
+            keyId: _currentKeyId,
+            messageType: _deletedType,
+          )
+        : null;
+
+    try {
+      await _service.updateMessage(
+        roomId: roomId,
+        messageId: messageId,
+        messageUpdate: messageUpdate,
+        roomUpdate: roomUpdate,
+      );
+      decryptedCache[messageId] = _deletedPlaceholder;
+      deletedMessageIds.add(messageId);
+      if (editingMessage.value?["id"] == messageId) {
+        cancelEdit();
+      }
+    } catch (e) {
+      Get.snackbar("Loi", "Khong the xoa tin nhan.");
+    }
+  }
+
   // ================= TYPING =================
   void onTypingChanged(String text) {
     if (!isTyping.value) {
@@ -534,6 +711,33 @@ class ChatController extends GetxController {
 
   void cancelReply() {
     replyingMessage.value = null;
+  }
+
+  // ================= EDIT =================
+  void startEdit({
+    required String messageId,
+    required String text,
+  }) {
+    replyingMessage.value = null;
+    editingMessage.value = {
+      "id": messageId,
+      "text": text,
+    };
+
+    inputController.text = text;
+    inputController.selection = TextSelection.collapsed(
+      offset: text.length,
+    );
+
+    showEmoji.value = false;
+    if (inputFocusNode.canRequestFocus) {
+      inputFocusNode.requestFocus();
+    }
+  }
+
+  void cancelEdit() {
+    editingMessage.value = null;
+    inputController.clear();
   }
 
   // ================= EMOJI =================
@@ -754,6 +958,7 @@ class ChatController extends GetxController {
     _typingTimer?.cancel();
     _roomSub?.cancel();
     inputController.dispose();
+    inputFocusNode.dispose();
     _service.setTyping(roomId: roomId, isTyping: false);
     if (_listeningUid != null) {
       _presence.unlistenExcept({});
@@ -762,6 +967,7 @@ class ChatController extends GetxController {
     _sessionKeyListenerSub?.cancel();
     decryptedCache.clear();
     _decrypting.clear();
+    deletedMessageIds.clear();
     allMessages.clear();
     super.onClose();
   }
