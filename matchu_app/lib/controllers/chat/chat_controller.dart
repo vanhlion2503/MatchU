@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_bottom_bar.dart';
+import 'package:matchu_app/views/chat/long_chat/view_once_image_view.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
@@ -33,6 +38,7 @@ class ChatController extends GetxController {
   // ================= INPUT =================
   final inputController = TextEditingController();
   final inputFocusNode = FocusNode();
+  final ImagePicker _picker = ImagePicker();
 
   // ================= STATE =================
   final otherUid = RxnString();
@@ -82,6 +88,8 @@ class ChatController extends GetxController {
   static const String _encryptedPlaceholder = "Tin nhan duoc ma hoa";
   static const String _deletedPlaceholder = "Tin nhan da bi xoa";
   static const String _deletedType = "deleted";
+  static const String viewOnceImageText = "Ảnh";
+  static const String viewOnceDeletedText = "Ảnh đã bị xóa";
 
   @override
   void onInit() {
@@ -341,6 +349,13 @@ class ChatController extends GetxController {
           hasChange = true;
           _updateDeletedFlag(id, newData);
 
+          if (!newData.containsKey("ciphertext")) {
+            final rawText = newData["text"];
+            if (rawText is String) {
+              decryptedCache[id] = rawText;
+            }
+          }
+
           // 🔥 CHỈ decrypt lại nếu ciphertext / iv đổi
           final oldCipher = oldData["ciphertext"];
           final newCipher = newData["ciphertext"];
@@ -545,6 +560,37 @@ class ChatController extends GetxController {
     inputController.clear();
   }
 
+  Future<void> pickAndSendImage({
+    ImageSource source = ImageSource.gallery,
+  }) async {
+    if (editingMessage.value != null) return;
+
+    final picked = await _picker.pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    _justSentMessage = true;
+    _typingTimer?.cancel();
+    isTyping.value = false;
+    await _service.setTyping(roomId: roomId, isTyping: false);
+
+    final reply = replyingMessage.value;
+
+    try {
+      await _service.sendImageMessage(
+        roomId: roomId,
+        file: File(picked.path),
+        replyToId: reply?["id"],
+        replyText: reply?["text"],
+      );
+      replyingMessage.value = null;
+    } catch (e) {
+      Get.snackbar("Loi", "Khong the gui anh.");
+    }
+  }
+
   bool _isLatestMessage(String messageId) {
     final index = _messageIndexMap[messageId];
     return index == 0;
@@ -688,6 +734,90 @@ class ChatController extends GetxController {
     } catch (e) {
       Get.snackbar("Loi", "Khong the xoa tin nhan.");
     }
+  }
+
+  void openViewOnceImage({
+    required String messageId,
+    required String senderId,
+    required String imagePath,
+    required bool isLatest,
+  }) {
+    if (imagePath.isEmpty) {
+      Get.snackbar("Loi", viewOnceDeletedText);
+      return;
+    }
+
+    final canDelete = senderId != uid;
+
+    Get.to(
+      () => ViewOnceImageView(
+        imagePath: imagePath,
+        canDelete: canDelete,
+        onViewed: canDelete
+            ? () => _markViewOnceImageViewed(messageId)
+            : null,
+        onExit: canDelete
+            ? () => _deleteViewedImage(
+                  messageId: messageId,
+                  senderId: senderId,
+                  imagePath: imagePath,
+                  isLatest: isLatest,
+                )
+            : null,
+      ),
+    );
+  }
+
+  Future<void> _markViewOnceImageViewed(String messageId) async {
+    try {
+      await _service.updateMessage(
+        roomId: roomId,
+        messageId: messageId,
+        messageUpdate: {
+          "viewedBy.$uid": FieldValue.serverTimestamp(),
+        },
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _deleteViewedImage({
+    required String messageId,
+    required String senderId,
+    required String imagePath,
+    required bool isLatest,
+  }) async {
+    final messageUpdate = {
+      "type": _deletedType,
+      "text": viewOnceDeletedText,
+      "imagePath": FieldValue.delete(),
+      "imageDeleted": true,
+      "deletedAt": FieldValue.serverTimestamp(),
+      "deletedBy": uid,
+    };
+
+    final roomUpdate = isLatest
+        ? {
+            "lastMessage": viewOnceDeletedText,
+            "lastMessageType": _deletedType,
+            "lastMessageCipher": FieldValue.delete(),
+            "lastMessageIv": FieldValue.delete(),
+            "lastMessageKeyId": 0,
+            "lastSenderId": senderId,
+          }
+        : null;
+
+    try {
+      await _service.updateMessage(
+        roomId: roomId,
+        messageId: messageId,
+        messageUpdate: messageUpdate,
+        roomUpdate: roomUpdate,
+      );
+    } catch (_) {}
+
+    try {
+      await FirebaseStorage.instance.ref(imagePath).delete();
+    } catch (_) {}
   }
 
   // ================= TYPING =================

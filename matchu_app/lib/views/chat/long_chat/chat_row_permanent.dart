@@ -33,6 +33,7 @@ class ChatRowPermanent extends StatelessWidget {
   final Map<String, String>? reactions;
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
+  final VoidCallback? onTapMessage;
 
   final GlobalKey bubbleKey;
 
@@ -58,6 +59,7 @@ class ChatRowPermanent extends StatelessWidget {
     this.reactions,
     this.onLongPress,
     this.onDoubleTap,
+    this.onTapMessage,
   });
 
   @override
@@ -100,6 +102,7 @@ class ChatRowPermanent extends StatelessWidget {
             GestureDetector(
               onLongPress: onLongPress,
               onDoubleTap: onDoubleTap,
+              onTap: onTapMessage,
               child: Container(
                 key: bubbleKey,
                 child: AnimatedEmoji(
@@ -187,6 +190,7 @@ class ChatRowPermanent extends StatelessWidget {
                           GestureDetector(
                             onLongPress: onLongPress,
                             onDoubleTap: onDoubleTap,
+                            onTap: onTapMessage,
                             child: Container(
                               key: bubbleKey,
                               child: AnimatedBubble(

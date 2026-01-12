@@ -233,11 +233,49 @@ service cloud.firestore {
           && request.resource.data.senderId is string
           && request.resource.data.createdAt != null;
 
+        function viewedByMap() {
+          return resource.data.viewedBy is map
+            ? resource.data.viewedBy
+            : {};
+        }
+
+        function isViewOnceRecipient() {
+          return request.auth.uid != resource.data.senderId;
+        }
+
+        function isViewOnceImage() {
+          return resource.data.viewOnce == true
+            && resource.data.type == "image";
+        }
+
         allow update: if isRoomParticipant()
-          && request.writeFields.size() == 1
-          && request.writeFields.hasOnly([
-            "reactions." + request.auth.uid
-          ]);
+          && (
+            request.writeFields.size() == 1
+            && request.writeFields.hasOnly([
+              "reactions." + request.auth.uid
+            ])
+
+            || (
+              isViewOnceImage()
+              && isViewOnceRecipient()
+              && request.resource.data.senderId == resource.data.senderId
+              && request.resource.data.viewOnce == true
+              && request.resource.data.diff(resource.data).changedKeys()
+                .hasOnly([
+                  "viewedBy",
+                  "type",
+                  "text",
+                  "imagePath",
+                  "imageDeleted",
+                  "deletedAt",
+                  "deletedBy"
+                ])
+              && request.resource.data.viewedBy is map
+              && request.resource.data.viewedBy.keys().hasOnly(
+                viewedByMap().keys().union([request.auth.uid])
+              )
+            )
+          );
 
       }
     }

@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 
 class ChatService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final _storage = FirebaseStorage.instance;
 
   String get uid => _auth.currentUser!.uid;
 
@@ -125,6 +129,60 @@ class ChatService {
       "lastMessageIv": encrypted["iv"],
       "lastMessageKeyId": keyId,
       
+      "lastSenderId": uid,
+      "lastMessageAt": FieldValue.serverTimestamp(),
+      "deletedFor.$otherUid": FieldValue.delete(),
+      "unread.$otherUid": FieldValue.increment(1),
+      "unread.$uid": 0,
+    });
+
+    await batch.commit();
+  }
+
+  Future<void> sendImageMessage({
+    required String roomId,
+    required File file,
+    String? replyToId,
+    String? replyText,
+  }) async {
+    final roomRef = _db.collection("chatRooms").doc(roomId);
+    final msgRef = roomRef.collection("messages").doc();
+
+    final roomSnap = await roomRef.get();
+    final participants = List<String>.from(roomSnap["participants"]);
+    final otherUid = participants.firstWhere((e) => e != uid);
+
+    final imagePath = "chatRooms/$roomId/images/${msgRef.id}.jpg";
+    final storageRef = _storage.ref(imagePath);
+
+    await storageRef.putFile(
+      file,
+      SettableMetadata(
+        contentType: "image/jpeg",
+        cacheControl: "no-store",
+      ),
+    );
+
+    final batch = _db.batch();
+
+    batch.set(msgRef, {
+      "senderId": uid,
+      "text": "Ảnh",
+      "type": "image",
+      "imagePath": imagePath,
+      "viewOnce": true,
+      "viewedBy": {},
+      "replyToId": replyToId,
+      "replyText": replyText,
+      "createdAt": FieldValue.serverTimestamp(),
+    });
+
+    batch.update(roomRef, {
+      "lastMessage": "Ảnh",
+      "lastMessageType": "image",
+      "lastMessageCipher": FieldValue.delete(),
+      "lastMessageIv": FieldValue.delete(),
+      "lastMessageKeyId": 0,
       "lastSenderId": uid,
       "lastMessageAt": FieldValue.serverTimestamp(),
       "deletedFor.$otherUid": FieldValue.delete(),

@@ -148,6 +148,16 @@ class ChatBottomBar extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  /// IMAGE
+                  IconButton(
+                    icon: const Icon(Icons.image_outlined, size: 22),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      controller.hideEmoji();
+                      controller.pickAndSendImage();
+                    },
+                  ),
+
                   /// 😊 EMOJI
                   IconButton(
                     icon: const Icon(Iconsax.emoji_happy, size: 22),

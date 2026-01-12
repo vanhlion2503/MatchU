@@ -137,8 +137,26 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             final createdAt = _getTime(data["createdAt"]);
             final isNewestMessage = messageIndex == 0;
             final messageType = data["type"] ?? "text";
-            final isDeleted = messageType == "deleted" ||
-                widget.controller.deletedMessageIds.contains(doc.id);
+            final viewedByRaw = data["viewedBy"];
+            final viewedBy = viewedByRaw is Map
+                ? Map<String, dynamic>.from(viewedByRaw)
+                : <String, dynamic>{};
+            final hasViewed = viewedBy.containsKey(uid);
+            final isViewOnce = data["viewOnce"] == true;
+            final isViewOnceImage = isViewOnce && messageType == "image";
+            final imagePath = data["imagePath"] is String
+                ? data["imagePath"] as String
+                : "";
+            final isMissingImage = isViewOnceImage && imagePath.isEmpty;
+            final isConsumedByRecipient = isViewOnceImage &&
+                hasViewed && data["senderId"] != uid;
+            final effectiveType = (messageType == "deleted" ||
+                    widget.controller.deletedMessageIds.contains(doc.id) ||
+                    isConsumedByRecipient ||
+                    isMissingImage)
+                ? "deleted"
+                : messageType;
+            final isDeleted = effectiveType == "deleted";
 
             // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
             final bubbleKey = _bubbleKeys.putIfAbsent(
@@ -197,18 +215,31 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                             final otherUid = widget.controller.otherUid.value;
                             final isMyLastMessage = isMe && messageIndex == 0;
 
-                            final decryptedText = widget.controller.decryptedCache[doc.id] ?? "…";
+                            final rawText = data["text"];
+                            final fallbackText =
+                                rawText is String ? rawText : "...";
+                            final decryptedText =
+                                widget.controller.decryptedCache[doc.id] ?? fallbackText;
+                            final displayText = isDeleted
+                                ? (isViewOnce
+                                    ? ChatController.viewOnceDeletedText
+                                    : (rawText is String && rawText.isNotEmpty
+                                        ? rawText
+                                        : decryptedText))
+                                : decryptedText;
                             final isPressed = _activeReactionMessageId == doc.id;
                             final reactions = Map<String, String>.from(
                               data["reactions"] ?? {},
                             );
+                            final canOpenImage =
+                                isViewOnceImage && !isDeleted;
 
                             return ChatRowPermanent(
                               key: ValueKey(doc.id), // 🔥 BẮT BUỘC
                               messageId: doc.id,
                               senderId: data["senderId"],
-                              text: decryptedText,
-                              type: isDeleted ? "deleted" : messageType,
+                              text: displayText,
+                              type: effectiveType,
                               isMe: isMe,
                               showAvatar: !isMe && isLastInGroup,
                               status: isMyLastMessage
@@ -232,6 +263,14 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                   ? () => widget.controller.scrollToMessage(
                                         docs: docs,
                                         messageId: data["replyToId"],
+                                      )
+                                  : null,
+                              onTapMessage: canOpenImage
+                                  ? () => widget.controller.openViewOnceImage(
+                                        messageId: doc.id,
+                                        senderId: data["senderId"],
+                                        imagePath: imagePath,
+                                        isLatest: isNewestMessage,
                                       )
                                   : null,
                               reactions: isDeleted ? null : reactions,
