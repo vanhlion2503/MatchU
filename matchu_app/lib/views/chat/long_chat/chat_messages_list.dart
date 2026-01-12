@@ -13,6 +13,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_row_permanent.dart';
+import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
 
@@ -71,6 +72,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
         // Sử dụng allMessages từ controller
         return Obx(() {
           final docs = widget.controller.allMessages;
+          final pending = widget.controller.pendingImageMessages;
+          final pendingCount = pending.length;
           
           if (docs.isEmpty && !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -78,7 +81,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
 
           // ✅ Đảm bảo itemCount hợp lệ
           // +1 cho typing slot, +1 cho loading indicator nếu đang load more
-          final itemCount = docs.length + 1 + (widget.controller.isLoadingMore ? 1 : 0);
+          final itemCount = docs.length + pendingCount + 1 + (widget.controller.isLoadingMore ? 1 : 0);
 
           return ScrollablePositionedList.builder(
             reverse: true, // ✅ Tin mới ở index 0, hiển thị ở đáy
@@ -105,6 +108,11 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
               });
             }
 
+            if (pendingCount > 0 && i <= pendingCount) {
+              final pendingItem = pending[i - 1];
+              return _buildPendingImageBubble(context, pendingItem);
+            }
+
             /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
             if (widget.controller.isLoadingMore && i == itemCount - 1) {
               return Obx(() {
@@ -123,7 +131,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             /// ================= MESSAGE =================
             // Với reverse: true, index 0 là typing, index 1+ là messages
             // docs[0] là tin mới nhất
-            final messageIndex = i - 1;
+            final messageIndex = i - 1 - pendingCount;
             
             // ✅ Kiểm tra bounds để tránh RangeError
             if (messageIndex < 0 || messageIndex >= docs.length) {
@@ -327,7 +335,87 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     );
   }
 
-  // ================= HELPER =================
+  Widget _buildPendingImageBubble(
+    BuildContext context,
+    PendingImageMessage pending,
+  ) {
+    final theme = Theme.of(context);
+    final bubbleColor = theme.colorScheme.primary;
+    final textColor = theme.colorScheme.onPrimary;
+
+    return Obx(() {
+      final progress = pending.progress.value;
+      final failed = pending.failed.value;
+
+      final label = failed ? "Gửi ảnh" : "Đang gửi ảnh...";
+
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Flexible(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: constraints.maxWidth * 0.65,
+                    ),
+                    child: AnimatedBubble(
+                      isMe: true,
+                      highlighted: false,
+                      pressed: false,
+                      bubbleColor: bubbleColor,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.image_outlined,
+                                size: 20,
+                                color: textColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  label,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: textColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          LinearProgressIndicator(
+                            value: failed
+                                ? null
+                                : (progress > 0 ? progress : null),
+                            minHeight: 3,
+                            backgroundColor: textColor.withOpacity(0.2),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(textColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+// ================= HELPER =================
 
   DateTime? _getTime(dynamic value) {
     if (value == null) return null;
@@ -421,7 +509,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
   }) {
     if (!mounted) return;
 
-    final canCopy = messageText.trim().isNotEmpty && !isDeleted;
+    final canCopy =
+        messageType == "text" && messageText.trim().isNotEmpty && !isDeleted;
     final canEdit = isMe && !isDeleted && messageType == "text";
     final canDelete = isMe && !isDeleted;
     final canReact = !isDeleted;

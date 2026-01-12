@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -144,6 +145,7 @@ class ChatService {
     required File file,
     String? replyToId,
     String? replyText,
+    void Function(double progress)? onUploadProgress,
   }) async {
     final roomRef = _db.collection("chatRooms").doc(roomId);
     final msgRef = roomRef.collection("messages").doc();
@@ -155,13 +157,29 @@ class ChatService {
     final imagePath = "chatRooms/$roomId/images/${msgRef.id}.jpg";
     final storageRef = _storage.ref(imagePath);
 
-    await storageRef.putFile(
+    final uploadTask = storageRef.putFile(
       file,
       SettableMetadata(
         contentType: "image/jpeg",
         cacheControl: "no-store",
       ),
     );
+
+    StreamSubscription<TaskSnapshot>? uploadSub;
+    if (onUploadProgress != null) {
+      uploadSub = uploadTask.snapshotEvents.listen((snapshot) {
+        if (snapshot.totalBytes > 0) {
+          onUploadProgress(snapshot.bytesTransferred / snapshot.totalBytes);
+        }
+      });
+    }
+
+    try {
+      await uploadTask;
+      onUploadProgress?.call(1.0);
+    } finally {
+      await uploadSub?.cancel();
+    }
 
     final batch = _db.batch();
 

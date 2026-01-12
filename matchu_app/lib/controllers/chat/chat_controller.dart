@@ -38,6 +38,9 @@ class ChatController extends GetxController {
   // ================= INPUT =================
   final inputController = TextEditingController();
   final inputFocusNode = FocusNode();
+
+  final RxList<PendingImageMessage> pendingImageMessages =
+      <PendingImageMessage>[].obs;
   final ImagePicker _picker = ImagePicker();
 
   // ================= STATE =================
@@ -448,7 +451,8 @@ class ChatController extends GetxController {
             positions.map((e) => e.index).reduce((a, b) => a > b ? a : b);
         
         // Khi scroll đến 90% của list hiện tại (gần đầu), load more
-        final totalItems = allMessages.length + 1; // +1 cho typing
+        final totalItems =
+            allMessages.length + 1 + pendingImageMessages.length;
         if (maxIndex >= totalItems * 0.9) {
           // Gọi method trực tiếp để tránh lỗi lookup
           Future.microtask(() => loadMoreMessages());
@@ -577,6 +581,10 @@ class ChatController extends GetxController {
     await _service.setTyping(roomId: roomId, isTyping: false);
 
     final reply = replyingMessage.value;
+    final pending = PendingImageMessage(
+      id: "local_${DateTime.now().microsecondsSinceEpoch}",
+    );
+    pendingImageMessages.insert(0, pending);
 
     try {
       await _service.sendImageMessage(
@@ -584,10 +592,21 @@ class ChatController extends GetxController {
         file: File(picked.path),
         replyToId: reply?["id"],
         replyText: reply?["text"],
+        onUploadProgress: (progress) {
+          final safe = progress.clamp(0.0, 1.0);
+          pending.progress.value = safe;
+        },
       );
+      if (pendingImageMessages.contains(pending)) {
+        pendingImageMessages.remove(pending);
+      }
       replyingMessage.value = null;
     } catch (e) {
+      pending.failed.value = true;
       Get.snackbar("Loi", "Khong the gui anh.");
+      Future.delayed(const Duration(seconds: 2), () {
+        pendingImageMessages.remove(pending);
+      });
     }
   }
 
@@ -1098,7 +1117,18 @@ class ChatController extends GetxController {
     decryptedCache.clear();
     _decrypting.clear();
     deletedMessageIds.clear();
+    pendingImageMessages.clear();
     allMessages.clear();
     super.onClose();
   }
+}
+
+class PendingImageMessage {
+  final String id;
+  final RxDouble progress = 0.0.obs;
+  final RxBool failed = false.obs;
+
+  PendingImageMessage({
+    required this.id,
+  });
 }

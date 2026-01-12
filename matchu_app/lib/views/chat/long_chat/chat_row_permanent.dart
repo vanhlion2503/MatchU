@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/utils/reaction_registry.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
@@ -116,8 +117,17 @@ class ChatRowPermanent extends StatelessWidget {
           ],
         ),
       );
+
     }
 
+    // ================= IMAGE MESSAGE =================
+    if (type == "image") {
+      return _buildImageMessage(
+        context,
+        bubbleColor,
+        resolvedTextColor,
+      );
+    }
 
     // ================= TEXT MESSAGE =================
     return Padding(
@@ -272,6 +282,187 @@ class ChatRowPermanent extends StatelessWidget {
       ),
     );
   }
+  Widget _buildImageMessage(
+    BuildContext context,
+    Color bubbleColor,
+    Color textColor,
+  ) {
+    final theme = Theme.of(context);
+    final label = text.isNotEmpty ? text : "Ảnh";
+
+    return Padding(
+      padding: EdgeInsets.only(top: smallMargin ? 6 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe)
+            SizedBox(
+              width: 36,
+              child: showAvatar
+                  ? UserAvatar(userId: senderId)
+                  : const SizedBox(),
+            ),
+          if (!isMe) const SizedBox(width: 6),
+          Flexible(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.65,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: isMe
+                        ? CrossAxisAlignment.end
+                        : CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (replyText != null && replyToId != null)
+                        GestureDetector(
+                          onTap: onTapReply,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.brightness == Brightness.dark
+                                  ? const Color.fromARGB(255, 77, 76, 76)
+                                  : const Color(0xFFF4F6F8)
+                                      .withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border(
+                                left: BorderSide(
+                                  color: theme.colorScheme.primary,
+                                  width: 4,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              replyText!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        ),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            onLongPress: onLongPress,
+                            onDoubleTap: onDoubleTap,
+                            onTap: onTapMessage,
+                            child: Container(
+                              key: bubbleKey,
+                              child: AnimatedBubble(
+                                isMe: isMe,
+                                highlighted: highlighted,
+                                pressed: isPressed,
+                                bubbleColor: bubbleColor,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Iconsax.gallery,
+                                          size: 20,
+                                          color: textColor,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            label,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: theme
+                                                .textTheme.bodyMedium
+                                                ?.copyWith(
+                                              color: textColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (onTapMessage != null) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        "Chạm để xem",
+                                        style: theme
+                                            .textTheme.labelSmall
+                                            ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: textColor.withOpacity(0.8),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (reactions != null && reactions!.isNotEmpty)
+                            Positioned(
+                              bottom: -10,
+                              right: isMe ? -6 : null,
+                              left: isMe ? null : -6,
+                              child: _MessengerReactionBadge(
+                                reactions: reactions!,
+                                isMe: isMe,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      if (showTime && time.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            time,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
+                      if (isMe && status != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (status == MessageStatus.seen)
+                                SeenAvatarAnimated(
+                                  userId: seenByUid,
+                                  size: 14,
+                                )
+                              else if (status == MessageStatus.sent)
+                                Text(
+                                  "Đã gửi",
+                                  style: theme.textTheme.labelSmall
+                                      ?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 bool _isEmojiOnly(String text) {

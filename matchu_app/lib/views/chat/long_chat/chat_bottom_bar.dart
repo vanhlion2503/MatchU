@@ -150,7 +150,7 @@ class ChatBottomBar extends StatelessWidget {
                 children: [
                   /// IMAGE
                   IconButton(
-                    icon: const Icon(Icons.image_outlined, size: 22),
+                    icon: const Icon(Iconsax.gallery, size: 22),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       controller.hideEmoji();
