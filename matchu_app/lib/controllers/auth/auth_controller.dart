@@ -286,6 +286,15 @@ class AuthController extends GetxController {
 
       await logoutC();
       _box.remove('isRegistering');
+      
+      Get.snackbar(
+        "🎉 Đăng ký thành công",
+        "Vui lòng đăng nhập để tiếp tục",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.withOpacity(0.9),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
       Get.offAllNamed('/');
 
     } on FirebaseAuthException catch (e) {

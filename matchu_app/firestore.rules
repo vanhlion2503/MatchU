@@ -248,12 +248,35 @@ service cloud.firestore {
             && resource.data.type == "image";
         }
 
+        function isSender() {
+          return request.auth.uid == resource.data.senderId;
+        }
+
         allow update: if isRoomParticipant()
           && (
             request.writeFields.size() == 1
             && request.writeFields.hasOnly([
               "reactions." + request.auth.uid
             ])
+
+            || (
+              isSender()
+              && request.resource.data.senderId == resource.data.senderId
+              && request.resource.data.createdAt == resource.data.createdAt
+              && (request.resource.data.type == "text"
+                  || request.resource.data.type == "deleted")
+              && request.resource.data.diff(resource.data).changedKeys()
+                .hasOnly([
+                  "ciphertext",
+                  "iv",
+                  "keyId",
+                  "type",
+                  "editedAt",
+                  "editedBy",
+                  "deletedAt",
+                  "deletedBy"
+                ])
+            )
 
             || (
               isViewOnceImage()
