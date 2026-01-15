@@ -279,7 +279,7 @@ class TempChatController extends GetxController {
 
         Future.delayed(const Duration(seconds: 2), () {
           if (isClosed) return;
-          Get.offNamed(
+          Get.offAllNamed(
             "/rating",
             arguments: {
               "roomId": roomId,

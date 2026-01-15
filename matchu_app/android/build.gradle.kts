@@ -19,3 +19,16 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force(
+                "org.jetbrains.kotlin:kotlin-stdlib:1.9.24",
+                "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.24",
+                "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.24"
+            )
+        }
+    }
+}
+

@@ -132,4 +132,19 @@ class UserService {
       return false;
     }
   }
+
+  Future<void> updateUserLocation({
+    required double lat,
+    required double lng,
+  }) async {
+    await _db.collection("users").doc(uid).set({
+      "location": {
+        "lat": lat,
+        "lng": lng,
+      },
+      "updatedAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+
 }

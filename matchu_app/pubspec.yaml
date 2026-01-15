@@ -64,6 +64,7 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   pointycastle: ^4.0.0
   convert: ^3.1.2
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

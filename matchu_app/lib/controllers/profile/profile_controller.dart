@@ -13,34 +13,63 @@ class ProfileController extends GetxController{
   final isLoading = true.obs;
   
   StreamSubscription<DocumentSnapshot>? _userSub;
+  StreamSubscription<User?>? _authSub;
+  Timer? _retryTimer;
   
+  @override
   void onInit(){
     super.onInit();
-     _listenUserProfile();
+    _authSub = _auth.authStateChanges().listen((firebaseUser) {
+      if (firebaseUser == null) {
+        cleanup();
+        return;
+      }
+      _listenUserProfile(firebaseUser.uid);
+    });
+
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      _listenUserProfile(currentUser.uid);
+    } else {
+      isLoading.value = false;
+    }
   }
 
-  void _listenUserProfile(){
+  void _listenUserProfile([String? uid]){
     _userSub?.cancel();
     
-    final firebaseUser = _auth.currentUser;
-    if (firebaseUser == null) {
+    final targetUid = uid ?? _auth.currentUser?.uid;
+    if (targetUid == null) {
       isLoading.value = false;
       return;
     }
-    
-    _userSub = _db.collection('users').doc(firebaseUser.uid).snapshots().listen(
+
+    isLoading.value = true;
+    _userSub = _db.collection('users').doc(targetUid).snapshots().listen(
       (doc) {
         if (doc.data() != null) {
           user.value = UserModel.fromJson(doc.data()!, doc.id);
+        } else {
+          user.value = null;
         }
         isLoading.value = false;
       },
       onError: (error) {
-        // 🔒 Handle permission denied và các lỗi khác
+        // Handle permission or transient errors.
         _userSub?.cancel();
         _userSub = null;
         user.value = null;
         isLoading.value = false;
+        if (_retryTimer != null) return;
+
+        final retryUid = _auth.currentUser?.uid;
+        if (retryUid == null) return;
+
+        _retryTimer = Timer(const Duration(seconds: 2), () {
+          _retryTimer = null;
+          if (isClosed) return;
+          _listenUserProfile(retryUid);
+        });
       },
       cancelOnError: false,
     );
@@ -123,10 +152,14 @@ class ProfileController extends GetxController{
     _userSub = null;
     user.value = null;
     isLoading.value = false;
+    _retryTimer?.cancel();
+    _retryTimer = null;
   }
 
   @override
   void onClose() {
+    _authSub?.cancel();
+    _authSub = null;
     cleanup();
     super.onClose();
   }

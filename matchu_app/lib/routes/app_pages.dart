@@ -3,6 +3,7 @@ import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
+import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
@@ -98,6 +99,9 @@ class AppPages {
 
         // 🔹 Feature
         Get.put(AvatarController());
+
+        // 🔥 NEARBY
+        Get.put(NearbyController());
       })
     ),
     GetPage(
