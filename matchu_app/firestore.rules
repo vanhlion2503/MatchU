@@ -9,7 +9,49 @@ service cloud.firestore {
 
     // ================= USERS =================
     match /users/{userId} {
-      allow read, write: if request.auth != null;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner() {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      function followersBefore() {
+        return resource.data.followers is list
+          ? resource.data.followers
+          : [];
+      }
+
+      function followersAfter() {
+        return request.resource.data.followers is list
+          ? request.resource.data.followers
+          : [];
+      }
+
+      function isAddSelfFollower() {
+        return !(request.auth.uid in followersBefore())
+          && request.auth.uid in followersAfter()
+          && followersAfter().size() == followersBefore().size() + 1;
+      }
+
+      function isRemoveSelfFollower() {
+        return request.auth.uid in followersBefore()
+          && !(request.auth.uid in followersAfter())
+          && followersAfter().size() + 1 == followersBefore().size();
+      }
+
+      function isFollowersOnlyUpdate() {
+        return request.auth != null
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["followers"])
+          && (isAddSelfFollower() || isRemoveSelfFollower());
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isOwner();
+      allow update: if isOwner() || isFollowersOnlyUpdate();
+      allow delete: if false;
       
       match /devices/{deviceId} {
 

@@ -41,7 +41,7 @@ class TempChatView extends StatelessWidget {
           preferredSize: const Size.fromHeight(4), // chiều cao progress bar
           child: Obx(() {
             final sec = controller.remainingSeconds.value;
-            final total = 180.0;
+            final total = 420.0;
             final progress = (sec / total).clamp(0.0, 1.0);
             final isDanger = sec <= 30;
 

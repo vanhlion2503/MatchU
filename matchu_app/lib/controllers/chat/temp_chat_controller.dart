@@ -25,7 +25,7 @@ class TempChatController extends GetxController {
   final uid = Get.find<AuthController>().user!.uid;
   final _db = FirebaseFirestore.instance;
 
-  final remainingSeconds = 180.obs;
+  final remainingSeconds = 420.obs;
   final userLiked = RxnBool();
   final otherLiked = RxnBool();
   final isTyping = false.obs;

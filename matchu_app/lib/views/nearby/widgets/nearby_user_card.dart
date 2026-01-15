@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:matchu_app/models/nearby_user_vm.dart';
+import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class NearbyUserCard extends StatelessWidget {
   final NearbyUserVM user;
@@ -24,7 +26,10 @@ class NearbyUserCard extends StatelessWidget {
       elevation: 0,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: () {},
+        onTap: () {
+          if (user.uid.isEmpty) return;
+          Get.to(() => OtherProfileView(userId: user.uid));
+        },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
