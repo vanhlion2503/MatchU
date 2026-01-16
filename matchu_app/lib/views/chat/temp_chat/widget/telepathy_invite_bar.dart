@@ -3,6 +3,12 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy_controller.dart';
 
+const _brandGradient = LinearGradient(
+  colors: [Color(0xFFF97316), Color(0xFFEC4899)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
 class TelepathyInviteBar extends StatelessWidget {
   final TempChatController controller;
 
@@ -26,16 +32,15 @@ class TelepathyInviteBar extends StatelessWidget {
 
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.dividerColor),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: Colors.black.withOpacity(0.14),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
@@ -43,59 +48,76 @@ class TelepathyInviteBar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.12),
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
                     shape: BoxShape.circle,
+                    gradient: _brandGradient,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.flash_on,
-                    size: 18,
-                    color: theme.colorScheme.primary,
+                    size: 22,
+                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    "Minigame: Kiểm tra độ hợp nhau?",
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Thử thách thần giao cách cảm?",
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Cùng kiểm tra độ hợp nhau. Cả 2 hãy đồng ý để bắt đầu",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              "Cả 2 cùng đồng ý mới bắt đầu.",
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             if (waiting)
               Row(
                 children: [
-                  const SizedBox(
+                  SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        theme.colorScheme.primary,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       otherAccepted
                           ? "Đang bắt đầu..."
-                          : "Đã đồng ý, chờ người kia...",
+                          : "Đang chờ đối phương đồng ý...",
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => telepathy.respond(false),
-                    child: const Text("Để sau"),
+                  _GhostActionButton(
+                    label: "Bỏ qua",
+                    icon: Icons.local_fire_department,
+                    compact: true,
+                    onTap: () => telepathy.respond(false),
                   ),
                 ],
               )
@@ -103,16 +125,18 @@ class TelepathyInviteBar extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => telepathy.respond(false),
-                      child: const Text("Bỏ qua 🙅"),
+                    child: _GhostActionButton(
+                      label: "Bỏ qua",
+                      icon: Icons.local_fire_department,
+                      onTap: () => telepathy.respond(false),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: FilledButton(
-                      onPressed: () => telepathy.respond(true),
-                      child: const Text("Đồng ý 🤙"),
+                    child: _GradientActionButton(
+                      label: "Đồng ý",
+                      icon: Icons.flash_on,
+                      onTap: () => telepathy.respond(true),
                     ),
                   ),
                 ],
@@ -121,5 +145,107 @@ class TelepathyInviteBar extends StatelessWidget {
         ),
       );
     });
+  }
+}
+
+class _GhostActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool compact;
+
+  const _GhostActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final vertical = compact ? 8.0 : 12.0;
+    final horizontal = compact ? 12.0 : 14.0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: EdgeInsets.symmetric(
+            vertical: vertical,
+            horizontal: horizontal,
+          ),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F4F5),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE4E4E7)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: compact ? 14 : 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GradientActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _GradientActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            gradient: _brandGradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
