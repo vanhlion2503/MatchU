@@ -32,10 +32,20 @@ class TelepathyPinnedBanner extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
+            // 🔼 Bóng phía trên
+            BoxShadow(
+              color: theme.brightness == Brightness.dark
+                  ? Colors.black.withOpacity(0.30)
+                  : Colors.black.withOpacity(0.06),
+              blurRadius: 14,
+              offset: const Offset(0, -6),
+            ),
+
+            // 🔽 Bóng phía dưới
             BoxShadow(
               color: theme.brightness == Brightness.dark
                   ? Colors.black.withOpacity(0.35)
-                  : Colors.black.withOpacity(0.08),
+                  : Colors.black.withOpacity(0.10),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),

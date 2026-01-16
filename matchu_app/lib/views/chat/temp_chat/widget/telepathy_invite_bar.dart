@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
 const _brandGradient = LinearGradient(
   colors: [Color(0xFFF97316), Color(0xFFEC4899)],
@@ -178,9 +179,10 @@ class _GhostActionButton extends StatelessWidget {
             horizontal: horizontal,
           ),
           decoration: BoxDecoration(
-            color: const Color(0xFFF4F4F5),
+            color: Theme.of(context).brightness == Brightness.dark 
+                        ? AppTheme.darkBorder 
+                        : AppTheme.lightBorder,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE4E4E7)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -193,7 +195,7 @@ class _GhostActionButton extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: theme.textTheme.bodySmall?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -237,7 +239,7 @@ class _GradientActionButton extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: theme.textTheme.bodySmall?.copyWith(
+                style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
