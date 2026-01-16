@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -77,7 +76,7 @@ class AuthController extends GetxController {
   void updateBirthdayIfReady() {
     if (selectedDay.value == null ||
         selectedMonth.value == null ||
-        selectedYear.value == null) return;
+        selectedYear.value == null) {return;}
 
     final y = selectedYear.value!;
     final m = selectedMonth.value!;

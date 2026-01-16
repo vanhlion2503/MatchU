@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
+import 'package:matchu_app/controllers/game/telepathy_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/quick_message.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
@@ -51,6 +52,8 @@ class TempChatController extends GetxController {
   int _lastMessageCount = 0;
   int? _lastHapticSecond;
   bool _hasNavigatedToMatch = false;
+  bool _hasTelepathyInvite = false;
+  static const int _telepathyInviteSecond = 390;
 
 
   Timer? _typingTimer;
@@ -81,21 +84,24 @@ class TempChatController extends GetxController {
     QuickMessage(id: "sport", text: "⚽ Bạn có chơi thể thao không?"),
   ];
 
+  late final TelepathyController telepathy;
+
   @override
   void onInit() {
     super.onInit();
+    telepathy = Get.put(TelepathyController(roomId), tag: roomId);
     _startTimer();
     _listenRoom();
     _loadOtherUserRating();
     _saveMyAnonymousAvatarToRoom();
     _listenAnonymousAvatars();
-    // Listen typing để auto scroll
+    // Listen typing ?? auto scroll
     currentQuickMessages.assignAll(_introMessages);
 
-    // Sau 20s đổi sang câu hỏi
+    // Sau 20s ??i sang c?u h?i
     quickPhase.value = QuickMessagePhase.intro;
     currentQuickMessages.assignAll(_introMessages);
-      ever<bool>(otherTyping, _onOtherTypingChanged);
+    ever<bool>(otherTyping, _onOtherTypingChanged);
   }
 
   List<QuickMessage> _pickRandomIceBreakers({int min = 6, int max = 7}) {
@@ -176,6 +182,21 @@ class TempChatController extends GetxController {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       remainingSeconds.value--;
+
+      if (remainingSeconds.value == _telepathyInviteSecond &&
+          !_hasTelepathyInvite) {
+        _hasTelepathyInvite = true;
+        final room = await service.getRoom(roomId);
+        final isA = room["userA"] == uid;
+        if (!isA) return;
+
+        final gameStatus = telepathy.status.value;
+        if (gameStatus == TelepathyStatus.idle ||
+            gameStatus == TelepathyStatus.cancelled ||
+            gameStatus == TelepathyStatus.finished) {
+          await telepathy.invite();
+        }
+      }
 
       if (remainingSeconds.value <= 10 &&
           remainingSeconds.value > 0 &&

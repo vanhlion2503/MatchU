@@ -4,6 +4,9 @@ import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/views/chat/chat_widget/gender_icon.dart';
 import 'package:matchu_app/views/chat/temp_chat/bottom_action_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/widget/heart_rain_overlay.dart';
+import 'package:matchu_app/views/chat/temp_chat/widget/telepathy_game_overlay.dart';
+import 'package:matchu_app/views/chat/temp_chat/widget/telepathy_pinned_banner.dart';
+import 'package:matchu_app/views/chat/temp_chat/widget/telepathy_result_overlay.dart';
 import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
@@ -222,15 +225,22 @@ class TempChatView extends StatelessWidget {
 
 
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            children: [
-              Expanded(child: MessagesList(roomId, controller)),
-              BottomActionBar(controller),
-            ],
-          ),
-        )
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: [
+                  TelepathyPinnedBanner(controller: controller),
+                  Expanded(child: MessagesList(roomId, controller)),
+                  BottomActionBar(controller),
+                ],
+              ),
+            ),
+            TelepathyGameOverlay(controller: controller),
+            TelepathyResultOverlay(controller: controller),
+          ],
+        ),
       ),
     );
   }

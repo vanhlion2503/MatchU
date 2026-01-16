@@ -48,9 +48,43 @@ service cloud.firestore {
           && (isAddSelfFollower() || isRemoveSelfFollower());
       }
 
+      function isRatingOnlyUpdate() {
+        let oldTotal = resource.data.totalChatRatings is int
+          ? resource.data.totalChatRatings
+          : (resource.data.totalChatRatings is number
+            ? resource.data.totalChatRatings
+            : 0);
+
+        return request.auth != null
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["avgChatRating", "totalChatRatings"])
+          && request.resource.data.totalChatRatings is number
+          && request.resource.data.totalChatRatings == oldTotal + 1
+          && request.resource.data.avgChatRating is number
+          && request.resource.data.avgChatRating >= 0
+          && request.resource.data.avgChatRating <= 5;
+      }
+
+      function isReportOnlyUpdate() {
+        let oldTotal = resource.data.totalReports is int
+          ? resource.data.totalReports
+          : (resource.data.totalReports is number
+            ? resource.data.totalReports
+            : 0);
+
+        return request.auth != null
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["totalReports"])
+          && request.resource.data.totalReports is number
+          && request.resource.data.totalReports == oldTotal + 1;
+      }
+
       allow read: if isSignedIn();
       allow create: if isOwner();
-      allow update: if isOwner() || isFollowersOnlyUpdate();
+      allow update: if isOwner()
+        || isFollowersOnlyUpdate()
+        || isRatingOnlyUpdate()
+        || isReportOnlyUpdate();
       allow delete: if false;
       
       match /devices/{deviceId} {
@@ -104,7 +138,29 @@ service cloud.firestore {
         return request.auth != null
           && request.auth.uid in resource.data.participants;
       }
-      
+
+      function isValidMinigame() {
+        return request.resource.data.minigame is map
+          && request.resource.data.minigame.type == "telepathy"
+          && request.resource.data.minigame.keys().hasOnly([
+            "type",
+            "status",
+            "invitedAt",
+            "consent",
+            "cancelledBy",
+            "cancelledAt",
+            "finishedAt",
+            "hookSent",
+            "result",
+            "questions",
+            "answers",
+            "currentQuestionIndex",
+            "questionStartedAt",
+            "startedAt",
+            "countdownStartedAt"
+          ]);
+      }
+
       function onlyUpdateMyAvatar() {
         // Các field thay đổi
         let changed = request.resource.data.diff(resource.data).changedKeys();
@@ -131,7 +187,6 @@ service cloud.firestore {
       // ✏️ Update
       allow update: if isParticipant()
         && (
-          // 🔹 update các field hệ thống
           request.resource.data.diff(resource.data).changedKeys()
             .hasOnly([
               "userALiked",
@@ -142,16 +197,19 @@ service cloud.firestore {
               "endedReason",
               "permanentRoomId",
               "endedAt",
+              "minigame"
             ])
-
-          // 🔹 hoặc update avatar của chính mình
+          && (
+            !request.resource.data.diff(resource.data).changedKeys()
+              .hasAny(["minigame"])
+            || isValidMinigame()
+          )
           || (
             request.resource.data.diff(resource.data).changedKeys()
               .hasOnly(["anonymousAvatars"])
             && request.resource.data.anonymousAvatars[request.auth.uid] is string
           )
         );
-
 
       allow delete: if false;
 

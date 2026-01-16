@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 
 class SystemMessageEvent extends StatelessWidget {
   final String text;
+  final Color? backgroundColor;
+  final Color? textColor;
 
   const SystemMessageEvent({
     super.key,
     required this.text,
+    this.backgroundColor,
+    this.textColor,
   });
 
   @override
@@ -25,7 +29,8 @@ class SystemMessageEvent extends StatelessWidget {
             vertical: 8,
           ),
           decoration: BoxDecoration(
-            color: theme.colorScheme.error.withOpacity(0.25),
+            color: backgroundColor ??
+                theme.colorScheme.error.withOpacity(0.25),
             borderRadius: BorderRadius.circular(18),
             // border: Border.all(
             //   color: theme.colorScheme.primary.withOpacity(0.25),
@@ -36,7 +41,8 @@ class SystemMessageEvent extends StatelessWidget {
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: theme.colorScheme.error.withOpacity(0.8),
+              color:
+                  textColor ?? theme.colorScheme.error.withOpacity(0.8),
             ),
           ),
         ),

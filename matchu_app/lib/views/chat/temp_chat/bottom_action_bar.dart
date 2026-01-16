@@ -8,6 +8,7 @@ import 'package:matchu_app/views/chat/temp_chat/icon_action.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:matchu_app/views/chat/temp_chat/widget/quick_message_bar.dart';
+import 'package:matchu_app/views/chat/temp_chat/widget/telepathy_invite_bar.dart';
 
 
 class BottomActionBar extends StatelessWidget {
@@ -26,6 +27,7 @@ class BottomActionBar extends StatelessWidget {
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              TelepathyInviteBar(controller: controller),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Obx((){

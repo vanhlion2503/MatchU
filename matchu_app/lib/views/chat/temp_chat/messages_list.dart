@@ -129,12 +129,29 @@ class _MessagesListState extends State<MessagesList> {
               return const SizedBox();
             }
 
+            if (code == "telepathy_cancelled" && targetUid != uid) {
+              return const SizedBox();
+            }
+
             if (code == "ended" && senderId == uid) {
               return const SizedBox();
             }
 
+            Color? backgroundColor;
+            Color? textColor;
+
+            if (code == "telepathy_cancelled") {
+              backgroundColor = theme.colorScheme.surfaceVariant;
+              textColor = theme.colorScheme.onSurfaceVariant;
+            } else if (code == "telepathy_hook") {
+              backgroundColor = theme.colorScheme.primary.withOpacity(0.12);
+              textColor = theme.colorScheme.primary;
+            }
+
             return SystemMessageEvent(
               text: data["text"] ?? "",
+              backgroundColor: backgroundColor,
+              textColor: textColor,
             );
           }
 
