@@ -57,11 +57,12 @@ class TelepathyResultCalculator {
   ) {
     switch (level) {
       case TelepathyLevel.high:
-        return "Wow! $score% t??ng ??ng! Hai b?n h?p c? qu? tr?i.";
+        return "Wow! $score% tương đồng! Hai bạn hợp cạ quá trời 😳";
       case TelepathyLevel.medium:
-        return "H?p nhau $score%. Kh? ?n ??y ch?!";
+        return "Hợp nhau $score%. Khá ổn đấy chứ! 🤝";
       case TelepathyLevel.low:
-        return "Ch? $score% th?i ?? Tr?i d?u ??i khi l?i h?t nhau m?nh!";
+        return "Chỉ $score% thôi 😅 Trái dấu đôi khi lại hút nhau mạnh!";
     }
+
   }
 }

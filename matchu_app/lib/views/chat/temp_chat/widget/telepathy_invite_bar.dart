@@ -194,8 +194,7 @@ class _GhostActionButton extends StatelessWidget {
               Text(
                 label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -219,6 +218,7 @@ class _GradientActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -237,8 +237,7 @@ class _GradientActionButton extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),

@@ -288,19 +288,25 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Row(
+              child: Column(
                 children: [
                   _buildOptionCard(
                     label: question.left,
+                    subtitle: "Chạm để chọn",
+                    badge: "A",
+                    icon: Icons.home_outlined,
                     selected:
                         telepathy.myAnswers[question.id] == question.left,
                     accent: _matchColor,
                     disabled: disabled,
                     onTap: () => telepathy.answer(question.left),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(height: 14),
                   _buildOptionCard(
                     label: question.right,
+                    subtitle: "Chạm để chọn",
+                    badge: "B",
+                    icon: Icons.terrain_outlined,
                     selected:
                         telepathy.myAnswers[question.id] == question.right,
                     accent: _diffColor,
@@ -376,59 +382,97 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
 
   Widget _buildOptionCard({
     required String label,
+    required String subtitle,
+    required String badge,
+    required IconData icon,
     required bool selected,
     required bool disabled,
     required Color accent,
     required VoidCallback onTap,
   }) {
+    final borderColor =
+        selected ? accent : Colors.white.withOpacity(0.18);
+    final backgroundColor =
+        selected ? accent.withOpacity(0.18) : Colors.white.withOpacity(0.08);
+    final mutedColor = Colors.white.withOpacity(0.35);
+    final textColor = Colors.white;
+    final subtitleColor = Colors.white.withOpacity(0.7);
+    final disabledOpacity = disabled && !selected ? 0.6 : 1.0;
+
     return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: disabled ? null : onTap,
-          borderRadius: BorderRadius.circular(22),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: selected
-                  ? accent.withOpacity(0.25)
-                  : Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: selected ? accent : Colors.white.withOpacity(0.15),
-                width: 1.2,
+      child: Opacity(
+        opacity: disabledOpacity,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: disabled ? null : onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: borderColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight:
-                        selected ? FontWeight.w700 : FontWeight.w600,
-                    fontSize: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Icon(icon, size: 28, color: mutedColor),
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withOpacity(0.75),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const Spacer(),
-                if (selected)
+                  const Spacer(),
                   Text(
-                    "Bạn chọn",
+                    label,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  )
-                else
-                  Text(
-                    "Chọn nhanh!",
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
+                      color: textColor,
+                      fontWeight: selected
+                          ? FontWeight.w700
+                          : FontWeight.w600,
+                      fontSize: 16,
                     ),
                   ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: subtitleColor,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

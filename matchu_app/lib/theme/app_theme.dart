@@ -148,7 +148,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
         ),
         textStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
         elevation: 0,
@@ -164,7 +164,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
         ),
         textStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -178,7 +178,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
         ),
         textStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -189,7 +189,7 @@ class AppTheme {
         foregroundColor: primaryColor,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         textStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -337,7 +337,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
         ),
         textStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
         elevation: 0,
@@ -352,6 +352,10 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        textStyle: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
 
@@ -363,6 +367,10 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        textStyle: GoogleFonts.inter(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
 
@@ -371,7 +379,7 @@ class AppTheme {
         foregroundColor: primaryColor,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         textStyle: GoogleFonts.inter(
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),

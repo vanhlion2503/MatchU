@@ -55,6 +55,9 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
       final accent = _accentForLevel(result.level);
       final scoreRatio = (result.score / 100).clamp(0.0, 1.0);
       final maxHeight = MediaQuery.of(context).size.height * 0.82;
+      const double outerSize = 100;
+      const double stroke = 10;
+      const double innerPadding = 12;
 
       return Positioned.fill(
         child: Container(
@@ -82,36 +85,54 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "K §¨t qu §œ Th §n Giao CA­ch C §œm",
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          "Kết quả tương thích",
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 18),
                         SizedBox(
-                          width: 140,
-                          height: 140,
+                          width: outerSize,
+                          height: outerSize,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              CircularProgressIndicator(
-                                value: scoreRatio,
-                                strokeWidth: 10,
-                                backgroundColor: accent.withOpacity(0.12),
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(accent),
+                              // ===== VÒNG TRÒN NGOÀI =====
+                              SizedBox(
+                                width: outerSize,
+                                height: outerSize,
+                                child: CircularProgressIndicator(
+                                  value: scoreRatio,
+                                  strokeWidth: stroke,
+                                  backgroundColor: accent.withOpacity(0.12),
+                                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                                ),
                               ),
-                              Text(
-                                "${result.score}%",
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: accent,
-                                  fontWeight: FontWeight.w800,
+
+                              // ===== VÙNG CHỮ AN TOÀN BÊN TRONG =====
+                              SizedBox(
+                                width: outerSize - stroke * 2 - innerPadding * 2,
+                                height: outerSize - stroke * 2 - innerPadding * 2,
+                                child: Center(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      "${result.score}%",
+                                      style: theme.textTheme.displaySmall?.copyWith(
+                                        color: accent,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+
+
+                        const SizedBox(height: 24),
                         Text(
                           result.summaryText,
                           textAlign: TextAlign.center,
@@ -124,13 +145,13 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             _StatChip(
-                              label: "TrA1ng kh ¯>p",
+                              label: "Trùng khớp",
                               value: "${result.matchedCount}/${result.total}",
                               color: accent,
                             ),
                             const SizedBox(width: 10),
                             _StatChip(
-                              label: "T ¯`c Ž` ¯T",
+                              label: "Tốc độ",
                               value: "15s",
                               color: theme.colorScheme.primary,
                             ),
@@ -150,8 +171,8 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
                           ),
                           label: Text(
                             _showOpponentAnswers
-                                ? "An dap an doi phuong"
-                                : "Xem dap an doi phuong",
+                                ? "Ẩn đáp án đối phương"
+                                : "Xem đáp án đối phương",
                           ),
                         ),
                         AnimatedSwitcher(
@@ -169,7 +190,7 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
                         FilledButton(
                           onPressed: () =>
                               telepathy.showResultOverlay.value = false,
-                          child: const Text("Quay l §­i trAý chuy ¯Øn"),
+                          child: const Text("Quay lại cuộc trò chuyện"),
                         ),
                       ],
                     ),
@@ -258,7 +279,7 @@ class _AnswerList extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(top: 12),
         child: Text(
-          "Chua co du lieu cau hoi.",
+          "Chưa có dữ liệu câu hỏi.",
           style: theme.textTheme.bodySmall,
         ),
       );
@@ -315,7 +336,7 @@ class _AnswerItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "CA›u $index: ${question.text}",
+          "Câu $index: ${question.text}",
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -326,13 +347,13 @@ class _AnswerItem extends StatelessWidget {
           runSpacing: 8,
           children: [
             _AnswerChip(
-              label: "B §­n",
-              value: myAnswer ?? "Chua tra loi",
+              label: "Bạn",
+              value: myAnswer ?? "Chưa trả lời",
               color: theme.colorScheme.primary,
             ),
             _AnswerChip(
-              label: "Ž`‘’i ph°ng",
-              value: otherAnswer ?? "Chua tra loi",
+              label: "Đối phương",
+              value: otherAnswer ?? "Chưa trả lời",
               color: accent,
             ),
           ],

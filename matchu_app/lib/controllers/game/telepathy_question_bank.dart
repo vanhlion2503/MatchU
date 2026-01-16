@@ -4,33 +4,34 @@ class TelepathyQuestionBank {
   static final _pool = <TelepathyQuestion>[
     TelepathyQuestion(
       id: "drink",
-      text: "Ăn uống: Trà sữa ?? hay Bia ???",
-      left: "Trà sữa ??",
-      right: "Bia ??",
+      text: "Ăn uống: Trà sữa 🧋 hay Bia 🍺",
+      left: "Trà sữa 🧋",
+      right: "Bia 🍺",
     ),
     TelepathyQuestion(
       id: "travel",
-      text: "Du l?ch: L?n n?i ?? hay Xu?ng bi?n ????",
-      left: "L?n n?i ??",
-      right: "Xu?ng bi?n ???",
+      text: "Du lịch: Lên núi ⛰️ hay Xuống biển 🌊",
+      left: "Lên núi ⛰️",
+      right: "Xuống biển 🌊",
     ),
     TelepathyQuestion(
       id: "money",
-      text: "T?i ch?nh: Ti?t ki?m ?? hay Yolo (ti?u h?t) ???",
-      left: "Ti?t ki?m ??",
-      right: "Yolo (ti?u h?t) ??",
+      text: "Tài chính: Tiết kiệm 💰 hay YOLO (tiêu hết) 🔥",
+      left: "Tiết kiệm 💰",
+      right: "YOLO (tiêu hết) 🔥",
     ),
     TelepathyQuestion(
       id: "love",
-      text: "T?nh y?u: C?ng khai ?? hay B? m?t ???",
-      left: "C?ng khai ??",
-      right: "B? m?t ??",
+      text: "Tình yêu: Công khai 💑 hay Bí mật 🤫",
+      left: "Công khai 💑",
+      right: "Bí mật 🤫",
     ),
     TelepathyQuestion(
       id: "conflict",
-      text: "X? l? m?u thu?n: C?i nhau cho ra ng? ra khoai ?? hay Im l?ng ch? ngu?i gi?n ???",
-      left: "C?i nhau cho ra ng? ra khoai ??",
-      right: "Im l?ng ch? ngu?i gi?n ??",
+      text:
+          "Xử lý mâu thuẫn: Cãi nhau cho ra ngô ra khoai 🗣️ hay Im lặng chờ nguôi giận 🤐",
+      left: "Cãi nhau cho ra ngô ra khoai 🗣️",
+      right: "Im lặng chờ nguôi giận 🤐",
     ),
   ];
 

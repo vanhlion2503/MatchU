@@ -488,26 +488,34 @@ class TelepathyController extends GetxController{
       case TelepathyLevel.high:
         final answer = same.isNotEmpty ? same.first["answer"] : null;
         if (answer is String && answer.isNotEmpty) {
-          return "Wow! ${result.score}% t??ng ??ng! Hai b?n l? tri k? th?t l?c ?? ?? "
-              "? m? khoan, c? 2 ??u ch?n '$answer', h? n?y c? d? ??nh g? ch?a?";
+          return "Wow! ${result.score}% tương đồng! "
+              "Hai bạn là tri kỷ thật lực đó 😳 "
+              "Ờ mà khoan… cả 2 đều chọn '$answer', "
+              "hẹn hò có dự định gì chưa? 😉";
         }
-        return "Wow! ${result.score}% t??ng ??ng! Hai b?n l? tri k? th?t l?c ?? ??";
+        return "Wow! ${result.score}% tương đồng! Hai bạn là tri kỷ thật lực đó 😳";
+
       case TelepathyLevel.medium:
         final me = diff.isNotEmpty ? diff.first["me"] : null;
         final other = diff.isNotEmpty ? diff.first["other"] : null;
         if (me is String && other is String) {
-          return "H?p nhau ${result.score}%. Kh? ?n ??y ch?! Nh?ng m? n?y... "
-              "B?n th?ch '$me' c?n ng??i kia th?ch '$other'. Hai b?n t?nh sao v? v? n?y? ??";
+          return "Hợp nhau ${result.score}%. Khá ổn đấy chứ! 🤝 "
+              "Nhưng mà này… "
+              "bạn thích '$me' còn người kia lại thích '$other'. "
+              "Hai bạn tính sao về vụ này? 😄";
         }
-        return "H?p nhau ${result.score}%. Kh? ?n ??y ch?!";
+        return "Hợp nhau ${result.score}%. Khá ổn đấy chứ! 🤝";
+
       case TelepathyLevel.low:
         final other = diff.isNotEmpty ? diff.first["other"] : null;
         if (other is String) {
-          return "Ch? ${result.score}% th?i ?? Hai c?c nam ch?m tr?i d?u th??ng h?t nhau m?nh l?m ??y! ?? "
-              "Th? h?i v? sao ng??i kia l?i ch?n '$other' xem n?o?";
+          return "Chỉ ${result.score}% thôi à 😅 "
+              "Hai cực nam châm trái dấu thường hút nhau mạnh lắm đấy! 🧲 "
+              "Thử hỏi vì sao người kia lại chọn '$other' xem nào? 😉";
         }
-        return "Ch? ${result.score}% th?i ?? Tr?i d?u ??i khi l?i h?t nhau m?nh!";
+        return "Chỉ ${result.score}% thôi 😅 Đôi khi trái dấu lại hút nhau mạnh!";
     }
+
   }
 
   Future<void> _sendDeclineMessage() async {
@@ -520,7 +528,7 @@ class TelepathyController extends GetxController{
         .add({
       "type": "system",
       "systemCode": "telepathy_cancelled",
-      "text": "B?n ?y mu?n tr? chuy?n th?m ch?t n?a tr??c khi ch?i!",
+      "text": "Bạn ấy muốn trò chuyện thêm chút nữa trước khi chơi!",
       "senderId": uid,
       "targetUid": _otherUid,
       "createdAt": FieldValue.serverTimestamp(),

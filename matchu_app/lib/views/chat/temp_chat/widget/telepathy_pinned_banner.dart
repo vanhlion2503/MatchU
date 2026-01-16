@@ -31,12 +31,13 @@ class TelepathyPinnedBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: theme.brightness == Brightness.dark
+                  ? Colors.black.withOpacity(0.35)
+                  : Colors.black.withOpacity(0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -61,7 +62,7 @@ class TelepathyPinnedBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Telepathy Test • ${result.score}%",
+                    "Độ tương thích • ${result.score}%",
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
