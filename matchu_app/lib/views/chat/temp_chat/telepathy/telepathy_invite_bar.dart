@@ -24,6 +24,13 @@ class TelepathyInviteBar extends StatelessWidget {
     final telepathy = controller.telepathy;
 
     return Obx(() {
+      final submitting = telepathy.submittingAction.value;
+
+      final loadingAccept =
+          submitting == TelepathySubmitAction.accept;
+      final loadingDecline =
+          submitting == TelepathySubmitAction.decline;
+
       if (telepathy.status.value != TelepathyStatus.inviting) {
         return const SizedBox.shrink();
       }
@@ -118,7 +125,10 @@ class TelepathyInviteBar extends StatelessWidget {
                     label: "Bỏ qua",
                     icon: Icons.local_fire_department,
                     compact: true,
-                    onTap: () => telepathy.respond(false),
+                    loading: loadingDecline,
+                    onTap: submitting == null
+                        ? () => telepathy.respond(false)
+                        : null,
                   ),
                 ],
               )
@@ -129,7 +139,10 @@ class TelepathyInviteBar extends StatelessWidget {
                     child: _GhostActionButton(
                       label: "Bỏ qua",
                       icon: Icons.local_fire_department,
-                      onTap: () => telepathy.respond(false),
+                      loading: loadingDecline,
+                      onTap: submitting == null
+                          ? () => telepathy.respond(false)
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -137,7 +150,10 @@ class TelepathyInviteBar extends StatelessWidget {
                     child: _GradientActionButton(
                       label: "Đồng ý",
                       icon: Icons.flash_on,
-                      onTap: () => telepathy.respond(true),
+                      loading: loadingAccept,
+                      onTap: submitting == null
+                          ? () => telepathy.respond(true)
+                          : null,
                     ),
                   ),
                 ],
@@ -152,54 +168,67 @@ class TelepathyInviteBar extends StatelessWidget {
 class _GhostActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool compact;
+  final bool loading;
 
   const _GhostActionButton({
     required this.label,
     required this.icon,
     required this.onTap,
     this.compact = false,
+    this.loading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final vertical = compact ? 8.0 : 12.0;
-    final horizontal = compact ? 12.0 : 14.0;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: loading ? null : onTap, // ⛔ disable
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           padding: EdgeInsets.symmetric(
-            vertical: vertical,
-            horizontal: horizontal,
+            vertical: compact ? 8 : 12,
+            horizontal: compact ? 12 : 14,
           ),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark 
-                        ? AppTheme.darkBorder 
-                        : AppTheme.lightBorder,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.darkBorder
+                : AppTheme.lightBorder,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: compact ? 14 : 16,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+          child: Center(
+            child: loading
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(
+                        theme.colorScheme.primary,
+                      ),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: compact ? 14 : 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),
@@ -207,46 +236,68 @@ class _GhostActionButton extends StatelessWidget {
   }
 }
 
+
 class _GradientActionButton extends StatelessWidget {
   final String label;
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
 
   const _GradientActionButton({
     required this.label,
     required this.icon,
     required this.onTap,
+    this.loading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: loading ? null : onTap, // ⛔ disable
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            gradient: _brandGradient,
+            gradient: loading ? null : _brandGradient,
+            color: loading
+                ? theme.colorScheme.surfaceVariant
+                : null,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: Colors.white),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          child: Center(
+            child: loading
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(
+                        theme.colorScheme.primary,
+                      ),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: 16, color: Colors.white),
+                      const SizedBox(width: 6),
+                      Text(
+                        label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),
     );
   }
 }
+

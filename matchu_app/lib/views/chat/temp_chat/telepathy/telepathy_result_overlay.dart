@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy_controller.dart';
 import 'package:matchu_app/models/telepathy_question.dart';
 import 'package:matchu_app/models/telepathy_result.dart';
+import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_motion.dart';
 
 class TelepathyResultOverlay extends StatefulWidget {
   final TempChatController controller;
@@ -18,9 +19,11 @@ class TelepathyResultOverlay extends StatefulWidget {
       _TelepathyResultOverlayState();
 }
 
-class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
+class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
+    with SingleTickerProviderStateMixin {
   bool _showOpponentAnswers = false;
   Worker? _overlayWorker;
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
@@ -29,12 +32,19 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
         ever(widget.controller.telepathy.showResultOverlay, (show) {
       if (show == true && mounted) {
         setState(() => _showOpponentAnswers = false);
+
+        _pulseController.forward(from: 0);
       }
     });
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: motionBase, // hoặc motionSlow
+    );
   }
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _overlayWorker?.dispose();
     super.dispose();
   }
@@ -101,11 +111,18 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
                               SizedBox(
                                 width: outerSize,
                                 height: outerSize,
-                                child: CircularProgressIndicator(
-                                  value: scoreRatio,
-                                  strokeWidth: stroke,
-                                  backgroundColor: accent.withOpacity(0.12),
-                                  valueColor: AlwaysStoppedAnimation<Color>(accent),
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.0, end: scoreRatio),
+                                  duration: motionSlow,
+                                  curve: curveEnter,
+                                  builder: (_, value, __) {
+                                    return CircularProgressIndicator(
+                                      value: value,
+                                      strokeWidth: stroke,
+                                      backgroundColor: accent.withOpacity(0.12),
+                                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                                    );
+                                  },
                                 ),
                               ),
 
@@ -116,12 +133,20 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay> {
                                 child: Center(
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      "${result.score}%",
-                                      style: theme.textTheme.displaySmall?.copyWith(
-                                        color: accent,
-                                        fontWeight: FontWeight.w900,
-                                        height: 1,
+                                    child: ScaleTransition(
+                                      scale: Tween(begin: 1.2, end: 1.0).animate(
+                                        CurvedAnimation(
+                                          parent: _pulseController,
+                                          curve: curveFeedback,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        "${result.score}%",
+                                        style: theme.textTheme.displaySmall?.copyWith(
+                                          color: accent,
+                                          fontWeight: FontWeight.w900,
+                                          height: 1,
+                                        ),
                                       ),
                                     ),
                                   ),

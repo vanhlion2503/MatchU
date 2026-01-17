@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
+import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_motion.dart';
 
 class TelepathyGameOverlay extends StatefulWidget {
   final TempChatController controller;
@@ -29,6 +30,10 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnim;
   late final AnonymousAvatarController _avatarController;
+  late final AnimationController _questionEnterController;
+  late final Animation<double> _questionOpacity;
+  late final Animation<double> _questionOffset;
+
 
   Worker? _feedbackWorker;
   AnimationController? _shakeController;
@@ -36,12 +41,33 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
   String? _lastFeedbackQuestionId;
   Color _flashColor = Colors.transparent;
   double _flashOpacity = 0;
+  Worker? _countdownWorker;
 
   @override
   void initState() {
     super.initState();
 
     _avatarController = Get.find<AnonymousAvatarController>();
+
+    _questionEnterController = AnimationController(
+      vsync: this,
+      duration: motionBase,
+    );
+
+    _questionOpacity = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _questionEnterController,
+        curve: curveEnter,
+      ),
+    );
+
+    _questionOffset = Tween(begin: 8.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _questionEnterController,
+        curve: curveEnter,
+      ),
+    );
+
 
     _shakeController = AnimationController(
       vsync: this,
@@ -74,10 +100,19 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
     // ✅ WORKER 2: reset feedback khi sang câu mới
     ever<int>(telepathy.currentIndex, (_) {
       _lastFeedbackQuestionId = null;
+      _questionEnterController.forward(from: 0);
     });
+
+    _countdownWorker = ever<TelepathyStatus>(
+      widget.controller.telepathy.status,
+      (status) {
+        if (status == TelepathyStatus.countdown) {
+          _pulseController.forward(from: 0);
+        }
+      },
+    );
+
   }
-
-
 
   @override
   void dispose() {
@@ -85,6 +120,8 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
     _feedbackWorker?.dispose();
     _shakeController?.dispose();
     _pulseController.dispose(); // ✅ THÊM
+    _countdownWorker?.dispose();
+    _questionEnterController.dispose();
     super.dispose();
   }
 
@@ -211,11 +248,19 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            seconds.toString(),
-            style: theme.textTheme.displayLarge?.copyWith(
-              color: _matchColor,
-              fontWeight: FontWeight.w700,
+          ScaleTransition(
+            scale: Tween(begin: 1.4, end: 1.0).animate(
+              CurvedAnimation(
+                parent: _pulseController,
+                curve: curveFeedback, // từ telepathy_motion.dart
+              ),
+            ),
+            child: Text(
+              seconds.toString(),
+              style: theme.textTheme.displayLarge?.copyWith(
+                color: _matchColor,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -320,14 +365,26 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
             const SizedBox(height: 16),
             _buildCompatibilityMeter(theme, matchRate, stats),
             const SizedBox(height: 18),
-            Text(
-              question.text,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
+            AnimatedBuilder(
+              animation: _questionEnterController,
+              builder: (_, __) {
+                return Opacity(
+                  opacity: _questionOpacity.value,
+                  child: Transform.translate(
+                    offset: Offset(0, _questionOffset.value),
+                    child: Text(
+                      question.text,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
+
             const SizedBox(height: 20),
             Expanded(
               child: Column(
@@ -434,15 +491,15 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
   }
 
   Widget _buildOptionCard({
-  required String label,
-  required String subtitle,
-  required String badge,
-  required IconData icon,
-  required bool selected,
-  required bool disabled,
-  required bool otherPicked, // ✅ THÊM
-  required Color accent,
-  required VoidCallback onTap,
+    required String label,
+    required String subtitle,
+    required String badge,
+    required IconData icon,
+    required bool selected,
+    required bool disabled,
+    required bool otherPicked,
+    required Color accent,
+    required VoidCallback onTap,
   }) {
     final borderColor =
         selected ? accent : Colors.white.withOpacity(0.18);
@@ -459,103 +516,121 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
           color: Colors.transparent,
           child: InkWell(
             onTap: disabled ? null : onTap,
+            onTapDown: (_) {
+              if (!disabled) {
+                _pulseController.forward(from: 0);
+              }
+            },
             borderRadius: BorderRadius.circular(22),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: borderColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // 🅰️🅱️ BADGE
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? accent
-                            : Colors.white.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(10),
+            child: ScaleTransition(
+              scale: selected
+                  ? Tween(begin: 1.0, end: 1.04).animate(
+                      CurvedAnimation(
+                        parent: _pulseController,
+                        curve: curveFeedback,
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        badge,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                    )
+                  : const AlwaysStoppedAnimation(1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // 🅰️🅱️ BADGE
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? accent
+                              : Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-                    ),
-                  ),
-
-                  // 👤 AVATAR CỦA MÌNH (HIỆN KHI MÌNH CHỌN)
-                  Positioned(
-                    top: 0,
-                    right: 35,
-                    child: AnimatedOpacity(
-                      opacity: selected ? 1 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: AnonymousAvatar(
-                        avatarKey: _avatarController.selectedAvatar.value,
-                        radius: 14,
-                      ),
-                    ),
-                  ),
-                  // 👤 AVATAR NGƯỜI KIA (HIỆN KHI HỌ CHỌN)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: AnimatedOpacity(
-                      opacity: otherPicked ? 1 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: AnonymousAvatar(
-                        avatarKey: widget.controller.otherAnonymousAvatar.value,
-                        radius: 14,
-                      ),
-                    ),
-                  ),
-
-                  // 📌 NỘI DUNG CHÍNH
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
+                        alignment: Alignment.center,
+                        child: Text(
+                          badge,
+                          style: const TextStyle(
                             color: Colors.white,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w600,
-                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+
+                    // 👤 AVATAR CỦA MÌNH
+                    Positioned(
+                      top: 0,
+                      right: 35,
+                      child: AnimatedOpacity(
+                        opacity: selected ? 1 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: AnonymousAvatar(
+                          avatarKey: _avatarController.selectedAvatar.value,
+                          radius: 14,
+                        ),
+                      ),
+                    ),
+
+                    // 👤 AVATAR ĐỐI PHƯƠNG
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AnimatedOpacity(
+                        opacity: otherPicked ? 1 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: AnonymousAvatar(
+                          avatarKey:
+                              widget.controller.otherAnonymousAvatar.value,
+                          radius: 14,
+                        ),
+                      ),
+                    ),
+
+                    // 📌 NỘI DUNG CHÍNH
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -563,6 +638,7 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
       ),
     );
   }
+
 
   _MatchStats _computeMatchStats(TelepathyController telepathy) {
     int matched = 0;
@@ -597,4 +673,3 @@ bool _otherPickedThis(
 ) {
   return telepathy.otherAnswers[questionId] == value;
 }
-

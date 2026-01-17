@@ -18,6 +18,11 @@ enum TelepathyStatus {
   cancelled,
 }
 
+enum TelepathySubmitAction {
+  accept,
+  decline,
+}
+
 class TelepathyController extends GetxController{
 
   final String roomId;
@@ -39,6 +44,7 @@ class TelepathyController extends GetxController{
   final cancelledBy = RxnString();
   final result = Rxn<TelepathyResult>();
   final showResultOverlay = false.obs;
+  final submittingAction = Rxn<TelepathySubmitAction>();
 
   StreamSubscription? _sub;
   Timer? _timer;
@@ -236,29 +242,47 @@ class TelepathyController extends GetxController{
   }
 
   Future<void> respond(bool accept) async {
+    final action =
+        accept ? TelepathySubmitAction.accept : TelepathySubmitAction.decline;
+
+    if (submittingAction.value != null) return; // ⛔ chặn double click
+
+    submittingAction.value = action;
+
     final ref = _db.collection("tempChats").doc(roomId);
 
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) return;
-      final game = snap["minigame"];
+    try {
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) return;
+
+        final game = snap["minigame"];
+        if (game?["status"] != "inviting") return;
+
+        if (!accept) {
+          tx.update(ref, {
+            "minigame.status": "cancelled",
+            "minigame.cancelledBy": uid,
+            "minigame.cancelledAt": FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+
+        tx.update(ref, {
+          "minigame.consent.$uid": true,
+        });
+      });
 
       if (!accept) {
-        tx.update(ref, {
-          "minigame.status": "cancelled",
-          "minigame.cancelledBy": uid,
-          "minigame.cancelledAt": FieldValue.serverTimestamp(),
-        });
-        return;
+        await _sendDeclineMessage();
       }
-
-      tx.update(ref, {"minigame.consent.$uid": true});
-    });
-
-    if (!accept) {
-      await _sendDeclineMessage();
+    } finally {
+      // ❗ KHÔNG reset
+      // UI sẽ biến mất khi status đổi
     }
   }
+
+
 
   Future<void> startGame() async {
     if (_isHost != true) return;
