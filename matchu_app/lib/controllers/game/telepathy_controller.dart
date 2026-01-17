@@ -13,6 +13,7 @@ enum TelepathyStatus {
   inviting,
   countdown,
   playing,
+  revealing,
   finished,
   cancelled,
 }
@@ -473,8 +474,31 @@ class TelepathyController extends GetxController{
     if (_lastAdvanceIndex == currentIndex.value) return;
 
     _lastAdvanceIndex = currentIndex.value;
-    Future.microtask(next);
+
+    // 1️⃣ REVEAL
+    _db.collection("tempChats").doc(roomId).update({
+      "minigame.status": "revealing",
+    });
+
+    Future.delayed(const Duration(milliseconds: 1000), () async {
+      if (_isHost != true) return;
+
+      // 🔥 NẾU LÀ CÂU CUỐI → FINISH NGAY
+      if (currentIndex.value + 1 >= questions.length) {
+        await finish();
+        return;
+      }
+
+      // 🔥 CHƯA HẾT → SANG CÂU TIẾP
+      await _db.collection("tempChats").doc(roomId).update({
+        "minigame.status": "playing",
+        "minigame.currentQuestionIndex": FieldValue.increment(1),
+        "minigame.questionStartedAt": FieldValue.serverTimestamp(),
+      });
+    });
   }
+
+
 
   String _buildHookMessage(TelepathyResult result) {
     final same = List<Map<String, dynamic>>.from(

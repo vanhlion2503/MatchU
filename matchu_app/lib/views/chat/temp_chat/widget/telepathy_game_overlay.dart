@@ -4,8 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy_controller.dart';
+import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
 
 class TelepathyGameOverlay extends StatefulWidget {
   final TempChatController controller;
@@ -20,9 +22,13 @@ class TelepathyGameOverlay extends StatefulWidget {
 }
 
 class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _matchColor = Color(0xFFEC4899);
   static const _diffColor = Color(0xFFF97316);
+
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnim;
+  late final AnonymousAvatarController _avatarController;
 
   Worker? _feedbackWorker;
   AnimationController? _shakeController;
@@ -34,12 +40,27 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
   @override
   void initState() {
     super.initState();
+
+    _avatarController = Get.find<AnonymousAvatarController>();
+
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 260),
     );
 
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+
+    _pulseAnim = CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeOutBack,
+    );
+
     final telepathy = widget.controller.telepathy;
+
+    // ✅ WORKER 1: feedback (bạn đã có)
     _feedbackWorker = everAll(
       [
         telepathy.status,
@@ -49,27 +70,37 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
       ],
       (_) => _handleFeedback(),
     );
+
+    // ✅ WORKER 2: reset feedback khi sang câu mới
+    ever<int>(telepathy.currentIndex, (_) {
+      _lastFeedbackQuestionId = null;
+    });
   }
+
+
 
   @override
   void dispose() {
     _flashTimer?.cancel();
     _feedbackWorker?.dispose();
     _shakeController?.dispose();
+    _pulseController.dispose(); // ✅ THÊM
     super.dispose();
   }
 
+
   void _handleFeedback() {
     final telepathy = widget.controller.telepathy;
-    if (telepathy.status.value != TelepathyStatus.playing) {
-      _lastFeedbackQuestionId = null;
-      return;
-    }
-    if (telepathy.questions.isEmpty) return;
 
-    final index = telepathy.currentIndex.value
-        .clamp(0, telepathy.questions.length - 1);
+    if (telepathy.status.value != TelepathyStatus.playing) return;
+    if (telepathy.questions.isEmpty) return; // ✅ FIX QUAN TRỌNG
+
+    final index = telepathy.currentIndex.value;
+
+    if (index < 0 || index >= telepathy.questions.length) return; // ✅ CHẮN CUỐI
+
     final question = telepathy.questions[index];
+
     final my = telepathy.myAnswers[question.id];
     final other = telepathy.otherAnswers[question.id];
 
@@ -80,18 +111,27 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
     _triggerFeedback(my == other);
   }
 
-  void _triggerFeedback(bool match) {
-    _showFlash(match ? _matchColor : _diffColor);
 
+
+  void _triggerFeedback(bool match) {
     if (match) {
       HapticFeedback.lightImpact();
       SystemSound.play(SystemSoundType.click);
+
+      // ✨ pulse nhẹ khi trùng
+      _pulseController.forward(from: 0);
     } else {
       HapticFeedback.mediumImpact();
       SystemSound.play(SystemSoundType.alert);
+
+      // ✨ rung nhẹ khi khác
       _shakeController?.forward(from: 0);
     }
+
+    // flash chỉ giữ rất nhẹ
+    _showFlash(match ? _matchColor : _diffColor);
   }
+
 
   void _showFlash(Color color) {
     _flashTimer?.cancel();
@@ -113,7 +153,8 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
     return Obx(() {
       final status = telepathy.status.value;
       if (status != TelepathyStatus.countdown &&
-          status != TelepathyStatus.playing) {
+          status != TelepathyStatus.playing &&
+          status != TelepathyStatus.revealing) {
         return const SizedBox.shrink();
       }
 
@@ -206,7 +247,8 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
     final question = telepathy.questions[index];
     final answered = telepathy.myAnswers.containsKey(question.id);
     final seconds = telepathy.remainingSeconds.value;
-    final disabled = answered;
+    final disabled = answered || telepathy.status.value == TelepathyStatus.revealing;
+
 
     final stats = _computeMatchStats(telepathy);
     final progress = total == 0 ? 0.0 : (index + 1) / total;
@@ -289,30 +331,41 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
             const SizedBox(height: 20),
             Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildOptionCard(
                     label: question.left,
                     subtitle: "Chạm để chọn",
                     badge: "A",
                     icon: Icons.home_outlined,
-                    selected:
-                        telepathy.myAnswers[question.id] == question.left,
+                    selected: telepathy.myAnswers[question.id] == question.left,
+                    otherPicked: _otherPickedThis(
+                      telepathy,
+                      question.id,
+                      question.left,
+                    ),
                     accent: _matchColor,
                     disabled: disabled,
                     onTap: () => telepathy.answer(question.left),
                   ),
+
                   const SizedBox(height: 14),
                   _buildOptionCard(
                     label: question.right,
                     subtitle: "Chạm để chọn",
                     badge: "B",
                     icon: Icons.terrain_outlined,
-                    selected:
-                        telepathy.myAnswers[question.id] == question.right,
+                    selected: telepathy.myAnswers[question.id] == question.right,
+                    otherPicked: _otherPickedThis(
+                      telepathy,
+                      question.id,
+                      question.right,
+                    ),
                     accent: _diffColor,
                     disabled: disabled,
                     onTap: () => telepathy.answer(question.right),
                   ),
+
                 ],
               ),
             ),
@@ -381,25 +434,25 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
   }
 
   Widget _buildOptionCard({
-    required String label,
-    required String subtitle,
-    required String badge,
-    required IconData icon,
-    required bool selected,
-    required bool disabled,
-    required Color accent,
-    required VoidCallback onTap,
+  required String label,
+  required String subtitle,
+  required String badge,
+  required IconData icon,
+  required bool selected,
+  required bool disabled,
+  required bool otherPicked, // ✅ THÊM
+  required Color accent,
+  required VoidCallback onTap,
   }) {
     final borderColor =
         selected ? accent : Colors.white.withOpacity(0.18);
     final backgroundColor =
         selected ? accent.withOpacity(0.18) : Colors.white.withOpacity(0.08);
-    final mutedColor = Colors.white.withOpacity(0.35);
-    final textColor = Colors.white;
-    final subtitleColor = Colors.white.withOpacity(0.7);
     final disabledOpacity = disabled && !selected ? 0.6 : 1.0;
 
-    return Expanded(
+    return SizedBox(
+      width: double.infinity,
+      height: MediaQuery.of(context).size.height * 0.22,
       child: Opacity(
         opacity: disabledOpacity,
         child: Material(
@@ -422,53 +475,84 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                   ),
                 ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Icon(icon, size: 28, color: mutedColor),
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.25),
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            badge,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white.withOpacity(0.75),
-                            ),
-                          ),
+                  // 🅰️🅱️ BADGE
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? accent
+                            : Colors.white.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        badge,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
                         ),
                       ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: textColor,
-                      fontWeight: selected
-                          ? FontWeight.w700
-                          : FontWeight.w600,
-                      fontSize: 16,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: subtitleColor,
-                      fontSize: 12,
+
+                  // 👤 AVATAR CỦA MÌNH (HIỆN KHI MÌNH CHỌN)
+                  Positioned(
+                    top: 0,
+                    right: 35,
+                    child: AnimatedOpacity(
+                      opacity: selected ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: AnonymousAvatar(
+                        avatarKey: _avatarController.selectedAvatar.value,
+                        radius: 14,
+                      ),
+                    ),
+                  ),
+                  // 👤 AVATAR NGƯỜI KIA (HIỆN KHI HỌ CHỌN)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: AnimatedOpacity(
+                      opacity: otherPicked ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: AnonymousAvatar(
+                        avatarKey: widget.controller.otherAnonymousAvatar.value,
+                        radius: 14,
+                      ),
+                    ),
+                  ),
+
+                  // 📌 NỘI DUNG CHÍNH
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w600,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -505,3 +589,12 @@ class _MatchStats {
     required this.answered,
   });
 }
+
+bool _otherPickedThis(
+  TelepathyController telepathy,
+  String questionId,
+  String value,
+) {
+  return telepathy.otherAnswers[questionId] == value;
+}
+
