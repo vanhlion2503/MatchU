@@ -60,6 +60,10 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
       }
 
       final result = telepathy.result.value;
+      final aiStatus = telepathy.aiInsightStatus.value;
+      final aiText = telepathy.aiInsightText.value;
+      final isAiLoading = aiStatus == "pending";
+      final isAiError = aiStatus == "error";
       if (result == null) return const SizedBox.shrink();
 
       final accent = _accentForLevel(result.level);
@@ -165,6 +169,75 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                             height: 1.4,
                           ),
                         ),
+                        // ================= AI INSIGHT =================
+                        if (isAiLoading)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  "AI đang phân tích thêm…",
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        if (!isAiLoading && aiText != null)
+                          Container(
+                            margin: const EdgeInsets.only(top: 14),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: accent.withOpacity(0.25),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Nhận xét từ MatchU AI",
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: accent,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  aiText!,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        if (isAiError)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(
+                              "AI sẽ quay lại sau khi hai bạn trò chuyện thêm 😉",
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        // ================= END AI INSIGHT =================
+
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,

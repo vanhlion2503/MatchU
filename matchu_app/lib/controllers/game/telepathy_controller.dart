@@ -46,6 +46,8 @@ class TelepathyController extends GetxController{
   final showResultOverlay = false.obs;
   final submittingAction = Rxn<TelepathySubmitAction>();
   final opponentJustAccepted = false.obs;
+  final aiInsightText = RxnString();
+  final aiInsightStatus = RxnString();
 
   StreamSubscription? _sub;
   Timer? _timer;
@@ -101,19 +103,14 @@ class TelepathyController extends GetxController{
 
       if (status.value == TelepathyStatus.finished) {
         final finishedAt = _parseTimestamp(game["finishedAt"]);
+
+        // 🔥 CHỈ MỞ OVERLAY – KHÔNG BAO GIỜ ĐÓNG Ở ĐÂY
         if (finishedAt != null && finishedAt != _lastFinishedAt) {
           showResultOverlay.value = true;
           _lastFinishedAt = finishedAt;
-        } else if (finishedAt == null && _lastFinishedAt == null) {
-          showResultOverlay.value = true;
-          _lastFinishedAt = DateTime.fromMillisecondsSinceEpoch(0);
-        } else {
-          showResultOverlay.value = false;
         }
-      } else {
-        showResultOverlay.value = false;
-        _lastFinishedAt = null;
       }
+
 
       if (status.value != TelepathyStatus.inviting) {
         _startingCountdown = false;
@@ -175,6 +172,14 @@ class TelepathyController extends GetxController{
 
       if (status.value == TelepathyStatus.finished) {
         _syncResult(game);
+        final ai = game["aiInsight"];
+        if (ai is Map) {
+          aiInsightStatus.value = ai["status"];
+          aiInsightText.value = ai["text"];
+        } else {
+          aiInsightStatus.value = null;
+          aiInsightText.value = null;
+        }
         _stopTimers();
         return;
       }
@@ -376,32 +381,40 @@ class TelepathyController extends GetxController{
   
   Future<void> finish() async {
     if (_isHost != true) return;
+
     final result = TelepathyResultCalculator.calculate(
       questions: questions,
       myAnswers: myAnswers,
       otherAnswers: otherAnswers,
     );
 
+    final aiPayload = _buildAiPayload(result: result);
+
     final ref = _db.collection("tempChats").doc(roomId);
+
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
       if (!snap.exists) return;
 
-      final data = snap.data()!;
-      final game = Map<String, dynamic>.from(data["minigame"] ?? {});
+      final game = Map<String, dynamic>.from(snap["minigame"] ?? {});
       final hookSent = game["hookSent"] == true;
 
-      final updateData = <String, dynamic>{
+      tx.update(ref, {
         "minigame.status": "finished",
         "minigame.result": result.toJson(),
         "minigame.finishedAt": FieldValue.serverTimestamp(),
-      };
 
-      if (!hookSent) {
-        updateData["minigame.hookSent"] = true;
-      }
+        // 🔥 AI PART
+        "minigame.aiInsight": {
+          "status": "pending",
+          "payload": aiPayload,
+          "text": null,
+          "tone": "positive",
+          "generatedAt": null,
+        },
 
-      tx.update(ref, updateData);
+        if (!hookSent) "minigame.hookSent": true,
+      });
 
       if (!hookSent) {
         tx.set(ref.collection("messages").doc(), {
@@ -413,6 +426,33 @@ class TelepathyController extends GetxController{
         });
       }
     });
+  }
+
+
+  Map<String, dynamic> _buildAiPayload({
+    required TelepathyResult result,
+  }){
+    final items = <Map<String, dynamic>>[];
+
+    for(final q in questions){
+
+      final my = myAnswers[q.id];
+      final other = otherAnswers[q.id];
+
+      if(my == null || other == null) continue;
+      items.add({
+        "question": q.text,
+        "category": q.category.name,
+        "me": my,
+        "other": other,
+        "same": my == other,
+      });
+    }
+    return{
+      "score": result.score,
+      "level": result.level.name,
+      "questions": items,
+    };
   }
 
   void _syncParticipants(Map<String, dynamic> data) {
