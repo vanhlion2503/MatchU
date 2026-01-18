@@ -102,7 +102,9 @@ class _TabItem extends StatelessWidget {
         height: 32,
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.white // tab được chọn để highlight phía sau lo
+              ? Theme.of(context).brightness == Brightness.dark
+                ? Colors.black
+                : Colors.white// tab được chọn để highlight phía sau lo
               : colorScheme.surface.withOpacity(0.6), // 👈 nền trắng cho tab chưa chọn
           borderRadius: BorderRadius.circular(10),
         ),
@@ -116,6 +118,8 @@ class _TabItem extends StatelessWidget {
             textStyle: textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
+            overlayColor: Colors.transparent,   
+            splashFactory: NoSplash.splashFactory,
           ),
           child: Text(title),
         ),

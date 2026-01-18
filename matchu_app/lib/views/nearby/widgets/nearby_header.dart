@@ -17,7 +17,7 @@ class NearbyHeader extends GetView<NearbyController> {
         children: [
           Text(
             "Khám phá",
-            style: textTheme.titleLarge?.copyWith(
+            style: textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),

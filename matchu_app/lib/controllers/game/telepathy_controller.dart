@@ -45,6 +45,7 @@ class TelepathyController extends GetxController{
   final result = Rxn<TelepathyResult>();
   final showResultOverlay = false.obs;
   final submittingAction = Rxn<TelepathySubmitAction>();
+  final opponentJustAccepted = false.obs;
 
   StreamSubscription? _sub;
   Timer? _timer;
@@ -60,7 +61,7 @@ class TelepathyController extends GetxController{
   static const int _questionDurationSeconds = 15;
   static const int _countdownDurationSeconds = 3;
   static const int _questionLeadMs = 500;
-  static const int _countdownLeadMs = 1500;
+  static const int _countdownLeadMs = 0;
   bool get isPlaying => status.value == TelepathyStatus.playing;
 
   @override
@@ -122,9 +123,19 @@ class TelepathyController extends GetxController{
       }
 
       final consent = Map<String, dynamic>.from(game["consent"] ?? {});
+      final prevOtherAccepted = otherConsent.value;
+
       myConsent.value = consent[uid] == true;
-      otherConsent.value =
-          _otherUid != null ? consent[_otherUid!] == true : false;
+      otherConsent.value =_otherUid != null ? consent[_otherUid!] == true : false;
+
+      if (!prevOtherAccepted && otherConsent.value) {
+        opponentJustAccepted.value = true;
+
+        // auto tắt sau 600ms
+        Future.delayed(const Duration(milliseconds: 600), () {
+          opponentJustAccepted.value = false;
+        });
+      }
 
       cancelledBy.value = game["cancelledBy"];
 
@@ -133,9 +144,20 @@ class TelepathyController extends GetxController{
             otherConsent.value &&
             _isHost == true &&
             !_startingCountdown) {
+
           _startingCountdown = true;
-          _startCountdown();
+
+          // 🔥 1. START COUNTDOWN NGAY (LOCAL)
+          final localNow = DateTime.now();
+          _startCountdownLocal(localNow);
+
+          // 🔄 2. SYNC LÊN FIRESTORE (KHÔNG ĐỢI)
+          _db.collection("tempChats").doc(roomId).update({
+            "minigame.status": "countdown",
+            "minigame.countdownStartedAt": FieldValue.serverTimestamp(),
+          });
         }
+
         _stopTimers();
         return;
       }
@@ -282,11 +304,11 @@ class TelepathyController extends GetxController{
     }
   }
 
-
-
   Future<void> startGame() async {
     if (_isHost != true) return;
-    final qs = TelepathyQuestionBank.pickRandom(5);
+    
+    // SỬA Ở ĐÂY: Dùng hàm pickSmartMix mới
+    final qs = TelepathyQuestionBank.pickSmartMix();
 
     await _db.collection("tempChats").doc(roomId).update({
       "minigame.status": "playing",
@@ -522,8 +544,6 @@ class TelepathyController extends GetxController{
     });
   }
 
-
-
   String _buildHookMessage(TelepathyResult result) {
     final same = List<Map<String, dynamic>>.from(
       result.highlight["same"] ?? [],
@@ -591,6 +611,12 @@ class TelepathyController extends GetxController{
     return null;
   }
 
+  void _startCountdownLocal(DateTime startedAt) {
+    _countdownStartedAt = startedAt;
+    _updateServerOffset(startedAt);
+    _updateCountdownRemaining();
+    _ensureCountdownTimer();
+  }
 
   @override
   void onClose() {

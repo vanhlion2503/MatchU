@@ -96,6 +96,45 @@ class TelepathyInviteBar extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
+
+            // 🔥 USER B: ĐỐI PHƯƠNG ĐÃ ĐỒNG Ý
+            if (!waiting && otherAccepted)
+              Obx(() {
+                return AnimatedScale(
+                  scale: telepathy.opponentJustAccepted.value ? 1.06 : 1.0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutBack,
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "Đối phương đã đồng ý 🎉",
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+
             if (waiting)
               Row(
                 children: [
@@ -113,7 +152,7 @@ class TelepathyInviteBar extends StatelessWidget {
                   Expanded(
                     child: Text(
                       otherAccepted
-                          ? "Đang bắt đầu..."
+                          ? "Đối phương đã sẵn sàng ⚡ Chuẩn bị bắt đầu..."
                           : "Đang chờ đối phương đồng ý...",
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
