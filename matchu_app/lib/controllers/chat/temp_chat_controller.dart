@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
-import 'package:matchu_app/controllers/game/telepathy_controller.dart';
+import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/quick_message.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';

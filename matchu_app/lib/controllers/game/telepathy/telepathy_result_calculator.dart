@@ -63,6 +63,5 @@ class TelepathyResultCalculator {
       case TelepathyLevel.low:
         return "Chỉ $score% thôi 😅 Trái dấu đôi khi lại hút nhau mạnh!";
     }
-
   }
 }

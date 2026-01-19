@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
-import 'package:matchu_app/controllers/game/telepathy_controller.dart';
+import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_motion.dart';
 

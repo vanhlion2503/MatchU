@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
-import 'package:matchu_app/controllers/game/telepathy_controller.dart';
+import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 
 const _brandGradient = LinearGradient(
