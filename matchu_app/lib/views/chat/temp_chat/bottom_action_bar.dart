@@ -9,6 +9,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/quick_message_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_invite_bar.dart';
+import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_invite_bar.dart';
 
 
 class BottomActionBar extends StatelessWidget {
@@ -28,6 +29,7 @@ class BottomActionBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               TelepathyInviteBar(controller: controller),
+              WordChainInviteBar(controller: controller),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Obx((){
@@ -119,6 +121,30 @@ class BottomActionBar extends StatelessWidget {
                       size: 32,
                     ),
                   ),
+
+                  const SizedBox(width: 6),
+
+                  Obx(() {
+                    final canInvite = controller.canInviteWordChain;
+
+                    return ActionIcon(
+                      onTap: () {
+                        if (!canInvite) return;
+                        HapticFeedback.lightImpact();
+                        controller.inviteWordChainManual();
+                      },
+                      backgroundColor: canInvite
+                          ? theme.colorScheme.surfaceVariant
+                          : theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                      child: Icon(
+                        Icons.link,
+                        color: canInvite
+                            ? color.primary
+                            : theme.colorScheme.onSurface.withOpacity(0.4),
+                        size: 24,
+                      ),
+                    );
+                  }),
 
                   const SizedBox(width: 6),
 

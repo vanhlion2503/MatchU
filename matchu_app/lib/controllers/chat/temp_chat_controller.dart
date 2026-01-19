@@ -3,14 +3,17 @@ import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
+import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/quick_message.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
+import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
 import 'package:matchu_app/views/matching/match_transition_view.dart';
 import '../auth/auth_controller.dart';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/services.dart'; 
 
 enum QuickMessagePhase {
@@ -94,8 +97,17 @@ class TempChatController extends GetxController {
   bool _telepathyAccepted = false;
   final Set<int> _telepathyShownMoments = {};
 
+  static const int _wordChainInviteStartAt = 360;
+  static const int _wordChainInviteEndAt = 120;
+
+  final Random _wordChainRandom = Random();
+  int? _wordChainInviteAt;
+  bool _wordChainAutoInviteTriggered = false;
+  bool _wordChainAutoInviteLocked = false;
+
 
   late final TelepathyController telepathy;
+  late final WordChainController wordChain;
 
   @override
   void onInit() {
@@ -110,6 +122,17 @@ class TempChatController extends GetxController {
         _telepathyAccepted = true;
       }
     });
+    wordChain = Get.put(WordChainController(roomId), tag: roomId);
+    ever<WordChainStatus>(wordChain.status, (status) {
+      if (status == WordChainStatus.inviting) {
+        _wordChainAutoInviteTriggered = true;
+      }
+      if (status == WordChainStatus.playing ||
+          status == WordChainStatus.finished) {
+        _wordChainAutoInviteLocked = true;
+      }
+    });
+    _setupWordChainInviteMoment();
     _startTimer();
     _listenRoom();
     _loadOtherUserRating();
@@ -203,9 +226,8 @@ class TempChatController extends GetxController {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       remainingSeconds.value--;
 
-      if (_telepathyAccepted) return;
-
       final sec = remainingSeconds.value;
+      if (!_telepathyAccepted) {
 
       // 🔥 CHECK CÁC MỐC INVITE
       if (_telepathyInviteMoments.contains(sec) &&
@@ -225,15 +247,20 @@ class TempChatController extends GetxController {
           await telepathy.invite();
         }
       }
+      }
 
-      if (remainingSeconds.value <= 10 &&
-          remainingSeconds.value > 0 &&
-          _lastHapticSecond != remainingSeconds.value) {
-        _lastHapticSecond = remainingSeconds.value;
+      await _maybeAutoInviteWordChain(sec);
+
+      if (_telepathyAccepted) return;
+
+      if (sec <= 10 &&
+          sec > 0 &&
+          _lastHapticSecond != sec) {
+        _lastHapticSecond = sec;
         HapticFeedback.lightImpact();
       }
 
-      if (remainingSeconds.value == 30 &&
+      if (sec == 30 &&
         hasSent30sWarning.value == false) {
 
         hasSent30sWarning.value = true;
@@ -250,11 +277,63 @@ class TempChatController extends GetxController {
           );
         }
       }
-      if (remainingSeconds.value <= 0) {
+      if (sec <= 0) {
         _timer?.cancel();
         endRoom("timeout");
       }
     });
+  }
+
+  void _setupWordChainInviteMoment() {
+    if (_wordChainInviteAt != null) return;
+    final range = _wordChainInviteStartAt - _wordChainInviteEndAt;
+    if (range <= 0) {
+      _wordChainInviteAt = _wordChainInviteStartAt;
+      return;
+    }
+    _wordChainInviteAt =
+        _wordChainInviteEndAt + _wordChainRandom.nextInt(range + 1);
+  }
+
+  bool get canInviteWordChain {
+    final chainStatus = wordChain.status.value;
+    if (chainStatus == WordChainStatus.inviting ||
+        chainStatus == WordChainStatus.playing) {
+      return false;
+    }
+
+    final tp = telepathy.status.value;
+    if (tp == TelepathyStatus.inviting ||
+        tp == TelepathyStatus.countdown ||
+        tp == TelepathyStatus.playing ||
+        tp == TelepathyStatus.revealing) {
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<void> _maybeAutoInviteWordChain(int sec) async {
+    if (_wordChainAutoInviteLocked || _wordChainAutoInviteTriggered) return;
+    if (_wordChainInviteAt == null) return;
+    if (sec > _wordChainInviteStartAt) return;
+    if (sec > _wordChainInviteAt!) return;
+    if (!canInviteWordChain) return;
+    if (!await _isRoomActive()) return;
+
+    final room = await service.getRoom(roomId);
+    final isA = room["userA"] == uid;
+    if (!isA) return;
+
+    _wordChainAutoInviteTriggered = true;
+    await wordChain.invite();
+  }
+
+  Future<void> inviteWordChainManual() async {
+    if (!await _isRoomActive()) return;
+    if (!canInviteWordChain) return;
+    _wordChainAutoInviteTriggered = true;
+    await wordChain.invite();
   }
 
   Future<void> endRoom(String reason) async {

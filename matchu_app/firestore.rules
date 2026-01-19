@@ -161,6 +161,40 @@ service cloud.firestore {
           ]);
       }
 
+      function isValidWordChainMinigame() {
+        return request.resource.data.minigames is map
+          && request.resource.data.minigames.keys().hasOnly(["wordChain"])
+          && request.resource.data.minigames.wordChain is map
+          && request.resource.data.minigames.wordChain.keys().hasOnly([
+            "status",
+            "invitedAt",
+            "consent",
+            "cancelledBy",
+            "cancelledAt",
+            "startedAt",
+            "currentWord",
+            "turnUid",
+            "remainingSeconds",
+            "usedWords",
+            "hearts",
+            "sosUsed",
+            "winnerUid",
+            "updatedAt"
+          ])
+          && request.resource.data.minigames.wordChain.status is string
+          && request.resource.data.minigames.wordChain.currentWord is string
+          && request.resource.data.minigames.wordChain.turnUid is string
+          && request.resource.data.minigames.wordChain.remainingSeconds is number
+          && request.resource.data.minigames.wordChain.usedWords is list
+          && request.resource.data.minigames.wordChain.hearts is map
+          && request.resource.data.minigames.wordChain.sosUsed is map
+          && request.resource.data.minigames.wordChain.consent is map
+          && (
+            !request.resource.data.minigames.wordChain.keys().hasAny(["winnerUid"])
+            || request.resource.data.minigames.wordChain.winnerUid is string
+          );
+      }
+
       function onlyUpdateMyAvatar() {
         // Các field thay đổi
         let changed = request.resource.data.diff(resource.data).changedKeys();
@@ -197,12 +231,18 @@ service cloud.firestore {
               "endedReason",
               "permanentRoomId",
               "endedAt",
-              "minigame"
+              "minigame",
+              "minigames"
             ])
           && (
             !request.resource.data.diff(resource.data).changedKeys()
               .hasAny(["minigame"])
             || isValidMinigame()
+          )
+          && (
+            !request.resource.data.diff(resource.data).changedKeys()
+              .hasAny(["minigames"])
+            || isValidWordChainMinigame()
           )
           || (
             request.resource.data.diff(resource.data).changedKeys()
