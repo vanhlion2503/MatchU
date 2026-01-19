@@ -39,6 +39,7 @@ class TelepathyInviteBar extends StatelessWidget {
       final otherAccepted = telepathy.otherConsent.value;
 
       return Container(
+        key: ValueKey(telepathy.invitedAt.value),
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(

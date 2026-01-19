@@ -48,6 +48,7 @@ class TelepathyController extends GetxController{
   final opponentJustAccepted = false.obs;
   final aiInsightText = RxnString();
   final aiInsightStatus = RxnString();
+  final invitedAt = Rxn<DateTime>();
 
   StreamSubscription? _sub;
   Timer? _timer;
@@ -87,6 +88,7 @@ class TelepathyController extends GetxController{
         cancelledBy.value = null;
         result.value = null;
         showResultOverlay.value = false;
+        submittingAction.value = null;
         _lastFinishedAt = null;
         _startingCountdown = false;
         _lastAdvanceIndex = null;
@@ -100,6 +102,9 @@ class TelepathyController extends GetxController{
       );
 
       status.value = nextStatus;
+      if (status.value != TelepathyStatus.inviting) {
+        submittingAction.value = null;
+      }
 
       if (status.value == TelepathyStatus.finished) {
         final finishedAt = _parseTimestamp(game["finishedAt"]);
@@ -137,6 +142,7 @@ class TelepathyController extends GetxController{
       cancelledBy.value = game["cancelledBy"];
 
       if (status.value == TelepathyStatus.inviting) {
+        invitedAt.value = _parseTimestamp(game["invitedAt"]);
         if (myConsent.value &&
             otherConsent.value &&
             _isHost == true &&

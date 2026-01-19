@@ -52,9 +52,6 @@ class TempChatController extends GetxController {
   int _lastMessageCount = 0;
   int? _lastHapticSecond;
   bool _hasNavigatedToMatch = false;
-  bool _hasTelepathyInvite = false;
-  static const int _telepathyInviteSecond = 390;
-
 
   Timer? _typingTimer;
   Timer? _timer;
@@ -84,12 +81,35 @@ class TempChatController extends GetxController {
     QuickMessage(id: "sport", text: "⚽ Bạn có chơi thể thao không?"),
   ];
 
+  // ⏱ Các mốc sẽ hiện invite (remainingSeconds)
+  static const List<int> _telepathyInviteMoments = [
+    400, // giây 20
+    360, // phút 6
+    300, // phút 5
+    240, // phút 4
+    180, // phút 3
+    120, // phút 2
+    60,  // phút 1
+  ];
+  bool _telepathyAccepted = false;
+  final Set<int> _telepathyShownMoments = {};
+
+
   late final TelepathyController telepathy;
 
   @override
   void onInit() {
     super.onInit();
     telepathy = Get.put(TelepathyController(roomId), tag: roomId);
+    ever<TelepathyStatus>(telepathy.status, (status) {
+      if (_telepathyAccepted) return;
+      if (status == TelepathyStatus.countdown ||
+          status == TelepathyStatus.playing ||
+          status == TelepathyStatus.revealing ||
+          status == TelepathyStatus.finished) {
+        _telepathyAccepted = true;
+      }
+    });
     _startTimer();
     _listenRoom();
     _loadOtherUserRating();
@@ -183,9 +203,16 @@ class TempChatController extends GetxController {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       remainingSeconds.value--;
 
-      if (remainingSeconds.value == _telepathyInviteSecond &&
-          !_hasTelepathyInvite) {
-        _hasTelepathyInvite = true;
+      if (_telepathyAccepted) return;
+
+      final sec = remainingSeconds.value;
+
+      // 🔥 CHECK CÁC MỐC INVITE
+      if (_telepathyInviteMoments.contains(sec) &&
+          !_telepathyShownMoments.contains(sec)) {
+
+        _telepathyShownMoments.add(sec);
+
         final room = await service.getRoom(roomId);
         final isA = room["userA"] == uid;
         if (!isA) return;
@@ -194,6 +221,7 @@ class TempChatController extends GetxController {
         if (gameStatus == TelepathyStatus.idle ||
             gameStatus == TelepathyStatus.cancelled ||
             gameStatus == TelepathyStatus.finished) {
+
           await telepathy.invite();
         }
       }
@@ -600,6 +628,11 @@ class TempChatController extends GetxController {
   void cleanupMessageKeys(Set<String> aliveIds) {
     messageKeys.removeWhere((key, _) => !aliveIds.contains(key));
   }
+
+  void markTelepathyAccepted() {
+    _telepathyAccepted = true;
+  }
+
 
   @override
   void onClose() {
