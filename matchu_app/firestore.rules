@@ -168,6 +168,7 @@ service cloud.firestore {
           && request.resource.data.minigames.wordChain.keys().hasOnly([
             "status",
             "invitedAt",
+            "countdownStartedAt",
             "consent",
             "cancelledBy",
             "cancelledAt",

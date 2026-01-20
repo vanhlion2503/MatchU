@@ -76,14 +76,14 @@ class WordChainInviteBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Word Chain challenge?',
+                        'Thử thách nối từ?',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Take turns with 2-word chains. Miss a turn and lose a heart.',
+                        'Thử nối từ 2 tiếng với mình nhé~ Bỏ lượt là bay tim liền!',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           height: 1.4,
@@ -120,7 +120,7 @@ class WordChainInviteBar extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Your partner is ready.',
+                            'Đối phương đã sẵn sahngf',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: theme.colorScheme.primary,
@@ -150,8 +150,8 @@ class WordChainInviteBar extends StatelessWidget {
                   Expanded(
                     child: Text(
                       otherAccepted
-                          ? 'Partner is ready. Starting soon...'
-                          : 'Waiting for your partner to accept...',
+                          ? 'Người kia đã sẵn sàng. Sẽ sớm bắt đầu ...'
+                          : 'Đang chờ đối phương chấp nhận ...',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.colorScheme.onSurfaceVariant,
@@ -159,7 +159,7 @@ class WordChainInviteBar extends StatelessWidget {
                     ),
                   ),
                   _GhostActionButton(
-                    label: 'Skip',
+                    label: 'Bỏ qua',
                     icon: Icons.close,
                     compact: true,
                     loading: loadingDecline,
@@ -174,7 +174,7 @@ class WordChainInviteBar extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _GhostActionButton(
-                      label: 'Skip',
+                      label: 'Bỏ qua',
                       icon: Icons.close,
                       loading: loadingDecline,
                       onTap: submitting == null
@@ -185,7 +185,7 @@ class WordChainInviteBar extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _GradientActionButton(
-                      label: 'Play',
+                      label: 'Chơi ngay',
                       icon: Icons.link,
                       loading: loadingAccept,
                       onTap: submitting == null

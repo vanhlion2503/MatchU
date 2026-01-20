@@ -1,6 +1,7 @@
 enum WordChainStatus {
   idle,
   inviting,
+  countdown,
   playing,
   finished,
 }

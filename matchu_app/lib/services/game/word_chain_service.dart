@@ -4,6 +4,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WordChainService {
   final _db = FirebaseFirestore.instance;
+  final _random = Random();
+
+  static const List<String> _seedWords = [
+    'mưa rào',
+    'kiếm tiền',
+    'mây trời',
+    'đường phố',
+    'hoa sữa',
+    'gió mát',
+    'trăng sao',
+    'bình yên',
+    'nắng vàng',
+    'mộng mơ',
+    'tình bạn',
+    'đêm khuya',
+    'sáng sớm',
+  ];
+
 
   DocumentReference<Map<String, dynamic>> _roomRef(String roomId) {
     return _db.collection("tempChats").doc(roomId);
@@ -37,6 +55,7 @@ class WordChainService {
         "minigames.wordChain.status": "inviting",
         "minigames.wordChain.invitedAt": FieldValue.serverTimestamp(),
         "minigames.wordChain.consent": {},
+        "minigames.wordChain.countdownStartedAt": FieldValue.delete(),
         "minigames.wordChain.currentWord": "",
         "minigames.wordChain.turnUid": "",
         "minigames.wordChain.remainingSeconds": 15,
@@ -71,6 +90,7 @@ class WordChainService {
         tx.update(ref, {
           "minigames.wordChain.status": "idle",
           "minigames.wordChain.consent": {},
+          "minigames.wordChain.countdownStartedAt": FieldValue.delete(),
           "minigames.wordChain.cancelledBy": uid,
           "minigames.wordChain.cancelledAt": FieldValue.serverTimestamp(),
         });
@@ -83,7 +103,7 @@ class WordChainService {
     });
   }
 
-  Future<void> startGame(String roomId) async {
+  Future<void> startCountdown(String roomId) async {
     final ref = _roomRef(roomId);
 
     await _db.runTransaction((tx) async {
@@ -102,7 +122,34 @@ class WordChainService {
       final allAccepted = participants.every((id) => consent[id] == true);
       if (!allAccepted) return;
 
-      final starter = participants[Random().nextInt(participants.length)];
+      tx.update(ref, {
+        "minigames.wordChain.status": "countdown",
+        "minigames.wordChain.countdownStartedAt": FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Future<void> startGame(String roomId) async {
+    final ref = _roomRef(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "countdown") return;
+
+      final participants = List<String>.from(data?["participants"] ?? []);
+      if (participants.length < 2) return;
+
+      final consent = Map<String, dynamic>.from(game?["consent"] ?? {});
+      final allAccepted = participants.every((id) => consent[id] == true);
+      if (!allAccepted) return;
+
+      final starter = participants[_random.nextInt(participants.length)];
+      final seed = _randomSeedWord();
       final hearts = {
         for (final id in participants) id: 3,
       };
@@ -112,14 +159,15 @@ class WordChainService {
 
       tx.update(ref, {
         "minigames.wordChain.status": "playing",
-        "minigames.wordChain.currentWord": "",
+        "minigames.wordChain.currentWord": seed,
         "minigames.wordChain.turnUid": starter,
         "minigames.wordChain.remainingSeconds": 15,
-        "minigames.wordChain.usedWords": [],
+        "minigames.wordChain.usedWords": [seed],
         "minigames.wordChain.hearts": hearts,
         "minigames.wordChain.sosUsed": sosUsed,
         "minigames.wordChain.winnerUid": FieldValue.delete(),
         "minigames.wordChain.startedAt": FieldValue.serverTimestamp(),
+        "minigames.wordChain.countdownStartedAt": FieldValue.delete(),
       });
     });
   }
@@ -131,7 +179,7 @@ class WordChainService {
     required List<String> usedWords,
   }) {
     final clean = input.trim();
-    final parts = clean.split(" ");
+    final parts = clean.split(RegExp(r'\s+'));
 
     // Điều kiện 1: đúng 2 tiếng
     if (parts.length != 2) return false;
@@ -139,8 +187,10 @@ class WordChainService {
     // Điều kiện 3: không trùng
     if (usedWords.contains(clean)) return false;
 
+    if (prevWord.trim().isEmpty) return true;
+
     // Điều kiện 3.2: nối từ strict
-    final prevLast = prevWord.split(" ").last;
+    final prevLast = prevWord.split(RegExp(r'\s+')).last;
     if (parts.first != prevLast) return false;
 
     // Điều kiện 2 (từ điển) → TODO: Cloud Function
@@ -194,6 +244,52 @@ class WordChainService {
     });
   }
 
+  Future<void> handleTimeout({
+    required String roomId,
+    required String uid,
+  }) async {
+    final ref = _roomRef(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "playing") return;
+
+      final participants = List<String>.from(data?["participants"] ?? []);
+      if (participants.length < 2) return;
+      final otherUid = participants.firstWhere((e) => e != uid);
+
+      final hearts = Map<String, int>.from(game?["hearts"] ?? {});
+      final nextHearts = (hearts[uid] ?? 0) - 1;
+      hearts[uid] = nextHearts;
+
+      if (nextHearts <= 0) {
+        tx.update(ref, {
+          "minigames.wordChain.status": "finished",
+          "minigames.wordChain.winnerUid": otherUid,
+          "minigames.wordChain.hearts": hearts,
+          "minigames.wordChain.remainingSeconds": 0,
+          "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      final seed = _randomSeedWord();
+      tx.update(ref, {
+        "minigames.wordChain.currentWord": seed,
+        "minigames.wordChain.usedWords": [seed],
+        "minigames.wordChain.turnUid": otherUid,
+        "minigames.wordChain.remainingSeconds": 15,
+        "minigames.wordChain.hearts": hearts,
+        "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   // ================= TIMER =================
   Future<void> resetTimer(String roomId) async {
     await _db.collection("tempChats").doc(roomId).update({
@@ -214,4 +310,9 @@ class WordChainService {
     });
     // TODO: auto-generate valid word
   }
+
+  String _randomSeedWord() {
+    return _seedWords[_random.nextInt(_seedWords.length)];
+  }
 }
+

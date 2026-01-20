@@ -127,7 +127,8 @@ class TempChatController extends GetxController {
       if (status == WordChainStatus.inviting) {
         _wordChainAutoInviteTriggered = true;
       }
-      if (status == WordChainStatus.playing ||
+      if (status == WordChainStatus.countdown ||
+          status == WordChainStatus.playing ||
           status == WordChainStatus.finished) {
         _wordChainAutoInviteLocked = true;
       }
@@ -298,6 +299,7 @@ class TempChatController extends GetxController {
   bool get canInviteWordChain {
     final chainStatus = wordChain.status.value;
     if (chainStatus == WordChainStatus.inviting ||
+        chainStatus == WordChainStatus.countdown ||
         chainStatus == WordChainStatus.playing) {
       return false;
     }

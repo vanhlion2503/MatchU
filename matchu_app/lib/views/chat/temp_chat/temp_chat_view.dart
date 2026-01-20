@@ -7,6 +7,7 @@ import 'package:matchu_app/views/chat/temp_chat/telepathy/heart_rain_overlay.dar
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_game_overlay.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_pinned_banner.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_result_overlay.dart';
+import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_playing_bar.dart';
 import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
@@ -237,6 +238,7 @@ class TempChatView extends StatelessWidget {
                 ],
               ),
             ),
+            WordChainPlayingBar(controller: controller),
             TelepathyGameOverlay(controller: controller),
             TelepathyResultOverlay(controller: controller),
           ],

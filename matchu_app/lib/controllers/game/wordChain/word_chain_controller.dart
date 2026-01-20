@@ -7,7 +7,6 @@ import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/game/word_chain_service.dart';
 
 
-
 enum WordChainSubmitAction {
   accept,
   decline,
@@ -26,6 +25,7 @@ class WordChainController extends GetxController {
   final currentWord = "".obs;
   final turnUid = "".obs;
   final remainingSeconds = 15.obs;
+  final countdownSeconds = 3.obs;
 
   final hearts = <String, int>{}.obs;
   final usedWords = <String>[].obs;
@@ -40,9 +40,13 @@ class WordChainController extends GetxController {
 
   StreamSubscription? _sub;
   Timer? _timer;
+  Timer? _countdownTimer;
+  DateTime? _countdownStartedAt;
   String? _otherUid;
   bool? _isHost;
+  bool _startingCountdown = false;
   bool _startingGame = false;
+  static const int _countdownTotalSeconds = 3;
 
   // ================= INIT =================
   @override
@@ -73,7 +77,7 @@ class WordChainController extends GetxController {
         submittingAction.value = null;
         invitedAt.value = null;
         opponentJustAccepted.value = false;
-        _startingGame = false;
+        _startingCountdown = false;
       }
 
       currentWord.value = game["currentWord"] ?? "";
@@ -89,11 +93,17 @@ class WordChainController extends GetxController {
 
       if (nextStatus == WordChainStatus.inviting) {
         invitedAt.value = _parseTimestamp(game["invitedAt"]);
-        _maybeStartGame();
+        _maybeStartCountdown();
+      } else if (nextStatus == WordChainStatus.countdown) {
+        _handleCountdown(game);
+      } else {
+        _countdownTimer?.cancel();
+        _countdownStartedAt = null;
+        countdownSeconds.value = _countdownTotalSeconds;
+        _startingGame = false;
       }
 
-      if (nextStatus == WordChainStatus.playing &&
-          turnUid.value == uid) {
+      if (nextStatus == WordChainStatus.playing && turnUid.value == uid) {
         _startTimer();
       } else {
         _timer?.cancel();
@@ -121,12 +131,12 @@ class WordChainController extends GetxController {
   // ================= TIMEOUT LOGIC =================
   Future<void> _onTimeout() async {
     HapticFeedback.heavyImpact();
+    _timer?.cancel();
 
-    // 💥 Mất tim
-    await service.loseHeartOnly(roomId, uid);
-
-    // ⏱ Reset timer — KHÔNG đổi lượt
-    await service.resetTimer(roomId);
+    await service.handleTimeout(
+      roomId: roomId,
+      uid: uid,
+    );
   }
 
   // ================= SUBMIT WORD =================
@@ -141,12 +151,10 @@ class WordChainController extends GetxController {
     );
 
     if (!ok) {
-      // ❌ Nhập sai → KHÔNG mất tim
       HapticFeedback.mediumImpact();
       return;
     }
 
-    // ✅ Đúng → đổi lượt
     await service.submitCorrectWord(roomId, uid, input);
   }
 
@@ -205,13 +213,13 @@ class WordChainController extends GetxController {
     }
   }
 
-  void _maybeStartGame() {
+  void _maybeStartCountdown() {
     if (_isHost != true) return;
-    if (_startingGame) return;
+    if (_startingCountdown) return;
     if (!myConsent.value || !otherConsent.value) return;
 
-    _startingGame = true;
-    service.startGame(roomId);
+    _startingCountdown = true;
+    service.startCountdown(roomId);
   }
 
   void _resetGameState() {
@@ -219,6 +227,7 @@ class WordChainController extends GetxController {
     currentWord.value = "";
     turnUid.value = "";
     remainingSeconds.value = 15;
+    countdownSeconds.value = _countdownTotalSeconds;
     winnerUid.value = null;
     hearts.clear();
     usedWords.clear();
@@ -228,8 +237,11 @@ class WordChainController extends GetxController {
     invitedAt.value = null;
     submittingAction.value = null;
     opponentJustAccepted.value = false;
+    _startingCountdown = false;
     _startingGame = false;
     _timer?.cancel();
+    _countdownTimer?.cancel();
+    _countdownStartedAt = null;
   }
 
   WordChainStatus _parseStatus(dynamic raw) {
@@ -248,10 +260,62 @@ class WordChainController extends GetxController {
     return null;
   }
 
+  void _handleCountdown(Map<String, dynamic> game) {
+    final startedAt = _parseTimestamp(game["countdownStartedAt"]);
+    if (startedAt == null) {
+      if (_countdownStartedAt == null) {
+        _countdownStartedAt = DateTime.now();
+        _startCountdownTimer(_countdownStartedAt!);
+      }
+      return;
+    }
+
+    if (_countdownStartedAt != startedAt) {
+      _countdownStartedAt = startedAt;
+      _startingGame = false;
+      _startCountdownTimer(startedAt);
+    } else {
+      _syncCountdown(startedAt);
+    }
+  }
+
+  void _startCountdownTimer(DateTime startedAt) {
+    _countdownTimer?.cancel();
+    _syncCountdown(startedAt);
+    _countdownTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _syncCountdown(startedAt);
+    });
+  }
+
+  void _syncCountdown(DateTime startedAt) {
+    final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+    final remainingMs = (_countdownTotalSeconds * 1000) - elapsedMs;
+    final remaining = (remainingMs / 1000)
+        .ceil()
+        .clamp(0, _countdownTotalSeconds)
+        .toInt();
+    countdownSeconds.value = remaining;
+
+    if (remaining <= 0) {
+      _countdownTimer?.cancel();
+      _startGameIfHost();
+    }
+  }
+
+  void _startGameIfHost() {
+    if (_isHost != true) return;
+    if (_startingGame) return;
+    if (status.value != WordChainStatus.countdown) return;
+
+    _startingGame = true;
+    service.startGame(roomId);
+  }
+
   // ================= CLEANUP =================
   @override
   void onClose() {
     _timer?.cancel();
+    _countdownTimer?.cancel();
     _sub?.cancel();
     super.onClose();
   }
