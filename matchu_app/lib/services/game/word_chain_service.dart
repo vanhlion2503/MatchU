@@ -100,6 +100,19 @@ class WordChainService {
       tx.update(ref, {
         "minigames.wordChain.consent.$uid": true,
       });
+
+      final participants = List<String>.from(data?["participants"] ?? []);
+      if (participants.length < 2) return;
+
+      final consent = Map<String, dynamic>.from(game?["consent"] ?? {});
+      consent[uid] = true;
+      final allAccepted = participants.every((id) => consent[id] == true);
+      if (!allAccepted) return;
+
+      tx.update(ref, {
+        "minigames.wordChain.status": "countdown",
+        "minigames.wordChain.countdownStartedAt": FieldValue.serverTimestamp(),
+      });
     });
   }
 
@@ -315,4 +328,3 @@ class WordChainService {
     return _seedWords[_random.nextInt(_seedWords.length)];
   }
 }
-

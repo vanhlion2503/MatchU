@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -42,6 +43,7 @@ class WordChainController extends GetxController {
   Timer? _timer;
   Timer? _countdownTimer;
   DateTime? _countdownStartedAt;
+  DateTime? _localCountdownStartedAt;
   String? _otherUid;
   bool? _isHost;
   bool _startingCountdown = false;
@@ -99,6 +101,7 @@ class WordChainController extends GetxController {
       } else {
         _countdownTimer?.cancel();
         _countdownStartedAt = null;
+        _localCountdownStartedAt = null;
         countdownSeconds.value = _countdownTotalSeconds;
         _startingGame = false;
       }
@@ -242,6 +245,7 @@ class WordChainController extends GetxController {
     _timer?.cancel();
     _countdownTimer?.cancel();
     _countdownStartedAt = null;
+    _localCountdownStartedAt = null;
   }
 
   WordChainStatus _parseStatus(dynamic raw) {
@@ -264,14 +268,16 @@ class WordChainController extends GetxController {
     final startedAt = _parseTimestamp(game["countdownStartedAt"]);
     if (startedAt == null) {
       if (_countdownStartedAt == null) {
-        _countdownStartedAt = DateTime.now();
-        _startCountdownTimer(_countdownStartedAt!);
+        _localCountdownStartedAt ??= DateTime.now();
+        _countdownStartedAt = _localCountdownStartedAt;
+        _startCountdownTimer(null);
       }
       return;
     }
 
     if (_countdownStartedAt != startedAt) {
       _countdownStartedAt = startedAt;
+      _localCountdownStartedAt ??= DateTime.now();
       _startingGame = false;
       _startCountdownTimer(startedAt);
     } else {
@@ -279,7 +285,7 @@ class WordChainController extends GetxController {
     }
   }
 
-  void _startCountdownTimer(DateTime startedAt) {
+  void _startCountdownTimer(DateTime? startedAt) {
     _countdownTimer?.cancel();
     _syncCountdown(startedAt);
     _countdownTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
@@ -287,8 +293,19 @@ class WordChainController extends GetxController {
     });
   }
 
-  void _syncCountdown(DateTime startedAt) {
-    final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
+  void _syncCountdown(DateTime? startedAt) {
+    final now = DateTime.now();
+    final localElapsedMs = _localCountdownStartedAt == null
+        ? 0
+        : now.difference(_localCountdownStartedAt!).inMilliseconds;
+    var serverElapsedMs = 0;
+    if (startedAt != null) {
+      serverElapsedMs = now.difference(startedAt).inMilliseconds;
+      if (serverElapsedMs < 0) {
+        serverElapsedMs = 0;
+      }
+    }
+    final elapsedMs = math.max(localElapsedMs, serverElapsedMs);
     final remainingMs = (_countdownTotalSeconds * 1000) - elapsedMs;
     final remaining = (remainingMs / 1000)
         .ceil()
