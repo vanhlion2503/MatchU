@@ -128,7 +128,7 @@ class _WordChainHeader extends StatelessWidget {
   }
 }
 
-class _WordChainMyTurn extends StatelessWidget {
+class _WordChainMyTurn extends StatefulWidget {
   final String currentWord;
   final bool isSeed;
   final TextEditingController inputController;
@@ -144,21 +144,60 @@ class _WordChainMyTurn extends StatelessWidget {
   });
 
   @override
+  State<_WordChainMyTurn> createState() => _WordChainMyTurnState();
+}
+
+class _WordChainMyTurnState extends State<_WordChainMyTurn> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  double _measureTextWidth(
+    String text,
+    TextStyle style,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    return painter.width;
+  }
+
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
     final secondary = theme.colorScheme.secondary;
     final muted = theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
-    final lastWord = _lastWordPrefix(currentWord);
-    final sourceLabel = isSeed ? 'Từ hệ thống' : 'Từ đối phương';
+    final lastWord = _lastWordPrefix(widget.currentWord);
+
+    final sourceLabel = widget.isSeed ? 'Từ hệ thống' : 'Từ đối phương';
     final helper = lastWord.isEmpty
         ? 'Nhập 2 từ bất kỳ'
         : 'Nhập từ bắt đầu bằng "$lastWord"';
-    final prefixText = lastWord.isEmpty ? null : '$lastWord ';
-    final inputFormatters = lastWord.isEmpty
-        ? null
-        : [FilteringTextInputFormatter.deny(RegExp(r'\s'))];
+    final prefixText = lastWord.isEmpty ? '' : '$lastWord ';
+    final textStyle = theme.textTheme.bodyLarge!.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+
+    final prefixWidth = prefixText.isEmpty
+        ? 0.0
+        : _measureTextWidth(prefixText, textStyle);
+
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -197,7 +236,7 @@ class _WordChainMyTurn extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      currentWord.isEmpty ? '...' : currentWord,
+                      widget.currentWord.isEmpty ? '...' : widget.currentWord,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w600,
@@ -231,50 +270,101 @@ class _WordChainMyTurn extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: accent.withOpacity(0.35),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withOpacity(0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+              // ===== KHUNG Ô NHẬP =====
+              GestureDetector(
+                onTap: () => _focusNode.requestFocus(),
+                child: Container(
+                  height: 56,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: accent.withOpacity(0.35),
+                      width: 2,
                     ),
-                  ],
-                ),
-                child: TextField(
-                  controller: inputController,
-                  minLines: 1,
-                  maxLines: 1,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => onSubmit(),
-                  inputFormatters: inputFormatters,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '...',
-                    prefixText: prefixText,
-                    prefixStyle: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+
+              // ===== TEXTFIELD ẨN (NHẬN INPUT THẬT) =====
+              Positioned.fill(
+                child: TextField(
+                  controller: widget.inputController,
+                  focusNode: _focusNode,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => widget.onSubmit(),
+                  cursorColor: theme.colorScheme.primary,
+
+                  // ⚠️ chữ ẩn nhưng GIỮ fontSize & lineHeight
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: Colors.transparent,
+                  ),
+
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.fromLTRB(
+                      16 + prefixWidth, // 👈 ĐẨY CURSOR SAU PREFIX
+                      16,
+                      16,
+                      16,
+                    ),
+                  ),
+                ),
+              ),
+
+
+              // ===== TEXTFIELD ẨN (CHỈ ĐỂ NHẬN INPUT) =====
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: widget.inputController,
+                        builder: (context, value, _) {
+                          final suffix = value.text;
+
+                          return RichText(
+                            text: TextSpan(
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              children: [
+                                if (lastWord.isNotEmpty)
+                                  TextSpan(
+                                    text: '$lastWord ',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                TextSpan(
+                                  text: suffix.isEmpty ? '...' : suffix,
+                                  style: TextStyle(
+                                    color: suffix.isEmpty
+                                        ? muted
+                                        : theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ===== LABEL "Đến lượt bạn" =====
               Positioned(
                 left: 12,
                 top: -10,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     borderRadius: BorderRadius.circular(12),
@@ -290,6 +380,7 @@ class _WordChainMyTurn extends StatelessWidget {
               ),
             ],
           ),
+
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
@@ -302,7 +393,7 @@ class _WordChainMyTurn extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           OutlinedButton.icon(
-            onPressed: onSOS,
+            onPressed: widget.onSOS,
             icon: Icon(
               Icons.help_outline,
               size: 18,

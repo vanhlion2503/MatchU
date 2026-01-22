@@ -53,11 +53,13 @@ class TelepathyController extends GetxController {
 
   StreamSubscription? _sub;
   int? _lastAdvanceIndex;
+  int? _lastRevealIndex;
   String? _otherUid;
   bool? _isHost;
   bool _startingCountdown = false;
   DateTime? _lastFinishedAt;
   late final TelepathyTimers _timers;
+  Timer? _revealFallbackTimer;
   bool get isPlaying => status.value == TelepathyStatus.playing;
 
   @override
@@ -110,6 +112,11 @@ class TelepathyController extends GetxController {
 
     if (nextStatus != TelepathyStatus.playing) {
       _lastAdvanceIndex = null;
+    }
+
+    if (nextStatus != TelepathyStatus.revealing) {
+      _revealFallbackTimer?.cancel();
+      _revealFallbackTimer = null;
     }
 
     if (nextStatus != TelepathyStatus.finished) {
@@ -177,6 +184,7 @@ class TelepathyController extends GetxController {
 
   void _handleRevealing() {
     _timers.stopQuestionTimer();
+    _scheduleRevealAdvanceFallback();
   }
 
   void _handleFinished(Map<String, dynamic> game) {
@@ -204,6 +212,9 @@ class TelepathyController extends GetxController {
     _clearRoundData();
     myConsent.value = false;
     otherConsent.value = false;
+    _lastRevealIndex = null;
+    _revealFallbackTimer?.cancel();
+    _revealFallbackTimer = null;
   }
 
   void _syncConsent(Map<String, dynamic> game) {
@@ -237,6 +248,9 @@ class TelepathyController extends GetxController {
     _lastFinishedAt = null;
     _startingCountdown = false;
     _lastAdvanceIndex = null;
+    _lastRevealIndex = null;
+    _revealFallbackTimer?.cancel();
+    _revealFallbackTimer = null;
     _clearRoundData();
     _timers.reset();
   }
@@ -246,6 +260,36 @@ class TelepathyController extends GetxController {
     questions.clear();
     myAnswers.clear();
     otherAnswers.clear();
+  }
+
+  void _scheduleRevealAdvanceFallback() {
+    if (_isHost != true) return;
+    if (questions.isEmpty) return;
+
+    final index = currentIndex.value;
+    if (index < 0 || index >= questions.length) return;
+
+    final question = questions[index];
+    final my = myAnswers[question.id];
+    final other = otherAnswers[question.id];
+    if (my == null || other == null) return;
+
+    if (_lastRevealIndex == index) return;
+    _lastRevealIndex = index;
+
+    _revealFallbackTimer?.cancel();
+    _revealFallbackTimer =
+        Timer(const Duration(milliseconds: 1200), () async {
+      if (_isHost != true) return;
+      if (status.value != TelepathyStatus.revealing) return;
+      if (currentIndex.value != index) return;
+
+      if (currentIndex.value + 1 >= questions.length) {
+        await finish();
+      } else {
+        await _service.continueAfterReveal(roomId);
+      }
+    });
   }
 
   Future<void> _handleQuestionTimeout() async {
@@ -540,6 +584,7 @@ class TelepathyController extends GetxController {
   void onClose() {
     _sub?.cancel();
     _timers.dispose();
+    _revealFallbackTimer?.cancel();
     super.onClose();
   }
 }

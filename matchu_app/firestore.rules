@@ -152,6 +152,7 @@ service cloud.firestore {
             "finishedAt",
             "hookSent",
             "result",
+            "aiInsight",
             "questions",
             "answers",
             "currentQuestionIndex",
