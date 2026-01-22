@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,8 @@ class WordChainGameplayView extends StatelessWidget {
   final VoidCallback onSubmit;
   final VoidCallback onSOS;
   final String? otherAvatarKey;
+  final bool showReward;
+  final int rewardTick;
 
   const WordChainGameplayView({
     super.key,
@@ -21,6 +24,8 @@ class WordChainGameplayView extends StatelessWidget {
     required this.onSubmit,
     required this.onSOS,
     required this.otherAvatarKey,
+    required this.showReward,
+    required this.rewardTick,
   });
 
   @override
@@ -28,32 +33,119 @@ class WordChainGameplayView extends StatelessWidget {
     return Obx(() {
       final isMyTurn = wordChain.turnUid.value == wordChain.uid;
 
-      return Column(
-        key: ValueKey("word_chain_playing_${isMyTurn ? 'me' : 'other'}"),
+      return Stack(
         children: [
-          _WordChainHeader(
-            isMyTurn: isMyTurn,
-            hearts: wordChain.hearts[wordChain.uid] ?? 0,
-            remainingSeconds: wordChain.remainingSeconds.value,
+          Column(
+            children: [
+              _WordChainHeader(
+                isMyTurn: isMyTurn,
+                hearts: wordChain.hearts[wordChain.uid] ?? 0,
+                remainingSeconds: wordChain.remainingSeconds.value,
+              ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final isMyChild =
+                        child.key == const ValueKey('word_chain_my_turn');
+                    final offset = isMyChild
+                        ? const Offset(0.08, 0)
+                        : const Offset(-0.08, 0);
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: offset,
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: isMyTurn
+                      ? _WordChainMyTurn(
+                          key: const ValueKey('word_chain_my_turn'),
+                          currentWord: wordChain.currentWord.value,
+                          isSeed: wordChain.usedWords.length <= 1,
+                          inputController: inputController,
+                          onSubmit: onSubmit,
+                          onSOS: onSOS,
+                        )
+                      : _WordChainOpponentTurn(
+                          key: const ValueKey('word_chain_other_turn'),
+                          currentWord: wordChain.currentWord.value,
+                          otherAvatarKey: otherAvatarKey,
+                        ),
+                ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final slide = Tween<Offset>(
+                      begin: const Offset(0, 0.2),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return ClipRect(
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: slide,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: isMyTurn
+                      ? _WordChainActionBar(
+                          key: const ValueKey('word_chain_action'),
+                          onSubmit: onSubmit,
+                        )
+                      : const SizedBox.shrink(
+                          key: ValueKey('word_chain_action_empty'),
+                        ),
+                ),
+              ),
+            ],
           ),
-          Expanded(
-            child: isMyTurn
-                ? _WordChainMyTurn(
-                    currentWord: wordChain.currentWord.value,
-                    isSeed: wordChain.usedWords.length <= 1,
-                    inputController: inputController,
-                    onSubmit: onSubmit,
-                    onSOS: onSOS,
-                  )
-                : _WordChainOpponentTurn(
-                    currentWord: wordChain.currentWord.value,
-                    otherAvatarKey: otherAvatarKey,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 72),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutBack,
+                    switchOutCurve: Curves.easeIn,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(
+                          scale: Tween<double>(begin: 0.85, end: 1.0)
+                              .animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: showReward
+                        ? _WordChainMicroReward(
+                            key: ValueKey('reward_$rewardTick'),
+                          )
+                        : const SizedBox.shrink(
+                            key: ValueKey('reward_empty'),
+                          ),
                   ),
-          ),
-          if (isMyTurn)
-            _WordChainActionBar(
-              onSubmit: onSubmit,
+                ),
+              ),
             ),
+          ),
         ],
       );
     });
@@ -97,31 +189,52 @@ class _WordChainHeader extends StatelessWidget {
             }),
           ),
           const Spacer(),
-          if (isMyTurn)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.error.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.timer_outlined,
-                    size: 14,
-                    color: theme.colorScheme.error,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${displaySeconds}s',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: theme.colorScheme.error,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) {
+              return ScaleTransition(
+                scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
+                child: FadeTransition(
+                  opacity: animation,
+                  child: child,
+                ),
+              );
+            },
+            child: isMyTurn
+                ? Container(
+                    key: const ValueKey('word_chain_timer'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
                     ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 14,
+                          color: theme.colorScheme.error,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${displaySeconds}s',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(
+                    key: ValueKey('word_chain_timer_empty'),
                   ),
-                ],
-              ),
-            ),
+          ),
         ],
       ),
     );
@@ -136,6 +249,7 @@ class _WordChainMyTurn extends StatefulWidget {
   final VoidCallback onSOS;
 
   const _WordChainMyTurn({
+    super.key,
     required this.currentWord,
     required this.isSeed,
     required this.inputController,
@@ -174,7 +288,6 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn> {
 
     return painter.width;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -422,74 +535,171 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn> {
   }
 }
 
-class _WordChainOpponentTurn extends StatelessWidget {
+class _WordChainOpponentTurn extends StatefulWidget {
   final String currentWord;
   final String? otherAvatarKey;
 
   const _WordChainOpponentTurn({
+    super.key,
     required this.currentWord,
     required this.otherAvatarKey,
   });
+
+  @override
+  State<_WordChainOpponentTurn> createState() => _WordChainOpponentTurnState();
+}
+
+class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
+    with SingleTickerProviderStateMixin {
+  static const List<String> _thinkingTexts = [
+    'Đang suy nghĩ...',
+    'Hơi khó rồi đây...',
+    'Tìm từ hợp lệ...',
+  ];
+
+  late final AnimationController _thinkingController;
+  late final math.Random _random;
+  late String _thinkingText;
+  Timer? _textTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _random = math.Random();
+    _thinkingText = _thinkingTexts[_random.nextInt(_thinkingTexts.length)];
+    _thinkingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+    _textTimer = Timer.periodic(const Duration(milliseconds: 2200), (_) {
+      if (!mounted) return;
+      setState(() {
+        _thinkingText = _nextThinkingText(_thinkingText);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _textTimer?.cancel();
+    _thinkingController.dispose();
+    super.dispose();
+  }
+
+  String _nextThinkingText(String current) {
+    if (_thinkingTexts.length <= 1) return current;
+    var next = _thinkingTexts[_random.nextInt(_thinkingTexts.length)];
+    if (next == current) {
+      final index =
+          (_thinkingTexts.indexOf(current) + 1) % _thinkingTexts.length;
+      next = _thinkingTexts[index];
+    }
+    return next;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
-    final lastWord = currentWord.isEmpty ? '...' : currentWord;
+    final lastWord = widget.currentWord.isEmpty ? '...' : widget.currentWord;
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 108,
-                height: 108,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.secondary.withOpacity(0.15),
-                  shape: BoxShape.circle,
+          AnimatedBuilder(
+            animation: _thinkingController,
+            builder: (context, child) {
+              final t = _thinkingController.value;
+              final pulse = 1 + math.sin(t * math.pi * 2) * 0.035;
+              final glow = 0.08 + ((math.sin(t * math.pi * 2) + 1) / 2) * 0.08;
+              return Transform.scale(
+                scale: pulse,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(glow),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: child,
                 ),
-              ),
-              AnonymousAvatar(
-                avatarKey: otherAvatarKey,
-                radius: 40,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: theme.brightness == Brightness.dark
-                    ? AppTheme.darkBorder
-                    : AppTheme.lightBorder,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+              );
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  width: 108,
+                  height: 108,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondary.withOpacity(0.18),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                AnonymousAvatar(
+                  avatarKey: widget.otherAvatarKey,
+                  radius: 40,
                 ),
               ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const _ThinkingDots(),
-                const SizedBox(width: 6),
-                Text(
-                  'Đang suy nghĩ...',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+          ),
+          const SizedBox(height: 12),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) {
+              final slide = Tween<Offset>(
+                begin: const Offset(0, 0.15),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: slide,
+                  child: child,
                 ),
-              ],
+              );
+            },
+            child: Container(
+              key: ValueKey(_thinkingText),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: theme.brightness == Brightness.dark
+                      ? AppTheme.darkBorder
+                      : AppTheme.lightBorder,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ThinkingDots(progress: _thinkingController),
+                  const SizedBox(width: 6),
+                  Text(
+                    _thinkingText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -514,10 +724,57 @@ class _WordChainOpponentTurn extends StatelessWidget {
   }
 }
 
+class _WordChainMicroReward extends StatelessWidget {
+  const _WordChainMicroReward({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: accent.withOpacity(0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withOpacity(0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.auto_awesome,
+            size: 16,
+            color: accent,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Chuẩn rồi! +1',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WordChainActionBar extends StatelessWidget {
   final VoidCallback onSubmit;
 
   const _WordChainActionBar({
+    super.key,
     required this.onSubmit,
   });
 
@@ -549,43 +806,23 @@ class _WordChainActionBar extends StatelessWidget {
   }
 }
 
-class _ThinkingDots extends StatefulWidget {
-  const _ThinkingDots();
+class _ThinkingDots extends StatelessWidget {
+  final Animation<double> progress;
 
-  @override
-  State<_ThinkingDots> createState() => _ThinkingDotsState();
-}
-
-class _ThinkingDotsState extends State<_ThinkingDots>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  const _ThinkingDots({
+    required this.progress,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        Theme.of(context).colorScheme.onSurface.withOpacity(0.4);
+    final color = Theme.of(context).colorScheme.onSurface.withOpacity(0.4);
 
-    return Row(
-      children: List.generate(3, (i) {
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (_, __) {
-            final t = (_controller.value + i * 0.2) % 1.0;
+    return AnimatedBuilder(
+      animation: progress,
+      builder: (_, __) {
+        return Row(
+          children: List.generate(3, (i) {
+            final t = (progress.value + i * 0.2) % 1.0;
             final dy = math.sin(t * math.pi * 2) * 2;
             return Transform.translate(
               offset: Offset(0, -dy),
@@ -599,9 +836,9 @@ class _ThinkingDotsState extends State<_ThinkingDots>
                 ),
               ),
             );
-          },
+          }),
         );
-      }),
+      },
     );
   }
 }
