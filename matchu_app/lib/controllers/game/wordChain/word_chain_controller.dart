@@ -39,16 +39,33 @@ class WordChainController extends GetxController {
   final submittingAction = Rxn<WordChainSubmitAction>();
   final opponentJustAccepted = false.obs;
 
+  // ===== REWARD PHASE =====
+  final rewardPhase = WordChainRewardPhase.idle.obs;
+  final rewardQuestion = ''.obs;
+  final rewardQuestionPresetId = RxnString();
+  final rewardAnswer = ''.obs;
+  final rewardDeclineCount = 0.obs;
+  final rewardAskedAt = Rxn<DateTime>();
+  final rewardAnsweredAt = Rxn<DateTime>();
+  final rewardReviewStartedAt = Rxn<DateTime>();
+  final rewardAutoAcceptedReason = RxnString();
+  final rewardCompletedAt = Rxn<DateTime>();
+  final rewardReviewSecondsLeft = 0.obs;
+
   StreamSubscription? _sub;
   Timer? _timer;
   Timer? _countdownTimer;
+  Timer? _rewardReviewTimer;
   DateTime? _countdownStartedAt;
   DateTime? _localCountdownStartedAt;
   String? _otherUid;
   bool? _isHost;
   bool _startingCountdown = false;
   bool _startingGame = false;
+  bool _autoAcceptingReward = false;
   static const int _countdownTotalSeconds = 3;
+  static const int rewardReviewTimeoutSeconds = 90;
+  static const int rewardMaxDeclines = 2;
 
   // ================= INIT =================
   @override
@@ -92,6 +109,7 @@ class WordChainController extends GetxController {
       sosUsed.assignAll(Map<String, bool>.from(game["sosUsed"] ?? {}));
 
       _syncConsent(game);
+      _syncReward(game);
 
       if (nextStatus == WordChainStatus.inviting) {
         invitedAt.value = _parseTimestamp(game["invitedAt"]);
@@ -186,6 +204,45 @@ class WordChainController extends GetxController {
     );
   }
 
+  // ================= REWARD =================
+  Future<void> submitRewardQuestion({
+    required String question,
+    String? presetId,
+  }) async {
+    final trimmed = question.trim();
+    if (trimmed.isEmpty) return;
+
+    await service.submitRewardQuestion(
+      roomId: roomId,
+      uid: uid,
+      question: trimmed,
+      presetId: presetId,
+    );
+  }
+
+  Future<void> submitRewardAnswer({
+    required String answer,
+  }) async {
+    final trimmed = answer.trim();
+    if (trimmed.isEmpty) return;
+
+    await service.submitRewardAnswer(
+      roomId: roomId,
+      uid: uid,
+      answer: trimmed,
+    );
+  }
+
+  Future<void> reviewRewardAnswer({
+    required bool accept,
+  }) async {
+    await service.reviewRewardAnswer(
+      roomId: roomId,
+      uid: uid,
+      accept: accept,
+    );
+  }
+
   // ================= HELPERS =================
   void _syncParticipants(Map<String, dynamic> data) {
     final userA = data["userA"];
@@ -216,6 +273,35 @@ class WordChainController extends GetxController {
     }
   }
 
+  void _syncReward(Map<String, dynamic> game) {
+    final rawReward = game["reward"];
+    final reward = rawReward is Map
+        ? Map<String, dynamic>.from(rawReward)
+        : <String, dynamic>{};
+
+    rewardPhase.value = _parseRewardPhase(reward["phase"]);
+    rewardQuestion.value = reward["question"]?.toString() ?? '';
+    rewardQuestionPresetId.value =
+        reward["questionPresetId"]?.toString();
+    rewardAnswer.value = reward["answer"]?.toString() ?? '';
+
+    final rawDeclines = reward["declineCount"];
+    rewardDeclineCount.value = rawDeclines is int
+        ? rawDeclines
+        : rawDeclines is num
+            ? rawDeclines.toInt()
+            : 0;
+
+    rewardAskedAt.value = _parseTimestamp(reward["askedAt"]);
+    rewardAnsweredAt.value = _parseTimestamp(reward["answeredAt"]);
+    rewardReviewStartedAt.value = _parseTimestamp(reward["reviewStartedAt"]);
+    rewardAutoAcceptedReason.value =
+        reward["autoAcceptedReason"]?.toString();
+    rewardCompletedAt.value = _parseTimestamp(reward["completedAt"]);
+
+    _updateRewardReviewTimer();
+  }
+
   void _maybeStartCountdown() {
     if (_isHost != true) return;
     if (_startingCountdown) return;
@@ -223,6 +309,46 @@ class WordChainController extends GetxController {
 
     _startingCountdown = true;
     service.startCountdown(roomId);
+  }
+
+  void _updateRewardReviewTimer() {
+    _rewardReviewTimer?.cancel();
+    _autoAcceptingReward = false;
+
+    if (rewardPhase.value != WordChainRewardPhase.reviewing ||
+        rewardReviewStartedAt.value == null) {
+      rewardReviewSecondsLeft.value = 0;
+      return;
+    }
+
+    final startedAt = rewardReviewStartedAt.value!;
+    _syncRewardCountdown(startedAt);
+    _rewardReviewTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) {
+      if (rewardPhase.value != WordChainRewardPhase.reviewing ||
+          rewardReviewStartedAt.value != startedAt) {
+        _rewardReviewTimer?.cancel();
+        return;
+      }
+      _syncRewardCountdown(startedAt);
+    });
+  }
+
+  void _syncRewardCountdown(DateTime startedAt) {
+    final now = DateTime.now();
+    var elapsedSeconds = now.difference(startedAt).inSeconds;
+    if (elapsedSeconds < 0) elapsedSeconds = 0;
+
+    final remaining = rewardReviewTimeoutSeconds - elapsedSeconds;
+    rewardReviewSecondsLeft.value = remaining > 0 ? remaining : 0;
+
+    if (remaining <= 0 && !_autoAcceptingReward) {
+      _autoAcceptingReward = true;
+      service.autoAcceptReward(
+        roomId: roomId,
+        reason: 'timeout',
+      );
+    }
   }
 
   void _resetGameState() {
@@ -240,12 +366,25 @@ class WordChainController extends GetxController {
     invitedAt.value = null;
     submittingAction.value = null;
     opponentJustAccepted.value = false;
+    rewardPhase.value = WordChainRewardPhase.idle;
+    rewardQuestion.value = '';
+    rewardQuestionPresetId.value = null;
+    rewardAnswer.value = '';
+    rewardDeclineCount.value = 0;
+    rewardAskedAt.value = null;
+    rewardAnsweredAt.value = null;
+    rewardReviewStartedAt.value = null;
+    rewardAutoAcceptedReason.value = null;
+    rewardCompletedAt.value = null;
+    rewardReviewSecondsLeft.value = 0;
     _startingCountdown = false;
     _startingGame = false;
     _timer?.cancel();
     _countdownTimer?.cancel();
+    _rewardReviewTimer?.cancel();
     _countdownStartedAt = null;
     _localCountdownStartedAt = null;
+    _autoAcceptingReward = false;
   }
 
   WordChainStatus _parseStatus(dynamic raw) {
@@ -253,6 +392,14 @@ class WordChainController extends GetxController {
     return WordChainStatus.values.firstWhere(
       (e) => e.name == raw,
       orElse: () => WordChainStatus.idle,
+    );
+  }
+
+  WordChainRewardPhase _parseRewardPhase(dynamic raw) {
+    if (raw is! String) return WordChainRewardPhase.idle;
+    return WordChainRewardPhase.values.firstWhere(
+      (e) => e.name == raw,
+      orElse: () => WordChainRewardPhase.idle,
     );
   }
 
@@ -333,6 +480,7 @@ class WordChainController extends GetxController {
   void onClose() {
     _timer?.cancel();
     _countdownTimer?.cancel();
+    _rewardReviewTimer?.cancel();
     _sub?.cancel();
     super.onClose();
   }

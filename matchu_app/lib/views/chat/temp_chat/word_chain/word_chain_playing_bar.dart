@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/models/word_chain.dart';
@@ -30,6 +29,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
   Worker? _statusWorker;
   Worker? _turnWorker;
   Worker? _wordWorker;
+  Worker? _autoAcceptWorker;
   Timer? _feedbackTimer;
   Timer? _invalidTimer;
   Timer? _rewardTimer;
@@ -37,13 +37,13 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
   bool _showHeartLoss = false;
   bool _showInvalidFeedback = false;
   bool _showMicroReward = false;
-  bool _winnerSelectionDone = false;
-  bool _sendingReward = false;
   String _invalidFeedbackText = '';
   int _rewardTick = 0;
   int? _lastHearts;
   bool _awaitingSubmitAck = false;
   String? _pendingWord;
+  DateTime? _lastAutoAcceptAt;
+  String? _lastAutoAcceptReason;
 
   @override
   void initState() {
@@ -60,17 +60,24 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
 
     _statusWorker = ever<WordChainStatus>(wordChain.status, (status) {
       if (!mounted) return;
-      if (status != WordChainStatus.finished &&
-          (_winnerSelectionDone || _sendingReward)) {
-        setState(() {
-          _winnerSelectionDone = false;
-          _sendingReward = false;
-        });
-      }
       if (status != WordChainStatus.playing) {
         _clearInvalidFeedback();
         _clearPendingSubmit();
       }
+    });
+
+    _autoAcceptWorker =
+        ever<DateTime?>(wordChain.rewardCompletedAt, (completedAt) {
+      if (!mounted || completedAt == null) return;
+      final reason = wordChain.rewardAutoAcceptedReason.value;
+      if (reason == null) return;
+      if (_lastAutoAcceptAt == completedAt &&
+          _lastAutoAcceptReason == reason) {
+        return;
+      }
+      _lastAutoAcceptAt = completedAt;
+      _lastAutoAcceptReason = reason;
+      _showAutoAcceptNotice(reason);
     });
 
     _turnWorker = ever<String>(wordChain.turnUid, (_) {
@@ -98,6 +105,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     _statusWorker?.dispose();
     _turnWorker?.dispose();
     _wordWorker?.dispose();
+    _autoAcceptWorker?.dispose();
     _inputController.dispose();
     super.dispose();
   }
@@ -189,47 +197,17 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     return parts.isEmpty ? '' : parts.last;
   }
 
-  String _winnerDisplayName() {
-    final auth = Get.find<AuthController>();
-    final name = auth.user?.displayName?.trim();
-    if (name == null || name.isEmpty) {
-      return 'Bạn';
-    }
-    return name;
-  }
+  void _showAutoAcceptNotice(String reason) {
+    if (!mounted) return;
+    final message = reason == 'timeout'
+        ? 'Hệ thống đã tự động tiếp tục để đảm bảo trải nghiệm cho cả hai.'
+        : 'Hệ thống đã tự động chấp nhận để đảm bảo công bằng cho cả hai.';
 
-  Future<void> _handleWinnerCard(
-    WordChainController wordChain,
-    WordChainWinnerCard card,
-  ) async {
-    if (_sendingReward || _winnerSelectionDone) return;
-    setState(() {
-      _sendingReward = true;
-    });
-    HapticFeedback.lightImpact();
-
-    try {
-      final winnerName = _winnerDisplayName();
-      final text =
-          'Chúc mừng $winnerName đã chiến thắng! 🏆\n${card.title}: ${card.prompt}';
-
-      await widget.controller.service.sendSystemMessage(
-        roomId: widget.controller.roomId,
-        text: text,
-        code: 'word_chain_reward',
-        senderId: wordChain.uid,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _winnerSelectionDone = true;
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _sendingReward = false;
-      });
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
   }
 
   Future<void> _submitWord(WordChainController wordChain) async {
@@ -289,15 +267,8 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
       final status = wordChain.status.value;
       if (status != WordChainStatus.countdown &&
           status != WordChainStatus.playing &&
-          status != WordChainStatus.finished) {
+          status != WordChainStatus.reward) {
         return const SizedBox.shrink();
-      }
-
-      if (status == WordChainStatus.finished) {
-        final isWinner = wordChain.winnerUid.value == wordChain.uid;
-        if (!isWinner || _winnerSelectionDone) {
-          return const SizedBox.shrink();
-        }
       }
 
       return Positioned.fill(
@@ -341,11 +312,10 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
           showReward: _showMicroReward,
           rewardTick: _rewardTick,
         );
-      case WordChainStatus.finished:
-        return WordChainWinnerView(
+      case WordChainStatus.reward:
+        return WordChainRewardView(
+          wordChain: wordChain,
           isWinner: wordChain.winnerUid.value == wordChain.uid,
-          sendingReward: _sendingReward,
-          onSelectCard: (card) => _handleWinnerCard(wordChain, card),
         );
       default:
         return const SizedBox.shrink();

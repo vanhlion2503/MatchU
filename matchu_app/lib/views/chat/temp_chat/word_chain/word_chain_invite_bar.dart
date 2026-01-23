@@ -158,6 +158,7 @@ class WordChainInviteBar extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   _GhostActionButton(
                     label: 'Bỏ qua',
                     icon: Icons.close,

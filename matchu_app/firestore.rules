@@ -162,6 +162,60 @@ service cloud.firestore {
           ]);
       }
 
+      function isValidWordChainReward() {
+        return !request.resource.data.minigames.wordChain.keys()
+            .hasAny(["reward"])
+          || (
+            request.resource.data.minigames.wordChain.reward is map
+            && request.resource.data.minigames.wordChain.reward.keys().hasOnly([
+              "phase",
+              "question",
+              "questionPresetId",
+              "answer",
+              "declineCount",
+              "askedAt",
+              "answeredAt",
+              "reviewStartedAt",
+              "autoAcceptedReason",
+              "completedAt"
+            ])
+            && request.resource.data.minigames.wordChain.reward.phase is string
+            && request.resource.data.minigames.wordChain.reward.declineCount is number
+            && (
+              request.resource.data.minigames.wordChain.reward.question is string
+              || request.resource.data.minigames.wordChain.reward.question == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.questionPresetId is string
+              || request.resource.data.minigames.wordChain.reward.questionPresetId == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.answer is string
+              || request.resource.data.minigames.wordChain.reward.answer == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.askedAt is timestamp
+              || request.resource.data.minigames.wordChain.reward.askedAt == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.answeredAt is timestamp
+              || request.resource.data.minigames.wordChain.reward.answeredAt == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.reviewStartedAt is timestamp
+              || request.resource.data.minigames.wordChain.reward.reviewStartedAt == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.autoAcceptedReason is string
+              || request.resource.data.minigames.wordChain.reward.autoAcceptedReason == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.completedAt is timestamp
+              || request.resource.data.minigames.wordChain.reward.completedAt == null
+            )
+          );
+      }
+
       function isValidWordChainMinigame() {
         return request.resource.data.minigames is map
           && request.resource.data.minigames.keys().hasOnly(["wordChain"])
@@ -181,6 +235,7 @@ service cloud.firestore {
             "hearts",
             "sosUsed",
             "winnerUid",
+            "reward",
             "updatedAt"
           ])
           && request.resource.data.minigames.wordChain.status is string
@@ -194,7 +249,8 @@ service cloud.firestore {
           && (
             !request.resource.data.minigames.wordChain.keys().hasAny(["winnerUid"])
             || request.resource.data.minigames.wordChain.winnerUid is string
-          );
+          )
+          && isValidWordChainReward();
       }
 
       function onlyUpdateMyAvatar() {

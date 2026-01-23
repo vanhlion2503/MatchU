@@ -129,6 +129,7 @@ class TempChatController extends GetxController {
       }
       if (status == WordChainStatus.countdown ||
           status == WordChainStatus.playing ||
+          status == WordChainStatus.reward ||
           status == WordChainStatus.finished) {
         _wordChainAutoInviteLocked = true;
       }
@@ -300,7 +301,8 @@ class TempChatController extends GetxController {
     final chainStatus = wordChain.status.value;
     if (chainStatus == WordChainStatus.inviting ||
         chainStatus == WordChainStatus.countdown ||
-        chainStatus == WordChainStatus.playing) {
+        chainStatus == WordChainStatus.playing ||
+        chainStatus == WordChainStatus.reward) {
       return false;
     }
 
@@ -463,16 +465,29 @@ class TempChatController extends GetxController {
 
     _justSentMessage.value = true;
 
-    await service.sendMessages(
-      roomId,
-      TempMessageModel(
-        senderId: uid,
-        text: text,
-        type: type,
-        replyToId: reply?["id"],
-        replyText: reply?["text"],
-      ),
-    );
+    try {
+      await service.sendMessages(
+        roomId,
+        TempMessageModel(
+          senderId: uid,
+          text: text,
+          type: type,
+          replyToId: reply?["id"],
+          replyText: reply?["text"],
+        ),
+      );
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') {
+        Get.snackbar(
+          "Thông báo",
+          "Không thể gửi tin nhắn lúc này.",
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 2),
+        );
+        return;
+      }
+      rethrow;
+    }
 
     // 🔥 clear reply SAU KHI GỬI
     replyingMessage.value = null;
