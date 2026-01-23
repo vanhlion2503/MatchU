@@ -253,7 +253,10 @@ class WordChainService {
         "minigames.wordChain.status": "reward",
         "minigames.wordChain.winnerUid":
             hearts.keys.firstWhere((e) => e != uid),
-        "minigames.wordChain.reward": _rewardState(phase: "asking"),
+        "minigames.wordChain.reward": _rewardState(
+          phase: "asking",
+          askingStartedAt: FieldValue.serverTimestamp(),
+        ),
         "minigames.wordChain.remainingSeconds": 0,
         "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
       });
@@ -292,7 +295,10 @@ class WordChainService {
         tx.update(ref, {
           "minigames.wordChain.status": "reward",
           "minigames.wordChain.winnerUid": otherUid,
-          "minigames.wordChain.reward": _rewardState(phase: "asking"),
+          "minigames.wordChain.reward": _rewardState(
+            phase: "asking",
+            askingStartedAt: FieldValue.serverTimestamp(),
+          ),
           "minigames.wordChain.hearts": hearts,
           "minigames.wordChain.remainingSeconds": 0,
           "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
@@ -346,6 +352,7 @@ class WordChainService {
           questionPresetId: presetId,
           declineCount: 0,
           askedAt: FieldValue.serverTimestamp(),
+          answeringStartedAt: FieldValue.serverTimestamp(),
         ),
         "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
       });
@@ -459,6 +466,22 @@ class WordChainService {
       final answer = reward["answer"]?.toString();
 
       if (accept || declineCount >= _rewardMaxDeclines) {
+        if (accept) {
+          final cleanQuestion = question?.trim() ?? '';
+          final cleanAnswer = answer?.trim() ?? '';
+          if (cleanQuestion.isNotEmpty && cleanAnswer.isNotEmpty) {
+            tx.set(
+              ref.collection("messages").doc(),
+              {
+                "type": "system",
+                "systemCode": "word_chain_reward",
+                "text": "Câu hỏi: $cleanQuestion\nCâu trả lời: $cleanAnswer",
+                "senderId": uid,
+                "createdAt": FieldValue.serverTimestamp(),
+              },
+            );
+          }
+        }
         tx.update(ref, {
           "minigames.wordChain.status": "finished",
           "minigames.wordChain.reward": _rewardState(
@@ -485,6 +508,7 @@ class WordChainService {
           questionPresetId: questionPresetId,
           declineCount: declineCount + 1,
           askedAt: askedAt,
+          answeringStartedAt: FieldValue.serverTimestamp(),
         ),
         "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
       });
@@ -534,6 +558,83 @@ class WordChainService {
     });
   }
 
+  Future<void> exitReward({
+    required String roomId,
+    required String uid,
+    required String reason,
+  }) async {
+    final ref = _roomRef(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "reward") return;
+
+      final reward = Map<String, dynamic>.from(game?["reward"] ?? {});
+      final phase = reward["phase"];
+      if (phase != "asking" && phase != "answering") return;
+
+      final winnerUid = game?["winnerUid"]?.toString();
+      if (reason == "winner_left" && (winnerUid != uid || phase != "asking")) {
+        return;
+      }
+      if (reason == "ask_timeout" && phase != "asking") return;
+      if (reason == "answer_timeout" && phase != "answering") return;
+
+      final rawDeclines = reward["declineCount"];
+      final declineCount = rawDeclines is int
+          ? rawDeclines
+          : rawDeclines is num
+              ? rawDeclines.toInt()
+              : 0;
+
+      final askedAt = reward["askedAt"];
+      final answeredAt = reward["answeredAt"];
+      final question = reward["question"]?.toString();
+      final questionPresetId = reward["questionPresetId"]?.toString();
+      final answer = reward["answer"]?.toString();
+
+      tx.update(ref, {
+        "minigames.wordChain.status": "finished",
+        "minigames.wordChain.reward": _rewardState(
+          phase: "done",
+          question: question,
+          questionPresetId: questionPresetId,
+          answer: answer,
+          declineCount: declineCount,
+          askedAt: askedAt,
+          answeredAt: answeredAt,
+          completedAt: FieldValue.serverTimestamp(),
+          autoAcceptedReason: reason,
+        ),
+        "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
+      });
+
+      final participants = List<String>.from(data?["participants"] ?? []);
+      final targetUid = _rewardExitTargetUid(
+        reason: reason,
+        winnerUid: winnerUid,
+        participants: participants,
+      );
+
+      tx.set(
+        ref.collection("messages").doc(),
+        {
+          "type": "system",
+          "systemCode": "word_chain_exit",
+          "text": _rewardExitMessage(reason),
+          "senderId": uid,
+          "targetUid": targetUid,
+          "createdAt": FieldValue.serverTimestamp(),
+        },
+      );
+    });
+  }
+
   // ================= TIMER =================
   Future<void> resetTimer(String roomId) async {
     await _db.collection("tempChats").doc(roomId).update({
@@ -561,6 +662,8 @@ class WordChainService {
     String? questionPresetId,
     String? answer,
     int declineCount = 0,
+    dynamic askingStartedAt,
+    dynamic answeringStartedAt,
     dynamic askedAt,
     dynamic answeredAt,
     dynamic reviewStartedAt,
@@ -573,6 +676,8 @@ class WordChainService {
       "questionPresetId": questionPresetId,
       "answer": answer,
       "declineCount": declineCount,
+      "askingStartedAt": askingStartedAt,
+      "answeringStartedAt": answeringStartedAt,
       "askedAt": askedAt,
       "answeredAt": answeredAt,
       "reviewStartedAt": reviewStartedAt,
@@ -583,5 +688,37 @@ class WordChainService {
 
   String _randomSeedWord() {
     return _seedWords[_random.nextInt(_seedWords.length)];
+  }
+
+  String _rewardExitMessage(String reason) {
+    switch (reason) {
+      case 'ask_timeout':
+        return 'Đối phương đã không đặt câu hỏi và đã thoát khỏi Word Chain.';
+      case 'answer_timeout':
+        return 'Đối phương đã không trả lời và đã thoát khỏi Word Chain.';
+      case 'winner_left':
+        return 'Đối phương đã thoát khỏi Word Chain.';
+      default:
+        return 'Đối phương đã thoát khỏi Word Chain.';
+    }
+  }
+
+  String? _rewardExitTargetUid({
+    required String reason,
+    required String? winnerUid,
+    required List<String> participants,
+  }) {
+    if (winnerUid == null) return null;
+    if (participants.length < 2) return null;
+
+    if (reason == 'answer_timeout') {
+      return winnerUid;
+    }
+    if (reason == 'ask_timeout' || reason == 'winner_left') {
+      for (final uid in participants) {
+        if (uid != winnerUid) return uid;
+      }
+    }
+    return null;
   }
 }

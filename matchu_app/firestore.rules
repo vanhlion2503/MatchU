@@ -173,6 +173,8 @@ service cloud.firestore {
               "questionPresetId",
               "answer",
               "declineCount",
+              "askingStartedAt",
+              "answeringStartedAt",
               "askedAt",
               "answeredAt",
               "reviewStartedAt",
@@ -192,6 +194,14 @@ service cloud.firestore {
             && (
               request.resource.data.minigames.wordChain.reward.answer is string
               || request.resource.data.minigames.wordChain.reward.answer == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.askingStartedAt is timestamp
+              || request.resource.data.minigames.wordChain.reward.askingStartedAt == null
+            )
+            && (
+              request.resource.data.minigames.wordChain.reward.answeringStartedAt is timestamp
+              || request.resource.data.minigames.wordChain.reward.answeringStartedAt == null
             )
             && (
               request.resource.data.minigames.wordChain.reward.askedAt is timestamp

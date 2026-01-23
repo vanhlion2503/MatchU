@@ -199,9 +199,30 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
 
   void _showAutoAcceptNotice(String reason) {
     if (!mounted) return;
-    final message = reason == 'timeout'
-        ? 'Hệ thống đã tự động tiếp tục để đảm bảo trải nghiệm cho cả hai.'
-        : 'Hệ thống đã tự động chấp nhận để đảm bảo công bằng cho cả hai.';
+    String? message;
+    switch (reason) {
+      case 'timeout':
+        message =
+            'Hệ thống đã tự động tiếp tục để đảm bảo trải nghiệm cho cả hai.';
+        break;
+      case 'max_declines':
+        message =
+            'Hệ thống đã tự động chấp nhận để đảm bảo công bằng cho cả hai.';
+        break;
+      case 'ask_timeout':
+        message =
+            'Đối phương đã không đặt câu hỏi và đã thoát khỏi Word Chain.';
+        break;
+      case 'answer_timeout':
+        message =
+            'Đối phương đã không trả lời và đã thoát khỏi Word Chain.';
+        break;
+      case 'winner_left':
+        message = 'Đối phương đã thoát khỏi Word Chain.';
+        break;
+      default:
+        return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

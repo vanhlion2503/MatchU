@@ -418,7 +418,7 @@ class CountdownChip extends StatelessWidget {
           Icon(Iconsax.timer_1, size: 16, color: accent),
           const SizedBox(width: 6),
           Text(
-            'Tự động sau ${secondsLeft}s',
+            'Kết thúc sau ${secondsLeft}s',
             style: theme.textTheme.bodySmall?.copyWith(
               color: accent,
               fontWeight: FontWeight.w700,

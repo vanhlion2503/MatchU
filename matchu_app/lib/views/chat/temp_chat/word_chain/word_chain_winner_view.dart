@@ -44,6 +44,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
   bool _sendingQuestion = false;
   bool _sendingAnswer = false;
   bool _reviewing = false;
+  bool _exiting = false;
 
   bool get _isWinner => widget.isWinner;
   bool get _isLoser => !widget.isWinner;
@@ -65,6 +66,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
         _selectedPreset = null;
         _inputMode = _RewardInputMode.suggested;
         _sendingQuestion = false;
+        _exiting = false;
         _questionFocus.unfocus();
       }
       if (phase != WordChainRewardPhase.answering) {
@@ -158,6 +160,15 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
     setState(() => _reviewing = false);
   }
 
+  Future<void> _exitReward() async {
+    if (_exiting) return;
+    setState(() => _exiting = true);
+    HapticFeedback.lightImpact();
+    await widget.wordChain.exitReward(reason: 'winner_left');
+    if (!mounted) return;
+    setState(() => _exiting = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -167,6 +178,9 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
       final question = widget.wordChain.rewardQuestion.value;
       final answer = widget.wordChain.rewardAnswer.value;
       final declineCount = widget.wordChain.rewardDeclineCount.value;
+      final askSecondsLeft = widget.wordChain.rewardAskSecondsLeft.value;
+      final answerSecondsLeft =
+          widget.wordChain.rewardAnswerSecondsLeft.value;
       final secondsLeft = widget.wordChain.rewardReviewSecondsLeft.value;
       final autoReason = widget.wordChain.rewardAutoAcceptedReason.value;
 
@@ -202,6 +216,8 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
                 question: question,
                 answer: answer,
                 declineCount: declineCount,
+                askSecondsLeft: askSecondsLeft,
+                answerSecondsLeft: answerSecondsLeft,
                 secondsLeft: secondsLeft,
                 autoReason: autoReason,
               ),
@@ -220,23 +236,29 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
     required String question,
     required String answer,
     required int declineCount,
+    required int askSecondsLeft,
+    required int answerSecondsLeft,
     required int secondsLeft,
     required String? autoReason,
   }) {
     switch (phase) {
       case WordChainRewardPhase.asking:
         return _isWinner
-            ? _buildQuestionComposer(theme)
-            : const RewardWaitingCard(
-                key: ValueKey('reward_wait_question'),
-                icon: Icons.help_outline,
-                title: 'Đối phương đang đặt câu hỏi',
-                message: 'Hãy chuẩn bị để trả lời ngay khi nhận được.',
-              );
+            ? _buildQuestionComposer(theme, askSecondsLeft)
+            : _buildWaitingQuestion(askSecondsLeft);
       case WordChainRewardPhase.answering:
         return _isLoser
-            ? _buildAnswerComposer(theme, question, declineCount)
-            : _buildWaitingAnswer(theme, question);
+            ? _buildAnswerComposer(
+                theme,
+                question,
+                declineCount,
+                answerSecondsLeft,
+              )
+            : _buildWaitingAnswer(
+                theme,
+                question,
+                answerSecondsLeft,
+              );
       case WordChainRewardPhase.reviewing:
         return _isWinner
             ? _buildReviewPanel(
@@ -265,7 +287,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
     }
   }
 
-  Widget _buildQuestionComposer(ThemeData theme) {
+  Widget _buildQuestionComposer(ThemeData theme, int secondsLeft) {
     final canSubmit = _inputMode == _RewardInputMode.suggested
         ? _selectedPreset != null
         : _questionController.text.trim().isNotEmpty;
@@ -376,6 +398,10 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
           const SafetyNote(
             text: 'Nội dung sẽ được kiểm duyệt tự động.',
           ),
+          if (secondsLeft > 0) ...[
+            const SizedBox(height: 10),
+            CountdownChip(secondsLeft: secondsLeft),
+          ],
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: canSubmit && !_sendingQuestion ? _submitQuestion : null,
@@ -416,8 +442,57 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed:
+                !_sendingQuestion && !_exiting ? _exitReward : null,
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size.fromHeight(44),
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: _exiting
+                  ? const SizedBox(
+                      key: ValueKey('exiting'),
+                      height: 44,
+                      child: Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  : const SizedBox(
+                      key: ValueKey('exit'),
+                      height: 44,
+                      child: Center(
+                        child: Text('Thoát không đặt câu hỏi'),
+                      ),
+                    ),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWaitingQuestion(int secondsLeft) {
+    return Column(
+      key: const ValueKey('reward_wait_question'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const RewardWaitingCard(
+          icon: Icons.help_outline,
+          title: 'Đối phương đang đặt câu hỏi',
+          message: 'Hãy chuẩn bị để trả lời ngay khi nhận được.',
+        ),
+        if (secondsLeft > 0) ...[
+          const SizedBox(height: 10),
+          CountdownChip(secondsLeft: secondsLeft),
+        ],
+      ],
     );
   }
 
@@ -425,6 +500,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
     ThemeData theme,
     String question,
     int declineCount,
+    int secondsLeft,
   ) {
     final isFinalAttempt =
         declineCount >= WordChainController.rewardMaxDeclines;
@@ -475,6 +551,10 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
                 ? 'Lượt này sẽ được tự động chấp nhận để đảm bảo công bằng.'
                 : 'Bạn bắt buộc trả lời để hoàn tất cơ chế thưởng.',
           ),
+          if (secondsLeft > 0) ...[
+            const SizedBox(height: 10),
+            CountdownChip(secondsLeft: secondsLeft),
+          ],
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: !_sendingAnswer ? _submitAnswer : null,
@@ -518,6 +598,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
   Widget _buildWaitingAnswer(
     ThemeData theme,
     String question,
+    int secondsLeft,
   ) {
     return Container(
       key: const ValueKey('reward_wait_answer'),
@@ -555,6 +636,10 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
               ),
             ],
           ),
+          if (secondsLeft > 0) ...[
+            const SizedBox(height: 12),
+            CountdownChip(secondsLeft: secondsLeft),
+          ],
         ],
       ),
     );

@@ -133,6 +133,12 @@ class _MessagesListState extends State<MessagesList> {
               return const SizedBox();
             }
 
+            if (code == "word_chain_exit" &&
+                targetUid != null &&
+                targetUid != uid) {
+              return const SizedBox();
+            }
+
             if (code == "ended" && senderId == uid) {
               return const SizedBox();
             }
