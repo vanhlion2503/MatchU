@@ -143,6 +143,15 @@ class _MessagesListState extends State<MessagesList> {
               return const SizedBox();
             }
 
+            if (code == "word_chain_reward") {
+              return _buildWordChainRewardBubbles(
+                data: data,
+                currentUid: uid,
+                controller: controller,
+                messageId: doc.id,
+              );
+            }
+
             Color? backgroundColor;
             Color? textColor;
 
@@ -331,6 +340,60 @@ class _MessagesListState extends State<MessagesList> {
     final dt = _getTime(value);
     if (dt == null) return "";
     return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+  }
+
+  Widget _buildWordChainRewardBubbles({
+    required Map<String, dynamic> data,
+    required String currentUid,
+    required TempChatController controller,
+    required String messageId,
+  }) {
+    final question = data["question"]?.toString() ?? "";
+    final answer = data["answer"]?.toString() ?? "";
+    final questionUid = data["questionUid"]?.toString();
+    final answerUid = data["answerUid"]?.toString();
+
+    if (question.isEmpty ||
+        answer.isEmpty ||
+        questionUid == null ||
+        answerUid == null) {
+      return SystemMessageEvent(text: data["text"] ?? "");
+    }
+
+    final questionIsMe = questionUid == currentUid;
+    final answerIsMe = answerUid == currentUid;
+    final otherAvatarKey = controller.otherAnonymousAvatar.value;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ChatRow(
+          text: question,
+          type: "text",
+          isMe: questionIsMe,
+          showAvatar: !questionIsMe,
+          smallMargin: false,
+          showTime: false,
+          time: "",
+          messageId: messageId,
+          highlighted: false,
+          anonymousAvatarKey: questionIsMe ? null : otherAvatarKey,
+        ),
+        const SizedBox(height: 6),
+        ChatRow(
+          text: answer,
+          type: "text",
+          isMe: answerIsMe,
+          showAvatar: !answerIsMe,
+          smallMargin: false,
+          showTime: false,
+          time: "",
+          messageId: messageId,
+          highlighted: false,
+          anonymousAvatarKey: answerIsMe ? null : otherAvatarKey,
+        ),
+      ],
+    );
   }
 
   void _showReactionPicker({

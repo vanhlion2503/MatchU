@@ -64,6 +64,12 @@ class WordChainController extends GetxController {
   Timer? _rewardAnswerTimer;
   DateTime? _countdownStartedAt;
   DateTime? _localCountdownStartedAt;
+  DateTime? _localRewardAskStartedAt;
+  DateTime? _localRewardAnswerStartedAt;
+  DateTime? _localRewardReviewStartedAt;
+  DateTime? _lastRewardAskStartedAt;
+  DateTime? _lastRewardAnswerStartedAt;
+  DateTime? _lastRewardReviewStartedAt;
   String? _otherUid;
   bool? _isHost;
   bool _startingCountdown = false;
@@ -341,16 +347,23 @@ class WordChainController extends GetxController {
     _rewardReviewTimer?.cancel();
     _autoAcceptingReward = false;
 
-    if (rewardPhase.value != WordChainRewardPhase.reviewing ||
-        rewardReviewStartedAt.value == null) {
+    if (rewardPhase.value != WordChainRewardPhase.reviewing) {
       rewardReviewSecondsLeft.value = 0;
+      _localRewardReviewStartedAt = null;
+      _lastRewardReviewStartedAt = null;
       return;
     }
 
-    final startedAt = rewardReviewStartedAt.value!;
+    final startedAt = rewardReviewStartedAt.value;
+    if (_lastRewardReviewStartedAt != startedAt) {
+      _lastRewardReviewStartedAt = startedAt;
+      _localRewardReviewStartedAt = DateTime.now();
+    }
+    _localRewardReviewStartedAt ??= DateTime.now();
+
     _syncRewardCountdown(startedAt);
     _rewardReviewTimer =
-        Timer.periodic(const Duration(seconds: 1), (_) {
+        Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (rewardPhase.value != WordChainRewardPhase.reviewing ||
           rewardReviewStartedAt.value != startedAt) {
         _rewardReviewTimer?.cancel();
@@ -360,12 +373,12 @@ class WordChainController extends GetxController {
     });
   }
 
-  void _syncRewardCountdown(DateTime startedAt) {
-    final now = DateTime.now();
-    var elapsedSeconds = now.difference(startedAt).inSeconds;
-    if (elapsedSeconds < 0) elapsedSeconds = 0;
-
-    final remaining = rewardReviewTimeoutSeconds - elapsedSeconds;
+  void _syncRewardCountdown(DateTime? startedAt) {
+    final remaining = _computeRemainingSeconds(
+      totalSeconds: rewardReviewTimeoutSeconds,
+      serverStartedAt: startedAt,
+      localStartedAt: _localRewardReviewStartedAt,
+    );
     rewardReviewSecondsLeft.value = remaining > 0 ? remaining : 0;
 
     if (remaining <= 0 && !_autoAcceptingReward) {
@@ -381,15 +394,22 @@ class WordChainController extends GetxController {
     _rewardAskTimer?.cancel();
     _autoEndingAskReward = false;
 
-    if (rewardPhase.value != WordChainRewardPhase.asking ||
-        rewardAskingStartedAt.value == null) {
+    if (rewardPhase.value != WordChainRewardPhase.asking) {
       rewardAskSecondsLeft.value = 0;
+      _localRewardAskStartedAt = null;
+      _lastRewardAskStartedAt = null;
       return;
     }
 
-    final startedAt = rewardAskingStartedAt.value!;
+    final startedAt = rewardAskingStartedAt.value;
+    if (_lastRewardAskStartedAt != startedAt) {
+      _lastRewardAskStartedAt = startedAt;
+      _localRewardAskStartedAt = DateTime.now();
+    }
+    _localRewardAskStartedAt ??= DateTime.now();
+
     _syncRewardAskCountdown(startedAt);
-    _rewardAskTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _rewardAskTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (rewardPhase.value != WordChainRewardPhase.asking ||
           rewardAskingStartedAt.value != startedAt) {
         _rewardAskTimer?.cancel();
@@ -399,12 +419,12 @@ class WordChainController extends GetxController {
     });
   }
 
-  void _syncRewardAskCountdown(DateTime startedAt) {
-    final now = DateTime.now();
-    var elapsedSeconds = now.difference(startedAt).inSeconds;
-    if (elapsedSeconds < 0) elapsedSeconds = 0;
-
-    final remaining = rewardAskTimeoutSeconds - elapsedSeconds;
+  void _syncRewardAskCountdown(DateTime? startedAt) {
+    final remaining = _computeRemainingSeconds(
+      totalSeconds: rewardAskTimeoutSeconds,
+      serverStartedAt: startedAt,
+      localStartedAt: _localRewardAskStartedAt,
+    );
     rewardAskSecondsLeft.value = remaining > 0 ? remaining : 0;
 
     if (remaining <= 0 && !_autoEndingAskReward) {
@@ -421,16 +441,23 @@ class WordChainController extends GetxController {
     _rewardAnswerTimer?.cancel();
     _autoEndingAnswerReward = false;
 
-    if (rewardPhase.value != WordChainRewardPhase.answering ||
-        rewardAnsweringStartedAt.value == null) {
+    if (rewardPhase.value != WordChainRewardPhase.answering) {
       rewardAnswerSecondsLeft.value = 0;
+      _localRewardAnswerStartedAt = null;
+      _lastRewardAnswerStartedAt = null;
       return;
     }
 
-    final startedAt = rewardAnsweringStartedAt.value!;
+    final startedAt = rewardAnsweringStartedAt.value;
+    if (_lastRewardAnswerStartedAt != startedAt) {
+      _lastRewardAnswerStartedAt = startedAt;
+      _localRewardAnswerStartedAt = DateTime.now();
+    }
+    _localRewardAnswerStartedAt ??= DateTime.now();
+
     _syncRewardAnswerCountdown(startedAt);
     _rewardAnswerTimer =
-        Timer.periodic(const Duration(seconds: 1), (_) {
+        Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (rewardPhase.value != WordChainRewardPhase.answering ||
           rewardAnsweringStartedAt.value != startedAt) {
         _rewardAnswerTimer?.cancel();
@@ -440,12 +467,12 @@ class WordChainController extends GetxController {
     });
   }
 
-  void _syncRewardAnswerCountdown(DateTime startedAt) {
-    final now = DateTime.now();
-    var elapsedSeconds = now.difference(startedAt).inSeconds;
-    if (elapsedSeconds < 0) elapsedSeconds = 0;
-
-    final remaining = rewardAnswerTimeoutSeconds - elapsedSeconds;
+  void _syncRewardAnswerCountdown(DateTime? startedAt) {
+    final remaining = _computeRemainingSeconds(
+      totalSeconds: rewardAnswerTimeoutSeconds,
+      serverStartedAt: startedAt,
+      localStartedAt: _localRewardAnswerStartedAt,
+    );
     rewardAnswerSecondsLeft.value = remaining > 0 ? remaining : 0;
 
     if (remaining <= 0 && !_autoEndingAnswerReward) {
@@ -497,6 +524,12 @@ class WordChainController extends GetxController {
     _rewardAnswerTimer?.cancel();
     _countdownStartedAt = null;
     _localCountdownStartedAt = null;
+    _localRewardAskStartedAt = null;
+    _localRewardAnswerStartedAt = null;
+    _localRewardReviewStartedAt = null;
+    _lastRewardAskStartedAt = null;
+    _lastRewardAnswerStartedAt = null;
+    _lastRewardReviewStartedAt = null;
     _autoAcceptingReward = false;
     _autoEndingAskReward = false;
     _autoEndingAnswerReward = false;
@@ -579,6 +612,30 @@ class WordChainController extends GetxController {
       _countdownTimer?.cancel();
       _startGameIfHost();
     }
+  }
+
+  int _computeRemainingSeconds({
+    required int totalSeconds,
+    required DateTime? serverStartedAt,
+    required DateTime? localStartedAt,
+  }) {
+    final now = DateTime.now();
+    var localElapsedMs = 0;
+    if (localStartedAt != null) {
+      localElapsedMs = now.difference(localStartedAt).inMilliseconds;
+      if (localElapsedMs < 0) localElapsedMs = 0;
+    }
+
+    var serverElapsedMs = 0;
+    if (serverStartedAt != null) {
+      serverElapsedMs = now.difference(serverStartedAt).inMilliseconds;
+      if (serverElapsedMs < 0) serverElapsedMs = 0;
+    }
+
+    final elapsedMs = math.max(localElapsedMs, serverElapsedMs);
+    final remainingMs = (totalSeconds * 1000) - elapsedMs;
+    final remaining = (remainingMs / 1000).ceil();
+    return remaining > 0 ? remaining : 0;
   }
 
   void _startGameIfHost() {

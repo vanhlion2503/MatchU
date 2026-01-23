@@ -396,6 +396,15 @@ class WordChainService {
       final questionPresetId = reward["questionPresetId"]?.toString();
 
       if (declineCount >= _rewardMaxDeclines) {
+        final rewardMessage = _rewardTranscriptMessage(
+          question: question,
+          answer: cleanAnswer,
+          winnerUid: winnerUid?.toString(),
+          loserUid: uid,
+        );
+        if (rewardMessage != null) {
+          tx.set(ref.collection("messages").doc(), rewardMessage);
+        }
         tx.update(ref, {
           "minigames.wordChain.status": "finished",
           "minigames.wordChain.reward": _rewardState(
@@ -464,23 +473,21 @@ class WordChainService {
       final question = reward["question"]?.toString();
       final questionPresetId = reward["questionPresetId"]?.toString();
       final answer = reward["answer"]?.toString();
+      final participants = List<String>.from(data?["participants"] ?? []);
+      final loserUid = _otherParticipant(
+        winnerUid?.toString(),
+        participants,
+      );
 
       if (accept || declineCount >= _rewardMaxDeclines) {
-        if (accept) {
-          final cleanQuestion = question?.trim() ?? '';
-          final cleanAnswer = answer?.trim() ?? '';
-          if (cleanQuestion.isNotEmpty && cleanAnswer.isNotEmpty) {
-            tx.set(
-              ref.collection("messages").doc(),
-              {
-                "type": "system",
-                "systemCode": "word_chain_reward",
-                "text": "Câu hỏi: $cleanQuestion\nCâu trả lời: $cleanAnswer",
-                "senderId": uid,
-                "createdAt": FieldValue.serverTimestamp(),
-              },
-            );
-          }
+        final rewardMessage = _rewardTranscriptMessage(
+          question: question,
+          answer: answer,
+          winnerUid: winnerUid?.toString(),
+          loserUid: loserUid,
+        );
+        if (rewardMessage != null) {
+          tx.set(ref.collection("messages").doc(), rewardMessage);
         }
         tx.update(ref, {
           "minigames.wordChain.status": "finished",
@@ -539,6 +546,19 @@ class WordChainService {
           : rawDeclines is num
               ? rawDeclines.toInt()
               : 0;
+      final participants = List<String>.from(data?["participants"] ?? []);
+      final winnerUid = game?["winnerUid"]?.toString();
+      final loserUid = _otherParticipant(winnerUid, participants);
+
+      final rewardMessage = _rewardTranscriptMessage(
+        question: reward["question"]?.toString(),
+        answer: reward["answer"]?.toString(),
+        winnerUid: winnerUid,
+        loserUid: loserUid,
+      );
+      if (rewardMessage != null) {
+        tx.set(ref.collection("messages").doc(), rewardMessage);
+      }
 
       tx.update(ref, {
         "minigames.wordChain.status": "finished",
@@ -684,6 +704,45 @@ class WordChainService {
       "autoAcceptedReason": autoAcceptedReason,
       "completedAt": completedAt,
     };
+  }
+
+  Map<String, dynamic>? _rewardTranscriptMessage({
+    required String? question,
+    required String? answer,
+    required String? winnerUid,
+    required String? loserUid,
+  }) {
+    final cleanQuestion = question?.trim() ?? '';
+    final cleanAnswer = answer?.trim() ?? '';
+    final cleanWinner = winnerUid?.trim() ?? '';
+    final cleanLoser = loserUid?.trim() ?? '';
+
+    if (cleanQuestion.isEmpty ||
+        cleanAnswer.isEmpty ||
+        cleanWinner.isEmpty ||
+        cleanLoser.isEmpty) {
+      return null;
+    }
+
+    return {
+      "type": "system",
+      "systemCode": "word_chain_reward",
+      "text": "Câu hỏi: $cleanQuestion\nCâu trả lời: $cleanAnswer",
+      "question": cleanQuestion,
+      "answer": cleanAnswer,
+      "questionUid": cleanWinner,
+      "answerUid": cleanLoser,
+      "senderId": cleanWinner,
+      "createdAt": FieldValue.serverTimestamp(),
+    };
+  }
+
+  String? _otherParticipant(String? winnerUid, List<String> participants) {
+    if (winnerUid == null) return null;
+    for (final uid in participants) {
+      if (uid != winnerUid) return uid;
+    }
+    return null;
   }
 
   String _randomSeedWord() {
