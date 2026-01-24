@@ -120,7 +120,7 @@ class WordChainInviteBar extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Đối phương đã sẵn sahngf',
+                            'Đối phương đã sẵn sàng',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: theme.colorScheme.primary,

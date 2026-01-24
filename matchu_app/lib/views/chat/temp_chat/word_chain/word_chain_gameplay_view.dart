@@ -166,7 +166,7 @@ class _WordChainHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = theme.colorScheme.primary;
+    final accent = theme.colorScheme.error;
     final muted = theme.colorScheme.onSurface.withOpacity(0.25);
     final displaySeconds = remainingSeconds < 0 ? 0 : remainingSeconds;
     const totalHearts = 3;
@@ -182,7 +182,7 @@ class _WordChainHeader extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 4),
                 child: Icon(
                   filled ? Icons.favorite : Icons.favorite_border,
-                  size: 18,
+                  size: 25,
                   color: filled ? accent : muted,
                 ),
               );
@@ -217,13 +217,13 @@ class _WordChainHeader extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.timer_outlined,
-                          size: 14,
+                          size: 20,
                           color: theme.colorScheme.error,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${displaySeconds}s',
-                          style: theme.textTheme.bodySmall?.copyWith(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: theme.colorScheme.error,
                           ),

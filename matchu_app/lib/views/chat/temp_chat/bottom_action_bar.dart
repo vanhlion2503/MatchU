@@ -9,6 +9,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/quick_message_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_invite_bar.dart';
+import 'package:matchu_app/views/chat/temp_chat/widgets/game_sheet_item.dart';
 import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_invite_bar.dart';
 
 
@@ -131,17 +132,17 @@ class BottomActionBar extends StatelessWidget {
                       onTap: () {
                         if (!canInvite) return;
                         HapticFeedback.lightImpact();
-                        controller.inviteWordChainManual();
+                        _showGameSheet(context);
                       },
                       backgroundColor: canInvite
                           ? theme.colorScheme.surfaceVariant
                           : theme.colorScheme.surfaceVariant.withOpacity(0.5),
                       child: Icon(
-                        Icons.link,
+                        Iconsax.game,
                         color: canInvite
                             ? color.primary
                             : theme.colorScheme.onSurface.withOpacity(0.4),
-                        size: 24,
+                        size: 32,
                       ),
                     );
                   }),
@@ -376,4 +377,65 @@ class BottomActionBar extends StatelessWidget {
     return emojiRegex.hasMatch(trimmed);
   }
 
+  void _showGameSheet(BuildContext context) {
+    final theme = Theme.of(context);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ===== DRAG HANDLE =====
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                Text(
+                  "Chọn trò chơi",
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // ===== WORD CHAIN =====
+                GameSheetItem(
+                  imageAsset: "assets/games/word_chain.png",
+                  title: "Nối từ",
+                  subtitle: "Luân phiên nối 2 từ, sai là chịu phạt",
+                  onTap: () {
+                    Get.back(); // đóng sheet
+                    controller.inviteWordChainManual();
+                  },
+                ),
+
+                // 🔮 Sau này thêm game khác chỉ cần copy item
+                // _GameSheetItem(...)
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 }
+
