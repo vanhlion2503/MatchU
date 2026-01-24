@@ -25,9 +25,30 @@ class _MessagesListState extends State<MessagesList> {
   OverlayEntry? _reactionEntry;
   // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
   final Map<String, GlobalKey> _bubbleKeys = {};
+  final Set<String> _systemSnackbarShown = {};
 
   void _cleanupBubbleKeys(Set<String> aliveIds) {
     _bubbleKeys.removeWhere((key, _) => !aliveIds.contains(key));
+  }
+
+  void _cleanupSnackbarIds(Set<String> aliveIds) {
+    _systemSnackbarShown.removeWhere((id) => !aliveIds.contains(id));
+  }
+
+  void _showSystemSnackbarOnce(String messageId, String message) {
+    if (message.isEmpty) return;
+    if (_systemSnackbarShown.contains(messageId)) return;
+
+    _systemSnackbarShown.add(messageId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Get.snackbar(
+        "Thông báo",
+        message,
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+    });
   }
 
 
@@ -65,6 +86,7 @@ class _MessagesListState extends State<MessagesList> {
         final aliveIds = docs.map((e) => e.id).toSet();
         controller.cleanupMessageKeys(aliveIds);
         _cleanupBubbleKeys(aliveIds);
+        _cleanupSnackbarIds(aliveIds);
 
         return ListView.builder(
           controller: controller.scrollController,
@@ -141,6 +163,10 @@ class _MessagesListState extends State<MessagesList> {
 
             if (code == "ended" && senderId == uid) {
               return const SizedBox();
+            }
+
+            if (code == "word_chain_exit") {
+              _showSystemSnackbarOnce(doc.id, data["text"] ?? "");
             }
 
             if (code == "word_chain_reward") {

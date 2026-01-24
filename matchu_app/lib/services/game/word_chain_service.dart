@@ -401,6 +401,7 @@ class WordChainService {
           answer: cleanAnswer,
           winnerUid: winnerUid?.toString(),
           loserUid: uid,
+          senderUid: uid,
         );
         if (rewardMessage != null) {
           tx.set(ref.collection("messages").doc(), rewardMessage);
@@ -485,6 +486,7 @@ class WordChainService {
           answer: answer,
           winnerUid: winnerUid?.toString(),
           loserUid: loserUid,
+          senderUid: uid,
         );
         if (rewardMessage != null) {
           tx.set(ref.collection("messages").doc(), rewardMessage);
@@ -524,6 +526,7 @@ class WordChainService {
 
   Future<void> autoAcceptReward({
     required String roomId,
+    required String uid,
     required String reason,
   }) async {
     final ref = _roomRef(roomId);
@@ -555,6 +558,7 @@ class WordChainService {
         answer: reward["answer"]?.toString(),
         winnerUid: winnerUid,
         loserUid: loserUid,
+        senderUid: uid,
       );
       if (rewardMessage != null) {
         tx.set(ref.collection("messages").doc(), rewardMessage);
@@ -711,16 +715,19 @@ class WordChainService {
     required String? answer,
     required String? winnerUid,
     required String? loserUid,
+    required String? senderUid,
   }) {
     final cleanQuestion = question?.trim() ?? '';
     final cleanAnswer = answer?.trim() ?? '';
     final cleanWinner = winnerUid?.trim() ?? '';
     final cleanLoser = loserUid?.trim() ?? '';
+    final cleanSender = senderUid?.trim() ?? '';
 
     if (cleanQuestion.isEmpty ||
         cleanAnswer.isEmpty ||
         cleanWinner.isEmpty ||
-        cleanLoser.isEmpty) {
+        cleanLoser.isEmpty ||
+        cleanSender.isEmpty) {
       return null;
     }
 
@@ -732,7 +739,7 @@ class WordChainService {
       "answer": cleanAnswer,
       "questionUid": cleanWinner,
       "answerUid": cleanLoser,
-      "senderId": cleanWinner,
+      "senderId": cleanSender,
       "createdAt": FieldValue.serverTimestamp(),
     };
   }

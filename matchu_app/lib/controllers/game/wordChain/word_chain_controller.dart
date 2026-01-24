@@ -385,6 +385,7 @@ class WordChainController extends GetxController {
       _autoAcceptingReward = true;
       service.autoAcceptReward(
         roomId: roomId,
+        uid: uid,
         reason: 'timeout',
       );
     }

@@ -210,24 +210,18 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
             'Hệ thống đã tự động chấp nhận để đảm bảo công bằng cho cả hai.';
         break;
       case 'ask_timeout':
-        message =
-            'Đối phương đã không đặt câu hỏi và đã thoát khỏi Word Chain.';
-        break;
       case 'answer_timeout':
-        message =
-            'Đối phương đã không trả lời và đã thoát khỏi Word Chain.';
-        break;
       case 'winner_left':
-        message = 'Đối phương đã thoát khỏi Word Chain.';
-        break;
+        return;
       default:
         return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+    Get.snackbar(
+      "Thông báo",
+      message,
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 2),
     );
   }
 
