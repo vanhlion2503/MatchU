@@ -226,6 +226,32 @@ service cloud.firestore {
           );
       }
 
+      function isValidWordChainPendingWord() {
+        return !request.resource.data.minigames.wordChain.keys()
+            .hasAny(["pendingWord"])
+          || (
+            request.resource.data.minigames.wordChain.pendingWord is map
+            && request.resource.data.minigames.wordChain.pendingWord.keys()
+              .hasOnly([
+                "word",
+                "uid",
+                "createdAt"
+              ])
+            && request.resource.data.minigames.wordChain.pendingWord.word is string
+            && request.resource.data.minigames.wordChain.pendingWord.uid is string
+            && (
+              request.resource.data.minigames.wordChain.pendingWord.createdAt is timestamp
+              || request.resource.data.minigames.wordChain.pendingWord.createdAt == null
+            )
+          );
+      }
+
+      function isValidWordChainInvalidReason() {
+        return !request.resource.data.minigames.wordChain.keys()
+            .hasAny(["invalidReason"])
+          || request.resource.data.minigames.wordChain.invalidReason is string;
+      }
+
       function isValidWordChainMinigame() {
         return request.resource.data.minigames is map
           && request.resource.data.minigames.keys().hasOnly(["wordChain"])
@@ -246,7 +272,9 @@ service cloud.firestore {
             "sosUsed",
             "winnerUid",
             "reward",
-            "updatedAt"
+            "updatedAt",
+            "pendingWord",
+            "invalidReason"
           ])
           && request.resource.data.minigames.wordChain.status is string
           && request.resource.data.minigames.wordChain.currentWord is string
@@ -260,7 +288,9 @@ service cloud.firestore {
             !request.resource.data.minigames.wordChain.keys().hasAny(["winnerUid"])
             || request.resource.data.minigames.wordChain.winnerUid is string
           )
-          && isValidWordChainReward();
+          && isValidWordChainReward()
+          && isValidWordChainPendingWord()
+          && isValidWordChainInvalidReason();
       }
 
       function onlyUpdateMyAvatar() {

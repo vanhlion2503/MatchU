@@ -192,8 +192,16 @@ class WordChainController extends GetxController {
       return;
     }
 
-    await service.submitCorrectWord(roomId, uid, input);
+    // ✅ CHỈ GỬI YÊU CẦU
+    await _db.collection("tempChats").doc(roomId).update({
+      "minigames.wordChain.pendingWord": {
+        "word": input.trim(),
+        "uid": uid,
+        "createdAt": FieldValue.serverTimestamp(),
+      }
+    });
   }
+
 
   // ================= SOS =================
   Future<void> useSOS() async {

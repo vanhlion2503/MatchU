@@ -9,6 +9,36 @@ const admin = require("firebase-admin");
 setGlobalOptions({ maxInstances: 10 });
 
 admin.initializeApp();
+const fs = require("fs");
+const path = require("path");
+
+// ===== LOAD VIETNAMESE DICTIONARY =====
+const DICT_PATH = path.join(__dirname, "assets", "vi_2words_clean.txt");
+const WORD_SET = new Set();
+
+(function loadDictionary() {
+  const content = fs.readFileSync(DICT_PATH, "utf8");
+  content.split("\n").forEach((line) => {
+    const word = line.trim().toLowerCase();
+    if (word) WORD_SET.add(word);
+  });
+
+  console.log("✅ Vietnamese dictionary loaded:", WORD_SET.size);
+})();
+
+function normalizeWord(word) {
+  return word
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function isValidVietnameseWord(word) {
+  if (!word || typeof word !== "string") return false;
+  return WORD_SET.has(normalizeWord(word));
+}
+
+
 const db = admin.firestore();
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
@@ -290,4 +320,139 @@ KHÔNG ĐƯỢC:
 CHỈ TRẢ VỀ ĐOẠN VĂN HOÀN CHỈNH.
 `;
 }
+
+exports.validateWordChainDictionary = onDocumentUpdated(
+  "tempChats/{roomId}",
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+    if (!after) return;
+
+    const game = after.minigames?.wordChain;
+    if (!game) return;
+
+    const pending = game.pendingWord;
+    if (!pending) return;
+
+    // ===== ANTI LOOP =====
+    const prevPending = before?.minigames?.wordChain?.pendingWord;
+    if (
+      prevPending &&
+      prevPending.word === pending.word &&
+      prevPending.uid === pending.uid
+    ) {
+      return;
+    }
+
+    const rawWord = pending.word;
+    const uid = pending.uid;
+    const ref = event.data.after.ref;
+
+    if (!rawWord || !uid) {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+      });
+      return;
+    }
+
+    const word = normalizeWord(rawWord);
+
+    // ===== CHECK STATUS =====
+    if (game.status !== "playing") {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+        "minigames.wordChain.invalidReason": "not_playing",
+      });
+      return;
+    }
+
+    // ===== CHECK TURN =====
+    if (game.turnUid !== uid) {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+        "minigames.wordChain.invalidReason": "not_your_turn",
+      });
+      return;
+    }
+
+    // ===== CHECK FORMAT (2 TIẾNG) =====
+    const parts = word.split(" ");
+    if (parts.length !== 2) {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+        "minigames.wordChain.invalidReason": "format",
+      });
+      return;
+    }
+
+    // ===== CHECK USED WORD =====
+    const usedWords = (game.usedWords || []).map(normalizeWord);
+    if (usedWords.includes(word)) {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+        "minigames.wordChain.invalidReason": "used_word",
+      });
+      return;
+    }
+
+    // ===== CHECK STRICT CHAIN =====
+    const prevWord = game.currentWord || "";
+    if (prevWord) {
+      const prevLast = normalizeWord(prevWord).split(" ").pop();
+      const first = parts[0];
+
+      if (first !== prevLast) {
+        await ref.update({
+          "minigames.wordChain.pendingWord":
+            admin.firestore.FieldValue.delete(),
+          "minigames.wordChain.invalidReason": "chain_mismatch",
+        });
+        return;
+      }
+    }
+
+    // ===== CHECK DICTIONARY =====
+    if (!isValidVietnameseWord(word)) {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+        "minigames.wordChain.invalidReason": "dictionary",
+      });
+      return;
+    }
+
+    // ===== COMMIT WORD (AUTHORITATIVE) =====
+    const participants = after.participants || [];
+    const nextUid = participants.find((id) => id !== uid);
+
+    if (!nextUid) {
+      await ref.update({
+        "minigames.wordChain.pendingWord":
+          admin.firestore.FieldValue.delete(),
+      });
+      return;
+    }
+
+    await ref.update({
+      "minigames.wordChain.currentWord": word,
+      "minigames.wordChain.usedWords":
+        admin.firestore.FieldValue.arrayUnion(word),
+      "minigames.wordChain.turnUid": nextUid,
+      "minigames.wordChain.remainingSeconds": 15,
+      "minigames.wordChain.pendingWord":
+        admin.firestore.FieldValue.delete(),
+      "minigames.wordChain.invalidReason":
+        admin.firestore.FieldValue.delete(),
+      "minigames.wordChain.updatedAt":
+        admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+);
+
+
 
