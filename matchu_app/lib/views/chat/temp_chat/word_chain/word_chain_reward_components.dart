@@ -144,13 +144,20 @@ class RewardMotto extends StatelessWidget {
   }
 }
 
-class RewardStepIndicator extends StatelessWidget {
+class RewardStepIndicator extends StatefulWidget {
   final WordChainRewardPhase phase;
 
   const RewardStepIndicator({
+    super.key,
     required this.phase,
   });
 
+  @override
+  State<RewardStepIndicator> createState() => _RewardStepIndicatorState();
+}
+
+class _RewardStepIndicatorState extends State<RewardStepIndicator>
+    with SingleTickerProviderStateMixin {
   static const _steps = <String>[
     'Kết quả',
     'Hỏi',
@@ -158,7 +165,10 @@ class RewardStepIndicator extends StatelessWidget {
     'Duyệt',
   ];
 
-  int _phaseIndex() {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulse;
+
+  int _phaseIndex(WordChainRewardPhase phase) {
     switch (phase) {
       case WordChainRewardPhase.idle:
         return 0;
@@ -173,63 +183,189 @@ class RewardStepIndicator extends StatelessWidget {
     }
   }
 
+  int get _activeIndex => _phaseIndex(widget.phase);
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _pulse = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(covariant RewardStepIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPulse();
+  }
+
+  void _syncPulse() {
+    if (_activeIndex >= _steps.length) {
+      if (_pulseController.isAnimating) {
+        _pulseController.stop();
+      }
+      return;
+    }
+    if (!_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildStepCircle({
+    required ThemeData theme,
+    required int index,
+    required int activeIndex,
+    required Color accent,
+  }) {
+    final isComplete = index < activeIndex;
+    final isActive = index == activeIndex && activeIndex < _steps.length;
+    final color = isComplete
+        ? AppTheme.successColor
+        : isActive
+            ? accent
+            : theme.colorScheme.onSurface.withOpacity(0.35);
+
+    Widget circle = AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isComplete
+            ? AppTheme.successColor.withOpacity(0.18)
+            : isActive
+                ? accent.withOpacity(0.15)
+                : theme.colorScheme.surfaceVariant,
+        border: Border.all(
+          color: color.withOpacity(isActive || isComplete ? 1 : 0.4),
+        ),
+      ),
+      child: Center(
+        child: isComplete
+            ? Icon(
+                Icons.check,
+                size: 18,
+                color: AppTheme.successColor,
+              )
+            : Text(
+                '${index + 1}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+      ),
+    );
+
+    if (isActive) {
+      circle = ScaleTransition(
+        scale: _pulse,
+        child: circle,
+      );
+    }
+
+    return circle;
+  }
+
+  Widget _buildConnector({
+    required ThemeData theme,
+    required int index,
+    required int activeIndex,
+  }) {
+    final isComplete = index < activeIndex;
+    final color = isComplete
+        ? AppTheme.successColor
+        : theme.colorScheme.onSurface.withOpacity(0.2);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeInOutCubic,
+      height: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final activeIndex = _phaseIndex();
+    final activeIndex = _activeIndex;
     final accent = theme.colorScheme.primary;
 
-    return Row(
-      children: List.generate(_steps.length, (index) {
-        final isComplete = index < activeIndex;
-        final isActive = index == activeIndex && activeIndex < _steps.length;
-        final color = isComplete
-            ? AppTheme.successColor
-            : isActive
-                ? accent
-                : theme.colorScheme.onSurface.withOpacity(0.35);
+    final stepRowChildren = <Widget>[];
+    final labelRowChildren = <Widget>[];
 
-        return Expanded(
-          child: Column(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isComplete
-                      ? AppTheme.successColor.withOpacity(0.18)
-                      : isActive
-                          ? accent.withOpacity(0.15)
-                          : theme.colorScheme.surfaceVariant,
-                  border: Border.all(
-                    color: color.withOpacity(isActive || isComplete ? 1 : 0.4),
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _steps[index],
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
+    for (var index = 0; index < _steps.length; index += 1) {
+      stepRowChildren.add(
+        Expanded(
+          flex: 3,
+          child: Center(
+            child: _buildStepCircle(
+              theme: theme,
+              index: index,
+              activeIndex: activeIndex,
+              accent: accent,
+            ),
+          ),
+        ),
+      );
+      labelRowChildren.add(
+        Expanded(
+          flex: 3,
+          child: Text(
+            _steps[index],
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: index < activeIndex
+                  ? AppTheme.successColor
+                  : index == activeIndex && activeIndex < _steps.length
+                      ? accent
+                      : theme.colorScheme.onSurface.withOpacity(0.35),
+              fontWeight:
+                  index == activeIndex ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+      );
+
+      if (index < _steps.length - 1) {
+        stepRowChildren.add(
+          Expanded(
+            flex: 2,
+            child: _buildConnector(
+              theme: theme,
+              index: index,
+              activeIndex: activeIndex,
+            ),
           ),
         );
-      }),
+        labelRowChildren.add(const Expanded(flex: 2, child: SizedBox()));
+      }
+    }
+
+    return Column(
+      children: [
+        Row(children: stepRowChildren),
+        const SizedBox(height: 6),
+        Row(children: labelRowChildren),
+      ],
     );
   }
 }
