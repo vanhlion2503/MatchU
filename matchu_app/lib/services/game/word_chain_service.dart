@@ -292,6 +292,17 @@ class WordChainService {
       final status = game is Map ? game["status"] : null;
       if (status != "playing") return;
 
+      final turnUid = game?["turnUid"];
+      if (turnUid != uid) return;
+
+      final rawRemaining = game?["remainingSeconds"];
+      final remainingSeconds = rawRemaining is int
+          ? rawRemaining
+          : rawRemaining is num
+              ? rawRemaining.toInt()
+              : null;
+      if (remainingSeconds != null && remainingSeconds > 0) return;
+
       final participants = List<String>.from(data?["participants"] ?? []);
       if (participants.length < 2) return;
       final otherUid = participants.firstWhere((e) => e != uid);

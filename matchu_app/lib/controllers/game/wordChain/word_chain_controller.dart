@@ -79,6 +79,7 @@ class WordChainController extends GetxController {
   bool _autoAcceptingReward = false;
   bool _autoEndingAskReward = false;
   bool _autoEndingAnswerReward = false;
+  bool _timeoutInProgress = false;
   static const int _countdownTotalSeconds = 3;
   static const int rewardAskTimeoutSeconds = 60;
   static const int rewardAnswerTimeoutSeconds = 60;
@@ -135,6 +136,7 @@ class WordChainController extends GetxController {
 
       _syncConsent(game);
       _syncReward(game);
+      _syncTimeoutGuard();
 
       if (nextStatus == WordChainStatus.inviting) {
         invitedAt.value = _parseTimestamp(game["invitedAt"]);
@@ -159,12 +161,14 @@ class WordChainController extends GetxController {
 
   // ================= TIMER =================
   void _startTimer() {
+    if (_timeoutInProgress) return;
     _timer?.cancel();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      if (turnUid.value != uid) return;
+      if (turnUid.value != uid || _timeoutInProgress) return;
 
-      remainingSeconds.value--;
+      final next = remainingSeconds.value - 1;
+      remainingSeconds.value = next > 0 ? next : 0;
 
       await service.updateTimer(roomId, remainingSeconds.value);
 
@@ -176,13 +180,19 @@ class WordChainController extends GetxController {
 
   // ================= TIMEOUT LOGIC =================
   Future<void> _onTimeout() async {
+    if (_timeoutInProgress) return;
+    _timeoutInProgress = true;
     HapticFeedback.heavyImpact();
     _timer?.cancel();
 
-    await service.handleTimeout(
-      roomId: roomId,
-      uid: uid,
-    );
+    try {
+      await service.handleTimeout(
+        roomId: roomId,
+        uid: uid,
+      );
+    } catch (_) {
+      _timeoutInProgress = false;
+    }
   }
 
   // ================= SUBMIT WORD =================
@@ -349,6 +359,14 @@ class WordChainController extends GetxController {
     _updateRewardAskTimer();
     _updateRewardAnswerTimer();
     _updateRewardReviewTimer();
+  }
+
+  void _syncTimeoutGuard() {
+    if (status.value != WordChainStatus.playing ||
+        turnUid.value != uid ||
+        remainingSeconds.value > 0) {
+      _timeoutInProgress = false;
+    }
   }
 
   void _maybeStartCountdown() {
@@ -553,6 +571,7 @@ class WordChainController extends GetxController {
     _autoAcceptingReward = false;
     _autoEndingAskReward = false;
     _autoEndingAnswerReward = false;
+    _timeoutInProgress = false;
   }
 
   WordChainStatus _parseStatus(dynamic raw) {
