@@ -42,6 +42,8 @@ class WordChainGameplayView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final isMyTurn = wordChain.turnUid.value == wordChain.uid;
+      final canUseSos =
+          isMyTurn && wordChain.sosUsed[wordChain.uid] != true;
 
       return Stack(
         children: [
@@ -82,6 +84,7 @@ class WordChainGameplayView extends StatelessWidget {
                           inputController: inputController,
                           onSubmit: onSubmit,
                           onSOS: onSOS,
+                          canUseSos: canUseSos,
                           feedbackMessage: inputFeedbackMessage,
                           showError: showInputError,
                           showSuccess: showInputSuccess,
@@ -262,6 +265,7 @@ class _WordChainMyTurn extends StatefulWidget {
   final TextEditingController inputController;
   final VoidCallback onSubmit;
   final VoidCallback onSOS;
+  final bool canUseSos;
   final String? feedbackMessage;
   final bool showError;
   final bool showSuccess;
@@ -275,6 +279,7 @@ class _WordChainMyTurn extends StatefulWidget {
     required this.inputController,
     required this.onSubmit,
     required this.onSOS,
+    required this.canUseSos,
     required this.feedbackMessage,
     required this.showError,
     required this.showSuccess,
@@ -403,6 +408,8 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
             ? successAccent.withOpacity(0.08)
             : theme.colorScheme.surface;
     const trailingPadding = 40.0;
+    final sosMuted =
+        widget.canUseSos ? muted : muted.withOpacity(0.4);
 
 
     return SingleChildScrollView(
@@ -672,16 +679,16 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
           ),
           const SizedBox(height: 18),
           OutlinedButton.icon(
-            onPressed: widget.onSOS,
+            onPressed: widget.canUseSos ? widget.onSOS : null,
             icon: Icon(
               Icons.help_outline,
               size: 18,
-              color: muted,
+              color: sosMuted,
             ),
             label: Text(
               'SOS • Cầu cứu',
               style: theme.textTheme.labelMedium?.copyWith(
-                color: muted,
+                color: sosMuted,
                 fontWeight: FontWeight.w600,
               ),
             ),

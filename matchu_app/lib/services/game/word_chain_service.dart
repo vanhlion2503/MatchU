@@ -13,6 +13,8 @@ class WordChainService {
   // ✅ seed words load từ file
   static List<String> _seedWords = [];
   static bool _loaded = false;
+  static Map<String, List<String>> _dictionaryIndex = {};
+  static bool _dictionaryLoaded = false;
 
   /// Load seed words từ file (chỉ load 1 lần)
   static Future<void> loadSeedWords() async {
@@ -31,6 +33,26 @@ class WordChainService {
         .toList();
 
     _loaded = true;
+  }
+
+  static Future<void> loadDictionaryWords() async {
+    if (_dictionaryLoaded) return;
+
+    final raw = await rootBundle.loadString(
+      'assets/wordChain/vi_2words_clean.txt',
+    );
+
+    final Map<String, List<String>> index = {};
+    for (final line in raw.split('\n')) {
+      final clean = _normalizeWord(line);
+      if (clean.isEmpty) continue;
+      final parts = clean.split(' ');
+      if (parts.length != 2) continue;
+      index.putIfAbsent(parts.first, () => []).add(clean);
+    }
+
+    _dictionaryIndex = index;
+    _dictionaryLoaded = true;
   }
 
   DocumentReference<Map<String, dynamic>> _roomRef(String roomId) {
@@ -697,7 +719,41 @@ class WordChainService {
     await _db.collection("tempChats").doc(roomId).update({
       "minigames.wordChain.sosUsed.$uid": true,
     });
-    // TODO: auto-generate valid word
+  }
+
+  Future<String?> findSosWord({
+    required String currentWord,
+    required List<String> usedWords,
+  }) async {
+    await loadDictionaryWords();
+
+    final prefix = _lastWordPrefix(currentWord);
+    if (prefix.isEmpty) return null;
+
+    final used = usedWords.map(_normalizeWord).toSet();
+    final candidates = _dictionaryIndex[prefix];
+    if (candidates == null || candidates.isEmpty) return null;
+
+    final available = candidates
+        .where((word) => !used.contains(word))
+        .toList();
+    if (available.isEmpty) return null;
+
+    return available[_random.nextInt(available.length)];
+  }
+
+  static String _normalizeWord(String value) {
+    return value
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  static String _lastWordPrefix(String value) {
+    final clean = _normalizeWord(value);
+    if (clean.isEmpty) return '';
+    final parts = clean.split(' ');
+    return parts.isEmpty ? '' : parts.last;
   }
 
   Map<String, dynamic> _rewardState({

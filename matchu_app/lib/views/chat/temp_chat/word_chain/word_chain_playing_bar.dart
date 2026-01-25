@@ -52,6 +52,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
   String? _lastAutoAcceptReason;
   String? _lastErrorMessage;
   DateTime? _lastErrorAt;
+  bool _confirmingSos = false;
 
   static const Duration _feedbackDuration = Duration(milliseconds: 1200);
   static const Duration _successDuration = Duration(milliseconds: 900);
@@ -379,6 +380,82 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     }
   }
 
+  Future<void> _handleSos(WordChainController wordChain) async {
+    if (_confirmingSos) return;
+    _confirmingSos = true;
+
+    bool confirmed = false;
+    try {
+      confirmed = await _confirmSos();
+    } finally {
+      _confirmingSos = false;
+    }
+
+    if (!confirmed) return;
+    final result = await wordChain.useSOS();
+    if (!result.allowed) return;
+
+    final word = result.word?.trim();
+    if (word == null || word.isEmpty) {
+      if (!mounted) return;
+      Get.snackbar(
+        "Thông báo",
+        "Không tìm được từ phù hợp",
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    final prefix = _lastWordPrefix(wordChain.currentWord.value);
+    final parts = word.split(RegExp(r'\s+'));
+    if (prefix.isNotEmpty && parts.length >= 2) {
+      _inputController.text = parts[1];
+    } else {
+      _inputController.text = word;
+    }
+    _inputController.selection = TextSelection.collapsed(
+      offset: _inputController.text.length,
+    );
+    HapticFeedback.lightImpact();
+  }
+
+  Future<bool> _confirmSos() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          title: Text(
+            "Sử dụng SOS?",
+            style: theme.textTheme.headlineMedium,
+          ),
+          content: Text(
+            "SOS chỉ được dùng 1 lần duy nhất trong 1 ván, bạn hãy cân nhắc kĩ.",
+            style: theme.textTheme.bodyMedium,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Hủy"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+              ),
+              child: const Text("Đồng ý"),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final wordChain = widget.controller.wordChain;
@@ -425,7 +502,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
           wordChain: wordChain,
           inputController: _inputController,
           onSubmit: () => _submitWord(wordChain),
-          onSOS: wordChain.useSOS,
+          onSOS: () => _handleSos(wordChain),
           otherAvatarKey: widget.controller.otherAnonymousAvatar.value,
           showReward: _showMicroReward,
           rewardTick: _rewardTick,

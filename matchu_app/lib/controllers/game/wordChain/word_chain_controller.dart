@@ -13,6 +13,16 @@ enum WordChainSubmitAction {
   decline,
 }
 
+class WordChainSosResult {
+  final bool allowed;
+  final String? word;
+
+  const WordChainSosResult({
+    required this.allowed,
+    this.word,
+  });
+}
+
 class WordChainController extends GetxController {
   final String roomId;
   WordChainController(this.roomId);
@@ -223,9 +233,31 @@ class WordChainController extends GetxController {
 
 
   // ================= SOS =================
-  Future<void> useSOS() async {
-    if (sosUsed[uid] == true) return;
+  Future<WordChainSosResult> useSOS() async {
+    if (status.value != WordChainStatus.playing) {
+      return const WordChainSosResult(allowed: false);
+    }
+    if (turnUid.value != uid) {
+      return const WordChainSosResult(allowed: false);
+    }
+    if (sosUsed[uid] == true) {
+      return const WordChainSosResult(allowed: false);
+    }
+
+    sosUsed[uid] = true;
+
+    String? word;
+    try {
+      word = await service.findSosWord(
+        currentWord: currentWord.value,
+        usedWords: List<String>.from(usedWords),
+      );
+    } catch (_) {
+      word = null;
+    }
+
     await service.useSOS(roomId, uid);
+    return WordChainSosResult(allowed: true, word: word);
   }
 
   // ================= INVITE =================
