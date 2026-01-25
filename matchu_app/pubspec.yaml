@@ -101,6 +101,7 @@ flutter:
      - assets/avatas/avataMd.png
      - assets/anonymous/
      - assets/games/
+     - assets/wordChain/first_turn_seeds.txt
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

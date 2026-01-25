@@ -1,28 +1,37 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart' show rootBundle;
+
 
 class WordChainService {
   final _db = FirebaseFirestore.instance;
   final _random = Random();
   static const int _rewardMaxDeclines = 2;
 
-  static const List<String> _seedWords = [
-    'mưa rào',
-    'kiếm tiền',
-    'mây trời',
-    'đường phố',
-    'hoa sữa',
-    'gió mát',
-    'trăng sao',
-    'bình yên',
-    'nắng vàng',
-    'mộng mơ',
-    'tình bạn',
-    'đêm khuya',
-    'sáng sớm',
-  ];
 
+  // ✅ seed words load từ file
+  static List<String> _seedWords = [];
+  static bool _loaded = false;
+
+  /// Load seed words từ file (chỉ load 1 lần)
+  static Future<void> loadSeedWords() async {
+    if (_loaded) return;
+
+    final raw = await rootBundle.loadString(
+      'assets/wordChain/first_turn_seeds.txt',
+    );
+
+    _seedWords = raw
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .where((e) => e.split(RegExp(r'\s+')).length == 2)
+        .toSet() // chống trùng
+        .toList();
+
+    _loaded = true;
+  }
 
   DocumentReference<Map<String, dynamic>> _roomRef(String roomId) {
     return _db.collection("tempChats").doc(roomId);
@@ -753,6 +762,9 @@ class WordChainService {
   }
 
   String _randomSeedWord() {
+    if (_seedWords.isEmpty) {
+      return 'tình bạn';
+    }
     return _seedWords[_random.nextInt(_seedWords.length)];
   }
 

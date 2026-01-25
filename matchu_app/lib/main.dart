@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/controllers/system/app_lifecycle_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
+import 'package:matchu_app/services/game/word_chain_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
@@ -30,10 +31,13 @@ void main() async {
     appleProvider: AppleProvider.debug,
   );
 
-  // ✅ 3. LOCAL STORAGE
+  // ✅ 3. LOAD WORD CHAIN SEED WORDS (🔥 THÊM DÒNG NÀY)
+  await WordChainService.loadSeedWords();
+
+  // ✅ 4. LOCAL STORAGE
   await GetStorage.init();
 
-  // ✅ 4. GLOBAL CONTROLLERS
+  // ✅ 5. GLOBAL CONTROLLERS
   Get.put(ThemeController(), permanent: true);
   Get.put(AuthController(), permanent: true);
   Get.put(AuthGateController(), permanent: true);
