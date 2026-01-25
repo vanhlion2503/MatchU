@@ -33,6 +33,8 @@ class WordChainController extends GetxController {
   final sosUsed = <String, bool>{}.obs;
 
   final winnerUid = RxnString();
+  final invalidReason = RxnString();
+  final pendingWord = Rxn<Map<String, dynamic>>();
   final myConsent = false.obs;
   final otherConsent = false.obs;
   final invitedAt = Rxn<DateTime>();
@@ -119,6 +121,13 @@ class WordChainController extends GetxController {
       turnUid.value = game["turnUid"] ?? "";
       remainingSeconds.value = game["remainingSeconds"] ?? 15;
       winnerUid.value = game["winnerUid"];
+      final rawInvalidReason = game["invalidReason"];
+      invalidReason.value = rawInvalidReason is String && rawInvalidReason.isNotEmpty
+          ? rawInvalidReason
+          : null;
+      final rawPendingWord = game["pendingWord"];
+      pendingWord.value =
+          rawPendingWord is Map ? Map<String, dynamic>.from(rawPendingWord) : null;
 
       hearts.assignAll(Map<String, int>.from(game["hearts"] ?? {}));
       usedWords.assignAll(List<String>.from(game["usedWords"] ?? []));
@@ -501,6 +510,8 @@ class WordChainController extends GetxController {
     remainingSeconds.value = 15;
     countdownSeconds.value = _countdownTotalSeconds;
     winnerUid.value = null;
+    invalidReason.value = null;
+    pendingWord.value = null;
     hearts.clear();
     usedWords.clear();
     sosUsed.clear();

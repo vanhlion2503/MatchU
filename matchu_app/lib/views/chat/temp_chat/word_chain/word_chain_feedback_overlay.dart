@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 
 class WordChainHeartLossOverlay extends StatelessWidget {
   const WordChainHeartLossOverlay({super.key});
@@ -66,50 +67,47 @@ class WordChainHeartLossOverlay extends StatelessWidget {
   }
 }
 
-class WordChainInvalidToast extends StatelessWidget {
+class WordChainInlineFeedback extends StatelessWidget {
   final String message;
+  final Color accentColor;
 
-  const WordChainInvalidToast({
+  const WordChainInlineFeedback({
     super.key,
     required this.message,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Positioned(
-      left: 24,
-      right: 24,
-      bottom: 110,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.error.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: theme.colorScheme.error.withOpacity(0.35),
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: accentColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: accentColor.withOpacity(0.35),
         ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 18,
-              color: theme.colorScheme.error,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                  fontWeight: FontWeight.w600,
-                ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Iconsax.danger,
+            size: 18,
+            color: accentColor,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: accentColor,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

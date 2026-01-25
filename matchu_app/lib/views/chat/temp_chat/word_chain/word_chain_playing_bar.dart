@@ -30,20 +30,38 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
   Worker? _turnWorker;
   Worker? _wordWorker;
   Worker? _autoAcceptWorker;
+  Worker? _invalidReasonWorker;
+  Worker? _pendingWordWorker;
   Timer? _feedbackTimer;
   Timer? _invalidTimer;
+  Timer? _successTimer;
   Timer? _rewardTimer;
   Timer? _pendingSubmitTimer;
   bool _showHeartLoss = false;
   bool _showInvalidFeedback = false;
+  bool _showSuccessFeedback = false;
   bool _showMicroReward = false;
   String _invalidFeedbackText = '';
   int _rewardTick = 0;
+  int _errorTick = 0;
+  int _successTick = 0;
   int? _lastHearts;
   bool _awaitingSubmitAck = false;
   String? _pendingWord;
   DateTime? _lastAutoAcceptAt;
   String? _lastAutoAcceptReason;
+  String? _lastErrorMessage;
+  DateTime? _lastErrorAt;
+
+  static const Duration _feedbackDuration = Duration(milliseconds: 1200);
+  static const Duration _successDuration = Duration(milliseconds: 900);
+  static const int _feedbackMinRepeatMs = 1000;
+  static const String _formatMessage =
+      'Từ phải gồm đúng 2 tiếng nha 😄\nVí dụ: mưa rào, bình yên';
+  static const String _usedMessage =
+      'Từ này đã được dùng rồi, thử từ khác nhé!';
+  static const String _dictionaryMessage =
+      'Từ này hơi lạ 🤔\nHãy chọn từ quen thuộc hơn';
 
   @override
   void initState() {
@@ -80,6 +98,36 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
       _showAutoAcceptNotice(reason);
     });
 
+    _invalidReasonWorker =
+        ever<String?>(wordChain.invalidReason, (reason) {
+      if (!mounted || reason == null || reason.isEmpty) return;
+      if (!_awaitingSubmitAck) return;
+      _clearPendingSubmit();
+      final message = _messageForInvalidReason(
+        reason,
+        wordChain.currentWord.value,
+      );
+      if (message != null) {
+        _showErrorFeedback(message);
+      }
+    });
+
+    _pendingWordWorker =
+        ever<Map<String, dynamic>?>(wordChain.pendingWord, (pending) {
+      if (!mounted || pending != null) return;
+      if (!_awaitingSubmitAck) return;
+      final reason = wordChain.invalidReason.value;
+      if (reason == null || reason.isEmpty) return;
+      _clearPendingSubmit();
+      final message = _messageForInvalidReason(
+        reason,
+        wordChain.currentWord.value,
+      );
+      if (message != null) {
+        _showErrorFeedback(message);
+      }
+    });
+
     _turnWorker = ever<String>(wordChain.turnUid, (_) {
       if (!mounted) return;
       _inputController.clear();
@@ -99,6 +147,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
   void dispose() {
     _feedbackTimer?.cancel();
     _invalidTimer?.cancel();
+    _successTimer?.cancel();
     _rewardTimer?.cancel();
     _pendingSubmitTimer?.cancel();
     _heartWorker?.dispose();
@@ -106,6 +155,8 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     _turnWorker?.dispose();
     _wordWorker?.dispose();
     _autoAcceptWorker?.dispose();
+    _invalidReasonWorker?.dispose();
+    _pendingWordWorker?.dispose();
     _inputController.dispose();
     super.dispose();
   }
@@ -123,13 +174,25 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     });
   }
 
-  void _triggerInvalidFeedback(String message) {
+  void _showErrorFeedback(String message) {
+    final now = DateTime.now();
+    if (_lastErrorMessage == message &&
+        _lastErrorAt != null &&
+        now.difference(_lastErrorAt!).inMilliseconds < _feedbackMinRepeatMs) {
+      return;
+    }
+    _lastErrorMessage = message;
+    _lastErrorAt = now;
+
+    HapticFeedback.mediumImpact();
     _invalidTimer?.cancel();
     setState(() {
       _invalidFeedbackText = message;
       _showInvalidFeedback = true;
+      _showSuccessFeedback = false;
+      _errorTick += 1;
     });
-    _invalidTimer = Timer(const Duration(milliseconds: 1200), () {
+    _invalidTimer = Timer(_feedbackDuration, () {
       if (!mounted) return;
       setState(() {
         _showInvalidFeedback = false;
@@ -159,6 +222,22 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     });
   }
 
+  void _triggerSuccessFeedback() {
+    _successTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _showSuccessFeedback = true;
+      _showInvalidFeedback = false;
+      _successTick += 1;
+    });
+    _successTimer = Timer(_successDuration, () {
+      if (!mounted) return;
+      setState(() {
+        _showSuccessFeedback = false;
+      });
+    });
+  }
+
   void _setPendingSubmit(String word) {
     _pendingSubmitTimer?.cancel();
     _pendingWord = word;
@@ -181,6 +260,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
 
     if (isOtherTurn && currentWord == _pendingWord) {
       _clearPendingSubmit();
+      _triggerSuccessFeedback();
       _triggerMicroReward();
       return;
     }
@@ -225,6 +305,29 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     );
   }
 
+  String? _messageForInvalidReason(String reason, String prevWord) {
+    switch (reason) {
+      case 'format':
+        return _formatMessage;
+      case 'chain_mismatch':
+        final last = _lastWordPrefix(prevWord);
+        if (last.isEmpty) {
+          return 'Từ mới cần nối tiếp theo từ trước nhé!';
+        }
+        return "Từ mới phải bắt đầu bằng '$last'";
+      case 'used_word':
+        return _usedMessage;
+      case 'dictionary':
+        return _dictionaryMessage;
+      case 'not_your_turn':
+        return 'Chờ chút, chưa đến lượt bạn.';
+      case 'not_playing':
+        return 'Ván đang tạm dừng, thử lại sau nhé!';
+      default:
+        return 'Chưa nhận được từ này, thử lại nhé!';
+    }
+  }
+
   Future<void> _submitWord(WordChainController wordChain) async {
     final prefix = _lastWordPrefix(wordChain.currentWord.value);
     final rawInput = _inputController.text.trim();
@@ -232,8 +335,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
 
     final suffixWords = rawInput.split(RegExp(r'\s+'));
     if (prefix.isNotEmpty && suffixWords.length != 1) {
-      _triggerInvalidFeedback('Chỉ cần nhập 1 từ sau "$prefix".');
-      HapticFeedback.mediumImpact();
+      _showErrorFeedback(_formatMessage);
       return;
     }
 
@@ -241,14 +343,12 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     final cleanWord = fullWord.trim();
     final parts = cleanWord.split(RegExp(r'\s+'));
     if (parts.length != 2) {
-      _triggerInvalidFeedback('Chỉ được 2 từ.');
-      HapticFeedback.mediumImpact();
+      _showErrorFeedback(_formatMessage);
       return;
     }
 
     if (wordChain.usedWords.contains(cleanWord)) {
-      _triggerInvalidFeedback('Từ này đã được dùng.');
-      HapticFeedback.mediumImpact();
+      _showErrorFeedback(_usedMessage);
       return;
     }
 
@@ -259,15 +359,20 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     );
 
     if (!valid) {
-      _triggerInvalidFeedback('Từ không hợp lệ.');
-      HapticFeedback.mediumImpact();
+      final expected = prefix.isNotEmpty
+          ? prefix
+          : _lastWordPrefix(wordChain.currentWord.value);
+      _showErrorFeedback(
+        expected.isEmpty
+            ? 'Từ mới cần nối tiếp theo từ trước nhé!'
+            : "Từ mới phải bắt đầu bằng '$expected'",
+      );
       return;
     }
 
     _setPendingSubmit(cleanWord);
     try {
       await wordChain.submitWord(cleanWord);
-      _inputController.clear();
       HapticFeedback.lightImpact();
     } catch (_) {
       _clearPendingSubmit();
@@ -298,8 +403,6 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
                 ),
               ),
               if (_showHeartLoss) const WordChainHeartLossOverlay(),
-              if (_showInvalidFeedback)
-                WordChainInvalidToast(message: _invalidFeedbackText),
             ],
           ),
         ),
@@ -326,6 +429,12 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
           otherAvatarKey: widget.controller.otherAnonymousAvatar.value,
           showReward: _showMicroReward,
           rewardTick: _rewardTick,
+          inputFeedbackMessage:
+              _showInvalidFeedback ? _invalidFeedbackText : null,
+          showInputError: _showInvalidFeedback,
+          showInputSuccess: _showSuccessFeedback,
+          inputErrorTick: _errorTick,
+          inputSuccessTick: _successTick,
         );
       case WordChainStatus.reward:
         return WordChainRewardView(

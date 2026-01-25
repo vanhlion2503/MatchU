@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
+import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_feedback_overlay.dart';
 
 class WordChainGameplayView extends StatelessWidget {
   final WordChainController wordChain;
@@ -16,6 +16,11 @@ class WordChainGameplayView extends StatelessWidget {
   final String? otherAvatarKey;
   final bool showReward;
   final int rewardTick;
+  final String? inputFeedbackMessage;
+  final bool showInputError;
+  final bool showInputSuccess;
+  final int inputErrorTick;
+  final int inputSuccessTick;
 
   const WordChainGameplayView({
     super.key,
@@ -26,6 +31,11 @@ class WordChainGameplayView extends StatelessWidget {
     required this.otherAvatarKey,
     required this.showReward,
     required this.rewardTick,
+    required this.inputFeedbackMessage,
+    required this.showInputError,
+    required this.showInputSuccess,
+    required this.inputErrorTick,
+    required this.inputSuccessTick,
   });
 
   @override
@@ -72,6 +82,11 @@ class WordChainGameplayView extends StatelessWidget {
                           inputController: inputController,
                           onSubmit: onSubmit,
                           onSOS: onSOS,
+                          feedbackMessage: inputFeedbackMessage,
+                          showError: showInputError,
+                          showSuccess: showInputSuccess,
+                          errorTick: inputErrorTick,
+                          successTick: inputSuccessTick,
                         )
                       : _WordChainOpponentTurn(
                           key: const ValueKey('word_chain_other_turn'),
@@ -247,6 +262,11 @@ class _WordChainMyTurn extends StatefulWidget {
   final TextEditingController inputController;
   final VoidCallback onSubmit;
   final VoidCallback onSOS;
+  final String? feedbackMessage;
+  final bool showError;
+  final bool showSuccess;
+  final int errorTick;
+  final int successTick;
 
   const _WordChainMyTurn({
     super.key,
@@ -255,24 +275,79 @@ class _WordChainMyTurn extends StatefulWidget {
     required this.inputController,
     required this.onSubmit,
     required this.onSOS,
+    required this.feedbackMessage,
+    required this.showError,
+    required this.showSuccess,
+    required this.errorTick,
+    required this.successTick,
   });
 
   @override
   State<_WordChainMyTurn> createState() => _WordChainMyTurnState();
 }
 
-class _WordChainMyTurnState extends State<_WordChainMyTurn> {
+class _WordChainMyTurnState extends State<_WordChainMyTurn>
+    with TickerProviderStateMixin {
   late final FocusNode _focusNode;
+  late final AnimationController _shakeController;
+  late final Animation<double> _shakeAnimation;
+  late final AnimationController _successController;
+  late final Animation<double> _successScale;
+  late final Animation<double> _successOpacity;
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0, end: -5), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -5, end: 5), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 5, end: -4), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -4, end: 4), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 4, end: 0), weight: 1),
+    ]).animate(CurvedAnimation(
+      parent: _shakeController,
+      curve: Curves.easeOut,
+    ));
+    _successController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+    _successScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _successController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+    _successOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 60),
+    ]).animate(CurvedAnimation(
+      parent: _successController,
+      curve: Curves.easeOut,
+    ));
+  }
+
+  @override
+  void didUpdateWidget(covariant _WordChainMyTurn oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.errorTick != oldWidget.errorTick) {
+      _shakeController.forward(from: 0);
+    }
+    if (widget.successTick != oldWidget.successTick) {
+      _successController.forward(from: 0);
+    }
   }
 
   @override
   void dispose() {
     _focusNode.dispose();
+    _shakeController.dispose();
+    _successController.dispose();
     super.dispose();
   }
 
@@ -296,7 +371,14 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn> {
     final secondary = theme.colorScheme.secondary;
     final muted = theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
+    const errorAccent = Color(0xFFFF8A65);
+    const successAccent = Color(0xFF2E7D32);
     final lastWord = _lastWordPrefix(widget.currentWord);
+    final feedbackMessage = widget.feedbackMessage?.trim();
+    final showFeedback = widget.showError &&
+        feedbackMessage != null &&
+        feedbackMessage.isNotEmpty;
+    final showSuccess = widget.showSuccess;
 
     final sourceLabel = widget.isSeed ? 'Từ hệ thống' : 'Từ đối phương';
     final helper = lastWord.isEmpty
@@ -310,6 +392,17 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn> {
     final prefixWidth = prefixText.isEmpty
         ? 0.0
         : _measureTextWidth(prefixText, textStyle);
+    final inputBorderColor = showFeedback
+        ? errorAccent
+        : showSuccess
+            ? successAccent
+            : accent.withOpacity(0.35);
+    final inputSurface = showFeedback
+        ? errorAccent.withOpacity(0.08)
+        : showSuccess
+            ? successAccent.withOpacity(0.08)
+            : theme.colorScheme.surface;
+    const trailingPadding = 40.0;
 
 
     return SingleChildScrollView(
@@ -380,121 +473,194 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn> {
             ],
           ),
           const SizedBox(height: 26),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // ===== KHUNG Ô NHẬP =====
-              GestureDetector(
-                onTap: () => _focusNode.requestFocus(),
-                child: Container(
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: accent.withOpacity(0.35),
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-
-              // ===== TEXTFIELD ẨN (NHẬN INPUT THẬT) =====
-              Positioned.fill(
-                child: TextField(
-                  controller: widget.inputController,
-                  focusNode: _focusNode,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => widget.onSubmit(),
-                  cursorColor: theme.colorScheme.primary,
-
-                  // ⚠️ chữ ẩn nhưng GIỮ fontSize & lineHeight
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: Colors.transparent,
-                  ),
-
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.fromLTRB(
-                      16 + prefixWidth, // 👈 ĐẨY CURSOR SAU PREFIX
-                      16,
-                      16,
-                      16,
-                    ),
-                  ),
-                ),
-              ),
-
-
-              // ===== TEXTFIELD ẨN (CHỈ ĐỂ NHẬN INPUT) =====
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Padding(
+          AnimatedBuilder(
+            animation: _shakeController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(_shakeAnimation.value, 0),
+                child: child,
+              );
+            },
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // ===== KHUNG Ô NHẬP =====
+                GestureDetector(
+                  onTap: () => _focusNode.requestFocus(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    height: 56,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: widget.inputController,
-                        builder: (context, value, _) {
-                          final suffix = value.text;
-
-                          return RichText(
-                            text: TextSpan(
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                              children: [
-                                if (lastWord.isNotEmpty)
-                                  TextSpan(
-                                    text: '$lastWord ',
-                                    style: TextStyle(
-                                      color: theme.colorScheme.primary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                TextSpan(
-                                  text: suffix.isEmpty ? '...' : suffix,
-                                  style: TextStyle(
-                                    color: suffix.isEmpty
-                                        ? muted
-                                        : theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                    decoration: BoxDecoration(
+                      color: inputSurface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: inputBorderColor,
+                        width: 2,
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              // ===== LABEL "Đến lượt bạn" =====
-              Positioned(
-                left: 12,
-                top: -10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Đến lượt bạn',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: accent,
-                      fontWeight: FontWeight.w700,
+                // ===== TEXTFIELD ẨN (NHẬN INPUT THẬT) =====
+                Positioned.fill(
+                  child: TextField(
+                    controller: widget.inputController,
+                    focusNode: _focusNode,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => widget.onSubmit(),
+                    cursorColor: theme.colorScheme.primary,
+
+                    // ⚠️ chữ ẩn nhưng GIỮ fontSize & lineHeight
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: Colors.transparent,
+                    ),
+
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.fromLTRB(
+                        16 + prefixWidth, // 👈 ĐẨY CURSOR SAU PREFIX
+                        16,
+                        trailingPadding,
+                        16,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+
+                // ===== TEXTFIELD ẨN (CHỈ ĐỂ NHẬN INPUT) =====
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: widget.inputController,
+                          builder: (context, value, _) {
+                            final suffix = value.text;
+
+                            return RichText(
+                              text: TextSpan(
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                children: [
+                                  if (lastWord.isNotEmpty)
+                                    TextSpan(
+                                      text: '$lastWord ',
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  TextSpan(
+                                    text: suffix.isEmpty ? '...' : suffix,
+                                    style: TextStyle(
+                                      color: suffix.isEmpty
+                                          ? muted
+                                          : theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                Positioned(
+                  right: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: IgnorePointer(
+                    child: FadeTransition(
+                      opacity: _successOpacity,
+                      child: ScaleTransition(
+                        scale: _successScale,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: successAccent.withOpacity(0.16),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: successAccent,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ===== LABEL "Đến lượt bạn" =====
+                Positioned(
+                  left: 12,
+                  top: -10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Đến lượt bạn',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          const SizedBox(height: 10),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) {
+              final slide = Tween<Offset>(
+                begin: const Offset(0, -0.1),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: slide,
+                  child: child,
+                ),
+              );
+            },
+            child: showFeedback
+                ? Padding(
+                    key: ValueKey(feedbackMessage),
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: WordChainInlineFeedback(
+                        message: feedbackMessage!,
+                        accentColor: errorAccent,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(
+                    key: ValueKey('word_chain_feedback_empty'),
+                  ),
+          ),
+
+          const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
