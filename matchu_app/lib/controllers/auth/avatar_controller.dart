@@ -192,6 +192,15 @@ class AvatarController extends GetxController {
     user.value = null;
   }
 
+  Future<void> cleanupAsync() async {
+    final sub = _userSub;
+    _userSub = null;
+    if (sub != null) {
+      await sub.cancel();
+    }
+    user.value = null;
+  }
+
   @override
   void onClose() {
     cleanup();

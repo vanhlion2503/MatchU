@@ -153,6 +153,16 @@ class UserController extends GetxController {
     _userSub = null;
   }
 
+  Future<void> stopHeartbeatAndSubscriptionsAsync() async {
+    _heartbeat?.cancel();
+    _heartbeat = null;
+    final sub = _userSub;
+    _userSub = null;
+    if (sub != null) {
+      await sub.cancel();
+    }
+  }
+
   @override
   void onClose() {
     stopHeartbeatAndSubscriptions();

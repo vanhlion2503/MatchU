@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 
 import '../../controllers/user/user_controller.dart';
@@ -58,7 +59,7 @@ class LogoutService {
       if (Get.isRegistered<UserController>()) {
         try {
           final u = Get.find<UserController>();
-          u.stopHeartbeatAndSubscriptions();
+          await u.stopHeartbeatAndSubscriptionsAsync();
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -76,7 +77,7 @@ class LogoutService {
       // 4️⃣ DỪNG UNREAD STREAM
       if (Get.isRegistered<UnreadController>()) {
         try {
-          Get.find<UnreadController>().cleanup();
+          await Get.find<UnreadController>().cleanupAsync();
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -85,7 +86,7 @@ class LogoutService {
       // 4️⃣.5️⃣ DỪNG CHAT LIST STREAM
       if (Get.isRegistered<ChatListController>()) {
         try {
-          Get.find<ChatListController>().cleanup();
+          await Get.find<ChatListController>().cleanupAsync();
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -94,7 +95,7 @@ class LogoutService {
       // 4️⃣.6️⃣ DỪNG PROFILE STREAM
       if (Get.isRegistered<ProfileController>()) {
         try {
-          Get.find<ProfileController>().cleanup();
+          await Get.find<ProfileController>().cleanupAsync();
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -103,7 +104,7 @@ class LogoutService {
       // 4️⃣.7️⃣ DỪNG AVATAR STREAM
       if (Get.isRegistered<AvatarController>()) {
         try {
-          Get.find<AvatarController>().cleanup();
+          await Get.find<AvatarController>().cleanupAsync();
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -130,7 +131,7 @@ class LogoutService {
       // 7️⃣ Reset anonymous avatar
       if (Get.isRegistered<AnonymousAvatarController>()) {
         try {
-          Get.find<AnonymousAvatarController>().reset();
+          await Get.find<AnonymousAvatarController>().resetAsync();
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -157,6 +158,14 @@ class LogoutService {
       // 8️⃣.5️⃣ 🔥 ĐỢI MỘT CHÚT ĐỂ ĐẢM BẢO TẤT CẢ LISTENERS ĐÃ ĐƯỢC CANCEL
       // Tránh race condition khi signOut() được gọi trong khi listeners còn active
       await Future.delayed(const Duration(milliseconds: 100));
+
+      // 8️⃣.6️⃣ 🔥 TẮT NETWORK FIRESTORE TRƯỚC KHI SIGN OUT
+      // Tránh listener còn active bắn permission denied sau khi auth = null
+      try {
+        await FirebaseFirestore.instance.disableNetwork();
+      } catch (e) {
+        // Ignore errors - continue with logout
+      }
 
       // 9️⃣ Firebase sign out
       await _auth.signOut();

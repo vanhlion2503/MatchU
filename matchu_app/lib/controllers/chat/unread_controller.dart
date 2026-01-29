@@ -60,6 +60,15 @@ class UnreadController extends GetxController {
     totalUnread.value = 0;
   }
 
+  Future<void> cleanupAsync() async {
+    final sub = _sub;
+    _sub = null;
+    totalUnread.value = 0;
+    if (sub != null) {
+      await sub.cancel();
+    }
+  }
+
   @override
   void onClose() {
     cleanup();

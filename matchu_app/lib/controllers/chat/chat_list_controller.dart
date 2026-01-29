@@ -301,6 +301,30 @@ class ChatListController extends GetxController
     _sessionKeySubs.clear();
   }
 
+  Future<void> cleanupAsync() async {
+    final futures = <Future<void>>[];
+
+    final sub = _sub;
+    _sub = null;
+    if (sub != null) {
+      futures.add(sub.cancel());
+    }
+
+    for (final sub in _sessionKeySubs.values) {
+      futures.add(sub.cancel());
+    }
+    _sessionKeySubs.clear();
+
+    if (futures.isNotEmpty) {
+      await Future.wait(futures);
+    }
+
+    rooms.clear();
+    filteredRooms.clear();
+    lastMessagePreviewCache.clear();
+    _previewMeta.clear();
+  }
+
   @override
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);

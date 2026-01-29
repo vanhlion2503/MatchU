@@ -156,6 +156,18 @@ class ProfileController extends GetxController{
     _retryTimer = null;
   }
 
+  Future<void> cleanupAsync() async {
+    final sub = _userSub;
+    _userSub = null;
+    if (sub != null) {
+      await sub.cancel();
+    }
+    user.value = null;
+    isLoading.value = false;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+  }
+
   @override
   void onClose() {
     _authSub?.cancel();

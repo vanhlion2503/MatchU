@@ -103,6 +103,18 @@ class AnonymousAvatarController extends GetxController {
     _reset();
   }
 
+  Future<void> resetAsync() async {
+    final sub = _userSub;
+    _userSub = null;
+    if (sub != null) {
+      await sub.cancel();
+    }
+    avatars.clear();
+    selectedAvatar.value = null;
+    gender.value = null;
+    _pendingAvatarKey = null;
+  }
+
   /// ===== LOAD USER + SET AVATAR LIST =====
   Future<void> load() async {
     final uid = _auth.currentUser?.uid;

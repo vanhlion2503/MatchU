@@ -37,6 +37,11 @@ class AuthGateController extends GetxController {
       return;
     }
 
+    // Ensure Firestore network is re-enabled after logout.
+    try {
+      await FirebaseFirestore.instance.enableNetwork();
+    } catch (_) {}
+
     final isRegistering = _box.read('isRegistering') == true;
     if (isRegistering) {
       await user.reload();
