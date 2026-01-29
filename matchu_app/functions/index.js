@@ -189,12 +189,16 @@ exports.generateTelepathyAiInsight = onDocumentUpdated(
     secrets: [GEMINI_API_KEY], // 🔥 BẮT BUỘC
   },
   async (event) => {
+    const before = event.data.before.data();
     const after = event.data.after.data();
     if (!after?.minigame?.aiInsight) return;
 
     const ai = after.minigame.aiInsight;
     if (ai.status !== "pending") return;
     if (ai.generatedAt) return;
+
+    const beforeAi = before?.minigame?.aiInsight;
+    if (beforeAi?.status === "pending" && !beforeAi?.generatedAt) return;
 
     const payload = ai.payload;
     if (!payload?.questions?.length) {
