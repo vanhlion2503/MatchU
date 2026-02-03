@@ -200,6 +200,8 @@ class MatchingController extends GetxController{
 
     isMatched.value = true;
     isSearching.value = false;
+    isMatchingActive.value = false;
+    isMinimized.value = false;
     canCancel.value = false;
 
 
@@ -220,12 +222,10 @@ class MatchingController extends GetxController{
   // STOP MATCHING
   // =========================================================
   Future<void> stopMatching() async {
-    if (!isSearching.value) return;
-    stopTimer();
-    final user = Get.find<AuthController>().user;
-    if (user == null) return;
+    final wasSearching = isSearching.value;
 
-    await _service.dequeue(user.uid);
+    stopTimer();
+    elapsedSeconds.value = 0;
 
     await _roomSub?.cancel();
     _roomSub = null;
@@ -233,7 +233,14 @@ class MatchingController extends GetxController{
     isSearching.value = false;
     isMatched.value = false;
     isMatchingActive.value = false;
+    isMinimized.value = false;
     canCancel.value = false;
+
+    if (!wasSearching) return;
+    final user = Get.find<AuthController>().user;
+    if (user == null) return;
+
+    await _service.dequeue(user.uid);
 
   }
 
