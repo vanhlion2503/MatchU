@@ -3,56 +3,83 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
-
 class WordChainService {
   final _db = FirebaseFirestore.instance;
   final _random = Random();
   static const int _rewardMaxDeclines = 2;
 
-
   // ✅ seed words load từ file
   static List<String> _seedWords = [];
   static bool _loaded = false;
+  static Future<void>? _seedLoadFuture;
   static Map<String, List<String>> _dictionaryIndex = {};
   static bool _dictionaryLoaded = false;
+  static Future<void>? _dictionaryLoadFuture;
 
   /// Load seed words từ file (chỉ load 1 lần)
   static Future<void> loadSeedWords() async {
     if (_loaded) return;
+    if (_seedLoadFuture != null) {
+      await _seedLoadFuture;
+      return;
+    }
 
-    final raw = await rootBundle.loadString(
-      'assets/wordChain/first_turn_seeds.txt',
-    );
+    _seedLoadFuture =
+        (() async {
+          final raw = await rootBundle.loadString(
+            'assets/wordChain/first_turn_seeds.txt',
+          );
 
-    _seedWords = raw
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .where((e) => e.split(RegExp(r'\s+')).length == 2)
-        .toSet() // chống trùng
-        .toList();
+          _seedWords =
+              raw
+                  .split('\n')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .where((e) => e.split(RegExp(r'\s+')).length == 2)
+                  .toSet()
+                  .toList();
 
-    _loaded = true;
+          _loaded = true;
+        })();
+
+    try {
+      await _seedLoadFuture;
+    } finally {
+      _seedLoadFuture = null;
+    }
   }
 
   static Future<void> loadDictionaryWords() async {
     if (_dictionaryLoaded) return;
-
-    final raw = await rootBundle.loadString(
-      'assets/wordChain/vi_2words_clean.txt',
-    );
-
-    final Map<String, List<String>> index = {};
-    for (final line in raw.split('\n')) {
-      final clean = _normalizeWord(line);
-      if (clean.isEmpty) continue;
-      final parts = clean.split(' ');
-      if (parts.length != 2) continue;
-      index.putIfAbsent(parts.first, () => []).add(clean);
+    if (_dictionaryLoadFuture != null) {
+      await _dictionaryLoadFuture;
+      return;
     }
 
-    _dictionaryIndex = index;
-    _dictionaryLoaded = true;
+    _dictionaryLoadFuture =
+        (() async {
+          final raw = await rootBundle.loadString(
+            'assets/wordChain/vi_2words_clean.txt',
+          );
+
+          final Map<String, List<String>> index = {};
+          for (final line in raw.split('\n')) {
+            final clean = _normalizeWord(line);
+            if (clean.isEmpty) continue;
+            final parts = clean.split(' ');
+            if (parts.length != 2) continue;
+            index.putIfAbsent(parts.first, () => []).add(clean);
+          }
+
+          _dictionaryIndex = index;
+          _dictionaryLoaded = true;
+        })();
+
+    try {
+      await _dictionaryLoadFuture;
+    } finally {
+      _dictionaryLoadFuture = null;
+    }
   }
 
   DocumentReference<Map<String, dynamic>> _roomRef(String roomId) {
@@ -78,12 +105,8 @@ class WordChainService {
       final participants = List<String>.from(data?["participants"] ?? []);
       if (participants.length < 2) return;
 
-      final hearts = {
-        for (final id in participants) id: 3,
-      };
-      final sosUsed = {
-        for (final id in participants) id: false,
-      };
+      final hearts = {for (final id in participants) id: 3};
+      final sosUsed = {for (final id in participants) id: false};
 
       tx.update(ref, {
         "minigames.wordChain.status": "inviting",
@@ -133,9 +156,7 @@ class WordChainService {
         return;
       }
 
-      tx.update(ref, {
-        "minigames.wordChain.consent.$uid": true,
-      });
+      tx.update(ref, {"minigames.wordChain.consent.$uid": true});
 
       final participants = List<String>.from(data?["participants"] ?? []);
       if (participants.length < 2) return;
@@ -179,6 +200,7 @@ class WordChainService {
   }
 
   Future<void> startGame(String roomId) async {
+    await loadSeedWords();
     final ref = _roomRef(roomId);
 
     await _db.runTransaction((tx) async {
@@ -199,12 +221,8 @@ class WordChainService {
 
       final starter = participants[_random.nextInt(participants.length)];
       final seed = _randomSeedWord();
-      final hearts = {
-        for (final id in participants) id: 3,
-      };
-      final sosUsed = {
-        for (final id in participants) id: false,
-      };
+      final hearts = {for (final id in participants) id: 3};
+      final sosUsed = {for (final id in participants) id: false};
 
       tx.update(ref, {
         "minigames.wordChain.status": "playing",
@@ -248,54 +266,75 @@ class WordChainService {
   }
 
   // ================= SUBMIT ĐÚNG =================
-  Future<void> submitCorrectWord(
-    String roomId,
-    String uid,
-    String word,
-  ) async {
-    final ref = _db.collection("tempChats").doc(roomId);
-    final snap = await ref.get();
+  Future<void> submitCorrectWord(String roomId, String uid, String word) async {
+    final ref = _roomRef(roomId);
 
-    final participants = List<String>.from(snap["participants"]);
-    final nextUid = participants.firstWhere((e) => e != uid);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
 
-    await ref.update({
-      "minigames.wordChain.currentWord": word,
-      "minigames.wordChain.usedWords": FieldValue.arrayUnion([word]),
-      "minigames.wordChain.turnUid": nextUid,
-      "minigames.wordChain.remainingSeconds": 15,
-      "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "playing") return;
+      if (game?["turnUid"] != uid) return;
+
+      final participants = List<String>.from(data?["participants"] ?? []);
+      if (participants.length < 2) return;
+      final nextUid = participants.firstWhere((e) => e != uid);
+
+      tx.update(ref, {
+        "minigames.wordChain.currentWord": word,
+        "minigames.wordChain.usedWords": FieldValue.arrayUnion([word]),
+        "minigames.wordChain.turnUid": nextUid,
+        "minigames.wordChain.remainingSeconds": 15,
+        "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
+      });
     });
   }
 
   // ================= TIMEOUT → LOSE HEART =================
   Future<void> loseHeartOnly(String roomId, String uid) async {
-    final ref = _db.collection("tempChats").doc(roomId);
-    final snap = await ref.get();
+    final ref = _roomRef(roomId);
 
-    final hearts = Map<String, int>.from(
-      snap["minigames"]["wordChain"]["hearts"],
-    );
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
 
-    hearts[uid] = hearts[uid]! - 1;
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "playing") return;
+      if (game?["turnUid"] != uid) return;
 
-    if (hearts[uid]! <= 0) {
-      await ref.update({
-        "minigames.wordChain.status": "reward",
-        "minigames.wordChain.winnerUid":
-            hearts.keys.firstWhere((e) => e != uid),
-        "minigames.wordChain.reward": _rewardState(
-          phase: "asking",
-          askingStartedAt: FieldValue.serverTimestamp(),
-        ),
-        "minigames.wordChain.remainingSeconds": 0,
+      final participants = List<String>.from(data?["participants"] ?? []);
+      if (participants.length < 2) return;
+      final otherUid = participants.firstWhere((e) => e != uid);
+
+      final hearts = Map<String, int>.from(game?["hearts"] ?? {});
+      final currentHeart = hearts[uid] ?? 0;
+      final nextHeart = currentHeart - 1;
+      hearts[uid] = nextHeart;
+
+      if (nextHeart <= 0) {
+        tx.update(ref, {
+          "minigames.wordChain.status": "reward",
+          "minigames.wordChain.winnerUid": otherUid,
+          "minigames.wordChain.reward": _rewardState(
+            phase: "asking",
+            askingStartedAt: FieldValue.serverTimestamp(),
+          ),
+          "minigames.wordChain.hearts": hearts,
+          "minigames.wordChain.remainingSeconds": 0,
+          "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      tx.update(ref, {
+        "minigames.wordChain.hearts": hearts,
         "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
       });
-      return;
-    }
-
-    await ref.update({
-      "minigames.wordChain.hearts": hearts,
     });
   }
 
@@ -303,6 +342,7 @@ class WordChainService {
     required String roomId,
     required String uid,
   }) async {
+    await loadSeedWords();
     final ref = _roomRef(roomId);
 
     await _db.runTransaction((tx) async {
@@ -318,9 +358,10 @@ class WordChainService {
       if (turnUid != uid) return;
 
       final rawRemaining = game?["remainingSeconds"];
-      final remainingSeconds = rawRemaining is int
-          ? rawRemaining
-          : rawRemaining is num
+      final remainingSeconds =
+          rawRemaining is int
+              ? rawRemaining
+              : rawRemaining is num
               ? rawRemaining.toInt()
               : null;
       if (remainingSeconds != null && remainingSeconds > 0) return;
@@ -427,9 +468,10 @@ class WordChainService {
       if (cleanAnswer.isEmpty) return;
 
       final rawDeclines = reward["declineCount"];
-      final declineCount = rawDeclines is int
-          ? rawDeclines
-          : rawDeclines is num
+      final declineCount =
+          rawDeclines is int
+              ? rawDeclines
+              : rawDeclines is num
               ? rawDeclines.toInt()
               : 0;
 
@@ -505,9 +547,10 @@ class WordChainService {
       if (reward["phase"] != "reviewing") return;
 
       final rawDeclines = reward["declineCount"];
-      final declineCount = rawDeclines is int
-          ? rawDeclines
-          : rawDeclines is num
+      final declineCount =
+          rawDeclines is int
+              ? rawDeclines
+              : rawDeclines is num
               ? rawDeclines.toInt()
               : 0;
 
@@ -517,10 +560,7 @@ class WordChainService {
       final questionPresetId = reward["questionPresetId"]?.toString();
       final answer = reward["answer"]?.toString();
       final participants = List<String>.from(data?["participants"] ?? []);
-      final loserUid = _otherParticipant(
-        winnerUid?.toString(),
-        participants,
-      );
+      final loserUid = _otherParticipant(winnerUid?.toString(), participants);
 
       if (accept || declineCount >= _rewardMaxDeclines) {
         final rewardMessage = _rewardTranscriptMessage(
@@ -544,8 +584,7 @@ class WordChainService {
             askedAt: askedAt,
             answeredAt: answeredAt,
             completedAt: FieldValue.serverTimestamp(),
-            autoAcceptedReason:
-                accept ? null : "max_declines",
+            autoAcceptedReason: accept ? null : "max_declines",
           ),
           "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
         });
@@ -586,9 +625,10 @@ class WordChainService {
       if (reward["phase"] != "reviewing") return;
 
       final rawDeclines = reward["declineCount"];
-      final declineCount = rawDeclines is int
-          ? rawDeclines
-          : rawDeclines is num
+      final declineCount =
+          rawDeclines is int
+              ? rawDeclines
+              : rawDeclines is num
               ? rawDeclines.toInt()
               : 0;
       final participants = List<String>.from(data?["participants"] ?? []);
@@ -652,9 +692,10 @@ class WordChainService {
       if (reason == "answer_timeout" && phase != "answering") return;
 
       final rawDeclines = reward["declineCount"];
-      final declineCount = rawDeclines is int
-          ? rawDeclines
-          : rawDeclines is num
+      final declineCount =
+          rawDeclines is int
+              ? rawDeclines
+              : rawDeclines is num
               ? rawDeclines.toInt()
               : 0;
 
@@ -687,17 +728,19 @@ class WordChainService {
         participants: participants,
       );
 
-      tx.set(
-        ref.collection("messages").doc(),
-        {
-          "type": "system",
-          "systemCode": "word_chain_exit",
-          "text": _rewardExitMessage(reason),
-          "senderId": uid,
-          "targetUid": targetUid,
-          "createdAt": FieldValue.serverTimestamp(),
-        },
-      );
+      tx.set(ref.collection("messages").doc(), {
+        "type": "system",
+        "systemCode": "word_chain_exit",
+        "text": _rewardExitMessage(reason),
+        "senderId": uid,
+        "targetUid": targetUid,
+        "status": "approved",
+        "blockedBy": null,
+        "reason": null,
+        "warning": false,
+        "aiScore": null,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
     });
   }
 
@@ -708,16 +751,54 @@ class WordChainService {
     });
   }
 
-  Future<void> updateTimer(String roomId, int seconds) async {
-    await _db.collection("tempChats").doc(roomId).update({
-      "minigames.wordChain.remainingSeconds": seconds,
+  Future<void> updateTimer(String roomId, String uid, int seconds) async {
+    final ref = _roomRef(roomId);
+    final nextSeconds = seconds.clamp(0, 15).toInt();
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "playing") return;
+
+      if (game?["turnUid"] != uid) return;
+
+      final rawCurrent = game?["remainingSeconds"];
+      final current =
+          rawCurrent is int
+              ? rawCurrent
+              : rawCurrent is num
+              ? rawCurrent.toInt()
+              : null;
+
+      // Keep timer monotonic: stale writes cannot increase remaining seconds.
+      if (current != null && nextSeconds >= current) return;
+
+      tx.update(ref, {"minigames.wordChain.remainingSeconds": nextSeconds});
     });
   }
 
   // ================= SOS =================
   Future<void> useSOS(String roomId, String uid) async {
-    await _db.collection("tempChats").doc(roomId).update({
-      "minigames.wordChain.sosUsed.$uid": true,
+    final ref = _roomRef(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+
+      final data = snap.data();
+      final game = data?["minigames"]?["wordChain"];
+      final status = game is Map ? game["status"] : null;
+      if (status != "playing") return;
+      if (game?["turnUid"] != uid) return;
+
+      final sosUsed = Map<String, dynamic>.from(game?["sosUsed"] ?? {});
+      if (sosUsed[uid] == true) return;
+
+      tx.update(ref, {"minigames.wordChain.sosUsed.$uid": true});
     });
   }
 
@@ -734,19 +815,14 @@ class WordChainService {
     final candidates = _dictionaryIndex[prefix];
     if (candidates == null || candidates.isEmpty) return null;
 
-    final available = candidates
-        .where((word) => !used.contains(word))
-        .toList();
+    final available = candidates.where((word) => !used.contains(word)).toList();
     if (available.isEmpty) return null;
 
     return available[_random.nextInt(available.length)];
   }
 
   static String _normalizeWord(String value) {
-    return value
-        .toLowerCase()
-        .trim()
-        .replaceAll(RegExp(r'\s+'), ' ');
+    return value.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   static String _lastWordPrefix(String value) {
@@ -816,6 +892,11 @@ class WordChainService {
       "questionUid": cleanWinner,
       "answerUid": cleanLoser,
       "senderId": cleanSender,
+      "status": "approved",
+      "blockedBy": null,
+      "reason": null,
+      "warning": false,
+      "aiScore": null,
       "createdAt": FieldValue.serverTimestamp(),
     };
   }

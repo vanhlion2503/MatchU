@@ -7,20 +7,13 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/game/word_chain_service.dart';
 
-
-enum WordChainSubmitAction {
-  accept,
-  decline,
-}
+enum WordChainSubmitAction { accept, decline }
 
 class WordChainSosResult {
   final bool allowed;
   final String? word;
 
-  const WordChainSosResult({
-    required this.allowed,
-    this.word,
-  });
+  const WordChainSosResult({required this.allowed, this.word});
 }
 
 class WordChainController extends GetxController {
@@ -133,12 +126,15 @@ class WordChainController extends GetxController {
       remainingSeconds.value = game["remainingSeconds"] ?? 15;
       winnerUid.value = game["winnerUid"];
       final rawInvalidReason = game["invalidReason"];
-      invalidReason.value = rawInvalidReason is String && rawInvalidReason.isNotEmpty
-          ? rawInvalidReason
-          : null;
+      invalidReason.value =
+          rawInvalidReason is String && rawInvalidReason.isNotEmpty
+              ? rawInvalidReason
+              : null;
       final rawPendingWord = game["pendingWord"];
       pendingWord.value =
-          rawPendingWord is Map ? Map<String, dynamic>.from(rawPendingWord) : null;
+          rawPendingWord is Map
+              ? Map<String, dynamic>.from(rawPendingWord)
+              : null;
 
       hearts.assignAll(Map<String, int>.from(game["hearts"] ?? {}));
       usedWords.assignAll(List<String>.from(game["usedWords"] ?? []));
@@ -180,7 +176,7 @@ class WordChainController extends GetxController {
       final next = remainingSeconds.value - 1;
       remainingSeconds.value = next > 0 ? next : 0;
 
-      await service.updateTimer(roomId, remainingSeconds.value);
+      await service.updateTimer(roomId, uid, remainingSeconds.value);
 
       if (remainingSeconds.value <= 0) {
         await _onTimeout();
@@ -196,10 +192,7 @@ class WordChainController extends GetxController {
     _timer?.cancel();
 
     try {
-      await service.handleTimeout(
-        roomId: roomId,
-        uid: uid,
-      );
+      await service.handleTimeout(roomId: roomId, uid: uid);
     } catch (_) {
       _timeoutInProgress = false;
     }
@@ -227,10 +220,9 @@ class WordChainController extends GetxController {
         "word": input.trim(),
         "uid": uid,
         "createdAt": FieldValue.serverTimestamp(),
-      }
+      },
     });
   }
-
 
   // ================= SOS =================
   Future<WordChainSosResult> useSOS() async {
@@ -272,11 +264,7 @@ class WordChainController extends GetxController {
     if (submittingAction.value != null) return;
     submittingAction.value = action;
 
-    await service.respond(
-      roomId: roomId,
-      uid: uid,
-      accept: accept,
-    );
+    await service.respond(roomId: roomId, uid: uid, accept: accept);
   }
 
   // ================= REWARD =================
@@ -295,37 +283,19 @@ class WordChainController extends GetxController {
     );
   }
 
-  Future<void> submitRewardAnswer({
-    required String answer,
-  }) async {
+  Future<void> submitRewardAnswer({required String answer}) async {
     final trimmed = answer.trim();
     if (trimmed.isEmpty) return;
 
-    await service.submitRewardAnswer(
-      roomId: roomId,
-      uid: uid,
-      answer: trimmed,
-    );
+    await service.submitRewardAnswer(roomId: roomId, uid: uid, answer: trimmed);
   }
 
-  Future<void> reviewRewardAnswer({
-    required bool accept,
-  }) async {
-    await service.reviewRewardAnswer(
-      roomId: roomId,
-      uid: uid,
-      accept: accept,
-    );
+  Future<void> reviewRewardAnswer({required bool accept}) async {
+    await service.reviewRewardAnswer(roomId: roomId, uid: uid, accept: accept);
   }
 
-  Future<void> exitReward({
-    required String reason,
-  }) async {
-    await service.exitReward(
-      roomId: roomId,
-      uid: uid,
-      reason: reason,
-    );
+  Future<void> exitReward({required String reason}) async {
+    await service.exitReward(roomId: roomId, uid: uid, reason: reason);
   }
 
   // ================= HELPERS =================
@@ -347,7 +317,8 @@ class WordChainController extends GetxController {
     final prevOtherAccepted = otherConsent.value;
 
     myConsent.value = consent[uid] == true;
-    otherConsent.value = _otherUid != null ? consent[_otherUid!] == true : false;
+    otherConsent.value =
+        _otherUid != null ? consent[_otherUid!] == true : false;
 
     if (!prevOtherAccepted && otherConsent.value) {
       opponentJustAccepted.value = true;
@@ -360,32 +331,32 @@ class WordChainController extends GetxController {
 
   void _syncReward(Map<String, dynamic> game) {
     final rawReward = game["reward"];
-    final reward = rawReward is Map
-        ? Map<String, dynamic>.from(rawReward)
-        : <String, dynamic>{};
+    final reward =
+        rawReward is Map
+            ? Map<String, dynamic>.from(rawReward)
+            : <String, dynamic>{};
 
     rewardPhase.value = _parseRewardPhase(reward["phase"]);
     rewardQuestion.value = reward["question"]?.toString() ?? '';
-    rewardQuestionPresetId.value =
-        reward["questionPresetId"]?.toString();
+    rewardQuestionPresetId.value = reward["questionPresetId"]?.toString();
     rewardAnswer.value = reward["answer"]?.toString() ?? '';
 
     final rawDeclines = reward["declineCount"];
-    rewardDeclineCount.value = rawDeclines is int
-        ? rawDeclines
-        : rawDeclines is num
+    rewardDeclineCount.value =
+        rawDeclines is int
+            ? rawDeclines
+            : rawDeclines is num
             ? rawDeclines.toInt()
             : 0;
 
     rewardAskedAt.value = _parseTimestamp(reward["askedAt"]);
     rewardAnsweredAt.value = _parseTimestamp(reward["answeredAt"]);
     rewardReviewStartedAt.value = _parseTimestamp(reward["reviewStartedAt"]);
-    rewardAskingStartedAt.value =
-        _parseTimestamp(reward["askingStartedAt"]);
-    rewardAnsweringStartedAt.value =
-        _parseTimestamp(reward["answeringStartedAt"]);
-    rewardAutoAcceptedReason.value =
-        reward["autoAcceptedReason"]?.toString();
+    rewardAskingStartedAt.value = _parseTimestamp(reward["askingStartedAt"]);
+    rewardAnsweringStartedAt.value = _parseTimestamp(
+      reward["answeringStartedAt"],
+    );
+    rewardAutoAcceptedReason.value = reward["autoAcceptedReason"]?.toString();
     rewardCompletedAt.value = _parseTimestamp(reward["completedAt"]);
 
     _updateRewardAskTimer();
@@ -429,8 +400,7 @@ class WordChainController extends GetxController {
     _localRewardReviewStartedAt ??= DateTime.now();
 
     _syncRewardCountdown(startedAt);
-    _rewardReviewTimer =
-        Timer.periodic(const Duration(milliseconds: 200), (_) {
+    _rewardReviewTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (rewardPhase.value != WordChainRewardPhase.reviewing ||
           rewardReviewStartedAt.value != startedAt) {
         _rewardReviewTimer?.cancel();
@@ -450,11 +420,7 @@ class WordChainController extends GetxController {
 
     if (remaining <= 0 && !_autoAcceptingReward) {
       _autoAcceptingReward = true;
-      service.autoAcceptReward(
-        roomId: roomId,
-        uid: uid,
-        reason: 'timeout',
-      );
+      service.autoAcceptReward(roomId: roomId, uid: uid, reason: 'timeout');
     }
   }
 
@@ -497,11 +463,7 @@ class WordChainController extends GetxController {
 
     if (remaining <= 0 && !_autoEndingAskReward) {
       _autoEndingAskReward = true;
-      service.exitReward(
-        roomId: roomId,
-        uid: uid,
-        reason: 'ask_timeout',
-      );
+      service.exitReward(roomId: roomId, uid: uid, reason: 'ask_timeout');
     }
   }
 
@@ -524,8 +486,7 @@ class WordChainController extends GetxController {
     _localRewardAnswerStartedAt ??= DateTime.now();
 
     _syncRewardAnswerCountdown(startedAt);
-    _rewardAnswerTimer =
-        Timer.periodic(const Duration(milliseconds: 200), (_) {
+    _rewardAnswerTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (rewardPhase.value != WordChainRewardPhase.answering ||
           rewardAnsweringStartedAt.value != startedAt) {
         _rewardAnswerTimer?.cancel();
@@ -545,11 +506,7 @@ class WordChainController extends GetxController {
 
     if (remaining <= 0 && !_autoEndingAnswerReward) {
       _autoEndingAnswerReward = true;
-      service.exitReward(
-        roomId: roomId,
-        uid: uid,
-        reason: 'answer_timeout',
-      );
+      service.exitReward(roomId: roomId, uid: uid, reason: 'answer_timeout');
     }
   }
 
@@ -661,9 +618,10 @@ class WordChainController extends GetxController {
 
   void _syncCountdown(DateTime? startedAt) {
     final now = DateTime.now();
-    final localElapsedMs = _localCountdownStartedAt == null
-        ? 0
-        : now.difference(_localCountdownStartedAt!).inMilliseconds;
+    final localElapsedMs =
+        _localCountdownStartedAt == null
+            ? 0
+            : now.difference(_localCountdownStartedAt!).inMilliseconds;
     var serverElapsedMs = 0;
     if (startedAt != null) {
       serverElapsedMs = now.difference(startedAt).inMilliseconds;
@@ -673,10 +631,8 @@ class WordChainController extends GetxController {
     }
     final elapsedMs = math.max(localElapsedMs, serverElapsedMs);
     final remainingMs = (_countdownTotalSeconds * 1000) - elapsedMs;
-    final remaining = (remainingMs / 1000)
-        .ceil()
-        .clamp(0, _countdownTotalSeconds)
-        .toInt();
+    final remaining =
+        (remainingMs / 1000).ceil().clamp(0, _countdownTotalSeconds).toInt();
     countdownSeconds.value = remaining;
 
     if (remaining <= 0) {

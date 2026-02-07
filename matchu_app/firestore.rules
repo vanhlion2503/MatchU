@@ -361,13 +361,35 @@ service cloud.firestore {
                 .data.participants;
         }
 
+        function isPendingUserMessageCreate() {
+          return (
+            !request.resource.data.keys().hasAny(["type"])
+            || request.resource.data.type != "system"
+          )
+          && request.resource.data.text is string
+          && request.resource.data.status == "pending"
+          && request.resource.data.blockedBy == null
+          && request.resource.data.reason == null
+          && request.resource.data.warning == false
+          && request.resource.data.aiScore == null;
+        }
+
+        function isLegacySystemMessageCreate() {
+          return request.resource.data.type == "system"
+            && request.resource.data.text is string;
+        }
+
         allow read: if isRoomParticipant();
 
         allow create: if isRoomParticipant()
           && get(/databases/$(database)/documents/tempChats/$(roomId))
               .data.status == "active"
           && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.createdAt != null;
+          && request.resource.data.createdAt != null
+          && (
+            isPendingUserMessageCreate()
+            || isLegacySystemMessageCreate()
+          );
 
         allow update: if isRoomParticipant()
           && request.writeFields.size() == 1

@@ -20,10 +20,7 @@ enum TelepathyStatus {
   cancelled,
 }
 
-enum TelepathySubmitAction {
-  accept,
-  decline,
-}
+enum TelepathySubmitAction { accept, decline }
 
 class TelepathyController extends GetxController {
   final String roomId;
@@ -40,6 +37,7 @@ class TelepathyController extends GetxController {
   final questions = <TelepathyQuestion>[].obs;
   final myAnswers = <String, String>{}.obs;
   final otherAnswers = <String, String>{}.obs;
+  final _localPendingAnswers = <String, String>{}.obs;
   final myConsent = false.obs;
   final otherConsent = false.obs;
   final cancelledBy = RxnString();
@@ -61,6 +59,19 @@ class TelepathyController extends GetxController {
   late final TelepathyTimers _timers;
   Timer? _revealFallbackTimer;
   bool get isPlaying => status.value == TelepathyStatus.playing;
+
+  String? selectedAnswerFor(String questionId) {
+    return myAnswers[questionId] ?? _localPendingAnswers[questionId];
+  }
+
+  bool hasAnsweredQuestion(String questionId) {
+    return selectedAnswerFor(questionId) != null;
+  }
+
+  bool isAnswerPending(String questionId) {
+    return !myAnswers.containsKey(questionId) &&
+        _localPendingAnswers.containsKey(questionId);
+  }
 
   @override
   void onInit() {
@@ -222,7 +233,8 @@ class TelepathyController extends GetxController {
     final prevOtherAccepted = otherConsent.value;
 
     myConsent.value = consent[uid] == true;
-    otherConsent.value = _otherUid != null ? consent[_otherUid!] == true : false;
+    otherConsent.value =
+        _otherUid != null ? consent[_otherUid!] == true : false;
 
     if (!prevOtherAccepted && otherConsent.value) {
       opponentJustAccepted.value = true;
@@ -260,6 +272,7 @@ class TelepathyController extends GetxController {
     questions.clear();
     myAnswers.clear();
     otherAnswers.clear();
+    _localPendingAnswers.clear();
   }
 
   void _scheduleRevealAdvanceFallback() {
@@ -276,18 +289,23 @@ class TelepathyController extends GetxController {
 
     if (_lastRevealIndex == index) return;
     _lastRevealIndex = index;
+    _continueFromRevealingNow(index);
+  }
 
-    _revealFallbackTimer?.cancel();
-    _revealFallbackTimer =
-        Timer(const Duration(milliseconds: 1200), () async {
+  void _continueFromRevealingNow(int index) {
+    Future<void>(() async {
       if (_isHost != true) return;
       if (status.value != TelepathyStatus.revealing) return;
       if (currentIndex.value != index) return;
 
-      if (currentIndex.value + 1 >= questions.length) {
-        await finish();
-      } else {
-        await _service.continueAfterReveal(roomId);
+      try {
+        if (index + 1 >= questions.length) {
+          await finish();
+        } else {
+          await _service.continueAfterReveal(roomId, expectedIndex: index);
+        }
+      } catch (_) {
+        _lastRevealIndex = null;
       }
     });
   }
@@ -322,9 +340,7 @@ class TelepathyController extends GetxController {
       for (final item in rawQuestions) {
         if (item is Map) {
           parsed.add(
-            TelepathyQuestion.fromJson(
-              Map<String, dynamic>.from(item),
-            ),
+            TelepathyQuestion.fromJson(Map<String, dynamic>.from(item)),
           );
         }
       }
@@ -356,6 +372,23 @@ class TelepathyController extends GetxController {
       }
     }
 
+    // Keep local tap feedback until server write is observed, then clear it.
+    final acknowledged = <String>[];
+    for (final questionId in _localPendingAnswers.keys) {
+      if (myAnswers.containsKey(questionId)) {
+        acknowledged.add(questionId);
+      }
+    }
+    for (final questionId in acknowledged) {
+      _localPendingAnswers.remove(questionId);
+    }
+
+    // Drop stale pending entries if question no longer exists in this round.
+    final validQuestionIds = questions.map((q) => q.id).toSet();
+    _localPendingAnswers.removeWhere((questionId, _) {
+      return !validQuestionIds.contains(questionId);
+    });
+
     _maybeAdvanceOnBothAnswered();
   }
 
@@ -371,14 +404,15 @@ class TelepathyController extends GetxController {
 
     submittingAction.value = action;
 
-    await _service.respond(
-      roomId: roomId,
-      uid: uid,
-      accept: accept,
-    );
+    try {
+      await _service.respond(roomId: roomId, uid: uid, accept: accept);
 
-    if (!accept) {
-      await _sendDeclineMessage();
+      if (!accept) {
+        await _sendDeclineMessage();
+      }
+    } catch (_) {
+      submittingAction.value = null;
+      rethrow;
     }
   }
 
@@ -387,10 +421,7 @@ class TelepathyController extends GetxController {
 
     final qs = TelepathyQuestionBank.pickSmartMix();
 
-    await _service.startGame(
-      roomId: roomId,
-      questions: qs,
-    );
+    await _service.startGame(roomId: roomId, questions: qs);
     _startingCountdown = false;
   }
 
@@ -399,14 +430,22 @@ class TelepathyController extends GetxController {
     if (currentIndex.value >= questions.length) return;
 
     final q = questions[currentIndex.value];
-    if (myAnswers.containsKey(q.id)) return;
+    if (hasAnsweredQuestion(q.id)) return;
 
-    await _service.submitAnswer(
-      roomId: roomId,
-      uid: uid,
-      questionId: q.id,
-      option: option,
-    );
+    // Optimistic lock for instant UI feedback, avoids double taps/race.
+    _localPendingAnswers[q.id] = option;
+
+    try {
+      await _service.submitAnswer(
+        roomId: roomId,
+        uid: uid,
+        questionId: q.id,
+        option: option,
+      );
+    } catch (_) {
+      _localPendingAnswers.remove(q.id);
+      rethrow;
+    }
   }
 
   Future<void> next() async {
@@ -415,7 +454,7 @@ class TelepathyController extends GetxController {
     if (currentIndex.value + 1 >= questions.length) {
       await finish();
     } else {
-      await _service.advanceQuestion(roomId);
+      await _service.advanceQuestion(roomId, expectedIndex: currentIndex.value);
     }
   }
 
@@ -439,17 +478,14 @@ class TelepathyController extends GetxController {
     );
   }
 
-  Map<String, dynamic> _buildAiPayload({
-    required TelepathyResult result,
-  }){
+  Map<String, dynamic> _buildAiPayload({required TelepathyResult result}) {
     final items = <Map<String, dynamic>>[];
 
-    for(final q in questions){
-
+    for (final q in questions) {
       final my = myAnswers[q.id];
       final other = otherAnswers[q.id];
 
-      if(my == null || other == null) continue;
+      if (my == null || other == null) continue;
       items.add({
         "question": q.text,
         "category": q.category.name,
@@ -458,7 +494,7 @@ class TelepathyController extends GetxController {
         "same": my == other,
       });
     }
-    return{
+    return {
       "score": result.score,
       "level": result.level.name,
       "questions": items,
@@ -478,13 +514,10 @@ class TelepathyController extends GetxController {
     _otherUid = _isHost == true ? userB : userA;
   }
 
-
   void _syncResult(Map<String, dynamic> game) {
     final raw = game["result"];
     if (raw is Map) {
-      result.value = TelepathyResult.fromJson(
-        Map<String, dynamic>.from(raw),
-      );
+      result.value = TelepathyResult.fromJson(Map<String, dynamic>.from(raw));
     } else {
       result.value = null;
     }
@@ -494,26 +527,33 @@ class TelepathyController extends GetxController {
     if (_isHost != true) return;
     if (currentIndex.value >= questions.length) return;
 
-    final q = questions[currentIndex.value];
+    final revealIndex = currentIndex.value;
+    final q = questions[revealIndex];
     final my = myAnswers[q.id];
     final other = otherAnswers[q.id];
 
     if (my == null || other == null) return;
-    if (_lastAdvanceIndex == currentIndex.value) return;
+    if (_lastAdvanceIndex == revealIndex) return;
 
-    _lastAdvanceIndex = currentIndex.value;
+    _lastAdvanceIndex = revealIndex;
+    _advanceToNextQuestionNow(revealIndex);
+  }
 
-    _service.setRevealing(roomId);
-
-    Future.delayed(const Duration(milliseconds: 1000), () async {
+  void _advanceToNextQuestionNow(int index) {
+    Future<void>(() async {
       if (_isHost != true) return;
+      if (status.value != TelepathyStatus.playing) return;
+      if (currentIndex.value != index) return;
 
-      if (currentIndex.value + 1 >= questions.length) {
-        await finish();
-        return;
+      try {
+        if (index + 1 >= questions.length) {
+          await finish();
+        } else {
+          await _service.advanceQuestion(roomId, expectedIndex: index);
+        }
+      } catch (_) {
+        _lastAdvanceIndex = null;
       }
-
-      await _service.continueAfterReveal(roomId);
     });
   }
 
@@ -556,7 +596,6 @@ class TelepathyController extends GetxController {
         }
         return "Chỉ ${result.score}% thôi 😅 Đôi khi trái dấu lại hút nhau mạnh!";
     }
-
   }
 
   Future<void> _sendDeclineMessage() async {
@@ -579,7 +618,6 @@ class TelepathyController extends GetxController {
     return null;
   }
 
-
   @override
   void onClose() {
     _sub?.cancel();
@@ -588,4 +626,3 @@ class TelepathyController extends GetxController {
     super.onClose();
   }
 }
-

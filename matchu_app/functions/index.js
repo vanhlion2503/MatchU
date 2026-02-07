@@ -6,6 +6,7 @@ const {
 const { defineSecret } = require("firebase-functions/params");
 const { GoogleGenAI } = require("@google/genai");
 const admin = require("firebase-admin");
+const axios = require("axios");
 setGlobalOptions({ maxInstances: 10 });
 
 admin.initializeApp();
@@ -40,6 +41,65 @@ function isValidVietnameseWord(word) {
 
 
 const db = admin.firestore();
+const MODERATION_THRESHOLD = 0.8;
+const MODERATION_ENDPOINT =
+  "https://ai-moderation-376071505252.asia-southeast1.run.app/moderate";
+const LINK_PATTERN = /(?:https?:\/\/|www\.)\S+/i;
+const PHONE_PATTERN = /(?:\+?\d[\d .-]{8,}\d)/;
+
+const DANGEROUS_KEYWORDS = {
+  sexual: [
+    // bộ phận sinh dục (rõ ràng)
+    "lồn",
+    "buồi",
+    "cặc",
+    "dương vật",
+    "âm đạo",
+    "địt",
+    "đụ",
+    "đéo",
+
+    // hành vi tình dục trực tiếp
+    "làm tình",
+    "chịch",
+    "xxx",
+    "sex",
+
+    // khiêu dâm nặng
+    "sục",
+    "bú",
+    "liếm",
+    "nứng",
+    "thủ dâm",
+
+    // lách luật phổ biến
+    "l.ồ.n",
+    "b.u.o.i",
+    "c.a.c",
+    "d.i.t",
+    "đj.t",
+    "đụ nhau"
+  ],
+
+  hate_or_threat: [
+    // đe dọa giết / gây thương tích
+    "giết",
+    "chém",
+    "đâm",
+    "đốt nhà",
+    "đập chết",
+    "xử mày",
+    "cho mày chết",
+    "đồ súc sinh",
+    "mày liệu hồn",
+    "ra đường coi chừng",
+  ],
+
+  grooming: [
+    // gợi ý dụ dỗ / tiếp cận trẻ vị thành niên
+  ],
+};
+
 
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
@@ -455,6 +515,413 @@ exports.validateWordChainDictionary = onDocumentUpdated(
       "minigames.wordChain.updatedAt":
         admin.firestore.FieldValue.serverTimestamp(),
     });
+  }
+);
+
+// =========================
+// CHAT MODERATION (tempChats)
+// =========================
+function isNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function normalizeModerationText(value) {
+  if (typeof value !== "string") return "";
+  return value.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function containsKeyword(normalizedText, keywords) {
+  if (typeof normalizedText !== "string" || !normalizedText) return false;
+  if (!Array.isArray(keywords) || keywords.length === 0) return false;
+
+  return keywords.some((keyword) => {
+    return typeof keyword === "string" &&
+      keyword.length > 0 &&
+      normalizedText.includes(keyword);
+  });
+}
+
+function normalizeParticipants(participants, userA, userB) {
+  const normalized = [];
+
+  if (Array.isArray(participants)) {
+    for (const uid of participants) {
+      if (typeof uid !== "string") continue;
+      const trimmed = uid.trim();
+      if (!trimmed || normalized.includes(trimmed)) continue;
+      normalized.push(trimmed);
+    }
+  }
+
+  for (const uid of [userA, userB]) {
+    if (typeof uid !== "string") continue;
+    const trimmed = uid.trim();
+    if (!trimmed || normalized.includes(trimmed)) continue;
+    normalized.push(trimmed);
+  }
+
+  return normalized;
+}
+
+function normalizeViolationCountMap(rawMap, participants) {
+  const map = {};
+
+  if (rawMap && typeof rawMap === "object" && !Array.isArray(rawMap)) {
+    for (const [uid, value] of Object.entries(rawMap)) {
+      if (typeof uid !== "string" || !uid.trim()) continue;
+      const parsed = Number(value);
+      map[uid] = Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
+    }
+  }
+
+  for (const uid of participants) {
+    if (!isNumber(map[uid])) {
+      map[uid] = 0;
+    }
+  }
+
+  return map;
+}
+
+function normalizeAiLabel(label) {
+  const raw = normalizeModerationText(label);
+
+  if (
+    raw === "normal" ||
+    raw === "scam" ||
+    raw === "sexual" ||
+    raw === "grooming" ||
+    raw === "hate_or_threat"
+  ) {
+    return raw;
+  }
+
+  if (raw === "hate" || raw === "insult" || raw === "threat") {
+    return "hate_or_threat";
+  }
+
+  return "hate_or_threat";
+}
+
+function parseAiScore(score) {
+  const parsed = Number(score);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function calculatePenalty(violationCount) {
+  if (violationCount <= 1) return 0;
+  if (violationCount === 2) return 2;
+  return Math.pow(2, violationCount - 1);
+}
+
+function ruleCheck(text) {
+  const normalizedText = normalizeModerationText(text);
+
+  if (!normalizedText) {
+    return { isViolation: false, reason: null };
+  }
+
+  if (containsKeyword(normalizedText, DANGEROUS_KEYWORDS.sexual)) {
+    return { isViolation: true, reason: "sexual" };
+  }
+
+  if (containsKeyword(normalizedText, DANGEROUS_KEYWORDS.hate_or_threat)) {
+    return { isViolation: true, reason: "hate_or_threat" };
+  }
+
+  if (containsKeyword(normalizedText, DANGEROUS_KEYWORDS.grooming)) {
+    return { isViolation: true, reason: "grooming" };
+  }
+
+  if (LINK_PATTERN.test(normalizedText) || PHONE_PATTERN.test(normalizedText)) {
+    return { isViolation: true, reason: "scam" };
+  }
+
+  return { isViolation: false, reason: null };
+}
+
+async function callAiModeration(text) {
+  const response = await axios.post(
+    MODERATION_ENDPOINT,
+    { text },
+    { timeout: 10000 }
+  );
+
+  return {
+    label: normalizeAiLabel(response?.data?.label),
+    score: parseAiScore(response?.data?.score),
+  };
+}
+
+exports.ensureTempChatModerationFields = onDocumentCreated(
+  "tempChats/{chatId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const roomData = snap.data() || {};
+    const participants = normalizeParticipants(
+      roomData.participants,
+      roomData.userA,
+      roomData.userB
+    );
+    const violationCount = normalizeViolationCountMap(
+      roomData.violationCount,
+      participants
+    );
+
+    const patch = { violationCount };
+    if (participants.length > 0) {
+      patch.participants = participants;
+    }
+
+    await snap.ref.set(patch, { merge: true });
+  }
+);
+
+exports.ensureUserReputationDefault = onDocumentCreated(
+  "users/{uid}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const userData = snap.data() || {};
+    if (isNumber(userData.reputation)) return;
+
+    await snap.ref.set({ reputation: 100 }, { merge: true });
+  }
+);
+
+exports.moderateTempChatMessage = onDocumentCreated(
+  "tempChats/{chatId}/messages/{msgId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const roomId = event.params.chatId;
+    const messageId = event.params.msgId;
+    const message = snap.data() || {};
+
+    try {
+
+    // System/event message is not user-generated chat content.
+    if (message.type === "system" || message.systemCode || message.event) {
+      return;
+    }
+
+    const senderId =
+      typeof message.senderId === "string" ? message.senderId.trim() : "";
+    const text = typeof message.text === "string" ? message.text : "";
+
+    if (!senderId) return;
+
+    // Ignore already-processed message in case of retry/duplicate trigger.
+    if (typeof message.status === "string" && message.status !== "pending") {
+      return;
+    }
+
+    if (!text.trim()) {
+      await snap.ref.set(
+        {
+          status: "approved",
+          blockedBy: null,
+          reason: null,
+          warning: false,
+          aiScore: null,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    const ruleResult = ruleCheck(text);
+    if (ruleResult.isViolation) {
+      await snap.ref.set(
+        {
+          status: "blocked",
+          blockedBy: "rule",
+          reason: ruleResult.reason,
+          warning: true,
+          aiScore: null,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    let aiResult;
+    try {
+      aiResult = await callAiModeration(text);
+    } catch (error) {
+      console.error("AI moderation failed; fallback to approve:", {
+        roomId,
+        messageId,
+        error: error?.message || String(error),
+      });
+
+      await snap.ref.set(
+        {
+          status: "approved",
+          blockedBy: null,
+          reason: null,
+          warning: false,
+          aiScore: null,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    const aiLabel = aiResult.label;
+    const aiScore = aiResult.score;
+
+    // label normal OR score < 0.8 => approve, no punishment
+    if (aiLabel === "normal" || aiScore < MODERATION_THRESHOLD) {
+      await snap.ref.set(
+        {
+          status: "approved",
+          blockedBy: null,
+          reason: null,
+          warning: false,
+          aiScore,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    // score >= 0.8 + scam => warning only, no punishment
+    if (aiLabel === "scam") {
+      await snap.ref.set(
+        {
+          status: "approved",
+          blockedBy: null,
+          reason: "scam",
+          warning: true,
+          aiScore,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    // score >= 0.8 + non-scam harmful label => block + penalty policy
+    const roomRef = db.collection("tempChats").doc(roomId);
+    const userRef = db.collection("users").doc(senderId);
+
+    await db.runTransaction(async (tx) => {
+      const [latestMsgSnap, roomSnap, userSnap] = await Promise.all([
+        tx.get(snap.ref),
+        tx.get(roomRef),
+        tx.get(userRef),
+      ]);
+
+      if (!latestMsgSnap.exists) return;
+
+      const latestMsg = latestMsgSnap.data() || {};
+      if (
+        typeof latestMsg.status === "string" &&
+        latestMsg.status !== "pending"
+      ) {
+        return;
+      }
+
+      const roomData = roomSnap.exists ? roomSnap.data() : {};
+      const participants = normalizeParticipants(
+        roomData?.participants,
+        roomData?.userA,
+        roomData?.userB
+      );
+      const violationCount = normalizeViolationCountMap(
+        roomData?.violationCount,
+        participants
+      );
+
+      const previousCount = isNumber(violationCount[senderId])
+        ? violationCount[senderId]
+        : 0;
+      const nextCount = previousCount + 1;
+      violationCount[senderId] = nextCount;
+
+      const roomPatch = { violationCount };
+      if (participants.length > 0) {
+        roomPatch.participants = participants;
+      }
+      tx.set(roomRef, roomPatch, { merge: true });
+
+      const penalty = calculatePenalty(nextCount);
+
+      if (penalty > 0) {
+        const userData = userSnap.exists ? userSnap.data() : {};
+        const currentReputation = isNumber(userData?.reputation)
+          ? userData.reputation
+          : 100;
+        const nextReputation = Math.max(0, currentReputation - penalty);
+
+        const userPatch = { reputation: nextReputation };
+
+        // Keep legacy score field synced if it already exists in this project.
+        if (isNumber(userData?.reputationScore)) {
+          userPatch.reputationScore = Math.max(
+            0,
+            userData.reputationScore - penalty
+          );
+        }
+
+        tx.set(userRef, userPatch, { merge: true });
+      } else if (!userSnap.exists || !isNumber(userSnap.data()?.reputation)) {
+        tx.set(userRef, { reputation: 100 }, { merge: true });
+      }
+
+      tx.set(
+        snap.ref,
+        {
+          status: "blocked",
+          blockedBy: "ai",
+          reason: aiLabel,
+          warning: true,
+          aiScore,
+        },
+        { merge: true }
+      );
+    });
+    } catch (error) {
+      console.error("Temp chat moderation crashed; fallback approve:", {
+        roomId,
+        messageId,
+        error: error?.message || String(error),
+      });
+
+      try {
+        const latestMsgSnap = await snap.ref.get();
+        if (!latestMsgSnap.exists) return;
+
+        const latestMsg = latestMsgSnap.data() || {};
+        if (
+          typeof latestMsg.status === "string" &&
+          latestMsg.status !== "pending"
+        ) {
+          return;
+        }
+
+        await snap.ref.set(
+          {
+            status: "approved",
+            blockedBy: null,
+            reason: null,
+            warning: false,
+            aiScore: null,
+          },
+          { merge: true }
+        );
+      } catch (fallbackError) {
+        console.error("Fallback approve failed:", {
+          roomId,
+          messageId,
+          error: fallbackError?.message || String(fallbackError),
+        });
+      }
+    }
   }
 );
 

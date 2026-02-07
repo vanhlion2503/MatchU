@@ -26,6 +26,9 @@ class _MessagesListState extends State<MessagesList> {
   // ✅ Lưu bubbleKeys để không bị tạo lại mỗi lần rebuild
   final Map<String, GlobalKey> _bubbleKeys = {};
   final Set<String> _systemSnackbarShown = {};
+  final Set<String> _blockedAlertShown = {};
+  final Map<String, String> _messageStatusCache = {};
+  bool _didInitStatusCache = false;
 
   void _cleanupBubbleKeys(Set<String> aliveIds) {
     _bubbleKeys.removeWhere((key, _) => !aliveIds.contains(key));
@@ -33,6 +36,14 @@ class _MessagesListState extends State<MessagesList> {
 
   void _cleanupSnackbarIds(Set<String> aliveIds) {
     _systemSnackbarShown.removeWhere((id) => !aliveIds.contains(id));
+  }
+
+  void _cleanupBlockedAlertIds(Set<String> aliveIds) {
+    _blockedAlertShown.removeWhere((id) => !aliveIds.contains(id));
+  }
+
+  void _cleanupMessageStatus(Set<String> aliveIds) {
+    _messageStatusCache.removeWhere((id, _) => !aliveIds.contains(id));
   }
 
   void _showSystemSnackbarOnce(String messageId, String message) {
@@ -51,6 +62,35 @@ class _MessagesListState extends State<MessagesList> {
     });
   }
 
+  void _showBlockedAlertOnce(String messageId) {
+    if (_blockedAlertShown.contains(messageId)) return;
+    _blockedAlertShown.add(messageId);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      Get.dialog<void>(
+        AlertDialog(
+          title: const Text("Cảnh báo"),
+          content: const Text("Tin nhắn của bạn vi phạm nguyên tắc cộng đồng."),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back<void>(),
+              child: const Text("Đã hiểu"),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  bool _canShowMessage(Map<String, dynamic> data, String uid) {
+    final senderId = data["senderId"]?.toString();
+    final status = (data["status"] ?? "approved").toString();
+    if (status == "approved") return true;
+    if (senderId != uid) return false;
+    return status == "pending" || status == "blocked";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,261 +99,323 @@ class _MessagesListState extends State<MessagesList> {
     final controller = widget.controller;
     final roomId = widget.roomId;
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection("tempChats")
-          .doc(roomId)
-          .collection("messages")
-          .orderBy("createdAt")
-          .snapshots(),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance
+              .collection("tempChats")
+              .doc(roomId)
+              .collection("messages")
+              .orderBy("createdAt")
+              .snapshots(),
       builder: (context, snap) {
         // Auto scroll khi có tin nhắn mới
         if (snap.hasData) {
-          final docs = snap.data!.docs;
+          final docs =
+              snap.data!.docs
+                  .where((doc) => _canShowMessage(doc.data(), uid))
+                  .toList();
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            controller.onNewMessages(
-              docs.length,
-              docs.cast<QueryDocumentSnapshot<Map<String, dynamic>>>(),
-            );
+            controller.onNewMessages(docs.length, docs);
           });
         }
 
         if (!snap.hasData) return const SizedBox();
 
-        final docs = snap.data!.docs;
+        final allDocs = snap.data!.docs;
+        final docs =
+            allDocs.where((doc) => _canShowMessage(doc.data(), uid)).toList();
 
-        final aliveIds = docs.map((e) => e.id).toSet();
+        for (final doc in allDocs) {
+          final data = doc.data();
+          final status = (data["status"] ?? "approved").toString();
+          final senderId = data["senderId"]?.toString();
+          final previous = _messageStatusCache[doc.id];
+
+          if (_didInitStatusCache &&
+              senderId == uid &&
+              status == "blocked" &&
+              previous != "blocked") {
+            _showBlockedAlertOnce(doc.id);
+          }
+
+          _messageStatusCache[doc.id] = status;
+        }
+
+        final aliveIds = allDocs.map((e) => e.id).toSet();
         controller.cleanupMessageKeys(aliveIds);
         _cleanupBubbleKeys(aliveIds);
         _cleanupSnackbarIds(aliveIds);
+        _cleanupBlockedAlertIds(aliveIds);
+        _cleanupMessageStatus(aliveIds);
+        _didInitStatusCache = true;
 
         return ListView.builder(
           controller: controller.scrollController,
           padding: const EdgeInsets.all(16),
           itemCount: docs.length + 2,
           itemBuilder: (_, i) {
-          // ================= HEADER =================
-          if (i == 0) {
-            return Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: theme.brightness == Brightness.dark
-                        ? AppTheme.darkBorder
-                        : AppTheme.lightBorder,
+            // ================= HEADER =================
+            if (i == 0) {
+              return Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color:
+                          theme.brightness == Brightness.dark
+                              ? AppTheme.darkBorder
+                              : AppTheme.lightBorder,
+                    ),
+                  ),
+                  child: Text(
+                    "Bắt đầu cuộc trò chuyện",
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                child: Text(
-                  "Bắt đầu cuộc trò chuyện",
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            );
-          }
-
-          // ================= TYPING BUBBLE (CUỐI LIST) =================
-          if (i == docs.length + 1) {
-            return Obx(() {
-              return MessengerTypingBubbleTemp(
-                show: controller.otherTyping.value,
-                controller: controller,
-              );
-            });
-          }
-
-          // ================= MESSAGE =================
-          final index = i - 1;
-          if (index < 0 || index >= docs.length) {
-            return const SizedBox();
-          }
-
-          final doc = docs[index];
-          final data = doc.data() as Map<String, dynamic>;
-          final messageType = data["type"] ?? "text";
-
-
-          // ================= SYSTEM MESSAGE =================
-          if (messageType == "system") {
-            final code = data["systemCode"];
-            final senderId = data["senderId"];
-            final targetUid = data["targetUid"];
-
-            if (code == "like" && targetUid != uid) {
-              return const SizedBox();
-            }
-
-            if (code == "telepathy_cancelled" && targetUid != uid) {
-              return const SizedBox();
-            }
-
-            if (code == "word_chain_exit" &&
-                targetUid != null &&
-                targetUid != uid) {
-              return const SizedBox();
-            }
-
-            if (code == "ended" && senderId == uid) {
-              return const SizedBox();
-            }
-
-            if (code == "word_chain_exit") {
-              _showSystemSnackbarOnce(doc.id, data["text"] ?? "");
-            }
-
-            if (code == "word_chain_reward") {
-              return _buildWordChainRewardBubbles(
-                data: data,
-                currentUid: uid,
-                controller: controller,
-                messageId: doc.id,
               );
             }
 
-            Color? backgroundColor;
-            Color? textColor;
-
-            if (code == "telepathy_cancelled") {
-              backgroundColor = theme.colorScheme.surfaceVariant;
-              textColor = theme.colorScheme.onSurfaceVariant;
-            } else if (code == "telepathy_hook") {
-              backgroundColor = theme.colorScheme.primary.withOpacity(0.12);
-              textColor = theme.colorScheme.primary;
+            // ================= TYPING BUBBLE (CUỐI LIST) =================
+            if (i == docs.length + 1) {
+              return Obx(() {
+                return MessengerTypingBubbleTemp(
+                  show: controller.otherTyping.value,
+                  controller: controller,
+                );
+              });
             }
 
-            return SystemMessageEvent(
-              text: data["text"] ?? "",
-              backgroundColor: backgroundColor,
-              textColor: textColor,
+            // ================= MESSAGE =================
+            final index = i - 1;
+            if (index < 0 || index >= docs.length) {
+              return const SizedBox();
+            }
+
+            final doc = docs[index];
+            final data = doc.data();
+            final messageType = data["type"] ?? "text";
+            final status = (data["status"] ?? "approved").toString();
+            final reason = data["reason"]?.toString();
+            final warning = data["warning"] == true;
+
+            // ================= SYSTEM MESSAGE =================
+            if (messageType == "system") {
+              final code = data["systemCode"];
+              final senderId = data["senderId"];
+              final targetUid = data["targetUid"];
+
+              if (code == "like" && targetUid != uid) {
+                return const SizedBox();
+              }
+
+              if (code == "telepathy_cancelled" && targetUid != uid) {
+                return const SizedBox();
+              }
+
+              if (code == "word_chain_exit" &&
+                  targetUid != null &&
+                  targetUid != uid) {
+                return const SizedBox();
+              }
+
+              if (code == "ended" && senderId == uid) {
+                return const SizedBox();
+              }
+
+              if (code == "word_chain_exit") {
+                _showSystemSnackbarOnce(doc.id, data["text"] ?? "");
+              }
+
+              if (code == "word_chain_reward") {
+                return _buildWordChainRewardBubbles(
+                  data: data,
+                  currentUid: uid,
+                  controller: controller,
+                  messageId: doc.id,
+                );
+              }
+
+              Color? backgroundColor;
+              Color? textColor;
+
+              if (code == "telepathy_cancelled") {
+                backgroundColor = theme.colorScheme.surfaceContainerHighest;
+                textColor = theme.colorScheme.onSurfaceVariant;
+              } else if (code == "telepathy_hook") {
+                backgroundColor = theme.colorScheme.primary.withValues(
+                  alpha: 0.12,
+                );
+                textColor = theme.colorScheme.primary;
+              }
+
+              return SystemMessageEvent(
+                text: data["text"] ?? "",
+                backgroundColor: backgroundColor,
+                textColor: textColor,
+              );
+            }
+
+            // ================= TEXT MESSAGE =================
+            final isMe = data["senderId"] == uid;
+            final isPending = status == "pending";
+            final isBlocked = status == "blocked";
+            final isScamWarning =
+                status == "approved" && warning && reason == "scam";
+            final canInteract = status == "approved";
+            final displayText =
+                isBlocked
+                    ? "Tin nhắn này vi phạm nguyên tắc cộng đồng"
+                    : (data["text"] ?? "");
+
+            final grouped = _shouldGroup(docs, index);
+            final showTime = _isLastInGroup(docs, index);
+
+            final key = controller.messageKeys.putIfAbsent(
+              doc.id,
+              () => GlobalKey(),
             );
-          }
 
-          // ================= TEXT MESSAGE =================
-          final isMe = data["senderId"] == uid;
+            // ✅ Lưu bubbleKey để show reaction picker
+            final bubbleKey = _bubbleKeys.putIfAbsent(
+              doc.id,
+              () => GlobalKey(),
+            );
 
-          final grouped = _shouldGroup(docs, index);
-          final showTime = _isLastInGroup(docs, index);
-          
-          final key = controller.messageKeys.putIfAbsent(
-            doc.id,
-            () => GlobalKey(),
-          );
+            double dragDx = 0;
 
-          // ✅ Lưu bubbleKey để show reaction picker
-          final bubbleKey = _bubbleKeys.putIfAbsent(
-            doc.id,
-            () => GlobalKey(),
-          );
+            return Container(
+              key: key,
+              child: AnimatedMessageBubble(
+                child: StatefulBuilder(
+                  builder: (context, setState) {
+                    return GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        if (isMe || !canInteract) return;
 
-          double dragDx = 0;
+                        dragDx += details.delta.dx;
+                        dragDx = dragDx.clamp(0, 80);
 
-          return Container(
-            key: key,
-            child: AnimatedMessageBubble(
-              child: StatefulBuilder(
-                builder: (context, setState) {
-                  return GestureDetector(
-                    onHorizontalDragUpdate: (details) {
-                      if (isMe) return;
+                        setState(() {});
+                      },
+                      onHorizontalDragEnd: (_) {
+                        if (canInteract && dragDx > 32) {
+                          HapticFeedback.lightImpact();
+                          controller.startReply({
+                            "id": doc.id,
+                            "text": data["text"],
+                          });
+                        }
 
-                      dragDx += details.delta.dx;
-                      dragDx = dragDx.clamp(0, 80);
-
-                      setState(() {});
-                    },
-                    onHorizontalDragEnd: (_) {
-                      if (dragDx > 32) {
-                        HapticFeedback.lightImpact();
-                        controller.startReply({
-                          "id": doc.id,
-                          "text": data["text"],
-                        });
-                      }
-
-                      setState(() => dragDx = 0);
-                    },
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        // 🔄 ICON REPLY – TRƯỢT THEO TAY
-                        Positioned(
-                          left: 12 + dragDx * 0.5,
-                          child: Opacity(
-                            opacity: (dragDx / 40).clamp(0, 1),
-                            child: Icon(
-                              Icons.reply,
-                              color: theme.colorScheme.primary,
-                              size: 22,
+                        setState(() => dragDx = 0);
+                      },
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          // 🔄 ICON REPLY – TRƯỢT THEO TAY
+                          Positioned(
+                            left: 12 + dragDx * 0.5,
+                            child: Opacity(
+                              opacity: (dragDx / 40).clamp(0, 1),
+                              child: Icon(
+                                Icons.reply,
+                                color: theme.colorScheme.primary,
+                                size: 22,
+                              ),
                             ),
                           ),
-                        ),
 
-                        // 💬 BUBBLE – TRƯỢT + MỜ THEO LỰC
-                        Transform.translate(
-                          offset: Offset(dragDx, 0),
-                          child: Opacity(
-                            opacity: (1 - dragDx / 120).clamp(0.7, 1),
-                            child: Obx(() {
-                              final reactions = Map<String, String>.from(data["reactions"] ?? {});
-                              
-                              return ChatRow(
-                                text: data["text"] ?? "",
-                                type: messageType,
-                                replyText: data["replyText"],
-                                replyToId: data["replyToId"],
-                                isMe: isMe,
-                                showAvatar: showTime && !isMe,
-                                smallMargin: grouped,
-                                showTime: showTime,
-                                time: _formatTime(data["createdAt"]),
-                                onTapReply: data["replyToId"] != null
-                                    ? () => controller.scrollToMessage(data["replyToId"])
-                                    : null,
-                                messageId: doc.id,
-                                highlighted: controller.highlightedMessageId.value == doc.id,
-                                anonymousAvatarKey: isMe? null: controller.otherAnonymousAvatar.value,
-                                reactions: reactions.isNotEmpty ? reactions : null,
-                                bubbleKey: bubbleKey,
-                                // ❤️ DOUBLE TAP = LOVE
-                                onDoubleTap: () {
-                                  if (reactions[uid] == "love") return;
-                                  controller.onReactMessage(
-                                    messageId: doc.id,
-                                    reactionId: "love",
-                                  );
-                                },
-                                onLongPress: () {
-                                  _showReactionPicker(
-                                    context: context,
-                                    controller: controller,
-                                    messageId: doc.id,
-                                    bubbleKey: bubbleKey,
-                                    isMe: isMe,
-                                  );
-                                },
-                              );
-                            }),
+                          // 💬 BUBBLE – TRƯỢT + MỜ THEO LỰC
+                          Transform.translate(
+                            offset: Offset(dragDx, 0),
+                            child: Opacity(
+                              opacity: (1 - dragDx / 120).clamp(0.7, 1),
+                              child: Obx(() {
+                                final reactions =
+                                    canInteract
+                                        ? Map<String, String>.from(
+                                          data["reactions"] ?? {},
+                                        )
+                                        : <String, String>{};
+
+                                return ChatRow(
+                                  text: displayText,
+                                  type: isBlocked ? "text" : messageType,
+                                  replyText:
+                                      canInteract ? data["replyText"] : null,
+                                  replyToId:
+                                      canInteract ? data["replyToId"] : null,
+                                  isMe: isMe,
+                                  showAvatar: showTime && !isMe,
+                                  smallMargin: grouped,
+                                  showTime: showTime,
+                                  time: _formatTime(data["createdAt"]),
+                                  isBlocked: isBlocked,
+                                  isPending: isPending,
+                                  scamWarning: isScamWarning,
+                                  onTapReply:
+                                      canInteract && data["replyToId"] != null
+                                          ? () => controller.scrollToMessage(
+                                            data["replyToId"],
+                                          )
+                                          : null,
+                                  messageId: doc.id,
+                                  highlighted:
+                                      controller.highlightedMessageId.value ==
+                                      doc.id,
+                                  anonymousAvatarKey:
+                                      isMe
+                                          ? null
+                                          : controller
+                                              .otherAnonymousAvatar
+                                              .value,
+                                  reactions:
+                                      reactions.isNotEmpty ? reactions : null,
+                                  bubbleKey: bubbleKey,
+                                  // ❤️ DOUBLE TAP = LOVE
+                                  onDoubleTap:
+                                      canInteract
+                                          ? () {
+                                            if (reactions[uid] == "love") {
+                                              return;
+                                            }
+                                            controller.onReactMessage(
+                                              messageId: doc.id,
+                                              reactionId: "love",
+                                            );
+                                          }
+                                          : null,
+                                  onLongPress:
+                                      canInteract
+                                          ? () {
+                                            _showReactionPicker(
+                                              context: context,
+                                              controller: controller,
+                                              messageId: doc.id,
+                                              bubbleKey: bubbleKey,
+                                              isMe: isMe,
+                                            );
+                                          }
+                                          : null,
+                                );
+                              }),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          );
-
-
-        },
-
+            );
+          },
         );
       },
     );
@@ -327,29 +429,35 @@ class _MessagesListState extends State<MessagesList> {
     return null;
   }
 
-  bool _shouldGroup(List docs, int index) {
-  if (index == 0) return false;
+  bool _shouldGroup(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    int index,
+  ) {
+    if (index == 0) return false;
 
-  final prev = docs[index - 1];
-  final curr = docs[index];
+    final prev = docs[index - 1].data();
+    final curr = docs[index].data();
 
-  // ✅ CÙNG NGƯỜI GỬI
-  if (prev["senderId"] != curr["senderId"]) return false;
+    // ✅ CÙNG NGƯỜI GỬI
+    if (prev["senderId"] != curr["senderId"]) return false;
 
-  final prevTime = _getTime(prev["createdAt"]);
-  final currTime = _getTime(curr["createdAt"]);
+    final prevTime = _getTime(prev["createdAt"]);
+    final currTime = _getTime(curr["createdAt"]);
 
-  if (prevTime == null || currTime == null) return false;
+    if (prevTime == null || currTime == null) return false;
 
-  // ✅ < 2 PHÚT → GROUP
-  return currTime.difference(prevTime).inMinutes < 2;
-}
+    // ✅ < 2 PHÚT → GROUP
+    return currTime.difference(prevTime).inMinutes < 2;
+  }
 
-  bool _isLastInGroup(List docs, int index) {
+  bool _isLastInGroup(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    int index,
+  ) {
     if (index == docs.length - 1) return true;
 
-    final curr = docs[index];
-    final next = docs[index + 1];
+    final curr = docs[index].data();
+    final next = docs[index + 1].data();
 
     if (curr["senderId"] != next["senderId"]) return true;
 
@@ -360,7 +468,6 @@ class _MessagesListState extends State<MessagesList> {
 
     return nextTime.difference(currTime).inMinutes >= 2;
   }
-
 
   String _formatTime(dynamic value) {
     final dt = _getTime(value);
@@ -432,8 +539,7 @@ class _MessagesListState extends State<MessagesList> {
     // Nếu đang mở → đóng cái cũ
     _reactionEntry?.remove();
 
-    final box =
-        bubbleKey.currentContext!.findRenderObject() as RenderBox;
+    final box = bubbleKey.currentContext!.findRenderObject() as RenderBox;
     final pos = box.localToGlobal(Offset.zero);
     final size = box.size;
 
@@ -441,41 +547,40 @@ class _MessagesListState extends State<MessagesList> {
     const pickerHeight = 40.0;
     const verticalGap = 10.0;
 
-    final left = isMe
-        ? pos.dx + size.width - pickerWidth
-        : pos.dx;
+    final left = isMe ? pos.dx + size.width - pickerWidth : pos.dx;
 
     final top = pos.dy - pickerHeight - verticalGap;
 
     _reactionEntry = OverlayEntry(
-      builder: (_) => GestureDetector(
-        behavior: HitTestBehavior.translucent, // 👈 BẮT BUỘC
-        onTap: () {
-          _reactionEntry?.remove();
-          _reactionEntry = null;
-        },
-        child: Stack(
-          children: [
-            Positioned(
-              left: left.clamp(
-                8.0,
-                MediaQuery.of(context).size.width - pickerWidth - 8,
-              ),
-              top: top,
-              child: ReactionPicker(
-                onSelect: (reactionId) {
-                  controller.onReactMessage(
-                    messageId: messageId,
-                    reactionId: reactionId,
-                  );
-                  _reactionEntry?.remove();
-                  _reactionEntry = null;
-                },
-              ),
+      builder:
+          (_) => GestureDetector(
+            behavior: HitTestBehavior.translucent, // 👈 BẮT BUỘC
+            onTap: () {
+              _reactionEntry?.remove();
+              _reactionEntry = null;
+            },
+            child: Stack(
+              children: [
+                Positioned(
+                  left: left.clamp(
+                    8.0,
+                    MediaQuery.of(context).size.width - pickerWidth - 8,
+                  ),
+                  top: top,
+                  child: ReactionPicker(
+                    onSelect: (reactionId) {
+                      controller.onReactMessage(
+                        messageId: messageId,
+                        reactionId: reactionId,
+                      );
+                      _reactionEntry?.remove();
+                      _reactionEntry = null;
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
 
     Overlay.of(context).insert(_reactionEntry!);

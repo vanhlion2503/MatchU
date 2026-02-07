@@ -1,38 +1,45 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import "package:cloud_firestore/cloud_firestore.dart";
 
 class TempMessageModel {
   final String senderId;
   final String text;
-  final String type; // 👈 text | emoji
+  final String type; // text | emoji
   final String? replyToId;
   final String? replyText;
+  final String status;
 
   TempMessageModel({
     required this.senderId,
     required this.text,
-    this.type = "text", // 👈 mặc định
+    this.type = "text",
     this.replyToId,
     this.replyText,
+    this.status = "pending",
   });
 
-  /// 🔥 GỬI LÊN FIRESTORE
+  // Create payload for temp chat user message.
   Map<String, dynamic> toJson() => {
-        "senderId": senderId,
-        "text": text,
-        "type": type, // 👈 QUAN TRỌNG
-        "replyToId": replyToId,
-        "replyText": replyText,
-        "createdAt": FieldValue.serverTimestamp(),
-      };
+    "senderId": senderId,
+    "text": text,
+    "type": type,
+    "replyToId": replyToId,
+    "replyText": replyText,
+    "status": status,
+    "blockedBy": null,
+    "reason": null,
+    "warning": false,
+    "aiScore": null,
+    "createdAt": FieldValue.serverTimestamp(),
+  };
 
-  /// 🔥 ĐỌC TỪ FIRESTORE
   factory TempMessageModel.fromJson(Map<String, dynamic> json) {
     return TempMessageModel(
       senderId: json["senderId"],
       text: json["text"] ?? "",
-      type: json["type"] ?? "text", // 👈 fallback
+      type: json["type"] ?? "text",
       replyToId: json["replyToId"],
       replyText: json["replyText"],
+      status: json["status"] ?? "pending",
     );
   }
 }

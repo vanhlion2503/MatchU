@@ -21,6 +21,9 @@ class ChatRow extends StatelessWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
   final GlobalKey? bubbleKey;
+  final bool isBlocked;
+  final bool isPending;
+  final bool scamWarning;
 
   const ChatRow({
     super.key,
@@ -41,44 +44,107 @@ class ChatRow extends StatelessWidget {
     this.onLongPress,
     this.onDoubleTap,
     this.bubbleKey,
+    this.isBlocked = false,
+    this.isPending = false,
+    this.scamWarning = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final baseBubbleColor =
+        isBlocked
+            ? theme.colorScheme.errorContainer
+            : isMe
+            ? theme.colorScheme.primary
+            : Theme.of(context).brightness == Brightness.dark
+            ? theme.colorScheme.surface
+            : const Color.fromARGB(255, 244, 246, 248);
     final bubbleColor =
-        isMe ? theme.colorScheme.primary : Theme.of(context).brightness == Brightness.dark 
-                                            ? theme.colorScheme.surface
-                                            : Color.fromARGB(255, 244, 246, 248);
-    final textColor = isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
-      
+        isPending ? baseBubbleColor.withValues(alpha: 0.72) : baseBubbleColor;
+    final textColor =
+        isBlocked
+            ? theme.colorScheme.onErrorContainer
+            : isMe
+            ? theme.colorScheme.onPrimary
+            : theme.colorScheme.onSurface;
+
     // ================= EMOJI ONLY =================
     if (type == "emoji") {
       return Padding(
         padding: EdgeInsets.only(top: smallMargin ? 2 : 10),
-        child: Row(
-          mainAxisAlignment:
-              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            if (!isMe)
-              SizedBox(
-                width: 36,
-                child: showAvatar ? AnonymousAvatar(avatarKey: anonymousAvatarKey, radius: 16,): const SizedBox(),
-              ),
-            if (!isMe) const SizedBox(width: 6),
-
-            AnimatedEmoji(
-              text: text,
-              highlighted: highlighted,
-              isMe: isMe,
+            Row(
+              mainAxisAlignment:
+                  isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (!isMe)
+                  SizedBox(
+                    width: 36,
+                    child:
+                        showAvatar
+                            ? AnonymousAvatar(
+                              avatarKey: anonymousAvatarKey,
+                              radius: 16,
+                            )
+                            : const SizedBox(),
+                  ),
+                if (!isMe) const SizedBox(width: 6),
+                AnimatedEmoji(text: text, highlighted: highlighted, isMe: isMe),
+              ],
             ),
+            if ((showTime && time.isNotEmpty) || isPending || scamWarning)
+              Padding(
+                padding: EdgeInsets.only(top: 4, left: isMe ? 0 : 42),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (showTime && time.isNotEmpty)
+                      Text(
+                        time,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    if (isPending)
+                      Text(
+                        "Đang gửi...",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    if (scamWarning)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "scam",
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onTertiaryContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
       );
     }
-
 
     // ================= TEXT MESSAGE=================
 
@@ -86,12 +152,19 @@ class ChatRow extends StatelessWidget {
       padding: EdgeInsets.only(top: smallMargin ? 2 : 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!isMe)
             SizedBox(
               width: 36,
-              child: showAvatar ? AnonymousAvatar(avatarKey: anonymousAvatarKey, radius: 16,) : const SizedBox(),
+              child:
+                  showAvatar
+                      ? AnonymousAvatar(
+                        avatarKey: anonymousAvatarKey,
+                        radius: 16,
+                      )
+                      : const SizedBox(),
             ),
           const SizedBox(width: 6),
           Flexible(
@@ -102,10 +175,12 @@ class ChatRow extends StatelessWidget {
                     maxWidth: constraints.maxWidth * 0.65, // 👈 60%
                   ),
                   child: Column(
-                    crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      
                       // ===== REPLY PREVIEW (TÁCH RIÊNG) =====
                       if (replyText != null && replyToId != null)
                         GestureDetector(
@@ -116,9 +191,16 @@ class ChatRow extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark 
-                                              ? theme.colorScheme.surface
-                                              : Color.fromARGB(255, 244, 246, 248).withOpacity(0.8),
+                              color:
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? theme.colorScheme.surface
+                                      : Color.fromARGB(
+                                        255,
+                                        244,
+                                        246,
+                                        248,
+                                      ).withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(10),
                               border: Border(
                                 left: BorderSide(
@@ -154,18 +236,26 @@ class ChatRow extends StatelessWidget {
                                 curve: Curves.easeOutCubic,
                                 builder: (context, value, child) {
                                   // 🔥 rung rất nhẹ ±2px
-                                  final shake = highlighted
-                                      ? (value < 0.5 ? value : (1 - value)) * 4
-                                      : 0;
+                                  final shake =
+                                      highlighted
+                                          ? (value < 0.5
+                                                  ? value
+                                                  : (1 - value)) *
+                                              4
+                                          : 0;
 
                                   return Transform.translate(
                                     offset: Offset(shake * (isMe ? -1 : 1), 0),
                                     child: AnimatedScale(
                                       scale: highlighted ? 1.04 : 1.0,
-                                      duration: const Duration(milliseconds: 220),
+                                      duration: const Duration(
+                                        milliseconds: 220,
+                                      ),
                                       curve: Curves.easeOutBack,
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 320),
+                                        duration: const Duration(
+                                          milliseconds: 320,
+                                        ),
                                         curve: Curves.easeOutCubic,
                                         padding: const EdgeInsets.all(14),
                                         decoration: BoxDecoration(
@@ -174,19 +264,30 @@ class ChatRow extends StatelessWidget {
                                             topLeft: const Radius.circular(16),
                                             topRight: const Radius.circular(16),
                                             bottomLeft:
-                                                isMe ? const Radius.circular(16) : const Radius.circular(4),
+                                                isMe
+                                                    ? const Radius.circular(16)
+                                                    : const Radius.circular(4),
                                             bottomRight:
-                                                isMe ? const Radius.circular(4) : const Radius.circular(16),
+                                                isMe
+                                                    ? const Radius.circular(4)
+                                                    : const Radius.circular(16),
                                           ),
-                                          boxShadow: highlighted
-                                              ? [
-                                                  BoxShadow(
-                                                    color: Colors.black.withOpacity(0.14),
-                                                    blurRadius: 18,
-                                                    offset: const Offset(0, 6),
-                                                  ),
-                                                ]
-                                              : [],
+                                          boxShadow:
+                                              highlighted
+                                                  ? [
+                                                    BoxShadow(
+                                                      color: Colors.black
+                                                          .withValues(
+                                                            alpha: 0.14,
+                                                          ),
+                                                      blurRadius: 18,
+                                                      offset: const Offset(
+                                                        0,
+                                                        6,
+                                                      ),
+                                                    ),
+                                                  ]
+                                                  : [],
                                         ),
                                         child: child,
                                       ),
@@ -217,16 +318,54 @@ class ChatRow extends StatelessWidget {
                         ],
                       ),
 
-
-                      // ===== TIME =====
-                      if (showTime && time.isNotEmpty)
+                      // ===== TIME / STATE =====
+                      if ((showTime && time.isNotEmpty) ||
+                          isPending ||
+                          scamWarning)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            time,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
+                          child: Wrap(
+                            alignment:
+                                isMe ? WrapAlignment.end : WrapAlignment.start,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (showTime && time.isNotEmpty)
+                                Text(
+                                  time,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                              if (isPending)
+                                Text(
+                                  "Đang gửi...",
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              if (scamWarning)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.tertiaryContainer,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    "scam",
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color:
+                                          theme.colorScheme.onTertiaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                     ],
@@ -253,10 +392,7 @@ class _MessengerReactionBadge extends StatelessWidget {
   final Map<String, String> reactions;
   final bool isMe;
 
-  const _MessengerReactionBadge({
-    required this.reactions,
-    required this.isMe,
-  });
+  const _MessengerReactionBadge({required this.reactions, required this.isMe});
 
   @override
   Widget build(BuildContext context) {
@@ -264,39 +400,40 @@ class _MessengerReactionBadge extends StatelessWidget {
 
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: grouped.entries.map((e) {
-        final reaction = ReactionRegistry.get(e.key);
-        if (reaction == null) return const SizedBox();
+      children:
+          grouped.entries.map((e) {
+            final reaction = ReactionRegistry.get(e.key);
+            if (reaction == null) return const SizedBox();
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 4,
-                  color: Colors.black.withOpacity(0.15),
-                )
-              ],
-            ),
-            child: Row(
-              children: [
-                reaction.icon,
-                if (e.value > 1) ...[
-                  const SizedBox(width: 2),
-                  Text(
-                    e.value.toString(),
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      }).toList(),
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 4,
+                      color: Colors.black.withValues(alpha: 0.15),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    reaction.icon,
+                    if (e.value > 1) ...[
+                      const SizedBox(width: 2),
+                      Text(
+                        e.value.toString(),
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
     );
   }
 }
