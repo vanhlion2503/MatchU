@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/profile_snap_shot.dart';
 import 'package:matchu_app/services/user/account_service.dart';
+import 'package:matchu_app/utils/profile_input_validator.dart';
 
 enum DobField { day, month, year }
 
@@ -35,10 +36,11 @@ class AccountSettingsController extends GetxController {
 
   Future<void> loadCurrentUser() async {
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .get();
+      final snap =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(FirebaseAuth.instance.currentUser!.uid)
+              .get();
 
       final data = snap.data()!;
 
@@ -76,7 +78,8 @@ class AccountSettingsController extends GetxController {
   void updateBirthdayIfReady() {
     if (selectedDay.value == null ||
         selectedMonth.value == null ||
-        selectedYear.value == null) return;
+        selectedYear.value == null)
+      return;
 
     final d = selectedDay.value!;
     final m = selectedMonth.value!;
@@ -87,29 +90,24 @@ class AccountSettingsController extends GetxController {
       selectedDay.value = lastDay;
     }
 
-    selectedBirthday.value = DateTime(
-      y,
-      m,
-      selectedDay.value!,
-    );
+    selectedBirthday.value = DateTime(y, m, selectedDay.value!);
   }
 
   Future<void> save() async {
-    final fullname = fullnameC.text.trim();
-    final nickname = nicknameC.text.trim();
+    final fullname = ProfileInputValidator.normalizeFullname(fullnameC.text);
+    final nickname = ProfileInputValidator.normalizeNickname(nicknameC.text);
     final gender = selectedGender.value;
     final birthday = selectedBirthday.value;
 
-    if (fullname.isEmpty) {
-      Get.snackbar("Lỗi", "Họ tên không được để trống");
+    final fullnameError = ProfileInputValidator.validateFullname(fullname);
+    if (fullnameError != null) {
+      Get.snackbar("Lỗi", fullnameError);
       return;
     }
 
-    if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(nickname)) {
-      Get.snackbar(
-        "Lỗi",
-        "Nickname chỉ gồm chữ không dấu, số, dấu gạch dưới (_)",
-      );
+    final nicknameError = ProfileInputValidator.validateNickname(nickname);
+    if (nicknameError != null) {
+      Get.snackbar("Lỗi", nicknameError);
       return;
     }
 
@@ -157,3 +155,4 @@ class AccountSettingsController extends GetxController {
     super.onClose();
   }
 }
+

@@ -52,12 +52,13 @@ class UserService {
     if (query.isEmpty) return [];
 
     try {
-      final result = await _db
-          .collection("users")
-          .where("nickname", isGreaterThanOrEqualTo: query)
-          .where("nickname", isLessThan: query + '\uf8ff')
-          .limit(20)
-          .get();
+      final result =
+          await _db
+              .collection("users")
+              .where("nickname", isGreaterThanOrEqualTo: query)
+              .where("nickname", isLessThan: query + '\uf8ff')
+              .limit(20)
+              .get();
 
       return result.docs
           .map((doc) => UserModel.fromJson(doc.data(), doc.id))
@@ -138,13 +139,27 @@ class UserService {
     required double lng,
   }) async {
     await _db.collection("users").doc(uid).set({
-      "location": {
-        "lat": lat,
-        "lng": lng,
-      },
+      "location": {"lat": lat, "lng": lng},
       "updatedAt": FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 
+  Future<void> setNearbyVisibility(
+    bool enabled, {
+    bool clearLocationWhenDisabled = true,
+  }) async {
+    final payload = <String, dynamic>{
+      "nearlyEnabled": enabled,
+      "updatedAt": FieldValue.serverTimestamp(),
+    };
 
+    if (!enabled && clearLocationWhenDisabled) {
+      payload["location"] = {"lat": null, "lng": null};
+    }
+
+    await _db
+        .collection("users")
+        .doc(uid)
+        .set(payload, SetOptions(merge: true));
+  }
 }

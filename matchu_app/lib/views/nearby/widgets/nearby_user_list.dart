@@ -7,10 +7,7 @@ import 'package:matchu_app/views/nearby/widgets/nearby_user_card.dart';
 class NearbyUserList extends StatelessWidget {
   final NearbyController controller;
 
-  const NearbyUserList({
-    super.key,
-    required this.controller,
-  });
+  const NearbyUserList({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +17,14 @@ class NearbyUserList extends StatelessWidget {
     return Obx(() {
       if (controller.isLoading.value) {
         return const Center(child: CircularProgressIndicator());
+      }
+
+      if (!controller.isLocationVisible.value) {
+        return const NearbyEmptyState(
+          icon: Icons.visibility_off_rounded,
+          title: "Ban dang tat hien thi vi tri",
+          subtitle: "Bat lai nut vi tri tren header de xem nguoi gan ban",
+        );
       }
 
       final items = controller.users;
@@ -36,10 +41,10 @@ class NearbyUserList extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 12),
               child: Text(
-                "Tìm thấy ${items.length} người gần bạn",
+                "Tim thay ${items.length} nguoi gan ban",
                 style: textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: colorScheme.onSurface.withOpacity(0.8),
+                  color: colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
               ),
             );

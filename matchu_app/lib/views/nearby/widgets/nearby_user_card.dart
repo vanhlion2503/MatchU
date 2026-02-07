@@ -23,7 +23,7 @@ class NearbyUserCard extends StatelessWidget {
     return Material(
       color: colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
-      elevation: 0,
+      elevation: 2,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {

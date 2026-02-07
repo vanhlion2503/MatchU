@@ -18,9 +18,9 @@ class NearbyView extends GetView<NearbyController> {
         child: Column(
           children: [
             const NearbyHeader(),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             NearbySegmentedControl(controller: controller),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             Expanded(
               child: Obx(() {
                 if (controller.selectedTab.value == 0) {

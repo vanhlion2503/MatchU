@@ -14,9 +14,9 @@ import 'package:matchu_app/services/auth/logout_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/user/avatar_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
+import 'package:matchu_app/utils/profile_input_validator.dart';
 
 enum DobField { day, month, year }
-
 
 class AuthController extends GetxController {
   final AuthService _auth = AuthService();
@@ -35,7 +35,6 @@ class AuthController extends GetxController {
   final RxString selectedGender = ''.obs;
   final _box = GetStorage();
 
-
   // ========= UI STATE =========
   final isPasswordHidden = true.obs;
   final isLoadingRegister = false.obs;
@@ -52,7 +51,6 @@ class AuthController extends GetxController {
   final selectedYear = RxnInt();
   final tempAvatarFile = Rxn<File>();
   final isUploadingAvatar = false.obs;
-
 
   Timer? _emailTimer;
   Timer? _enrollTimer;
@@ -76,7 +74,9 @@ class AuthController extends GetxController {
   void updateBirthdayIfReady() {
     if (selectedDay.value == null ||
         selectedMonth.value == null ||
-        selectedYear.value == null) {return;}
+        selectedYear.value == null) {
+      return;
+    }
 
     final y = selectedYear.value!;
     final m = selectedMonth.value!;
@@ -88,11 +88,7 @@ class AuthController extends GetxController {
       selectedDay.value = lastDayOfMonth;
     }
 
-    final date = DateTime(
-      y,
-      m,
-      selectedDay.value!,
-    );
+    final date = DateTime(y, m, selectedDay.value!);
 
     selectedBirthday.value = date;
     birthdayC.text = DateFormat('dd/MM/yyyy').format(date);
@@ -112,7 +108,7 @@ class AuthController extends GetxController {
   //                      REGISTER ACCOUNT
   // =============================================================
   Future<void> register() async {
-    _box.write('isRegistering', true); 
+    _box.write('isRegistering', true);
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
@@ -145,7 +141,10 @@ class AuthController extends GetxController {
       );
     } on FirebaseAuthException catch (e) {
       isLoadingRegister.value = false;
-      Get.snackbar("Đăng ký thất bại", firebaseErrorToVietnamese(e.code));
+      Get.snackbar(
+        "Đăng ký thất bại",
+        firebaseErrorToVietnamese(e.code),
+      );
     }
   }
 
@@ -221,10 +220,11 @@ class AuthController extends GetxController {
       return;
     }
     // Kiểm tra số điện thoại được dùng tối đa 2 lần
-    final phoneQuery = await _auth.db
-        .collection('users')
-        .where("phonenumber", isEqualTo: phone)
-        .get();
+    final phoneQuery =
+        await _auth.db
+            .collection('users')
+            .where("phonenumber", isEqualTo: phone)
+            .get();
 
     if (phoneQuery.docs.length >= 2) {
       Get.snackbar(
@@ -285,7 +285,7 @@ class AuthController extends GetxController {
 
       await logoutC();
       _box.remove('isRegistering');
-      
+
       Get.snackbar(
         "🎉 Đăng ký thành công",
         "Vui lòng đăng nhập để tiếp tục",
@@ -295,7 +295,6 @@ class AuthController extends GetxController {
         duration: const Duration(seconds: 3),
       );
       Get.offAllNamed('/');
-
     } on FirebaseAuthException catch (e) {
       isLoadingRegister.value = false;
       Get.snackbar("Lỗi OTP", firebaseErrorToVietnamese(e.code));
@@ -389,7 +388,6 @@ class AuthController extends GetxController {
       // ❌ KHÔNG kiểm tra currentUser
       // ❌ KHÔNG Get.to / Get.off ở đây
       // ✅ AuthGateController sẽ tự xử lý authStateChanges
-
     } on FirebaseAuthException catch (e) {
       Get.snackbar("OTP sai", e.message ?? "Xác thực thất bại");
     } catch (e) {
@@ -399,14 +397,10 @@ class AuthController extends GetxController {
     }
   }
 
-
   Future<void> pickTempAvatar(ImageSource source) async {
     final picker = ImagePicker();
 
-    final picked = await picker.pickImage(
-      source: source,
-      imageQuality: 100,
-    );
+    final picked = await picker.pickImage(source: source, imageQuality: 100);
     if (picked == null) return;
 
     final cropped = await ImageCropper().cropImage(
@@ -414,10 +408,7 @@ class AuthController extends GetxController {
       aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
       compressFormat: ImageCompressFormat.jpg,
       uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Cắt ảnh',
-          lockAspectRatio: true,
-        ),
+        AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
         IOSUiSettings(title: 'Cắt ảnh'),
       ],
     );
@@ -427,22 +418,25 @@ class AuthController extends GetxController {
     tempAvatarFile.value = File(cropped.path);
   }
 
-
   // =============================================================
   //                     SAVE PROFILE
   // =============================================================
   Future<void> saveProfile() async {
-    final nickname = nicknameC.text.trim();
+    final fullname = ProfileInputValidator.normalizeFullname(fullnameC.text);
+    final nickname = ProfileInputValidator.normalizeNickname(nicknameC.text);
 
-    if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(nickname)) {
-      Get.snackbar("Lỗi",
-          "Nickname chỉ gồm chữ không dấu, số, hoặc dấu gạch dưới (_)");
+    final fullnameError = ProfileInputValidator.validateFullname(fullname);
+    if (fullnameError != null) {
+      Get.snackbar("Lỗi", fullnameError);
       return;
     }
-    if (fullnameC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Vui lòng nhập họ tên");
+
+    final nicknameError = ProfileInputValidator.validateNickname(nickname);
+    if (nicknameError != null) {
+      Get.snackbar("Lỗi", nicknameError);
       return;
     }
+
     if (selectedGender.value.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng chọn giới tính");
       return;
@@ -466,12 +460,10 @@ class AuthController extends GetxController {
     try {
       String? avatarUrl;
       if (tempAvatarFile.value != null) {
-        avatarUrl = await AvatarService.uploadAvatar(
-          tempAvatarFile.value!,
-        );
+        avatarUrl = await AvatarService.uploadAvatar(tempAvatarFile.value!);
       }
       await _auth.saveUserProfile(
-        fullname: fullnameC.text.trim(),
+        fullname: fullname,
         nickname: nickname,
         phonenumber: fullPhoneNumber.value.trim(),
         birthday: selectedBirthday.value!,
@@ -481,10 +473,9 @@ class AuthController extends GetxController {
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
-        await _auth.db
-            .collection("users")
-            .doc(uid)
-            .update({"isProfileCompleted": true});
+        await _auth.db.collection("users").doc(uid).update({
+          "isProfileCompleted": true,
+        });
       }
 
       isLoadingRegister.value = false;
@@ -493,7 +484,7 @@ class AuthController extends GetxController {
       await anonAvatarC.load();
 
       await IdentityKeyService.generateIfNotExists();
-      
+
       Get.offAllNamed('/main');
     } catch (e) {
       isLoadingRegister.value = false;
@@ -532,3 +523,4 @@ class AuthController extends GetxController {
     super.onClose();
   }
 }
+

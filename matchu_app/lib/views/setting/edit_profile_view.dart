@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
+import 'package:matchu_app/utils/profile_input_validator.dart';
 import 'package:matchu_app/views/setting/widgets/dob_box_edit.dart';
-import 'package:matchu_app/widgets/dob_box.dart';
 import 'package:matchu_app/widgets/gender_widget.dart';
 
 class EditProfileView extends StatelessWidget {
@@ -29,7 +29,6 @@ class EditProfileView extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Obx(() {
-
               if (c.isLoadingInitial.value) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -46,6 +45,10 @@ class EditProfileView extends StatelessWidget {
                   TextField(
                     controller: c.fullnameC,
                     textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.words,
+                    maxLength: ProfileInputValidator.maxFullnameLength,
+                    inputFormatters:
+                        ProfileInputValidator.fullnameInputFormatters,
                     decoration: const InputDecoration(
                       labelText: "Họ và tên",
                       prefixIcon: Icon(Icons.person_outline),
@@ -62,6 +65,10 @@ class EditProfileView extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextField(
                     controller: c.nicknameC,
+                    textInputAction: TextInputAction.done,
+                    maxLength: ProfileInputValidator.maxNicknameLength,
+                    inputFormatters:
+                        ProfileInputValidator.nicknameInputFormatters,
                     decoration: const InputDecoration(
                       labelText: "@username",
                       prefixIcon: Icon(Icons.tag_faces_outlined),
@@ -81,9 +88,8 @@ class EditProfileView extends StatelessWidget {
                     children: [
                       dobBoxEdit(
                         context,
-                        label: c.selectedDay.value
-                                ?.toString()
-                                .padLeft(2, '0') ??
+                        label:
+                            c.selectedDay.value?.toString().padLeft(2, '0') ??
                             "DD",
                         active: c.selectedDobField.value == DobField.day,
                         onTap: () => openEditDayPicker(context, c),
@@ -91,9 +97,8 @@ class EditProfileView extends StatelessWidget {
                       const SizedBox(width: 12),
                       dobBoxEdit(
                         context,
-                        label: c.selectedMonth.value
-                                ?.toString()
-                                .padLeft(2, '0') ??
+                        label:
+                            c.selectedMonth.value?.toString().padLeft(2, '0') ??
                             "MM",
                         active: c.selectedDobField.value == DobField.month,
                         onTap: () => openEditMonthPicker(context, c),
@@ -101,8 +106,7 @@ class EditProfileView extends StatelessWidget {
                       const SizedBox(width: 12),
                       dobBoxEdit(
                         context,
-                        label:
-                            c.selectedYear.value?.toString() ?? "YYYY",
+                        label: c.selectedYear.value?.toString() ?? "YYYY",
                         flex: 2,
                         active: c.selectedDobField.value == DobField.year,
                         onTap: () => openEditYearPicker(context, c),
@@ -125,30 +129,24 @@ class EditProfileView extends StatelessWidget {
                         context,
                         label: "Nam",
                         value: "male",
-                        isSelected:
-                            c.selectedGender.value == "male",
-                        onTap: () =>
-                            c.selectedGender.value = "male",
+                        isSelected: c.selectedGender.value == "male",
+                        onTap: () => c.selectedGender.value = "male",
                       ),
                       const SizedBox(width: 12),
                       genderButton(
                         context,
                         label: "Nữ",
                         value: "female",
-                        isSelected:
-                            c.selectedGender.value == "female",
-                        onTap: () =>
-                            c.selectedGender.value = "female",
+                        isSelected: c.selectedGender.value == "female",
+                        onTap: () => c.selectedGender.value = "female",
                       ),
                       const SizedBox(width: 12),
                       genderButton(
                         context,
                         label: "Khác",
                         value: "other",
-                        isSelected:
-                            c.selectedGender.value == "other",
-                        onTap: () =>
-                            c.selectedGender.value = "other",
+                        isSelected: c.selectedGender.value == "other",
+                        onTap: () => c.selectedGender.value = "other",
                       ),
                     ],
                   ),
@@ -162,13 +160,13 @@ class EditProfileView extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed:
                           c.isSaving.value || !c.hasChanged ? null : c.save,
-                      child: c.isSaving.value
-                          ? const CircularProgressIndicator()
-                          : const Text(
-                              "Lưu thay đổi",
-                              style:
-                                  TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                      child:
+                          c.isSaving.value
+                              ? const CircularProgressIndicator()
+                              : const Text(
+                                "Lưu thay đổi",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                     ),
                   ),
                 ],

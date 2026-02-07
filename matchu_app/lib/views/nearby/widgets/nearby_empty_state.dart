@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
+
 class NearbyEmptyState extends StatelessWidget {
-  const NearbyEmptyState({super.key});
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const NearbyEmptyState({
+    super.key,
+    this.title = "Khong tim thay ai phu hop",
+    this.subtitle = "Hay thu tang khoang cach de tim kiem",
+    this.icon = Icons.location_off,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -14,24 +24,22 @@ class NearbyEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.location_off,
+              icon,
               size: 56,
-              color: colorScheme.onSurface.withOpacity(0.5),
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
-              "Không tìm thấy ai phù hợp",
+              title,
               textAlign: TextAlign.center,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Text(
-              "Hãy thử tăng khoảng cách để tìm kiếm ",
+              subtitle,
               textAlign: TextAlign.center,
               style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.6),
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ],

@@ -7,7 +7,6 @@ class NearbyHeader extends GetView<NearbyController> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
@@ -16,18 +15,53 @@ class NearbyHeader extends GetView<NearbyController> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            "Khám phá",
+            "Kết nối",
             style: textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
-          Container(
-            child: IconButton(
-              tooltip: "Làm mới",
-              icon: const Icon(Icons.refresh),
-              onPressed: controller.refresh, // ✅ OK
-            ),
-          ),
+          Obx(() {
+            final isLocationVisible = controller.isLocationVisible.value;
+            final isUpdatingVisibility = controller.isUpdatingVisibility.value;
+
+            return Row(
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: isUpdatingVisibility
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
+                          )
+                        : IconButton(
+                            tooltip: isLocationVisible
+                                ? "Tắt hiển thị vị trí"
+                                : "Bật hiển thị vị trí",
+                            icon: Icon(
+                              isLocationVisible
+                                  ? Icons.location_on_rounded
+                                  : Icons.location_off_rounded,
+                              color: isLocationVisible
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.error,
+                            ),
+                            onPressed: () =>
+                                controller.setLocationVisibility(!isLocationVisible),
+                          ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: "Làm mới",
+                  icon: const Icon(Icons.refresh),
+                  onPressed: controller.refresh,
+                ),
+              ],
+            );
+          }),
+
         ],
       ),
     );

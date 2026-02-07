@@ -5,10 +5,7 @@ import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 class NearbyRangeFilter extends StatelessWidget {
   final NearbyController controller;
 
-  const NearbyRangeFilter({
-    super.key,
-    required this.controller,
-  });
+  const NearbyRangeFilter({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -20,13 +17,13 @@ class NearbyRangeFilter extends StatelessWidget {
 
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         decoration: BoxDecoration(
           color: colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -42,7 +39,7 @@ class NearbyRangeFilter extends StatelessWidget {
                   "Phạm vi quét",
                   style: textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface.withOpacity(0.9),
+                    color: colorScheme.onSurface.withValues(alpha: 0.9),
                     letterSpacing: 0.6,
                   ),
                 ),
@@ -65,7 +62,7 @@ class NearbyRangeFilter extends StatelessWidget {
                 activeTrackColor: Colors.blueAccent,
 
                 // ===== PHẦN CHƯA KÉO TỚI =====
-                inactiveTrackColor: Colors.blueAccent.withOpacity(0.25),
+                inactiveTrackColor: Colors.blueAccent.withValues(alpha: 0.25),
 
                 // ===== THUMB =====
                 thumbColor: Colors.white,
@@ -75,10 +72,8 @@ class NearbyRangeFilter extends StatelessWidget {
                 ),
 
                 // ===== OVERLAY =====
-                overlayColor: Colors.blueAccent.withOpacity(0.08),
-                overlayShape: const RoundSliderOverlayShape(
-                  overlayRadius: 14,
-                ),
+                overlayColor: Colors.blueAccent.withValues(alpha: 0.08),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
 
                 trackShape: const RoundedRectSliderTrackShape(),
               ),
