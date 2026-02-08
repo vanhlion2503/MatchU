@@ -54,7 +54,9 @@ class AuthService {
 
       await user.reload();
       if (!user.emailVerified) {
-        throw Exception("Bạn phải xác minh email trước khi dùng số điện thoại.");
+        throw Exception(
+          "Bạn phải xác minh email trước khi dùng số điện thoại.",
+        );
       }
 
       final session = await user.multiFactor.getSession();
@@ -95,8 +97,7 @@ class AuthService {
         smsCode: smsCode,
       );
 
-      final assertion =
-          PhoneMultiFactorGenerator.getAssertion(credential);
+      final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
 
       await user.multiFactor.enroll(assertion, displayName: "SMS");
     } on FirebaseAuthException catch (e) {
@@ -135,10 +136,7 @@ class AuthService {
       "bio": "",
       "interests": [],
 
-      "location": {
-        "lat": null,
-        "lng": null,
-      },
+      "location": {"lat": null, "lng": null},
 
       "nearlyEnabled": true,
       "reputationScore": 100,
@@ -163,6 +161,7 @@ class AuthService {
 
       "role": "user",
       "isProfileCompleted": false,
+      "isFaceVerified": false,
       "anonymousAvatar": null,
 
       "lastActiveAt": FieldValue.serverTimestamp(),
@@ -181,7 +180,6 @@ class AuthService {
         .set(data, SetOptions(merge: true));
   }
 
-
   /* ======================= LOGIN + MFA ======================= */
 
   Future<void> login({
@@ -192,10 +190,7 @@ class AuthService {
     required Function(String error) onFailed,
   }) async {
     try {
-      await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
 
       await setOnlineStatus(true);
       onSuccess();
@@ -221,8 +216,7 @@ class AuthService {
         multiFactorInfo: phoneInfo,
         multiFactorSession: resolver.session,
         verificationCompleted: (credential) async {
-          final assertion =
-              PhoneMultiFactorGenerator.getAssertion(credential);
+          final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
           await resolver.resolveSignIn(assertion);
           await setOnlineStatus(true);
         },
@@ -249,8 +243,7 @@ class AuthService {
       smsCode: smsCode,
     );
 
-    final assertion =
-        PhoneMultiFactorGenerator.getAssertion(cred);
+    final assertion = PhoneMultiFactorGenerator.getAssertion(cred);
 
     await e.resolver.resolveSignIn(assertion);
     await setOnlineStatus(true);

@@ -56,6 +56,14 @@ class RightSideMenu {
                           Get.toNamed("/account-security");
                         },
                       ),
+                      menuItem(
+                        icon: Icons.lock_outline,
+                        text: "Xác thực tài khoản",
+                        onTap: () {
+                          Get.back(); 
+                          Get.toNamed("/face-verification");
+                        },
+                      ),
 
                       Builder(
                         builder: (context) {

@@ -9,7 +9,7 @@ class AppRouter {
   static const String completeProfile = '/complete-profile';
   static const String forgotPassword = '/forgot-password';
   static const String changePassword = '/change-password';
-  
+
   static const String welcome = '/welcome';
   static const String home = '/home';
   static const String main = '/main';
@@ -18,10 +18,11 @@ class AppRouter {
   static const String searchUser = '/search-user';
   static const String displayMode = '/display-mode';
   static const String editProfile = '/edit-profile';
-  
+
   static const String matching = '/matching';
   static const String tempChat = '/tempChat';
   static const String rating = '/rating';
-  static const String chat = '/chat'; 
+  static const String chat = '/chat';
   static const String chatList = '/chat-list';
+  static const String faceVerification = '/face-verification';
 }

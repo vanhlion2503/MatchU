@@ -7,40 +7,41 @@ class UserModel {
   final String nickname;
   final String phonenumber;
 
-  final String? googleId;                 // Đăng nhập Google
+  final String? googleId; // Đăng nhập Google
   final DateTime? birthday;
   final String? gender;
   final String bio;
   final String avatarUrl;
 
-  final List<String> interests;           // Sở thích
+  final List<String> interests; // Sở thích
 
   final double? lat;
   final double? lng;
 
-  final bool nearlyEnabled;               
-  final int reputationScore;              
-  final int trustWarnings;                
-  final int totalReports;                 
+  final bool nearlyEnabled;
+  final int reputationScore;
+  final int trustWarnings;
+  final int totalReports;
 
-  final double avgChatRating;             
-  final int totalChatRatings;             
+  final double avgChatRating;
+  final int totalChatRatings;
 
-  final List<String> followers;           // Danh sách người theo dõi
-  final List<String> following;           // Danh sách mình theo dõi
+  final List<String> followers; // Danh sách người theo dõi
+  final List<String> following; // Danh sách mình theo dõi
 
-  final int rank;                         
-  final int experience;                   
-  final int dailyExp;                     
+  final int rank;
+  final int experience;
+  final int dailyExp;
 
-  final int totalPosts;                   
-  final int totalLikes;                   
+  final int totalPosts;
+  final int totalLikes;
 
-  final String activeStatus;              
-  final String accountStatus;             
+  final String activeStatus;
+  final String accountStatus;
 
   final String role;
   final bool isProfileCompleted;
+  final bool isFaceVerified;
 
   final DateTime? lastActiveAt;
   final DateTime? createdAt;
@@ -88,6 +89,7 @@ class UserModel {
 
     this.role = "user",
     this.isProfileCompleted = false,
+    this.isFaceVerified = false,
 
     this.lastActiveAt,
     this.createdAt,
@@ -113,10 +115,7 @@ class UserModel {
 
       "interests": interests,
 
-      "location": {
-        "lat": lat,
-        "lng": lng,
-      },
+      "location": {"lat": lat, "lng": lng},
 
       "nearlyEnabled": nearlyEnabled,
       "reputationScore": reputationScore,
@@ -141,6 +140,7 @@ class UserModel {
 
       "role": role,
       "isProfileCompleted": isProfileCompleted,
+      "isFaceVerified": isFaceVerified,
 
       "lastActiveAt": lastActiveAt?.toIso8601String(),
       "createdAt": createdAt?.toIso8601String(),
@@ -160,6 +160,17 @@ class UserModel {
       return null;
     }
 
+    bool parseBool(dynamic value, {bool fallback = false}) {
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final lower = value.trim().toLowerCase();
+        if (lower == "true" || lower == "1") return true;
+        if (lower == "false" || lower == "0") return false;
+      }
+      return fallback;
+    }
+
     return UserModel(
       uid: uid,
       email: json["email"] ?? "",
@@ -176,8 +187,14 @@ class UserModel {
 
       interests: List<String>.from(json["interests"] ?? []),
 
-      lat: location?["lat"] != null ? (location!["lat"] as num).toDouble() : null,
-      lng: location?["lng"] != null ? (location!["lng"] as num).toDouble() : null,
+      lat:
+          location?["lat"] != null
+              ? (location!["lat"] as num).toDouble()
+              : null,
+      lng:
+          location?["lng"] != null
+              ? (location!["lng"] as num).toDouble()
+              : null,
 
       nearlyEnabled: json["nearlyEnabled"] ?? true,
       reputationScore: json["reputationScore"] ?? 100,
@@ -202,6 +219,7 @@ class UserModel {
 
       role: json["role"] ?? "user",
       isProfileCompleted: json["isProfileCompleted"] ?? false,
+      isFaceVerified: parseBool(json["isFaceVerified"]),
 
       lastActiveAt: parseDate(json["lastActiveAt"]),
       createdAt: parseDate(json["createdAt"]),
@@ -253,6 +271,7 @@ class UserModel {
 
     String? role,
     bool? isProfileCompleted,
+    bool? isFaceVerified,
 
     DateTime? lastActiveAt,
     DateTime? createdAt,
@@ -300,6 +319,7 @@ class UserModel {
 
       role: role ?? this.role,
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,
+      isFaceVerified: isFaceVerified ?? this.isFaceVerified,
 
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       createdAt: createdAt ?? this.createdAt,

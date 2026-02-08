@@ -1,9 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
@@ -22,12 +20,9 @@ class OtherProfileView extends StatelessWidget {
   Widget build(BuildContext context) {
     final OtherProfileController c = Get.put(
       OtherProfileController(userId),
-      tag: userId,        // ⭐ Gán tag để controller không bị trùng
-      permanent: false,   // Cho phép tự hủy khi back
+      tag: userId, // ⭐ Gán tag để controller không bị trùng
+      permanent: false, // Cho phép tự hủy khi back
     );
-
-    final AvatarController avatarC = Get.put(AvatarController());
-
 
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
@@ -41,7 +36,7 @@ class OtherProfileView extends StatelessWidget {
 
         final UserModel u = c.user.value!;
         final String currentUid = c.currentUid;
-        final bool isMe = currentUid == u.uid; 
+        final bool isMe = currentUid == u.uid;
 
         return SingleChildScrollView(
           child: Column(
@@ -75,7 +70,10 @@ class OtherProfileView extends StatelessWidget {
                               height: 180,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [colorScheme.primary, colorScheme.secondary],
+                                  colors: [
+                                    colorScheme.primary,
+                                    colorScheme.secondary,
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -88,7 +86,9 @@ class OtherProfileView extends StatelessWidget {
 
                             // ================= BACK BUTTON (🔥 ĐÚNG CHỖ) =================
                             Positioned(
-                              top: MediaQuery.of(context).padding.top + 4, // 👈 sát status bar
+                              top:
+                                  MediaQuery.of(context).padding.top +
+                                  4, // 👈 sát status bar
                               left: 8,
                               child: IconButton(
                                 onPressed: () => Get.back(),
@@ -96,14 +96,11 @@ class OtherProfileView extends StatelessWidget {
                                 color: colorScheme.onPrimary,
                               ),
                             ),
-
-                        
                           ],
                         ),
                       ),
-
                     ),
-                
+
                     // ================= AVATAR =================
                     Positioned(
                       bottom: 0,
@@ -115,32 +112,40 @@ class OtherProfileView extends StatelessWidget {
                           color: Colors.transparent,
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: () => openAvatarFullscreen(context, u.avatarUrl),
+                            onTap:
+                                () =>
+                                    openAvatarFullscreen(context, u.avatarUrl),
                             child: CircleAvatar(
                               radius: 55,
-                              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                              backgroundColor:
+                                  Theme.of(context).scaffoldBackgroundColor,
                               child: CircleAvatar(
                                 radius: 50,
-                                backgroundImage: u.avatarUrl.isNotEmpty
-                                    ? CachedNetworkImageProvider(u.avatarUrl)
-                                    : const AssetImage("assets/avatas/avataMd.png")
-                                        as ImageProvider,
-                                child: u.avatarUrl.isEmpty
-                                    ? Text(
-                                        u.nickname[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
+                                backgroundImage:
+                                    u.avatarUrl.isNotEmpty
+                                        ? CachedNetworkImageProvider(
+                                          u.avatarUrl,
+                                        )
+                                        : const AssetImage(
+                                              "assets/avatas/avataMd.png",
+                                            )
+                                            as ImageProvider,
+                                child:
+                                    u.avatarUrl.isEmpty
+                                        ? Text(
+                                          u.nickname[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                        : null,
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -148,13 +153,47 @@ class OtherProfileView extends StatelessWidget {
               const SizedBox(height: 10),
 
               // ================= NAME =================
-              Text(u.fullname, style: textTheme.headlineSmall),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      u.fullname,
+                      style: textTheme.headlineSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  if (u.isFaceVerified)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(
+                        Icons.verified_rounded,
+                        size: 20,
+                        color: Colors.blue,
+                      ),
+                    ),
+                ],
+              ),
+              if (!u.isFaceVerified)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    "Tài khoản này chưa xác thực",
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 6),
               Text(
-                "@${u.nickname} • ${c.age}", 
-                  style: textTheme.bodyMedium?.copyWith(
+                "@${u.nickname} • ${c.age}",
+                style: textTheme.bodyMedium?.copyWith(
                   color: textTheme.bodySmall?.color,
-                ),),
+                ),
+              ),
 
               const SizedBox(height: 18),
 
@@ -172,46 +211,56 @@ class OtherProfileView extends StatelessWidget {
                       /// ================= FOLLOW BUTTON =================
                       SizedBox(
                         height: buttonHeight,
-                        child: followed
-                            ? Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(30),
-                                  color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppTheme.darkBorder 
-                                          : AppTheme.lightBorder,
-                                ),
-                                child: OutlinedButton(
-                                  onPressed: () => c.unfollow(),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide.none,
-                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child:
+                            followed
+                                ? Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(30),
+                                    color:
+                                        Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? AppTheme.darkBorder
+                                            : AppTheme.lightBorder,
+                                  ),
+                                  child: OutlinedButton(
+                                    onPressed: () => c.unfollow(),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide.none,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      "Đang theo dõi",
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                : ElevatedButton(
+                                  onPressed: () => c.follow(),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(30),
                                     ),
                                   ),
                                   child: Text(
-                                    "Đang theo dõi",
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                        ),
+                                    "Theo dõi",
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
                                   ),
                                 ),
-                              )
-                            : ElevatedButton(
-                                onPressed: () => c.follow(),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                child: Text(
-                                  "Theo dõi",
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
                       ),
 
                       /// ================= MESSAGE BUTTON =================
@@ -224,24 +273,28 @@ class OtherProfileView extends StatelessWidget {
                               _openChat(userId);
                             },
                             icon: Icon(
-                              Iconsax.message, 
+                              Iconsax.message,
                               size: 22,
-                              color: Theme.of(context).brightness == Brightness.dark 
-                                          ? AppTheme.lightBorder
-                                          : AppTheme.darkBorder,
-                                          
+                              color:
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.lightBorder
+                                      : AppTheme.darkBorder,
                             ),
                             label: Text(
                               "Nhắn tin",
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Theme.of(context).brightness == Brightness.dark 
-                                                ? AppTheme.darkBorder 
-                                                : AppTheme.lightBorder,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              backgroundColor:
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? AppTheme.darkBorder
+                                      : AppTheme.lightBorder,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),
@@ -251,10 +304,7 @@ class OtherProfileView extends StatelessWidget {
                       ],
                     ],
                   );
-
                 }),
-
-
 
               const SizedBox(height: 20),
 
@@ -275,36 +325,40 @@ class OtherProfileView extends StatelessWidget {
                 children: [
                   Expanded(
                     child: statItem(
-                      "${u.followers.length}", 
+                      "${u.followers.length}",
                       "Người theo dõi",
                       textTheme,
                       onTap: () {
-                        Get.to(() => FollowTabView(
-                          userId: c.user.value!.uid,
-                          initialIndex: 0,
-                          ));
+                        Get.to(
+                          () => FollowTabView(
+                            userId: c.user.value!.uid,
+                            initialIndex: 0,
+                          ),
+                        );
                       },
-                      ),
+                    ),
                   ),
                   Expanded(
                     child: statItem(
-                      "${u.following.length}", 
+                      "${u.following.length}",
                       "Đang theo dõi",
                       textTheme,
                       onTap: () {
-                        Get.to(() => FollowTabView(
-                          userId: c.user.value!.uid,
-                          initialIndex: 1,
-                          ));
+                        Get.to(
+                          () => FollowTabView(
+                            userId: c.user.value!.uid,
+                            initialIndex: 1,
+                          ),
+                        );
                       },
-                      ),
+                    ),
                   ),
                   Expanded(child: statItem("Lv. ${u.rank}", "Rank", textTheme)),
                 ],
               ),
 
               const SizedBox(height: 30),
-        
+
               // ---------------- TABS ----------------
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -314,7 +368,7 @@ class OtherProfileView extends StatelessWidget {
                   tabItem("Likes", false, textTheme),
                 ],
               ),
-        
+
               const SizedBox(height: 20),
 
               // ================= POSTS =================
@@ -334,7 +388,10 @@ class OtherProfileView extends StatelessWidget {
                         color: theme.colorScheme.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                          color:
+                              isDark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
                         ),
                       ),
                     );
@@ -354,9 +411,7 @@ class OtherProfileView extends StatelessWidget {
     showDialog(
       context: context,
       barrierColor: Colors.black,
-      builder: (_) => AvatarFullscreenView(
-        avatarUrl: avatarUrl,
-      ),
+      builder: (_) => AvatarFullscreenView(avatarUrl: avatarUrl),
     );
   }
 
@@ -368,11 +423,8 @@ class OtherProfileView extends StatelessWidget {
 
     Get.to(
       () => const ChatView(),
-      arguments: {
-        "roomId": roomId,
-      },
+      arguments: {"roomId": roomId},
       transition: Transition.cupertino,
     );
   }
-
 }
