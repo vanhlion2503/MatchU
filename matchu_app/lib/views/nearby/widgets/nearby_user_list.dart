@@ -22,8 +22,8 @@ class NearbyUserList extends StatelessWidget {
       if (!controller.isLocationVisible.value) {
         return const NearbyEmptyState(
           icon: Icons.visibility_off_rounded,
-          title: "Ban dang tat hien thi vi tri",
-          subtitle: "Bat lai nut vi tri tren header de xem nguoi gan ban",
+          title: "Bạn đang tắt hiện thị vị trí",
+          subtitle: "Bật vị trí để xem những người ở quanh bạn",
         );
       }
 
@@ -39,11 +39,11 @@ class NearbyUserList extends StatelessWidget {
         itemBuilder: (context, index) {
           if (index == 0) {
             return Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 12),
+              padding: const EdgeInsets.only(left: 4, bottom: 18, top: 12),
               child: Text(
-                "Tim thay ${items.length} nguoi gan ban",
+                "Tìm thấy ${items.length} người gần bạn",
                 style: textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.bold,
                   color: colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
               ),

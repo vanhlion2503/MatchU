@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
 class NearbySegmentedControl extends StatelessWidget {
   final NearbyController controller;
@@ -12,7 +13,6 @@ class NearbySegmentedControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Obx(() {
       final selected = controller.selectedTab.value;
 
@@ -21,13 +21,11 @@ class NearbySegmentedControl extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant,
+            color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkBorder : Color.fromARGB(255, 240, 240, 241),
             borderRadius: BorderRadius.circular(14),
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final highlightWidth = (constraints.maxWidth - 8) / 2;
-
               return Stack(
                 children: [
                   AnimatedAlign(
@@ -36,21 +34,6 @@ class NearbySegmentedControl extends StatelessWidget {
                         : Alignment.centerRight,
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOut,
-                    child: Container(
-                      width: highlightWidth,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   Row(
                     children: [
@@ -97,15 +80,15 @@ class _TabItem extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: const EdgeInsets.all(2), // khoảng cách giữa các tab
+      padding: const EdgeInsets.all(4), // khoảng cách giữa các tab
       child: Container(
-        height: 32,
+        height: 42,
         decoration: BoxDecoration(
           color: isSelected
               ? Theme.of(context).brightness == Brightness.dark
                 ? Colors.black
                 : Colors.white// tab được chọn để highlight phía sau lo
-              : colorScheme.surface.withOpacity(0.6), // 👈 nền trắng cho tab chưa chọn
+              : Theme.of(context).brightness == Brightness.dark ? AppTheme.darkBorder : Color.fromARGB(255, 240, 240, 241), // 👈 nền trắng cho tab chưa chọn
           borderRadius: BorderRadius.circular(10),
         ),
         child: TextButton(
@@ -114,7 +97,7 @@ class _TabItem extends StatelessWidget {
             padding: EdgeInsets.zero,
             foregroundColor: isSelected
                 ? colorScheme.onSurface
-                : colorScheme.onSurface.withOpacity(0.6),
+                : colorScheme.onSurface.withOpacity(0.7),
             textStyle: textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),

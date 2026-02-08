@@ -7,8 +7,8 @@ class NearbyEmptyState extends StatelessWidget {
 
   const NearbyEmptyState({
     super.key,
-    this.title = "Khong tim thay ai phu hop",
-    this.subtitle = "Hay thu tang khoang cach de tim kiem",
+    this.title = "Không tìm thấy ai phù hợp",
+    this.subtitle = "Hãy thử tăng khoảng cách để tìm kiếm",
     this.icon = Icons.location_off,
   });
 
