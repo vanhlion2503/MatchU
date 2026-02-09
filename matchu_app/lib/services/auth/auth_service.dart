@@ -152,6 +152,8 @@ class AuthService {
       "rank": 1,
       "experience": 0,
       "dailyExp": 0,
+      "dailyMatchingCount": 0,
+      "dailyMatchingDate": null,
 
       "totalPosts": 0,
       "totalLikes": 0,
