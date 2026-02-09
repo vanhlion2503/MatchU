@@ -26,6 +26,13 @@ class FaceVerificationController extends GetxController
   final Rx<VerificationState> state = VerificationState.idle.obs;
   final RxBool blinkDetected = false.obs;
   final RxBool headTurnDetected = false.obs;
+  final RxBool hasStartedVerificationFlow = false.obs;
+  final RxBool isCheckingVerificationStatus = true.obs;
+  final RxBool isAlreadyVerified = false.obs;
+  final RxBool wasAlreadyVerifiedAtEntry = false.obs;
+  final RxInt currentLivenessStep = 0.obs;
+  final RxList<bool> livenessStepDone =
+      List<bool>.filled(_livenessStepLabels.length, false).obs;
   final RxString instructionText = "Đặt khuôn mặt vào khung và chụp ảnh".obs;
 
   final RxBool isCameraReady = false.obs;
@@ -50,14 +57,31 @@ class FaceVerificationController extends GetxController
   int _activeStreamSession = 0;
   Completer<void>? _pendingFrameProcessing;
   Uint8List? _nv21ReusableBuffer;
+  double? _straightYawBaseline;
+  int _straightStableFrames = 0;
+  bool _blinkPrimed = false;
+  DateTime _lastLivenessStepAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastFrameProcessedAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _frameProcessInterval = Duration(milliseconds: 120);
+  static const Duration _livenessStepGap = Duration(milliseconds: 350);
+  static const int _straightStableRequiredFrames = 3;
+  static const double _straightYawTolerance = 8;
+  static const double _straightRollTolerance = 10;
+  static const double _blinkOpenThreshold = 0.65;
+  static const double _blinkClosedThreshold = 0.3;
+  static const double _turnYawThreshold = 14;
+  static const List<String> _livenessStepLabels = <String>[
+    "Nhin thang",
+    "Chop mat",
+    "Quay trai",
+    "Quay phai",
+  ];
 
   @override
   void onInit() {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(initCamera());
+    unawaited(_loadVerificationStatusOnEntry());
   }
 
   @override
@@ -67,6 +91,74 @@ class FaceVerificationController extends GetxController
     unawaited(disposeResources());
     _verificationService.dispose();
     super.onClose();
+  }
+
+  List<String> get livenessStepLabels => _livenessStepLabels;
+
+  bool isLivenessStepDone(int index) {
+    if (index < 0 || index >= livenessStepDone.length) {
+      return false;
+    }
+    return livenessStepDone[index];
+  }
+
+  bool isLivenessStepActive(int index) {
+    return currentLivenessStep.value == index && !isLivenessStepDone(index);
+  }
+
+  Future<void> _loadVerificationStatusOnEntry() async {
+    isCheckingVerificationStatus.value = true;
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) {
+        isAlreadyVerified.value = false;
+        wasAlreadyVerifiedAtEntry.value = false;
+        state.value = VerificationState.idle;
+        instructionText.value = "Dat khuon mat vao khung va chup anh";
+        return;
+      }
+
+      final snapshot = await _db.collection("users").doc(uid).get();
+      final isVerified = snapshot.data()?["isFaceVerified"] == true;
+      isAlreadyVerified.value = isVerified;
+      wasAlreadyVerifiedAtEntry.value = isVerified;
+
+      if (isVerified) {
+        hasStartedVerificationFlow.value = false;
+        await _shutdownCameraForPreviewExit();
+        state.value = VerificationState.success;
+        errorText.value = "";
+        instructionText.value = "Tai khoan da xac thuc khuon mat";
+      } else {
+        state.value = VerificationState.idle;
+        instructionText.value = "Dat khuon mat vao khung va chup anh";
+      }
+    } catch (e, stackTrace) {
+      debugPrint("loadVerificationStatusOnEntry error: $e");
+      debugPrintStack(stackTrace: stackTrace);
+      isAlreadyVerified.value = false;
+      wasAlreadyVerifiedAtEntry.value = false;
+      state.value = VerificationState.idle;
+      instructionText.value = "Dat khuon mat vao khung va chup anh";
+    } finally {
+      isCheckingVerificationStatus.value = false;
+    }
+  }
+
+  void startVerificationFlow() {
+    if (isCheckingVerificationStatus.value) {
+      return;
+    }
+    if (isAlreadyVerified.value) {
+      state.value = VerificationState.success;
+      hasStartedVerificationFlow.value = false;
+      return;
+    }
+    if (hasStartedVerificationFlow.value) {
+      return;
+    }
+    hasStartedVerificationFlow.value = true;
+    unawaited(initCamera());
   }
 
   @override
@@ -113,7 +205,10 @@ class FaceVerificationController extends GetxController
   }
 
   Future<void> initCamera() async {
-    if (_isDisposed || _isInitializingCamera || !_requiresPreviewCamera) {
+    if (_isDisposed ||
+        _isInitializingCamera ||
+        !_requiresPreviewCamera ||
+        !hasStartedVerificationFlow.value) {
       return;
     }
 
@@ -144,9 +239,7 @@ class FaceVerificationController extends GetxController
       await _disposeCameraOnly();
       await _initFrontCamera();
 
-      blinkDetected.value = false;
-      headTurnDetected.value = false;
-      _livenessPassed = false;
+      _resetLivenessSequence(updateInstruction: false);
       state.value = VerificationState.capturingSelfie;
       instructionText.value = "Đặt khuôn mặt vào khung và chụp ảnh";
     } catch (e, stackTrace) {
@@ -188,7 +281,7 @@ class FaceVerificationController extends GetxController
       selfieFile = savedFile;
 
       state.value = VerificationState.liveness;
-      instructionText.value = "Nháy mắt để tiếp tục";
+      instructionText.value = "Bat dau kiem tra liveness...";
       await startLiveness();
     } catch (e, stackTrace) {
       if (e is CameraException) {
@@ -222,12 +315,9 @@ class FaceVerificationController extends GetxController
       await _initFaceDetector();
       await _stopImageStream();
 
-      blinkDetected.value = false;
-      headTurnDetected.value = false;
-      _livenessPassed = false;
+      _resetLivenessSequence();
       _isProcessingFrame = false;
       _lastFrameProcessedAt = DateTime.fromMillisecondsSinceEpoch(0);
-      instructionText.value = "Nháy mắt để tiếp tục";
 
       final streamSession = ++_activeStreamSession;
       await camera.startImageStream((image) {
@@ -251,19 +341,141 @@ class FaceVerificationController extends GetxController
     if (blinkDetected.value) {
       return;
     }
-
     blinkDetected.value = true;
-    if (!headTurnDetected.value) {
-      instructionText.value = "Quay đầu sang trái hoặc phải";
-    }
   }
 
   void onHeadTurnDetected() {
     if (headTurnDetected.value) {
       return;
     }
-
     headTurnDetected.value = true;
+  }
+
+  void _resetLivenessSequence({bool updateInstruction = true}) {
+    blinkDetected.value = false;
+    headTurnDetected.value = false;
+    _livenessPassed = false;
+    currentLivenessStep.value = 0;
+    livenessStepDone.assignAll(
+      List<bool>.filled(_livenessStepLabels.length, false),
+    );
+    _straightYawBaseline = null;
+    _straightStableFrames = 0;
+    _blinkPrimed = false;
+    _lastLivenessStepAt = DateTime.fromMillisecondsSinceEpoch(0);
+    if (updateInstruction) {
+      _updateInstructionForCurrentStep();
+    }
+  }
+
+  void _updateInstructionForCurrentStep() {
+    switch (currentLivenessStep.value) {
+      case 0:
+        instructionText.value = "Buoc 1/4: Nhin thang vao camera";
+        break;
+      case 1:
+        instructionText.value = "Buoc 2/4: Chop mat";
+        break;
+      case 2:
+        instructionText.value = "Buoc 3/4: Quay dau sang trai";
+        break;
+      case 3:
+        instructionText.value = "Buoc 4/4: Quay dau sang phai";
+        break;
+      default:
+        instructionText.value = "Da hoan tat kiem tra liveness";
+        break;
+    }
+  }
+
+  void _completeCurrentLivenessStep() {
+    final step = currentLivenessStep.value;
+    if (step < 0 || step >= _livenessStepLabels.length) {
+      return;
+    }
+
+    final now = DateTime.now();
+    if (now.difference(_lastLivenessStepAt) < _livenessStepGap) {
+      return;
+    }
+    _lastLivenessStepAt = now;
+
+    livenessStepDone[step] = true;
+    if (step == 1) {
+      onBlinkDetected();
+    }
+
+    if (step >= _livenessStepLabels.length - 1) {
+      onHeadTurnDetected();
+      _livenessPassed = true;
+      instructionText.value = "Dang chup anh xac thuc...";
+      return;
+    }
+
+    currentLivenessStep.value = step + 1;
+    _updateInstructionForCurrentStep();
+  }
+
+  void _processLivenessStep(Face face) {
+    final step = currentLivenessStep.value;
+    final yaw = face.headEulerAngleY ?? 0;
+    final roll = face.headEulerAngleZ ?? 0;
+
+    switch (step) {
+      case 0:
+        final left = face.leftEyeOpenProbability;
+        final right = face.rightEyeOpenProbability;
+        final eyesAreOpen =
+            left == null || right == null || (left > 0.4 && right > 0.4);
+        final isStraight =
+            eyesAreOpen &&
+            yaw.abs() <= _straightYawTolerance &&
+            roll.abs() <= _straightRollTolerance;
+        if (!isStraight) {
+          _straightStableFrames = 0;
+          return;
+        }
+
+        _straightStableFrames++;
+        if (_straightStableFrames >= _straightStableRequiredFrames) {
+          _straightYawBaseline = yaw;
+          _completeCurrentLivenessStep();
+        }
+        return;
+      case 1:
+        final left = face.leftEyeOpenProbability;
+        final right = face.rightEyeOpenProbability;
+        if (left == null || right == null) {
+          return;
+        }
+        if (!_blinkPrimed &&
+            left > _blinkOpenThreshold &&
+            right > _blinkOpenThreshold) {
+          _blinkPrimed = true;
+        }
+        final blinkClosed =
+            left < _blinkClosedThreshold && right < _blinkClosedThreshold;
+        if (_blinkPrimed && blinkClosed) {
+          _completeCurrentLivenessStep();
+        }
+        return;
+      case 2:
+        final baseline = _straightYawBaseline ?? 0;
+        final deltaYaw = yaw - baseline;
+        if (deltaYaw <= -_turnYawThreshold) {
+          _completeCurrentLivenessStep();
+        }
+        return;
+      case 3:
+        final baseline = _straightYawBaseline ?? 0;
+        final deltaYaw = yaw - baseline;
+        if (deltaYaw >= _turnYawThreshold) {
+          _completeCurrentLivenessStep();
+        }
+        return;
+      default:
+        return;
+    }
   }
 
   Future<void> onLivenessPassed() async {
@@ -341,8 +553,17 @@ class FaceVerificationController extends GetxController
   }
 
   Future<void> retryVerification() async {
+    if (wasAlreadyVerifiedAtEntry.value) {
+      hasStartedVerificationFlow.value = false;
+      state.value = VerificationState.success;
+      instructionText.value = "Tai khoan da xac thuc khuon mat";
+      errorText.value = "";
+      return;
+    }
     selfieFile = null;
     liveFrameFile = null;
+    hasStartedVerificationFlow.value = true;
+    _resetLivenessSequence(updateInstruction: false);
     state.value = VerificationState.idle;
     instructionText.value = "Đặt khuôn mặt vào khung và chụp ảnh";
     errorText.value = "";
@@ -390,27 +611,16 @@ class FaceVerificationController extends GetxController
         return;
       }
       if (faces.isEmpty) {
+        if (currentLivenessStep.value == 0) {
+          _straightStableFrames = 0;
+        }
         return;
       }
 
       final targetFace = _pickPrimaryFace(faces);
-      final left = targetFace.leftEyeOpenProbability;
-      final right = targetFace.rightEyeOpenProbability;
-      final eulerY = targetFace.headEulerAngleY ?? 0;
+      _processLivenessStep(targetFace);
 
-      final isBlink =
-          left != null && right != null && left < 0.3 && right < 0.3;
-      final isHeadTurn = eulerY.abs() > 15;
-
-      if (isBlink) {
-        onBlinkDetected();
-      }
-      if (isHeadTurn) {
-        onHeadTurnDetected();
-      }
-
-      if (blinkDetected.value && headTurnDetected.value && !_livenessPassed) {
-        _livenessPassed = true;
+      if (_livenessPassed) {
         unawaited(onLivenessPassed());
       }
     } catch (e, stackTrace) {
@@ -795,6 +1005,7 @@ class FaceVerificationController extends GetxController
       "isFaceVerified": true,
       "updatedAt": FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    isAlreadyVerified.value = true;
   }
 
   Future<XFile> _safeTakePicture(CameraController camera) async {
@@ -811,9 +1022,10 @@ class FaceVerificationController extends GetxController
   }
 
   bool get _requiresPreviewCamera =>
-      state.value == VerificationState.idle ||
-      state.value == VerificationState.capturingSelfie ||
-      state.value == VerificationState.liveness;
+      hasStartedVerificationFlow.value &&
+      (state.value == VerificationState.idle ||
+          state.value == VerificationState.capturingSelfie ||
+          state.value == VerificationState.liveness);
 
   Future<void> _waitForCameraShutdown() async {
     for (int i = 0; i < 20; i++) {
