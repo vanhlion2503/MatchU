@@ -1,70 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
 class FaceVerificationGlassIconButton extends StatelessWidget {
   const FaceVerificationGlassIconButton({
     super.key,
     required this.icon,
     required this.onTap,
-    required this.dark,
   });
 
   final IconData icon;
   final VoidCallback onTap;
-  final bool dark;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(99),
       child: Ink(
-        width: 40,
-        height: 40,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              dark
-                  ? Colors.white.withValues(alpha: 0.14)
-                  : const Color(0xFFF8FAFC),
+          color: isDark
+                ? Colors.white.withValues(alpha: 0.14)
+                : const Color(0xFFE2E8F0),
           border: Border.all(
-            color:
-                dark
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : const Color(0xFFE2E8F0),
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.14)
+                : const Color(0xFFE2E8F0),
           ),
         ),
         child: Icon(
           icon,
-          size: 20,
-          color: dark ? Colors.white : const Color(0xFF0F172A),
+          size: 22,
+          color: isDark ? Colors.white : const Color(0xFF0F172A),
         ),
       ),
     );
   }
 }
 
-class FaceVerificationPhoneHomeIndicator extends StatelessWidget {
-  const FaceVerificationPhoneHomeIndicator({super.key, required this.dark});
-
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 128,
-        height: 4,
-        decoration: BoxDecoration(
-          color:
-              dark
-                  ? Colors.white.withValues(alpha: 0.24)
-                  : Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(999),
-        ),
-      ),
-    );
-  }
-}
 
 class FaceVerificationSoftCircle extends StatelessWidget {
   const FaceVerificationSoftCircle({

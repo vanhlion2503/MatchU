@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart'; // nhớ import
@@ -33,107 +34,107 @@ class RightSideMenu {
                 height: double.infinity,
                 color: Theme.of(context).scaffoldBackgroundColor,
                 child: SafeArea(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: IntrinsicHeight(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
 
-                      const SizedBox(height: 10),
+                                const SizedBox(height: 10),
 
-                      // ==== HỒ SƠ ====
-                      sectionHeader("Hồ sơ cá nhân"),
-                      menuItem(
-                        icon: Icons.person_outline,
-                        text: "Chỉnh sửa hồ sơ",
-                        onTap: () {
-                          Get.back(); 
-                          Get.toNamed("/edit-profile");
-                        },
-                      ),
-                      menuItem(
-                        icon: Icons.lock_outline,
-                        text: "Tài khoản & Bảo mật",
-                        onTap: () {
-                          Get.toNamed("/account-security");
-                        },
-                      ),
-                      menuItem(
-                        icon: Icons.lock_outline,
-                        text: "Xác thực tài khoản",
-                        onTap: () {
-                          Get.back(); 
-                          Get.toNamed("/face-verification");
-                        },
-                      ),
+                                // ==== HỒ SƠ ====
+                                sectionHeader("Hồ sơ cá nhân"),
+                                menuItem(
+                                  icon: Iconsax.user,
+                                  text: "Chỉnh sửa hồ sơ",
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed("/edit-profile");
+                                  },
+                                ),
+                                menuItem(
+                                  icon: Iconsax.lock,
+                                  text: "Tài khoản & Bảo mật",
+                                  onTap: () {
+                                    Get.toNamed("/account-security");
+                                  },
+                                ),
+                                menuItem(
+                                  icon: Iconsax.user_tag,
+                                  text: "Xác thực tài khoản",
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed("/face-verification");
+                                  },
+                                ),
 
-                      Builder(
-                        builder: (context) {
-                          final isDark = Theme.of(context).brightness == Brightness.dark;
-                          return Divider(
-                            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                          );
-                        },
-                      ),
+                                divider(),
 
-                      // ==== HOẠT ĐỘNG ====
-                      sectionHeader("Hoạt động"),
-                      menuItem(
-                        icon: Icons.notifications_none,
-                        text: "Trung tâm hoạt động",
-                        onTap: () => Get.toNamed("/activity-center"),
-                      ),
-                      menuItem(
-                        icon: Icons.favorite_border,
-                        text: "Người đã thích bạn",
-                        onTap: () => Get.toNamed("/liked-you"),
-                      ),
-                      menuItem(
-                        icon: Icons.group_outlined,
-                        text: "Danh sách bạn đang theo dõi",
-                        onTap: () => Get.toNamed("/following-list"),
-                      ),
+                                // ==== HOẠT ĐỘNG ====
+                                sectionHeader("Hoạt động"),
+                                menuItem(
+                                  icon: Iconsax.notification,
+                                  text: "Trung tâm hoạt động",
+                                  onTap: () => Get.toNamed("/activity-center"),
+                                ),
+                                menuItem(
+                                  icon: Iconsax.heart,
+                                  text: "Người đã thích bạn",
+                                  onTap: () => Get.toNamed("/liked-you"),
+                                ),
+                                menuItem(
+                                  icon: Iconsax.profile_2user,
+                                  text: "Danh sách bạn đang theo dõi",
+                                  onTap: () => Get.toNamed("/following-list"),
+                                ),
 
-                      Builder(
-                        builder: (context) {
-                          final isDark = Theme.of(context).brightness == Brightness.dark;
-                          return Divider(
-                            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                          );
-                        },
-                      ),
+                                divider(),
 
-                      // ==== CÀI ĐẶT ====
-                      sectionHeader("Hệ thống"),
-                      menuItem(
-                        icon: Icons.settings_outlined,
-                        text: "Cài đặt ứng dụng",
-                        onTap: () => Get.toNamed("/app-settings"),
-                      ),
-                      menuItem(
-                        icon: Icons.brightness_6_outlined,
-                        text: "Chế độ",
-                        onTap: (){
-                          Get.back(); 
-                          Get.toNamed("/display-mode");
-                          },
-                      ),
+                                // ==== HỆ THỐNG ====
+                                sectionHeader("Hệ thống"),
+                                menuItem(
+                                  icon: Iconsax.setting_2,
+                                  text: "Cài đặt ứng dụng",
+                                  onTap: () => Get.toNamed("/app-settings"),
+                                ),
+                                menuItem(
+                                  icon: Iconsax.moon,
+                                  text: "Chế độ",
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed("/display-mode");
+                                  },
+                                ),
 
-                      const Spacer(),
+                                const Spacer(),
 
-                      // ==== ĐĂNG XUẤT ====
-                      menuItem(
-                        icon: Icons.logout,
-                        text: "Đăng xuất",
-                        danger: true,
-                        onTap: () {
-                          Navigator.pop(context); // đóng menu
-                          authC.logoutC();        // đăng xuất
-                        },
-                      ),
+                                // ==== ĐĂNG XUẤT ====
+                                menuItem(
+                                  icon: Icons.logout,
+                                  text: "Đăng xuất",
+                                  danger: true,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    authC.logoutC();
+                                  },
+                                ),
 
-                      const SizedBox(height: 20),
-                    ],
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
+
               ),
             ),
           ),
@@ -141,6 +142,18 @@ class RightSideMenu {
       },
     );
   }
+
+  static Widget divider() {
+    return Builder(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Divider(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+        );
+      },
+    );
+  }
+
 
   // ===== PHẦN HEADER =====
   static Widget sectionHeader(String title) {

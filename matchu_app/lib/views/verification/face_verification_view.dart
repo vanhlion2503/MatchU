@@ -29,6 +29,7 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
+            top: false,   // 👈 QUAN TRỌNG
             bottom: false,
             child: FaceVerificationIntroScreen(
               onBack: Get.back,
@@ -44,6 +45,7 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
                 ? Colors.black
                 : Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
+          top: false,   // 👈 QUAN TRỌNG
           bottom: false,
           child: switch (currentState) {
             VerificationState.idle ||

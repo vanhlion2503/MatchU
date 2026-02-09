@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:matchu_app/views/verification/widgets/verification_common_widgets.dart';
 
 class FaceVerificationSuccessScreen extends StatelessWidget {
   const FaceVerificationSuccessScreen({
@@ -38,7 +37,7 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
           child: Column(
             children: [
-              const SizedBox(height: 14),
+              const SizedBox(height: 50),
               Container(
                 width: 98,
                 height: 98,
@@ -82,9 +81,9 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
                     color: AppTheme.primaryColor.withValues(alpha: 0.22),
                   ),
                 ),
-                child: const Text(
+                child: Text(
                   'ĐÃ XÁC THỰC',
-                  style: TextStyle(
+                  style: theme.textTheme.headlineSmall?.copyWith(
                     color: AppTheme.primaryColor,
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -143,7 +142,6 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
-              const FaceVerificationPhoneHomeIndicator(dark: false),
             ],
           ),
         ),
@@ -165,16 +163,26 @@ class _BenefitTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: AppTheme.primaryColor),
+          Icon(
+            icon,
+            color: AppTheme.primaryColor,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -182,18 +190,17 @@ class _BenefitTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
+                  style: textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface.withOpacity(0.6),
                   ),
                 ),
               ],

@@ -15,14 +15,28 @@ class NearbySegmentedControl extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final selected = controller.selectedTab.value;
-
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkBorder : Color.fromARGB(255, 240, 240, 241),
-            borderRadius: BorderRadius.circular(14),
+            color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? AppTheme.darkBorder
+                : AppTheme.lightBorder,
+          ),
+          boxShadow: isDark
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -88,7 +102,7 @@ class _TabItem extends StatelessWidget {
               ? Theme.of(context).brightness == Brightness.dark
                 ? Colors.black
                 : Colors.white// tab được chọn để highlight phía sau lo
-              : Theme.of(context).brightness == Brightness.dark ? AppTheme.darkBorder : Color.fromARGB(255, 240, 240, 241), // 👈 nền trắng cho tab chưa chọn
+              : Theme.of(context).colorScheme.surface, // 👈 nền trắng cho tab chưa chọn
           borderRadius: BorderRadius.circular(10),
         ),
         child: TextButton(

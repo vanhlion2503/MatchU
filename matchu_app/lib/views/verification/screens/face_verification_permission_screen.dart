@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:matchu_app/views/verification/widgets/verification_common_widgets.dart';
-
 class FaceVerificationPermissionScreen extends StatelessWidget {
   const FaceVerificationPermissionScreen({
     super.key,
@@ -54,7 +52,6 @@ class FaceVerificationPermissionScreen extends StatelessWidget {
           const SizedBox(height: 8),
           TextButton(onPressed: onClose, child: const Text('Đóng')),
           const SizedBox(height: 16),
-          const FaceVerificationPhoneHomeIndicator(dark: true),
         ],
       ),
     );

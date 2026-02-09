@@ -12,7 +12,7 @@ class NearbyRangeFilter extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Obx(() {
       final value = controller.radiusKm.value;
 
@@ -20,15 +20,22 @@ class NearbyRangeFilter extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 20),
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkBorder : Color.fromARGB(255, 240, 240, 241),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDark
+                ? AppTheme.darkBorder
+                : AppTheme.lightBorder,
+          ),
+          boxShadow: isDark
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

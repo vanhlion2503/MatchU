@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 

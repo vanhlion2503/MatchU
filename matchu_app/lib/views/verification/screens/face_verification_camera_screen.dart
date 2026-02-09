@@ -88,18 +88,17 @@ class FaceVerificationCameraScreen extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
           child: Column(
             children: [
+              const SizedBox(height: 38),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   FaceVerificationGlassIconButton(
                     icon: Icons.close_rounded,
                     onTap: onClose,
-                    dark: true,
                   ),
                   FaceVerificationGlassIconButton(
                     icon: Icons.flash_on_outlined,
                     onTap: onFlashTap,
-                    dark: true,
                   ),
                 ],
               ),
@@ -123,12 +122,10 @@ class FaceVerificationCameraScreen extends StatelessWidget {
               ),
               const Spacer(),
               if (isLiveness)
-                _buildLivenessInstructionCard()
+                _buildLivenessInstructionCard(context)
               else
-                _buildSelfieCaptureControls(),
+                _buildSelfieCaptureControls(context),
               const SizedBox(height: 18),
-              const FaceVerificationPhoneHomeIndicator(dark: true),
-              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -136,7 +133,12 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLivenessInstructionCard() {
+  Widget _buildLivenessInstructionCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final steps = livenessStepLabels;
     if (steps.isEmpty) {
       return const SizedBox.shrink();
@@ -150,25 +152,33 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 🔒 Privacy note
         Text(
           'Chỉ xác minh chuyển động, không lưu video',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.42),
-            fontSize: 11,
+          style: textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 8),
+
+        const SizedBox(height: 12),
+
+        // 📦 Instruction card
         Container(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
+            color: isDark
+                ? AppTheme.darkSurface.withOpacity(0.92)
+                : AppTheme.lightSurface.withOpacity(0.95),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+            border: Border.all(
+              color: isDark
+                  ? AppTheme.darkBorder.withOpacity(0.8)
+                  : AppTheme.lightBorder,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
+                color: Colors.black.withOpacity(isDark ? 0.4 : 0.18),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -176,26 +186,33 @@ class FaceVerificationCameraScreen extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // 🎯 Step icon
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                  color: AppTheme.primaryColor.withOpacity(0.15),
                 ),
-                child: Icon(_stepIcon(active), color: AppTheme.primaryColor),
+                child: Icon(
+                  _stepIcon(active),
+                  color: AppTheme.primaryColor,
+                ),
               ),
+
               const SizedBox(width: 12),
+
+              // 📝 Instruction text
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       steps[active],
-                      style: const TextStyle(
+                      style: textTheme.bodyMedium?.copyWith(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -203,40 +220,45 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                       instructionText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: textTheme.bodySmall?.copyWith(
                         fontSize: 12,
-                        color: Color(0xFF475569),
                         fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface.withOpacity(0.65),
                       ),
                     ),
                   ],
                 ),
               ),
+
               const SizedBox(width: 8),
+
+              // 📊 Progress
               Column(
                 children: [
                   Text(
                     progressText,
-                    style: const TextStyle(
+                    style: textTheme.bodySmall?.copyWith(
                       fontSize: 11,
-                      color: Color(0xFF64748B),
                       fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface.withOpacity(0.55),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Icon(
+                  Icon(
                     Icons.arrow_forward_rounded,
                     size: 16,
-                    color: Color(0xFF94A3B8),
+                    color: colorScheme.onSurface.withOpacity(0.4),
                   ),
                 ],
               ),
             ],
           ),
         ),
+        const SizedBox(height: 24),
       ],
     );
   }
+
 
   IconData _stepIcon(int stepIndex) {
     switch (stepIndex) {
@@ -253,56 +275,67 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildSelfieCaptureControls() {
+  Widget _buildSelfieCaptureControls(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     final canCapture = isCameraReady && !isCaptureLocked;
 
     return Column(
       children: [
+        // 🔔 Tip ánh sáng
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.45),
+            color: Colors.black.withOpacity(0.45), // overlay OK
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.12),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.light_mode_outlined,
-                color: Color(0xFFFCD34D),
                 size: 15,
+                color: Color(0xFFFCD34D), // màu cảnh báo ánh sáng → giữ nguyên
               ),
               const SizedBox(width: 6),
               Text(
                 'Giữ môi trường đủ sáng',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.92),
+                style: textTheme.bodySmall?.copyWith(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
+                  color: Colors.white
                 ),
               ),
             ],
           ),
         ),
+
         const SizedBox(height: 16),
+
+        // 📸 Capture button
         _CaptureButton(
           enabled: canCapture,
           isLoading: isCaptureLocked,
           onTap: onCaptureSelfie,
         ),
+
         const SizedBox(height: 12),
+
+        // 🔒 Privacy note
         Text(
           'Ảnh chỉ dùng để xác minh',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.52),
-            fontSize: 10,
+          style: textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w500,
           ),
         ),
       ],
     );
   }
+
 
   Widget _buildCameraFeed() {
     final camera = cameraController;

@@ -203,7 +203,7 @@ class ProfileView extends StatelessWidget {
                     "Tài khoản chưa xác thực",
                     style: textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.error,
-                      fontSize: 12,
+                      fontSize: 15,
                     ),
                   ),
                 ),

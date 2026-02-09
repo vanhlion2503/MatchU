@@ -32,7 +32,6 @@ class FaceVerificationFailedScreen extends StatelessWidget {
               FaceVerificationGlassIconButton(
                 icon: Icons.arrow_back_ios_new_rounded,
                 onTap: onBack,
-                dark: false,
               ),
             ],
           ),
@@ -71,7 +70,6 @@ class FaceVerificationFailedScreen extends StatelessWidget {
             child: Text(
               'Lý do thường gặp',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF0F172A),
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.6,
               ),
@@ -131,7 +129,6 @@ class FaceVerificationFailedScreen extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          const FaceVerificationPhoneHomeIndicator(dark: false),
         ],
       ),
     );
@@ -139,29 +136,39 @@ class FaceVerificationFailedScreen extends StatelessWidget {
 }
 
 class _ReasonTile extends StatelessWidget {
-  const _ReasonTile({required this.icon, required this.label});
+  const _ReasonTile({
+    required this.icon,
+    required this.label,
+  });
 
   final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: const Color(0xFFF8FAFC),
+        color: colorScheme.surface,
       ),
       child: Row(
         children: [
-          Icon(icon, size: 19, color: const Color(0xFF94A3B8)),
+          Icon(
+            icon,
+            size: 19,
+            color: colorScheme.onSurface.withOpacity(0.45),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
+              style: textTheme.bodySmall?.copyWith(
                 fontSize: 12,
-                color: Color(0xFF475569),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -171,3 +178,4 @@ class _ReasonTile extends StatelessWidget {
     );
   }
 }
+

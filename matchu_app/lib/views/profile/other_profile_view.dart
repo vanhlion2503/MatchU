@@ -183,7 +183,7 @@ class OtherProfileView extends StatelessWidget {
                     "Tài khoản này chưa xác thực",
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.error,
-                      fontSize: 12,
+                      fontSize: 15,
                     ),
                   ),
                 ),

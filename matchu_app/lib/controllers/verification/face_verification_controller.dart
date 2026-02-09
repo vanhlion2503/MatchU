@@ -71,10 +71,10 @@ class FaceVerificationController extends GetxController
   static const double _blinkClosedThreshold = 0.3;
   static const double _turnYawThreshold = 14;
   static const List<String> _livenessStepLabels = <String>[
-    "Nhin thang",
-    "Chop mat",
-    "Quay trai",
-    "Quay phai",
+    "Nhìn thẳng",
+    "Chớp mắt",
+    "Quay trái",
+    "Quay phải",
   ];
 
   @override
@@ -114,7 +114,7 @@ class FaceVerificationController extends GetxController
         isAlreadyVerified.value = false;
         wasAlreadyVerifiedAtEntry.value = false;
         state.value = VerificationState.idle;
-        instructionText.value = "Dat khuon mat vao khung va chup anh";
+        instructionText.value = "Đặt khuôn mặt vào khung hình và chụp ảnh";
         return;
       }
 
@@ -128,10 +128,10 @@ class FaceVerificationController extends GetxController
         await _shutdownCameraForPreviewExit();
         state.value = VerificationState.success;
         errorText.value = "";
-        instructionText.value = "Tai khoan da xac thuc khuon mat";
+        instructionText.value = "Tài khoản này đã xác thực khuôn mặt";
       } else {
         state.value = VerificationState.idle;
-        instructionText.value = "Dat khuon mat vao khung va chup anh";
+        instructionText.value = "Đặt khuôn mặt vào khung hình và chụp ảnh";
       }
     } catch (e, stackTrace) {
       debugPrint("loadVerificationStatusOnEntry error: $e");
@@ -139,7 +139,7 @@ class FaceVerificationController extends GetxController
       isAlreadyVerified.value = false;
       wasAlreadyVerifiedAtEntry.value = false;
       state.value = VerificationState.idle;
-      instructionText.value = "Dat khuon mat vao khung va chup anh";
+      instructionText.value = "Đặt khuôn mặt vào khung hình và chụp ảnh";
     } finally {
       isCheckingVerificationStatus.value = false;
     }
@@ -371,19 +371,19 @@ class FaceVerificationController extends GetxController
   void _updateInstructionForCurrentStep() {
     switch (currentLivenessStep.value) {
       case 0:
-        instructionText.value = "Buoc 1/4: Nhin thang vao camera";
+        instructionText.value = "Bước 1/4: Nhìn thẳng vào camera";
         break;
       case 1:
-        instructionText.value = "Buoc 2/4: Chop mat";
+        instructionText.value = "Bước 2/4: Chớp mắt";
         break;
       case 2:
-        instructionText.value = "Buoc 3/4: Quay dau sang trai";
+        instructionText.value = "Bước 3/4: Quay đầu sang phải";
         break;
       case 3:
-        instructionText.value = "Buoc 4/4: Quay dau sang phai";
+        instructionText.value = "Bước 4/4: Quay đầu sang trái";
         break;
       default:
-        instructionText.value = "Da hoan tat kiem tra liveness";
+        instructionText.value = "Bạn đã hoàn thành xác thực khuôn mặt";
         break;
     }
   }
@@ -408,7 +408,7 @@ class FaceVerificationController extends GetxController
     if (step >= _livenessStepLabels.length - 1) {
       onHeadTurnDetected();
       _livenessPassed = true;
-      instructionText.value = "Dang chup anh xac thuc...";
+      instructionText.value = "Đang chụp ảnh xác thực...";
       return;
     }
 
@@ -484,7 +484,7 @@ class FaceVerificationController extends GetxController
       return;
     }
     try {
-      instructionText.value = "Dang chup anh xac thuc...";
+      instructionText.value = "Đang chụp ảnh xác thực...";
       await _stopImageStream();
       await Future<void>.delayed(const Duration(milliseconds: 120));
 
@@ -517,7 +517,7 @@ class FaceVerificationController extends GetxController
       }
 
       state.value = VerificationState.processing;
-      instructionText.value = "Dang xu ly du lieu khuon mat...";
+      instructionText.value = "Đang xử lý dữ liệu khuôn mặt ...";
 
       final isVerified = await _verificationService.uploadVerification(
         selfieFile: selfie,
@@ -527,10 +527,10 @@ class FaceVerificationController extends GetxController
       if (isVerified) {
         await _markCurrentUserVerified();
         state.value = VerificationState.success;
-        instructionText.value = "Xac thuc khuon mat thanh cong";
+        instructionText.value = "Xác thực thành công";
       } else {
         state.value = VerificationState.failed;
-        errorText.value = "Xac thuc that bai. Vui long thu lai.";
+        errorText.value = "Xác thực thất bại. Vui lòng thử lại.";
         instructionText.value = errorText.value;
       }
     } catch (e, stackTrace) {
@@ -541,7 +541,7 @@ class FaceVerificationController extends GetxController
       debugPrint("onLivenessPassed error: $e");
       debugPrintStack(stackTrace: stackTrace);
       state.value = VerificationState.failed;
-      errorText.value = "Liveness check that bai. Vui long thu lai.";
+      errorText.value = "Xác thực khuôn mặt thất bại. Vui lòng thử lại.";
       instructionText.value = errorText.value;
     }
   }
@@ -556,7 +556,7 @@ class FaceVerificationController extends GetxController
     if (wasAlreadyVerifiedAtEntry.value) {
       hasStartedVerificationFlow.value = false;
       state.value = VerificationState.success;
-      instructionText.value = "Tai khoan da xac thuc khuon mat";
+      instructionText.value = "Tài khoản đã xác thực khuôn mặt";
       errorText.value = "";
       return;
     }
