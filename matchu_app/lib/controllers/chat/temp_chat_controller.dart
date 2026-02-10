@@ -52,6 +52,8 @@ class TempChatController extends GetxController {
   
   bool _shownOtherLikeEffect = false;
   bool _isEnding = false;
+  bool _roomStatusKnown = false;
+  bool _roomIsActive = true;
   int _lastMessageCount = 0;
   int? _lastHapticSecond;
   bool _hasNavigatedToMatch = false;
@@ -368,6 +370,8 @@ class TempChatController extends GetxController {
     _roomSub = service.listenRoom(roomId).listen((doc) async {
       if (!doc.exists) return;
       final data = doc.data() as Map<String,dynamic>;
+      _roomStatusKnown = true;
+      _roomIsActive = data["status"] == "active";
       final typing = data["typing"] ?? {};
       final isA = data["userA"] == uid;
 
@@ -459,7 +463,7 @@ class TempChatController extends GetxController {
 
     switchToIceBreaker();
 
-    if (!await _isRoomActive()) return;
+    if (!_canUseRoomActions) return;
     
     final reply = replyingMessage.value;
 
@@ -478,6 +482,7 @@ class TempChatController extends GetxController {
       );
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {
+        _justSentMessage.value = false;
         Get.snackbar(
           "Thông báo",
           "Không thể gửi tin nhắn lúc này.",
@@ -486,6 +491,7 @@ class TempChatController extends GetxController {
         );
         return;
       }
+      _justSentMessage.value = false;
       rethrow;
     }
 
@@ -510,9 +516,17 @@ class TempChatController extends GetxController {
     });
   }
 
+  bool get _canUseRoomActions {
+    if (!_roomStatusKnown) return true;
+    return _roomIsActive;
+  }
+
   Future<bool> _isRoomActive() async {
+    if (_roomStatusKnown) return _roomIsActive;
     final room = await service.getRoom(roomId);
-    return room["status"] == "active";
+    _roomStatusKnown = true;
+    _roomIsActive = room["status"] == "active";
+    return _roomIsActive;
   }
 
   /// Auto scroll khi có tin nhắn mới (giống long_chat)
@@ -601,9 +615,13 @@ class TempChatController extends GetxController {
     );
   }
 
-  void onTypingChanged(String text) async {
-
-    if (!await _isRoomActive()) return;
+  void onTypingChanged(String text) {
+    if (!_canUseRoomActions) {
+      if (isTyping.value) {
+        stopTyping();
+      }
+      return;
+    }
     final hasText = text.trim().isNotEmpty;
 
     if (hasText) {
@@ -661,9 +679,8 @@ class TempChatController extends GetxController {
   void onReactMessage({
     required String messageId,
     required String reactionId,
-  }) async {
-
-    if (!await _isRoomActive()) return;
+  }) {
+    if (!_canUseRoomActions) return;
 
     service.toggleReaction(
       roomId: roomId,

@@ -44,8 +44,23 @@ const db = admin.firestore();
 const MODERATION_THRESHOLD = 0.8;
 const MODERATION_ENDPOINT =
   "https://ai-moderation-376071505252.asia-southeast1.run.app/moderate";
+const AI_MODERATION_TIMEOUT_MS = 4000;
+const AI_MODERATION_CACHE_TTL_MS = 5 * 60 * 1000;
+const AI_MODERATION_CACHE_MAX_ENTRIES = 512;
 const LINK_PATTERN = /(?:https?:\/\/|www\.)\S+/i;
 const PHONE_PATTERN = /(?:\+?\d[\d .-]{8,}\d)/;
+const EMOJI_ONLY_PATTERN = /^[\p{Extended_Pictographic}\u200d\ufe0f]+$/u;
+const AI_MODERATION_CACHE = new Map();
+const FAST_PATH_SAFE_PHRASES = new Set([
+  "hi",
+  "hello",
+  "hey",
+  "alo",
+  "xin chào",
+  "chào",
+  "chào bạn",
+  "rất vui được gặp bạn",
+]);
 
 const DANGEROUS_KEYWORDS = {
   sexual: [
@@ -530,6 +545,60 @@ function normalizeModerationText(value) {
   return value.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
+function normalizeFastPathText(value) {
+  const normalized = normalizeModerationText(value);
+  if (!normalized) return "";
+  return normalized
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isEmojiOnlyMessage(value) {
+  if (typeof value !== "string") return false;
+  const compact = value.replace(/\s+/g, "");
+  if (!compact) return false;
+  return EMOJI_ONLY_PATTERN.test(compact);
+}
+
+function shouldFastApproveWithoutAi(text) {
+  const normalized = normalizeModerationText(text);
+  if (!normalized) return true;
+  if (isEmojiOnlyMessage(normalized)) return true;
+
+  const fastPathText = normalizeFastPathText(normalized);
+  if (!fastPathText) return false;
+  return FAST_PATH_SAFE_PHRASES.has(fastPathText);
+}
+
+function getCachedAiModerationResult(key) {
+  const cached = AI_MODERATION_CACHE.get(key);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    AI_MODERATION_CACHE.delete(key);
+    return null;
+  }
+
+  return cached.result;
+}
+
+function setCachedAiModerationResult(key, result) {
+  AI_MODERATION_CACHE.set(key, {
+    result,
+    expiresAt: Date.now() + AI_MODERATION_CACHE_TTL_MS,
+  });
+
+  if (AI_MODERATION_CACHE.size <= AI_MODERATION_CACHE_MAX_ENTRIES) return;
+
+  const oldestKey = AI_MODERATION_CACHE.keys().next().value;
+  if (oldestKey !== undefined) {
+    AI_MODERATION_CACHE.delete(oldestKey);
+  }
+}
+
 function containsKeyword(normalizedText, keywords) {
   if (typeof normalizedText !== "string" || !normalizedText) return false;
   if (!Array.isArray(keywords) || keywords.length === 0) return false;
@@ -641,16 +710,28 @@ function ruleCheck(text) {
 }
 
 async function callAiModeration(text) {
+  const normalizedText = normalizeModerationText(text);
+  if (normalizedText) {
+    const cachedResult = getCachedAiModerationResult(normalizedText);
+    if (cachedResult) return cachedResult;
+  }
+
   const response = await axios.post(
     MODERATION_ENDPOINT,
     { text },
-    { timeout: 10000 }
+    { timeout: AI_MODERATION_TIMEOUT_MS }
   );
 
-  return {
+  const result = {
     label: normalizeAiLabel(response?.data?.label),
     score: parseAiScore(response?.data?.score),
   };
+
+  if (normalizedText) {
+    setCachedAiModerationResult(normalizedText, result);
+  }
+
+  return result;
 }
 
 exports.ensureTempChatModerationFields = onDocumentCreated(
@@ -742,6 +823,20 @@ exports.moderateTempChatMessage = onDocumentCreated(
           blockedBy: "rule",
           reason: ruleResult.reason,
           warning: true,
+          aiScore: null,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    if (shouldFastApproveWithoutAi(text)) {
+      await snap.ref.set(
+        {
+          status: "approved",
+          blockedBy: null,
+          reason: null,
+          warning: false,
           aiScore: null,
         },
         { merge: true }
