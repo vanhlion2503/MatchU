@@ -59,6 +59,7 @@ class CallController extends GetxController {
     super.onInit();
     _authSub = _auth.authStateChanges().listen(_onAuthChanged);
     _onAuthChanged(_auth.currentUser);
+    _warmUpRenderers();
   }
 
   String get callStatusText {
@@ -121,7 +122,8 @@ class CallController extends GetxController {
       callType.value = normalizedType;
       currentRoomChatId.value = roomChatId;
       peerUserId.value = receiverId;
-      await _loadPeerInfo(receiverId);
+      _openCallView('pending');
+      _loadPeerInfoInBackground(receiverId);
 
       await _webRTCService.initPeerConnection(
         withVideo: normalizedType == 'video',
@@ -146,12 +148,10 @@ class CallController extends GetxController {
 
       await _subscribeToCall(callId, callerSide: true);
       await _subscribeToRemoteIceCandidates(callId, callerSide: true);
-
-      _openCallView(callId);
     } catch (error) {
       debugPrint('startCall error: $error');
       _setError('Unable to start call.');
-      await _clearLocalSession(popScreens: false);
+      await _clearLocalSession(popScreens: true);
     }
   }
 
@@ -200,7 +200,7 @@ class CallController extends GetxController {
       currentCallId.value = callId;
       currentRoomChatId.value = roomChatId;
       peerUserId.value = callerId;
-      await _loadPeerInfo(callerId);
+      _loadPeerInfoInBackground(callerId);
       callType.value = normalizedType;
       callState.value = CallUiState.connecting;
       isCaller.value = false;
@@ -210,6 +210,7 @@ class CallController extends GetxController {
       _didIceRestartAttempt = false;
       _isSettingRemoteDescription = false;
       _lastAppliedAnswerSdp = null;
+      _openCallView(callId, replaceIncoming: true);
 
       await _webRTCService.initPeerConnection(
         withVideo: normalizedType == 'video',
@@ -232,8 +233,6 @@ class CallController extends GetxController {
 
       await _subscribeToCall(callId, callerSide: false);
       await _subscribeToRemoteIceCandidates(callId, callerSide: false);
-
-      _openCallView(callId, replaceIncoming: true);
     } catch (error) {
       debugPrint('acceptCall error: $error');
       _setError('Unable to accept call.');
@@ -346,11 +345,9 @@ class CallController extends GetxController {
               callState.value = CallUiState.ringing;
               isMuted.value = false;
               isCameraEnabled.value = type == 'video';
-
-              await _loadPeerInfo(callerId);
-
-              await _subscribeToCall(callId, callerSide: false);
               _openIncomingCallView(callId);
+              _loadPeerInfoInBackground(callerId);
+              await _subscribeToCall(callId, callerSide: false);
             } catch (error) {
               debugPrint('incoming call listener error: $error');
             }
@@ -669,6 +666,22 @@ class CallController extends GetxController {
     final name = user.fullname.trim();
     peerName.value = name.isNotEmpty ? name : user.nickname;
     peerAvatarUrl.value = user.avatarUrl;
+  }
+
+  void _loadPeerInfoInBackground(String uid) {
+    unawaited(
+      _loadPeerInfo(uid).catchError((error) {
+        debugPrint('load peer info background error: $error');
+      }),
+    );
+  }
+
+  void _warmUpRenderers() {
+    unawaited(
+      _webRTCService.initRenderers().catchError((error) {
+        debugPrint('renderer warmup error: $error');
+      }),
+    );
   }
 
   String _normalizeCallType(String? type) {

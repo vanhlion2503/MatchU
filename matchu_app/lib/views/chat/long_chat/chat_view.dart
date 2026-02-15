@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -160,7 +162,9 @@ class ChatView extends StatelessWidget {
                     Get.snackbar("Call", "Unable to find receiver.");
                     return;
                   }
-                  await callController.startCall(roomId, otherUid, 'audio');
+                  unawaited(
+                    callController.startCall(roomId, otherUid, 'audio'),
+                  );
                   break;
 
                 case ChatMenuAction.video:
@@ -168,7 +172,9 @@ class ChatView extends StatelessWidget {
                     Get.snackbar("Call", "Unable to find receiver.");
                     return;
                   }
-                  await callController.startCall(roomId, otherUid, 'video');
+                  unawaited(
+                    callController.startCall(roomId, otherUid, 'video'),
+                  );
                   break;
 
                 case ChatMenuAction.report:
