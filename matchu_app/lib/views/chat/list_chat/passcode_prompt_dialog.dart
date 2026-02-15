@@ -161,7 +161,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
       return StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text('Nhap ma PIN'),
+            title: const Text('Nhập mã PIN'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

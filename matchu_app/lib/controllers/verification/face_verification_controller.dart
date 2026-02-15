@@ -377,10 +377,10 @@ class FaceVerificationController extends GetxController
         instructionText.value = "Bước 2/4: Chớp mắt";
         break;
       case 2:
-        instructionText.value = "Bước 3/4: Quay đầu sang phải";
+        instructionText.value = "Bước 3/4: Quay đầu sang trái";
         break;
       case 3:
-        instructionText.value = "Bước 4/4: Quay đầu sang trái";
+        instructionText.value = "Bước 4/4: Quay đầu sang phải";
         break;
       default:
         instructionText.value = "Bạn đã hoàn thành xác thực khuôn mặt";
@@ -505,10 +505,8 @@ class FaceVerificationController extends GetxController
       );
       liveFrameFile = savedFrame;
 
-      // Give CameraX a short settle window before disposing surfaces.
       await Future<void>.delayed(const Duration(milliseconds: 180));
 
-      // Ensure preview resources are closed before leaving preview UI.
       await _shutdownCameraForPreviewExit();
 
       final selfie = selfieFile;

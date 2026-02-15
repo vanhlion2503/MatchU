@@ -15,6 +15,8 @@ import 'package:matchu_app/views/auth/forgot_password_view.dart';
 import 'package:matchu_app/views/auth/otp_enroll_view.dart';
 import 'package:matchu_app/views/auth/verify_email_view.dart';
 import 'package:matchu_app/views/chat/list_chat/chat_list_view.dart';
+import 'package:matchu_app/views/chat/call/call_view.dart';
+import 'package:matchu_app/views/chat/call/incoming_call_view.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/matching/matching_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
@@ -122,6 +124,8 @@ class AppPages {
         Get.put(PresenceController());
       }),
     ),
+    GetPage(name: AppRouter.incomingCall, page: () => const IncomingCallView()),
+    GetPage(name: AppRouter.call, page: () => const CallView()),
 
     GetPage(name: AppRouter.chatList, page: () => ChatListView()),
 

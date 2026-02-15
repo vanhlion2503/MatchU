@@ -126,16 +126,16 @@ class _RandomChatViewState extends State<RandomChatView>
 
     final quota = _quotaPreview;
     if (quota == null) {
-      return '🔍 Bắt đầu tìm kiếm';
+      return 'Bắt đầu tìm kiếm';
     }
     if (quota.isUnlimited) {
-      return '🔍 Bắt đầu tìm kiếm • Không giới hạn';
+      return 'Bắt đầu tìm kiếm';
     }
     if (quota.remaining <= 0) {
       return 'Hết lượt hôm nay • 0/${quota.limit}';
     }
 
-    return '🔍 Bắt đầu tìm kiếm • ${quota.remaining}/${quota.limit}';
+    return 'Bắt đầu tìm kiếm • ${quota.remaining}/${quota.limit}';
   }
 
   Future<void> _showOutOfQuotaDialog() async {

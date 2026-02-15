@@ -564,6 +564,165 @@ service cloud.firestore {
     }
 
   
+    // ================= CALL SESSIONS (WEBRTC SIGNALING) =================
+    match /callSessions/{callId} {
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isCallParticipant() {
+        return isSignedIn()
+          && request.auth.uid in resource.data.participants;
+      }
+
+      function isValidCallType(value) {
+        return value == "audio" || value == "video";
+      }
+
+      function isValidCallStatus(value) {
+        return value in ["ringing", "active", "rejected", "ended", "busy", "missed"];
+      }
+
+      function roomExistsAndBothAreParticipants() {
+        let roomId = request.resource.data.roomChatId;
+        return roomId is string
+          && exists(/databases/$(database)/documents/chatRooms/$(roomId))
+          && request.resource.data.callerId in
+            get(/databases/$(database)/documents/chatRooms/$(roomId))
+              .data.participants
+          && request.resource.data.receiverId in
+            get(/databases/$(database)/documents/chatRooms/$(roomId))
+              .data.participants;
+      }
+
+      function changedKeys() {
+        return request.resource.data.diff(resource.data).changedKeys();
+      }
+
+      // Read is allowed for caller/receiver.
+      // This makes incoming-call query by receiverId/status pass rule checks.
+      allow read: if isSignedIn()
+        && (
+          request.auth.uid == resource.data.callerId
+          || request.auth.uid == resource.data.receiverId
+          || isCallParticipant()
+        );
+
+      // Caller creates the session with initial SDP offer.
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          "callId",
+          "roomChatId",
+          "callerId",
+          "receiverId",
+          "participants",
+          "type",
+          "status",
+          "offer",
+          "answer",
+          "createdAt",
+          "updatedAt"
+        ])
+        && request.resource.data.callId == callId
+        && request.resource.data.callerId == request.auth.uid
+        && request.resource.data.receiverId is string
+        && request.resource.data.receiverId != request.auth.uid
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants.hasAll([
+          request.resource.data.callerId,
+          request.resource.data.receiverId
+        ])
+        && request.resource.data.type is string
+        && isValidCallType(request.resource.data.type)
+        && request.resource.data.status == "ringing"
+        && request.resource.data.offer is map
+        && request.resource.data.answer == null
+        && roomExistsAndBothAreParticipants();
+
+      // Participants can only update signaling fields.
+      allow update: if isCallParticipant()
+        && changedKeys().hasOnly([
+          "offer",
+          "answer",
+          "status",
+          "updatedAt",
+          "answeredAt",
+          "endedAt"
+        ])
+        && request.resource.data.callId == resource.data.callId
+        && request.resource.data.roomChatId == resource.data.roomChatId
+        && request.resource.data.callerId == resource.data.callerId
+        && request.resource.data.receiverId == resource.data.receiverId
+        && request.resource.data.participants == resource.data.participants
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.status is string
+        && isValidCallStatus(request.resource.data.status)
+        && (
+          !changedKeys().hasAny(["offer"])
+          || (
+            request.auth.uid == resource.data.callerId
+            && request.resource.data.offer is map
+          )
+        )
+        && (
+          !changedKeys().hasAny(["answer"])
+          || (
+            request.auth.uid == resource.data.receiverId
+            && request.resource.data.answer is map
+          )
+        );
+
+      allow delete: if false;
+
+      function canReadCandidate() {
+        return isSignedIn()
+          && exists(/databases/$(database)/documents/callSessions/$(callId))
+          && request.auth.uid in
+            get(/databases/$(database)/documents/callSessions/$(callId))
+              .data.participants;
+      }
+
+      function canCreateCandidate() {
+        return canReadCandidate()
+          && request.resource.data.senderId == request.auth.uid;
+      }
+
+      function isValidCandidateDoc() {
+        return request.resource.data.keys().hasOnly([
+          "candidate",
+          "sdpMid",
+          "sdpMLineIndex",
+          "senderId",
+          "createdAt"
+        ])
+        && request.resource.data.candidate is string
+        && (
+          request.resource.data.sdpMid == null
+          || request.resource.data.sdpMid is string
+        )
+        && (
+          request.resource.data.sdpMLineIndex == null
+          || request.resource.data.sdpMLineIndex is int
+          || request.resource.data.sdpMLineIndex is number
+        );
+      }
+
+      match /callerCandidates/{candidateId} {
+        allow read: if canReadCandidate();
+        allow create: if canCreateCandidate() && isValidCandidateDoc();
+        allow update, delete: if false;
+      }
+
+      match /calleeCandidates/{candidateId} {
+        allow read: if canReadCandidate();
+        allow create: if canCreateCandidate() && isValidCandidateDoc();
+        allow update, delete: if false;
+      }
+    }
+
+  
     match /chatRatings/{id} {
 
       // 👀 Transaction cần read

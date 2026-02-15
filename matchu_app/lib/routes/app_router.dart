@@ -24,5 +24,7 @@ class AppRouter {
   static const String rating = '/rating';
   static const String chat = '/chat';
   static const String chatList = '/chat-list';
+  static const String incomingCall = '/incoming-call';
+  static const String call = '/call';
   static const String faceVerification = '/face-verification';
 }

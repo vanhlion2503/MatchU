@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 
 import '../../controllers/user/user_controller.dart';
@@ -23,7 +25,7 @@ class LogoutService {
     // 🔥 LẤY UID TRƯỚC KHI LOGOUT (QUAN TRỌNG!)
     final currentUser = _auth.currentUser;
     final uid = currentUser?.uid;
-    
+
     try {
       // 1️⃣ Update offline (Firestore + Realtime Database) - TRƯỚC KHI DỪNG CÁC SERVICES
       if (currentUser != null && uid != null) {
@@ -31,13 +33,14 @@ class LogoutService {
           // 1️⃣.1️⃣ Update Firestore offline
           if (Get.isRegistered<UserController>()) {
             try {
-              await Get.find<UserController>()
-                  .updateProfile({"activeStatus": "offline"});
+              await Get.find<UserController>().updateProfile({
+                "activeStatus": "offline",
+              });
             } catch (e) {
               // Ignore errors - continue
             }
           }
-          
+
           // 1️⃣.2️⃣ Update Realtime Database offline (QUAN TRỌNG!)
           // 🔥 PHẢI SET OFFLINE TRƯỚC KHI SIGN OUT!
           try {
@@ -142,6 +145,11 @@ class LogoutService {
         Get.delete<ChatController>(force: true);
       } catch (_) {}
 
+      if (Get.isRegistered<CallController>()) {
+        try {
+          await Get.find<CallController>().endCall();
+        } catch (_) {}
+      }
 
       // 8️⃣ ❗ CLEAR SESSION KEYS (KHÔNG XOÁ IDENTITY KEY)
       try {
@@ -170,6 +178,7 @@ class LogoutService {
       // 9️⃣ Firebase sign out
       await _auth.signOut();
     } catch (e) {
+      debugPrint('Logout error: $e');
     }
   }
 }
