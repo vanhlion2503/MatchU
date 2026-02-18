@@ -138,6 +138,7 @@ class IncomingCallView extends GetView<CallController> {
                                   color: const Color(0xFFDC3545),
                                   onTap: () => controller.rejectCall(callId),
                                 ),
+                                const SizedBox(width: 12),
                                 IncomingCallActionButton(
                                   icon: isVideo ? Iconsax.video : Iconsax.call_calling,
                                   label: 'Chập nhận',

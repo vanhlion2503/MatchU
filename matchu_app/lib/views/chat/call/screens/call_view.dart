@@ -22,11 +22,16 @@ class CallView extends GetView<CallController> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Obx(() {
+          final callState = controller.callState.value;
+          final isCaller = controller.isCaller.value;
           final isVideo = controller.isVideoCall;
+          final peerName = controller.peerName.value;
+          final avatarUrl = controller.peerAvatarUrl.value;
+          final statusText = controller.callStatusText;
           final isOutgoingWaiting =
-              controller.isCaller.value &&
-              (controller.callState.value == CallUiState.creating ||
-                  controller.callState.value == CallUiState.ringing);
+              isCaller &&
+              (callState == CallUiState.creating ||
+                  callState == CallUiState.ringing);
           final safePadding = MediaQuery.paddingOf(context);
 
           return Stack(
@@ -34,20 +39,26 @@ class CallView extends GetView<CallController> {
               Positioned.fill(
                 child:
                     isOutgoingWaiting
-                        ? const CallOutgoingWaitingView()
+                        ? CallOutgoingWaitingView(
+                          avatarUrl: avatarUrl,
+                          title: peerName,
+                          subtitle: statusText,
+                        )
                         : (isVideo
                             ? CallVideoLayer(controller: controller)
-                            : CallAudioLayer(controller: controller)),
+                            : CallAudioLayer(
+                              avatarUrl: avatarUrl,
+                              title: peerName,
+                              subtitle: statusText,
+                            )),
               ),
-              Positioned(
-                left: 20,
-                right: 20,
-                top: safePadding.top + 16,
-                child: CallHeaderInfo(
-                  title: controller.peerName.value,
-                  subtitle: controller.callStatusText,
+              if (!isOutgoingWaiting && isVideo)
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  top: safePadding.top + 16,
+                  child: CallHeaderInfo(title: peerName, subtitle: statusText),
                 ),
-              ),
               if (isVideo && !isOutgoingWaiting)
                 Positioned(
                   top: safePadding.top + 96,

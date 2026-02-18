@@ -33,6 +33,7 @@ class CallController extends GetxController {
   final RxBool isCameraEnabled = true.obs;
   final Rx<CallUiState> callState = CallUiState.idle.obs;
   final RxnString errorMessage = RxnString();
+  final RxInt callDurationSeconds = 0.obs;
 
   RTCVideoRenderer get localRenderer => _webRTCService.localRenderer;
   RTCVideoRenderer get remoteRenderer => _webRTCService.remoteRenderer;
@@ -45,6 +46,7 @@ class CallController extends GetxController {
   final Set<String> _handledRemoteCandidateIds = <String>{};
   final List<RTCIceCandidate> _pendingLocalCandidates = <RTCIceCandidate>[];
   Timer? _ringingTimeout;
+  Timer? _callDurationTimer;
   bool _isSettingRemoteDescription = false;
   bool _isEndingCall = false;
   bool _hasAcceptedCall = false;
@@ -71,7 +73,7 @@ class CallController extends GetxController {
       case CallUiState.connecting:
         return 'Đang kết nối...';
       case CallUiState.active:
-        return 'Đang trò chuyện';
+        return 'Đang trò chuyện $formattedCallDuration';
       case CallUiState.ended:
         return 'Cuộc gọi đã kết thúc';
       case CallUiState.error:
@@ -79,6 +81,19 @@ class CallController extends GetxController {
       case CallUiState.idle:
         return '';
     }
+  }
+
+  String get formattedCallDuration {
+    final duration = Duration(seconds: callDurationSeconds.value);
+    final hours = duration.inHours;
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:$minutes:$seconds';
+    }
+
+    return '$minutes:$seconds';
   }
 
   bool get isVideoCall => callType.value == 'video';
@@ -111,6 +126,7 @@ class CallController extends GetxController {
     try {
       errorMessage.value = null;
       callState.value = CallUiState.creating;
+      _stopCallDurationTimer(reset: true);
       isCaller.value = true;
       isMuted.value = false;
       isCameraEnabled.value = normalizedType == 'video';
@@ -197,6 +213,7 @@ class CallController extends GetxController {
       final normalizedType = _normalizeCallType(data['type'] as String?);
 
       errorMessage.value = null;
+      _stopCallDurationTimer(reset: true);
       currentCallId.value = callId;
       currentRoomChatId.value = roomChatId;
       peerUserId.value = callerId;
@@ -343,6 +360,7 @@ class CallController extends GetxController {
               callType.value = type;
               isCaller.value = false;
               callState.value = CallUiState.ringing;
+              _stopCallDurationTimer(reset: true);
               isMuted.value = false;
               isCameraEnabled.value = type == 'video';
               _openIncomingCallView(callId);
@@ -426,7 +444,8 @@ class CallController extends GetxController {
 
         if (status == 'active' && callState.value != CallUiState.active) {
           _cancelRingingTimeout();
-          callState.value = CallUiState.connecting;
+          callState.value = CallUiState.active;
+          _startCallDurationTimer();
         }
 
         if (_isTerminalStatus(status)) {
@@ -518,14 +537,20 @@ class CallController extends GetxController {
         _cancelRingingTimeout();
         _didIceRestartAttempt = false;
         callState.value = CallUiState.active;
+        _startCallDurationTimer();
         break;
       case RTCPeerConnectionState.RTCPeerConnectionStateConnecting:
+        if (callState.value == CallUiState.active) {
+          break;
+        }
+        _stopCallDurationTimer();
         if (callState.value != CallUiState.ringing) {
           callState.value = CallUiState.connecting;
         }
         break;
       case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
       case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
+        _stopCallDurationTimer();
         // Keep call alive while caller is still waiting for answer.
         final waitingForAnswer =
             isCaller.value &&
@@ -550,7 +575,23 @@ class CallController extends GetxController {
         break;
       case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
       case RTCPeerConnectionState.RTCPeerConnectionStateNew:
+        _stopCallDurationTimer();
         break;
+    }
+  }
+
+  void _startCallDurationTimer() {
+    if (_callDurationTimer != null) return;
+    _callDurationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      callDurationSeconds.value += 1;
+    });
+  }
+
+  void _stopCallDurationTimer({bool reset = false}) {
+    _callDurationTimer?.cancel();
+    _callDurationTimer = null;
+    if (reset) {
+      callDurationSeconds.value = 0;
     }
   }
 
@@ -610,6 +651,7 @@ class CallController extends GetxController {
 
   Future<void> _clearLocalSession({required bool popScreens}) async {
     _cancelRingingTimeout();
+    _stopCallDurationTimer(reset: true);
     await _callDocSub?.cancel();
     _callDocSub = null;
     await _remoteIceSub?.cancel();
@@ -757,6 +799,7 @@ class CallController extends GetxController {
   @override
   void onClose() {
     _cancelRingingTimeout();
+    _stopCallDurationTimer(reset: true);
     _authSub?.cancel();
     _incomingCallSub?.cancel();
     _callDocSub?.cancel();
