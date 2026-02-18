@@ -65,17 +65,17 @@ class CallController extends GetxController {
   String get callStatusText {
     switch (callState.value) {
       case CallUiState.creating:
-        return 'Creating call...';
+        return 'Đang gọi...';
       case CallUiState.ringing:
-        return isCaller.value ? 'Ringing...' : 'Incoming call';
+        return isCaller.value ? 'Đang đổ chuông...' : 'Cuộc gọi đến';
       case CallUiState.connecting:
-        return 'Connecting...';
+        return 'Đang kết nối...';
       case CallUiState.active:
-        return 'Connected';
+        return 'Đang trò chuyện';
       case CallUiState.ended:
-        return 'Call ended';
+        return 'Cuộc gọi đã kết thúc';
       case CallUiState.error:
-        return errorMessage.value ?? 'Call error';
+        return errorMessage.value ?? 'Lỗi cuộc gọi';
       case CallUiState.idle:
         return '';
     }
