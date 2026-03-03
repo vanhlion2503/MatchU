@@ -14,6 +14,26 @@ import 'package:matchu_app/services/user/user_service.dart';
 
 enum CallUiState { idle, creating, ringing, connecting, active, ended, error }
 
+class CallEndedSummary {
+  const CallEndedSummary({
+    required this.peerName,
+    required this.peerAvatarUrl,
+    required this.durationSeconds,
+    required this.roomChatId,
+    required this.peerUserId,
+    required this.callType,
+    required this.reason,
+  });
+
+  final String peerName;
+  final String peerAvatarUrl;
+  final int durationSeconds;
+  final String roomChatId;
+  final String peerUserId;
+  final String callType;
+  final String reason;
+}
+
 class CallController extends GetxController {
   final CallSignalingService _signalingService = CallSignalingService();
   final WebRTCService _webRTCService = WebRTCService();
@@ -34,6 +54,7 @@ class CallController extends GetxController {
   final Rx<CallUiState> callState = CallUiState.idle.obs;
   final RxnString errorMessage = RxnString();
   final RxInt callDurationSeconds = 0.obs;
+  final Rxn<CallEndedSummary> endedSummary = Rxn<CallEndedSummary>();
 
   RTCVideoRenderer get localRenderer => _webRTCService.localRenderer;
   RTCVideoRenderer get remoteRenderer => _webRTCService.remoteRenderer;
@@ -96,6 +117,67 @@ class CallController extends GetxController {
     return '$minutes:$seconds';
   }
 
+  String formatEndedDuration(int seconds) {
+    final duration = Duration(seconds: seconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    final remainingSeconds = duration.inSeconds % 60;
+
+    if (hours > 0) {
+      return '$hours giờ $minutes phút $remainingSeconds giây';
+    }
+    if (minutes > 0) {
+      return '$minutes phút $remainingSeconds giây';
+    }
+    return '$remainingSeconds giây';
+  }
+
+  String endedReasonText(String reason) {
+    switch (reason) {
+      case 'rejected':
+        return 'Cuộc gọi bị từ chối';
+      case 'busy':
+        return 'Đối phương đang bận';
+      case 'missed':
+        return 'Không có phản hồi';
+      default:
+        return 'Cuộc gọi đã kết thúc';
+    }
+  }
+
+  Future<void> handleCallBackNavigation() async {
+    if (endedSummary.value != null) {
+      closeEndedScreen();
+      return;
+    }
+    await endCall();
+  }
+
+  Future<void> redialLastPeer() async {
+    final summary = endedSummary.value;
+    if (summary == null) return;
+
+    if (summary.roomChatId.isEmpty || summary.peerUserId.isEmpty) {
+      closeEndedScreen();
+      Get.snackbar('Call', 'Unable to redial this conversation.');
+      return;
+    }
+
+    endedSummary.value = null;
+    callState.value = CallUiState.idle;
+    await startCall(summary.roomChatId, summary.peerUserId, summary.callType);
+  }
+
+  void backToChatFromEnded() {
+    closeEndedScreen();
+  }
+
+  void closeEndedScreen() {
+    endedSummary.value = null;
+    callState.value = CallUiState.idle;
+    _closeCallScreens();
+  }
+
   bool get isVideoCall => callType.value == 'video';
 
   Future<void> startCall(
@@ -125,6 +207,7 @@ class CallController extends GetxController {
 
     try {
       errorMessage.value = null;
+      endedSummary.value = null;
       callState.value = CallUiState.creating;
       _stopCallDurationTimer(reset: true);
       isCaller.value = true;
@@ -213,6 +296,7 @@ class CallController extends GetxController {
       final normalizedType = _normalizeCallType(data['type'] as String?);
 
       errorMessage.value = null;
+      endedSummary.value = null;
       _stopCallDurationTimer(reset: true);
       currentCallId.value = callId;
       currentRoomChatId.value = roomChatId;
@@ -278,6 +362,19 @@ class CallController extends GetxController {
     _isEndingCall = true;
 
     final callId = currentCallId.value;
+    final hasLiveSession =
+        (callId != null && callId.isNotEmpty) ||
+        callState.value == CallUiState.creating ||
+        callState.value == CallUiState.ringing ||
+        callState.value == CallUiState.connecting ||
+        callState.value == CallUiState.active;
+
+    if (!hasLiveSession) {
+      _isEndingCall = false;
+      return;
+    }
+
+    final snapshot = _buildEndedSummary(reason: 'ended');
 
     try {
       if (callId != null && callId.isNotEmpty) {
@@ -286,7 +383,8 @@ class CallController extends GetxController {
     } catch (error) {
       debugPrint('endCall error: $error');
     } finally {
-      await _clearLocalSession(popScreens: true);
+      await _clearLocalSession(popScreens: false);
+      _showEndedSummary(snapshot);
       _isEndingCall = false;
     }
   }
@@ -315,7 +413,7 @@ class CallController extends GetxController {
       _iceServerService.clearCache();
       _incomingCallSub?.cancel();
       _incomingCallSub = null;
-      unawaited(_clearLocalSession(popScreens: true));
+      unawaited(_clearLocalSession(popScreens: true, clearEndedSummary: true));
       return;
     }
 
@@ -386,7 +484,7 @@ class CallController extends GetxController {
     ) async {
       try {
         if (!snapshot.exists) {
-          await _clearLocalSession(popScreens: true);
+          await _finalizeCallAndShowEndedIfNeeded(reason: 'ended');
           return;
         }
 
@@ -449,7 +547,7 @@ class CallController extends GetxController {
         }
 
         if (_isTerminalStatus(status)) {
-          await _clearLocalSession(popScreens: true);
+          await _finalizeCallAndShowEndedIfNeeded(reason: status);
         }
       } catch (error) {
         debugPrint('call document listener error: $error');
@@ -606,7 +704,7 @@ class CallController extends GetxController {
       } catch (error) {
         debugPrint('ringing timeout update error: $error');
       } finally {
-        await _clearLocalSession(popScreens: true);
+        await _finalizeCallAndShowEndedIfNeeded(reason: 'missed');
       }
     });
   }
@@ -649,7 +747,43 @@ class CallController extends GetxController {
     }
   }
 
-  Future<void> _clearLocalSession({required bool popScreens}) async {
+  Future<void> _finalizeCallAndShowEndedIfNeeded({
+    required String reason,
+  }) async {
+    final shouldShowEnded = Get.currentRoute == AppRouter.call;
+    final snapshot =
+        shouldShowEnded ? _buildEndedSummary(reason: reason) : null;
+
+    await _clearLocalSession(popScreens: !shouldShowEnded);
+
+    if (snapshot != null) {
+      _showEndedSummary(snapshot);
+    }
+  }
+
+  CallEndedSummary _buildEndedSummary({required String reason}) {
+    final safeName = peerName.value.trim();
+
+    return CallEndedSummary(
+      peerName: safeName.isNotEmpty ? safeName : 'Unknown user',
+      peerAvatarUrl: peerAvatarUrl.value,
+      durationSeconds: callDurationSeconds.value,
+      roomChatId: currentRoomChatId.value ?? '',
+      peerUserId: peerUserId.value ?? '',
+      callType: _normalizeCallType(callType.value),
+      reason: reason,
+    );
+  }
+
+  void _showEndedSummary(CallEndedSummary summary) {
+    endedSummary.value = summary;
+    callState.value = CallUiState.ended;
+  }
+
+  Future<void> _clearLocalSession({
+    required bool popScreens,
+    bool clearEndedSummary = true,
+  }) async {
     _cancelRingingTimeout();
     _stopCallDurationTimer(reset: true);
     await _callDocSub?.cancel();
@@ -677,6 +811,9 @@ class CallController extends GetxController {
     isMuted.value = false;
     isCameraEnabled.value = true;
     callState.value = CallUiState.idle;
+    if (clearEndedSummary) {
+      endedSummary.value = null;
+    }
 
     if (popScreens) {
       _closeCallScreens();

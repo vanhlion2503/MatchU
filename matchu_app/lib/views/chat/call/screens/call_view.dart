@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
+import 'package:matchu_app/views/chat/call/screens/call_ended_view.dart';
 import 'package:matchu_app/views/chat/call/screens/call_outgoing_waiting_view.dart';
 import 'package:matchu_app/views/chat/call/widgets/call_audio_layer.dart';
 import 'package:matchu_app/views/chat/call/widgets/call_controls.dart';
@@ -17,11 +18,24 @@ class CallView extends GetView<CallController> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        await controller.endCall();
+        await controller.handleCallBackNavigation();
       },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: Obx(() {
+          final endedSummary = controller.endedSummary.value;
+          if (endedSummary != null) {
+            return CallEndedView(
+              summary: endedSummary,
+              statusText: controller.endedReasonText(endedSummary.reason),
+              durationText: controller.formatEndedDuration(
+                endedSummary.durationSeconds,
+              ),
+              onRedial: controller.redialLastPeer,
+              onMessage: controller.backToChatFromEnded,
+            );
+          }
+
           final callState = controller.callState.value;
           final isCaller = controller.isCaller.value;
           final isVideo = controller.isVideoCall;
