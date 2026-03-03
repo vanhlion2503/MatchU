@@ -194,6 +194,7 @@ class MatchingController extends GetxController {
     isMatchingActive.value = false;
     isMinimized.value = false;
     canCancel.value = false;
+    _isHandlingMatchFound = false;
   }
 
   // =========================================================
@@ -202,6 +203,7 @@ class MatchingController extends GetxController {
   Future<void> startMatching({required String targetGender}) async {
     if (isSearching.value || _isStartInProgress) return;
     _isStartInProgress = true;
+    _isHandlingMatchFound = false;
 
     try {
       final auth = Get.find<AuthController>();
@@ -381,6 +383,7 @@ class MatchingController extends GetxController {
     isMatchingActive.value = false;
     isMinimized.value = false;
     canCancel.value = false;
+    _isHandlingMatchFound = false;
 
     if (!wasSearching) return;
 

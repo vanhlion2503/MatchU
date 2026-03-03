@@ -651,6 +651,8 @@ class _RandomChatViewState extends State<RandomChatView>
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
+          maxLines: 2, 
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
             color:
