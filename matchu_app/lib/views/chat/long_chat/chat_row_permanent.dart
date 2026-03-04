@@ -16,7 +16,7 @@ class ChatRowPermanent extends StatelessWidget {
   final String type;
 
   final bool isMe;
-  final bool showAvatar;   // chỉ true ở tin CUỐI nhóm
+  final bool showAvatar; // chỉ true ở tin CUỐI nhóm
   final bool smallMargin;
   final bool showTime;
   final String time;
@@ -32,6 +32,9 @@ class ChatRowPermanent extends StatelessWidget {
   final String? seenByUid;
 
   final Map<String, String>? reactions;
+  final String? callStatus;
+  final String? callType;
+  final int? callDurationSeconds;
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onTapMessage;
@@ -58,6 +61,9 @@ class ChatRowPermanent extends StatelessWidget {
     this.status,
     this.seenByUid,
     this.reactions,
+    this.callStatus,
+    this.callType,
+    this.callDurationSeconds,
     this.onLongPress,
     this.onDoubleTap,
     this.onTapMessage,
@@ -67,18 +73,18 @@ class ChatRowPermanent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    final bubbleColor = isMe
-        ? theme.colorScheme.primary
-        : theme.brightness == Brightness.dark
+    final bubbleColor =
+        isMe
+            ? theme.colorScheme.primary
+            : theme.brightness == Brightness.dark
             ? AppTheme.darkBorder
             : const Color(0xFFF4F6F8);
 
     final textColor =
         isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
     final isDeleted = type == "deleted";
-    final resolvedTextColor = isDeleted
-        ? theme.colorScheme.onSurface.withOpacity(0.6)
-        : textColor;
+    final resolvedTextColor =
+        isDeleted ? theme.colorScheme.onSurface.withOpacity(0.6) : textColor;
 
     // ================= EMOJI ONLY =================
     final isEmojiOnly = _isEmojiOnly(text);
@@ -94,9 +100,10 @@ class ChatRowPermanent extends StatelessWidget {
             if (!isMe)
               SizedBox(
                 width: 36,
-                child: showAvatar
-                    ? UserAvatar(userId: senderId)
-                    : const SizedBox(),
+                child:
+                    showAvatar
+                        ? UserAvatar(userId: senderId)
+                        : const SizedBox(),
               ),
             if (!isMe) const SizedBox(width: 6),
 
@@ -117,16 +124,15 @@ class ChatRowPermanent extends StatelessWidget {
           ],
         ),
       );
-
     }
 
     // ================= IMAGE MESSAGE =================
     if (type == "image") {
-      return _buildImageMessage(
-        context,
-        bubbleColor,
-        resolvedTextColor,
-      );
+      return _buildImageMessage(context, bubbleColor, resolvedTextColor);
+    }
+
+    if (type == "call") {
+      return _buildCallMessage(context, bubbleColor, resolvedTextColor);
     }
 
     // ================= TEXT MESSAGE =================
@@ -141,9 +147,8 @@ class ChatRowPermanent extends StatelessWidget {
           if (!isMe)
             SizedBox(
               width: 36,
-              child: showAvatar
-                  ? UserAvatar(userId: senderId)
-                  : const SizedBox(),
+              child:
+                  showAvatar ? UserAvatar(userId: senderId) : const SizedBox(),
             ),
 
           if (!isMe) const SizedBox(width: 6),
@@ -158,7 +163,9 @@ class ChatRowPermanent extends StatelessWidget {
                   ),
                   child: Column(
                     crossAxisAlignment:
-                        isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                        isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // ===== REPLY PREVIEW =====
@@ -172,10 +179,12 @@ class ChatRowPermanent extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.brightness == Brightness.dark
-                                  ? const Color.fromARGB(255, 77, 76, 76)
-                                  : const Color(0xFFF4F6F8)
-                                      .withOpacity(0.8),
+                              color:
+                                  theme.brightness == Brightness.dark
+                                      ? const Color.fromARGB(255, 77, 76, 76)
+                                      : const Color(
+                                        0xFFF4F6F8,
+                                      ).withOpacity(0.8),
                               borderRadius: BorderRadius.circular(10),
                               border: Border(
                                 left: BorderSide(
@@ -236,7 +245,7 @@ class ChatRowPermanent extends StatelessWidget {
                       SizedBox(height: 3),
                       // ===== TIME
                       if (showTime && time.isNotEmpty)
-                      Padding(
+                        Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             time,
@@ -256,10 +265,7 @@ class ChatRowPermanent extends StatelessWidget {
                             children: [
                               // ===== SEEN / SENT =====
                               if (status == MessageStatus.seen)
-                                SeenAvatarAnimated(
-                                  userId: seenByUid,
-                                  size: 14,
-                                )
+                                SeenAvatarAnimated(userId: seenByUid, size: 14)
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
@@ -270,8 +276,6 @@ class ChatRowPermanent extends StatelessWidget {
                             ],
                           ),
                         ),
-
-
                     ],
                   ),
                 );
@@ -282,6 +286,147 @@ class ChatRowPermanent extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildCallMessage(
+    BuildContext context,
+    Color bubbleColor,
+    Color textColor,
+  ) {
+    final theme = Theme.of(context);
+    final normalizedCallStatus = (callStatus ?? "").toLowerCase();
+    final normalizedCallType = callType == "video" ? "video" : "audio";
+    final isMissedCall = normalizedCallStatus == "missed";
+    final duration = callDurationSeconds ?? 0;
+
+    final iconData =
+        isMissedCall
+            ? Iconsax.call_slash
+            : (normalizedCallType == "video" ? Iconsax.video : Iconsax.call);
+    final iconColor = isMissedCall ? Colors.redAccent : textColor;
+
+    final fallbackText =
+        isMissedCall
+            ? "Cuộc gọi bị bỏ lỡ"
+            : (duration > 0
+                ? "${normalizedCallType == "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"} • ${_formatCallDuration(duration)}"
+                : "${normalizedCallType == "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"} đã kết thúc");
+    final displayText = text.trim().isNotEmpty ? text : fallbackText;
+
+    return Padding(
+      padding: EdgeInsets.only(top: smallMargin ? 6 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe)
+            SizedBox(
+              width: 36,
+              child:
+                  showAvatar ? UserAvatar(userId: senderId) : const SizedBox(),
+            ),
+          if (!isMe) const SizedBox(width: 6),
+          Flexible(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.65,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                        isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            onLongPress: onLongPress,
+                            onDoubleTap: onDoubleTap,
+                            onTap: onTapMessage,
+                            child: Container(
+                              key: bubbleKey,
+                              child: AnimatedBubble(
+                                isMe: isMe,
+                                highlighted: highlighted,
+                                pressed: isPressed,
+                                bubbleColor: bubbleColor,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(iconData, size: 18, color: iconColor),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        displayText,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              color: textColor,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (reactions != null && reactions!.isNotEmpty)
+                            Positioned(
+                              bottom: -10,
+                              right: isMe ? -6 : null,
+                              left: isMe ? null : -6,
+                              child: _MessengerReactionBadge(
+                                reactions: reactions!,
+                                isMe: isMe,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      if (showTime && time.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            time,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
+                      if (isMe && status != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (status == MessageStatus.seen)
+                                SeenAvatarAnimated(userId: seenByUid, size: 14)
+                              else if (status == MessageStatus.sent)
+                                Text(
+                                  "ÄÃ£ gá»­i",
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildImageMessage(
     BuildContext context,
     Color bubbleColor,
@@ -300,9 +445,8 @@ class ChatRowPermanent extends StatelessWidget {
           if (!isMe)
             SizedBox(
               width: 36,
-              child: showAvatar
-                  ? UserAvatar(userId: senderId)
-                  : const SizedBox(),
+              child:
+                  showAvatar ? UserAvatar(userId: senderId) : const SizedBox(),
             ),
           if (!isMe) const SizedBox(width: 6),
           Flexible(
@@ -313,9 +457,10 @@ class ChatRowPermanent extends StatelessWidget {
                     maxWidth: constraints.maxWidth * 0.65,
                   ),
                   child: Column(
-                    crossAxisAlignment: isMe
-                        ? CrossAxisAlignment.end
-                        : CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (replyText != null && replyToId != null)
@@ -327,10 +472,12 @@ class ChatRowPermanent extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.brightness == Brightness.dark
-                                  ? const Color.fromARGB(255, 77, 76, 76)
-                                  : const Color(0xFFF4F6F8)
-                                      .withOpacity(0.8),
+                              color:
+                                  theme.brightness == Brightness.dark
+                                      ? const Color.fromARGB(255, 77, 76, 76)
+                                      : const Color(
+                                        0xFFF4F6F8,
+                                      ).withOpacity(0.8),
                               borderRadius: BorderRadius.circular(10),
                               border: Border(
                                 left: BorderSide(
@@ -362,8 +509,7 @@ class ChatRowPermanent extends StatelessWidget {
                                 pressed: isPressed,
                                 bubbleColor: bubbleColor,
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Row(
@@ -379,12 +525,11 @@ class ChatRowPermanent extends StatelessWidget {
                                           child: Text(
                                             label,
                                             overflow: TextOverflow.ellipsis,
-                                            style: theme
-                                                .textTheme.bodyMedium
+                                            style: theme.textTheme.bodyMedium
                                                 ?.copyWith(
-                                              color: textColor,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                                  color: textColor,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                           ),
                                         ),
                                       ],
@@ -393,12 +538,11 @@ class ChatRowPermanent extends StatelessWidget {
                                       const SizedBox(height: 6),
                                       Text(
                                         "Chạm để xem",
-                                        style: theme
-                                            .textTheme.labelSmall
+                                        style: theme.textTheme.labelSmall
                                             ?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                            color: textColor.withOpacity(0.8),
-                                        ),
+                                              fontWeight: FontWeight.w600,
+                                              color: textColor.withOpacity(0.8),
+                                            ),
                                       ),
                                     ],
                                   ],
@@ -437,15 +581,11 @@ class ChatRowPermanent extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               if (status == MessageStatus.seen)
-                                SeenAvatarAnimated(
-                                  userId: seenByUid,
-                                  size: 14,
-                                )
+                                SeenAvatarAnimated(userId: seenByUid, size: 14)
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
-                                  style: theme.textTheme.labelSmall
-                                      ?.copyWith(
+                                  style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),
                                 ),
@@ -463,6 +603,20 @@ class ChatRowPermanent extends StatelessWidget {
     );
   }
 
+  String _formatCallDuration(int totalSeconds) {
+    final duration = Duration(seconds: totalSeconds);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    final seconds = duration.inSeconds % 60;
+
+    if (hours > 0) {
+      return '$hours giờ $minutes phút $seconds giây';
+    }
+    if (minutes > 0) {
+      return '$minutes phút $seconds giây';
+    }
+    return '$seconds giây';
+  }
 }
 
 bool _isEmojiOnly(String text) {
@@ -485,15 +639,11 @@ Map<String, int> _groupReactions(Map<String, String> reactions) {
   return result;
 }
 
-
 class _MessengerReactionBadge extends StatelessWidget {
   final Map<String, String> reactions;
   final bool isMe;
 
-  const _MessengerReactionBadge({
-    required this.reactions,
-    required this.isMe,
-  });
+  const _MessengerReactionBadge({required this.reactions, required this.isMe});
 
   @override
   Widget build(BuildContext context) {
@@ -501,39 +651,40 @@ class _MessengerReactionBadge extends StatelessWidget {
 
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: grouped.entries.map((e) {
-        final reaction = ReactionRegistry.get(e.key);
-        if (reaction == null) return const SizedBox();
+      children:
+          grouped.entries.map((e) {
+            final reaction = ReactionRegistry.get(e.key);
+            if (reaction == null) return const SizedBox();
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 4,
-                  color: Colors.black.withOpacity(0.15),
-                )
-              ],
-            ),
-            child: Row(
-              children: [
-                reaction.icon,
-                if (e.value > 1) ...[
-                  const SizedBox(width: 2),
-                  Text(
-                    e.value.toString(),
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
-      }).toList(),
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 4,
+                      color: Colors.black.withOpacity(0.15),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    reaction.icon,
+                    if (e.value > 1) ...[
+                      const SizedBox(width: 2),
+                      Text(
+                        e.value.toString(),
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
     );
   }
 }

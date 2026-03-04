@@ -23,6 +23,7 @@ class IncomingCallView extends GetView<CallController> {
             ((Get.arguments as Map?)?['callId'] as String?);
         final isVideo = controller.callType.value == 'video';
         final avatarUrl = controller.peerAvatarUrl.value;
+        final actionBusy = controller.isIncomingActionBusy.value;
 
         return Stack(
           children: [
@@ -136,14 +137,25 @@ class IncomingCallView extends GetView<CallController> {
                                   icon: Iconsax.call_slash,
                                   label: 'Từ chối',
                                   color: const Color(0xFFDC3545),
-                                  onTap: () => controller.rejectCall(callId),
+                                  isLoading: actionBusy,
+                                  onTap:
+                                      actionBusy
+                                          ? null
+                                          : () => controller.rejectCall(callId),
                                 ),
                                 const SizedBox(width: 12),
                                 IncomingCallActionButton(
-                                  icon: isVideo ? Iconsax.video : Iconsax.call_calling,
-                                  label: 'Chập nhận',
+                                  icon:
+                                      isVideo
+                                          ? Iconsax.video
+                                          : Iconsax.call_calling,
+                                  label: 'Chấp nhận',
                                   color: const Color(0xFF28A745),
-                                  onTap: () => controller.acceptCall(callId),
+                                  isLoading: actionBusy,
+                                  onTap:
+                                      actionBusy
+                                          ? null
+                                          : () => controller.acceptCall(callId),
                                 ),
                               ],
                             ),

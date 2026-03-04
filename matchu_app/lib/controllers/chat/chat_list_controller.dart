@@ -28,13 +28,13 @@ class ChatListController extends GetxController
   StreamSubscription<List<ChatRoomModel>>? _sub;
   final isLoading = true.obs;
   bool _hasFirstData = false;
-  bool _hasAnimated = false;
+  // bool _hasAnimated = false;
 
   @override
   void onInit() {
     super.onInit();
 
-    final presence = Get.put(PresenceController(), permanent: true);
+    // final presence = Get.put(PresenceController(), permanent: true);
     
     WidgetsBinding.instance.addObserver(this);
     _sub = _service.listenChatRooms().listen(
@@ -169,8 +169,8 @@ class ChatListController extends GetxController
           return false;
         }
 
-        final name = (user.fullname ?? "").toLowerCase();
-        final nick = (user.nickname ?? "").toLowerCase();
+        final name = (user.fullname).toLowerCase();
+        final nick = (user.nickname).toLowerCase();
 
         return name.contains(q) || nick.contains(q);
       }),

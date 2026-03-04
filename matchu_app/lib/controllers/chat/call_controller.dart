@@ -51,6 +51,7 @@ class CallController extends GetxController {
   final RxBool isCaller = false.obs;
   final RxBool isMuted = false.obs;
   final RxBool isCameraEnabled = true.obs;
+  final RxBool isIncomingActionBusy = false.obs;
   final Rx<CallUiState> callState = CallUiState.idle.obs;
   final RxnString errorMessage = RxnString();
   final RxInt callDurationSeconds = 0.obs;
@@ -74,6 +75,8 @@ class CallController extends GetxController {
   bool _didIceRestartAttempt = false;
   String? _lastAppliedAnswerSdp;
   String? _lastAppliedOfferSdp;
+  String? _latestCallDocId;
+  Map<String, dynamic>? _latestCallDocData;
 
   static const Duration _maxRingingDuration = Duration(seconds: 45);
 
@@ -255,6 +258,7 @@ class CallController extends GetxController {
   }
 
   Future<void> acceptCall(String callId) async {
+    if (isIncomingActionBusy.value) return;
     final myUid = currentUserId.value;
     if (myUid == null || myUid.isEmpty) {
       _setError('You must login before accepting a call.');
@@ -265,29 +269,42 @@ class CallController extends GetxController {
       return;
     }
 
+    isIncomingActionBusy.value = true;
+
     try {
-      final snapshot = await _signalingService.getCallDocument(callId);
-      final data = snapshot.data();
-      if (!snapshot.exists || data == null) {
+      final cachedData = _getCachedCallData(callId);
+      if (cachedData == null) {
+        // Give immediate feedback while waiting for first call document read.
+        errorMessage.value = null;
+        callState.value = CallUiState.connecting;
+        _openCallView(callId, replaceIncoming: true);
+      }
+
+      final data = await _resolveIncomingCallData(callId);
+      if (data == null) {
         _setError('Call no longer exists.');
+        await _clearLocalSession(popScreens: true);
         return;
       }
 
       final receiverId = data['receiverId'] as String? ?? '';
       if (receiverId != myUid) {
         _setError('This call is not assigned to current user.');
+        await _clearLocalSession(popScreens: true);
         return;
       }
 
       final status = data['status'] as String? ?? '';
       if (status != 'ringing') {
         _setError('Call is no longer ringing.');
+        await _clearLocalSession(popScreens: true);
         return;
       }
 
       final remoteOffer = _parseMap(data['offer']);
       if (remoteOffer == null) {
         _setError('Missing offer from caller.');
+        await _clearLocalSession(popScreens: true);
         return;
       }
 
@@ -313,24 +330,28 @@ class CallController extends GetxController {
       _lastAppliedAnswerSdp = null;
       _openCallView(callId, replaceIncoming: true);
 
+      final iceServersFuture = _iceServerService.getIceServers();
       await _webRTCService.initPeerConnection(
         withVideo: normalizedType == 'video',
         onIceCandidate: (candidate) => _addLocalCandidate(candidate),
         onConnectionStateChanged: _handleConnectionStateChanged,
-        iceServers: await _iceServerService.getIceServers(),
+        iceServers: await iceServersFuture,
       );
 
       _isSettingRemoteDescription = true;
-      await _webRTCService.setRemoteDescription(remoteOffer);
-      _lastAppliedOfferSdp = remoteOffer['sdp'] as String?;
-      _cancelRingingTimeout();
+      try {
+        await _webRTCService.setRemoteDescription(remoteOffer);
+        _lastAppliedOfferSdp = remoteOffer['sdp'] as String?;
+        _cancelRingingTimeout();
 
-      final answer = await _webRTCService.createAnswer();
-      await _signalingService.updateAnswer(
-        callId: callId,
-        answer: _sessionDescriptionToMap(answer),
-      );
-      _isSettingRemoteDescription = false;
+        final answer = await _webRTCService.createAnswer();
+        await _signalingService.updateAnswer(
+          callId: callId,
+          answer: _sessionDescriptionToMap(answer),
+        );
+      } finally {
+        _isSettingRemoteDescription = false;
+      }
 
       await _subscribeToCall(callId, callerSide: false);
       await _subscribeToRemoteIceCandidates(callId, callerSide: false);
@@ -338,22 +359,51 @@ class CallController extends GetxController {
       debugPrint('acceptCall error: $error');
       _setError('Unable to accept call.');
       await _clearLocalSession(popScreens: true);
+    } finally {
+      isIncomingActionBusy.value = false;
     }
   }
 
-  Future<void> rejectCall(String callId) async {
-    if (callId.isEmpty) return;
+  Future<void> rejectCall(String callId, {String reason = 'rejected'}) async {
+    if (callId.isEmpty || isIncomingActionBusy.value) return;
+
+    isIncomingActionBusy.value = true;
+
+    final isCurrentCall = currentCallId.value == callId;
+    final durationSnapshot = callDurationSeconds.value;
+    final fallbackRoomChatId = currentRoomChatId.value;
+    final fallbackType = callType.value;
+    final myUid = currentUserId.value ?? '';
+    final peerUid = peerUserId.value ?? '';
+    final wasCaller = isCaller.value;
+    final fallbackCallerId = wasCaller ? myUid : peerUid;
+    final fallbackReceiverId = wasCaller ? peerUid : myUid;
+
+    if (isCurrentCall) {
+      await _clearLocalSession(popScreens: true);
+    } else {
+      _popIncomingViewIfVisible();
+    }
 
     try {
-      await _signalingService.rejectCall(callId);
+      await _signalingService.rejectCall(callId, reason: reason);
     } catch (error) {
       debugPrint('rejectCall error: $error');
     } finally {
-      if (currentCallId.value == callId) {
-        await _clearLocalSession(popScreens: true);
-      } else {
-        _popIncomingViewIfVisible();
+      if (isCurrentCall) {
+        unawaited(
+          _persistCallSummary(
+            callId: callId,
+            reason: reason,
+            durationSeconds: durationSnapshot,
+            fallbackRoomChatId: fallbackRoomChatId,
+            fallbackCallerId: fallbackCallerId,
+            fallbackReceiverId: fallbackReceiverId,
+            fallbackType: fallbackType,
+          ),
+        );
       }
+      isIncomingActionBusy.value = false;
     }
   }
 
@@ -375,16 +425,35 @@ class CallController extends GetxController {
     }
 
     final snapshot = _buildEndedSummary(reason: 'ended');
+    final myUid = currentUserId.value ?? '';
+    final peerUid = snapshot.peerUserId;
+    final wasCaller = isCaller.value;
+    final fallbackCallerId = wasCaller ? myUid : peerUid;
+    final fallbackReceiverId = wasCaller ? peerUid : myUid;
 
     try {
-      if (callId != null && callId.isNotEmpty) {
-        await _signalingService.endCall(callId);
-      }
-    } catch (error) {
-      debugPrint('endCall error: $error');
-    } finally {
       await _clearLocalSession(popScreens: false);
       _showEndedSummary(snapshot);
+
+      if (callId != null && callId.isNotEmpty) {
+        unawaited(
+          _signalingService.endCall(callId).catchError((error) {
+            debugPrint('endCall error: $error');
+          }),
+        );
+        unawaited(
+          _persistCallSummary(
+            callId: callId,
+            reason: 'ended',
+            durationSeconds: snapshot.durationSeconds,
+            fallbackRoomChatId: snapshot.roomChatId,
+            fallbackCallerId: fallbackCallerId,
+            fallbackReceiverId: fallbackReceiverId,
+            fallbackType: snapshot.callType,
+          ),
+        );
+      }
+    } finally {
       _isEndingCall = false;
     }
   }
@@ -461,8 +530,10 @@ class CallController extends GetxController {
               _stopCallDurationTimer(reset: true);
               isMuted.value = false;
               isCameraEnabled.value = type == 'video';
+              isIncomingActionBusy.value = false;
               _openIncomingCallView(callId);
               _loadPeerInfoInBackground(callerId);
+              _prefetchIceServersInBackground();
               await _subscribeToCall(callId, callerSide: false);
             } catch (error) {
               debugPrint('incoming call listener error: $error');
@@ -479,17 +550,23 @@ class CallController extends GetxController {
     required bool callerSide,
   }) async {
     await _callDocSub?.cancel();
+    _latestCallDocId = callId;
+    _latestCallDocData = null;
     _callDocSub = _signalingService.listenCallDocument(callId).listen((
       snapshot,
     ) async {
       try {
         if (!snapshot.exists) {
+          if (_latestCallDocId == callId) {
+            _latestCallDocData = null;
+          }
           await _finalizeCallAndShowEndedIfNeeded(reason: 'ended');
           return;
         }
 
         final data = snapshot.data();
         if (data == null) return;
+        _latestCallDocData = Map<String, dynamic>.from(data);
 
         final status = data['status'] as String? ?? '';
 
@@ -750,6 +827,15 @@ class CallController extends GetxController {
   Future<void> _finalizeCallAndShowEndedIfNeeded({
     required String reason,
   }) async {
+    final callId = currentCallId.value;
+    final durationSnapshot = callDurationSeconds.value;
+    final fallbackRoomChatId = currentRoomChatId.value;
+    final fallbackType = callType.value;
+    final myUid = currentUserId.value ?? '';
+    final peerUid = peerUserId.value ?? '';
+    final wasCaller = isCaller.value;
+    final fallbackCallerId = wasCaller ? myUid : peerUid;
+    final fallbackReceiverId = wasCaller ? peerUid : myUid;
     final shouldShowEnded = Get.currentRoute == AppRouter.call;
     final snapshot =
         shouldShowEnded ? _buildEndedSummary(reason: reason) : null;
@@ -758,6 +844,51 @@ class CallController extends GetxController {
 
     if (snapshot != null) {
       _showEndedSummary(snapshot);
+    }
+
+    if (callId != null && callId.isNotEmpty) {
+      unawaited(
+        _persistCallSummary(
+          callId: callId,
+          reason: reason,
+          durationSeconds: durationSnapshot,
+          fallbackRoomChatId: fallbackRoomChatId,
+          fallbackCallerId: fallbackCallerId,
+          fallbackReceiverId: fallbackReceiverId,
+          fallbackType: fallbackType,
+        ),
+      );
+    }
+  }
+
+  Future<void> _persistCallSummary({
+    required String callId,
+    required String reason,
+    required int durationSeconds,
+    String? fallbackRoomChatId,
+    String? fallbackCallerId,
+    String? fallbackReceiverId,
+    String? fallbackType,
+  }) async {
+    final myUid = currentUserId.value ?? '';
+    final peerUid = peerUserId.value ?? '';
+    final resolvedCallerId =
+        fallbackCallerId ?? (isCaller.value ? myUid : peerUid);
+    final resolvedReceiverId =
+        fallbackReceiverId ?? (isCaller.value ? peerUid : myUid);
+
+    try {
+      await _signalingService.persistCallSummaryMessage(
+        callId: callId,
+        fallbackRoomChatId: fallbackRoomChatId ?? currentRoomChatId.value,
+        fallbackCallerId: resolvedCallerId,
+        fallbackReceiverId: resolvedReceiverId,
+        fallbackType: fallbackType ?? callType.value,
+        fallbackStatus: reason,
+        fallbackDurationSeconds: durationSeconds,
+      );
+    } catch (error) {
+      debugPrint('persist call summary error: $error');
     }
   }
 
@@ -784,6 +915,10 @@ class CallController extends GetxController {
     required bool popScreens,
     bool clearEndedSummary = true,
   }) async {
+    if (popScreens) {
+      _closeCallScreens();
+    }
+
     _cancelRingingTimeout();
     _stopCallDurationTimer(reset: true);
     await _callDocSub?.cancel();
@@ -798,6 +933,8 @@ class CallController extends GetxController {
     _didIceRestartAttempt = false;
     _lastAppliedAnswerSdp = null;
     _lastAppliedOfferSdp = null;
+    _latestCallDocId = null;
+    _latestCallDocData = null;
 
     await _webRTCService.resetConnection();
 
@@ -810,14 +947,49 @@ class CallController extends GetxController {
     isCaller.value = false;
     isMuted.value = false;
     isCameraEnabled.value = true;
+    isIncomingActionBusy.value = false;
     callState.value = CallUiState.idle;
     if (clearEndedSummary) {
       endedSummary.value = null;
     }
+  }
 
-    if (popScreens) {
-      _closeCallScreens();
+  Map<String, dynamic>? _getCachedCallData(String callId) {
+    if (_latestCallDocId != callId) return null;
+    final cached = _latestCallDocData;
+    if (cached == null) return null;
+    return Map<String, dynamic>.from(cached);
+  }
+
+  Future<Map<String, dynamic>?> _resolveIncomingCallData(String callId) async {
+    final cached = _getCachedCallData(callId);
+    if (cached != null) {
+      final status = cached['status'] as String? ?? '';
+      final offer = _parseMap(cached['offer']);
+      if (status == 'ringing' && offer != null) {
+        return cached;
+      }
     }
+
+    final snapshot = await _signalingService.getCallDocument(callId);
+    if (!snapshot.exists) return null;
+
+    final data = snapshot.data();
+    if (data == null) return null;
+
+    return Map<String, dynamic>.from(data);
+  }
+
+  void _prefetchIceServersInBackground() {
+    unawaited(
+      (() async {
+        try {
+          await _iceServerService.getIceServers();
+        } catch (error) {
+          debugPrint('ice prefetch error: $error');
+        }
+      })(),
+    );
   }
 
   Future<void> _loadPeerInfo(String uid) async {
@@ -890,6 +1062,7 @@ class CallController extends GetxController {
 
   void _setError(String message) {
     errorMessage.value = message;
+    isIncomingActionBusy.value = false;
     callState.value = CallUiState.error;
     Get.snackbar('Call', message);
   }

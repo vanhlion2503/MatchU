@@ -17,7 +17,6 @@ import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
 
-
 class ChatMessagesList extends StatefulWidget {
   final ChatController controller;
   const ChatMessagesList({super.key, required this.controller});
@@ -68,267 +67,300 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
           });
         }
 
-        
         // Sử dụng allMessages từ controller
         return Obx(() {
           final docs = widget.controller.allMessages;
           final pending = widget.controller.pendingImageMessages;
           final pendingCount = pending.length;
-          
+
           if (docs.isEmpty && !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
           // ✅ Đảm bảo itemCount hợp lệ
           // +1 cho typing slot, +1 cho loading indicator nếu đang load more
-          final itemCount = docs.length + pendingCount + 1 + (widget.controller.isLoadingMore ? 1 : 0);
+          final itemCount =
+              docs.length +
+              pendingCount +
+              1 +
+              (widget.controller.isLoadingMore ? 1 : 0);
 
           return ScrollablePositionedList.builder(
             reverse: true, // ✅ Tin mới ở index 0, hiển thị ở đáy
             itemScrollController: widget.controller.itemScrollController,
             itemPositionsListener: widget.controller.itemPositionsListener,
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              bottomPadding,
-            ),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
             itemCount: itemCount,
-          itemBuilder: (_, i) {
-            /// ================= TYPING SLOT (Ở ĐÁY - index 0) =================
-            if (i == 0) {
-              return Obx(() {
-                final otherUid = widget.controller.otherUid.value;
-                if (otherUid == null) return const SizedBox();
+            itemBuilder: (_, i) {
+              /// ================= TYPING SLOT (Ở ĐÁY - index 0) =================
+              if (i == 0) {
+                return Obx(() {
+                  final otherUid = widget.controller.otherUid.value;
+                  if (otherUid == null) return const SizedBox();
 
-                return MessengerTypingBubble(
-                  show: widget.controller.otherTyping.value,
-                  senderId: otherUid,
-                );
-              });
-            }
+                  return MessengerTypingBubble(
+                    show: widget.controller.otherTyping.value,
+                    senderId: otherUid,
+                  );
+                });
+              }
 
-            if (pendingCount > 0 && i <= pendingCount) {
-              final pendingItem = pending[i - 1];
-              return _buildPendingImageBubble(context, pendingItem);
-            }
+              if (pendingCount > 0 && i <= pendingCount) {
+                final pendingItem = pending[i - 1];
+                return _buildPendingImageBubble(context, pendingItem);
+              }
 
-            /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
-            if (widget.controller.isLoadingMore && i == itemCount - 1) {
-              return Obx(() {
-                if (!widget.controller.isLoadingMore) return const SizedBox();
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16.0),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
+              /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
+              if (widget.controller.isLoadingMore && i == itemCount - 1) {
+                return Obx(() {
+                  if (!widget.controller.isLoadingMore) return const SizedBox();
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2.0),
                     ),
-                  ),
-                );
-              });
-            }
+                  );
+                });
+              }
 
-            /// ================= MESSAGE =================
-            // Với reverse: true, index 0 là typing, index 1+ là messages
-            // docs[0] là tin mới nhất
-            final messageIndex = i - 1 - pendingCount;
-            
-            // ✅ Kiểm tra bounds để tránh RangeError
-            if (messageIndex < 0 || messageIndex >= docs.length) {
-              return const SizedBox();
-            }
-            
-            final doc = docs[messageIndex];
-            final data = doc.data();
-            final isMe = data["senderId"] == uid;
-            final isLastInGroup = _isLastInGroup(docs, messageIndex);
-            final createdAt = _getTime(data["createdAt"]);
-            final isNewestMessage = messageIndex == 0;
-            final messageType = data["type"] ?? "text";
-            final viewedByRaw = data["viewedBy"];
-            final viewedBy = viewedByRaw is Map
-                ? Map<String, dynamic>.from(viewedByRaw)
-                : <String, dynamic>{};
-            final hasViewed = viewedBy.containsKey(uid);
-            final isViewOnce = data["viewOnce"] == true;
-            final isViewOnceImage = isViewOnce && messageType == "image";
-            final imagePath = data["imagePath"] is String
-                ? data["imagePath"] as String
-                : "";
-            final isMissingImage = isViewOnceImage && imagePath.isEmpty;
-            final isConsumedByRecipient = isViewOnceImage &&
-                hasViewed && data["senderId"] != uid;
-            final effectiveType = (messageType == "deleted" ||
-                    widget.controller.deletedMessageIds.contains(doc.id) ||
-                    isConsumedByRecipient ||
-                    isMissingImage)
-                ? "deleted"
-                : messageType;
-            final isDeleted = effectiveType == "deleted";
+              /// ================= MESSAGE =================
+              // Với reverse: true, index 0 là typing, index 1+ là messages
+              // docs[0] là tin mới nhất
+              final messageIndex = i - 1 - pendingCount;
 
-            // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
-            final bubbleKey = _bubbleKeys.putIfAbsent(
-              doc.id,
-              () => GlobalKey(),
-            );
+              // ✅ Kiểm tra bounds để tránh RangeError
+              if (messageIndex < 0 || messageIndex >= docs.length) {
+                return const SizedBox();
+              }
 
-            double dragDx = 0;
+              final doc = docs[messageIndex];
+              final data = doc.data();
+              final isMe = data["senderId"] == uid;
+              final isLastInGroup = _isLastInGroup(docs, messageIndex);
+              final createdAt = _getTime(data["createdAt"]);
+              final isNewestMessage = messageIndex == 0;
+              final messageType = data["type"] ?? "text";
+              final callDataRaw = data["callData"];
+              final callData =
+                  callDataRaw is Map
+                      ? Map<String, dynamic>.from(callDataRaw)
+                      : null;
+              final callStatus = callData?["status"] as String?;
+              final callType = callData?["callType"] as String?;
+              final callDurationRaw = callData?["durationSeconds"];
+              final int? callDurationSeconds =
+                  callDurationRaw is int
+                      ? callDurationRaw
+                      : (callDurationRaw is num
+                          ? callDurationRaw.toInt()
+                          : null);
+              final viewedByRaw = data["viewedBy"];
+              final viewedBy =
+                  viewedByRaw is Map
+                      ? Map<String, dynamic>.from(viewedByRaw)
+                      : <String, dynamic>{};
+              final hasViewed = viewedBy.containsKey(uid);
+              final isViewOnce = data["viewOnce"] == true;
+              final isViewOnceImage = isViewOnce && messageType == "image";
+              final imagePath =
+                  data["imagePath"] is String
+                      ? data["imagePath"] as String
+                      : "";
+              final isMissingImage = isViewOnceImage && imagePath.isEmpty;
+              final isConsumedByRecipient =
+                  isViewOnceImage && hasViewed && data["senderId"] != uid;
+              final effectiveType =
+                  (messageType == "deleted" ||
+                          widget.controller.deletedMessageIds.contains(
+                            doc.id,
+                          ) ||
+                          isConsumedByRecipient ||
+                          isMissingImage)
+                      ? "deleted"
+                      : messageType;
+              final isDeleted = effectiveType == "deleted";
 
-            final bubbleContent = StatefulBuilder(
-              builder: (context, setState) {
-                return Listener(
-                  onPointerMove: (event) {
-                    if (isMe) return;
+              // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
+              final bubbleKey = _bubbleKeys.putIfAbsent(
+                doc.id,
+                () => GlobalKey(),
+              );
 
-                    final dx = event.delta.dx;
-                    final dy = event.delta.dy;
+              double dragDx = 0;
 
-                    if (dx <= 0) return;
-                    if (dx.abs() < dy.abs()) return;
+              final bubbleContent = StatefulBuilder(
+                builder: (context, setState) {
+                  return Listener(
+                    onPointerMove: (event) {
+                      if (isMe) return;
 
-                    dragDx += dx;
-                    dragDx = dragDx.clamp(0, 80);
-                    setState(() {});
-                  },
-                  onPointerUp: (_) {
-                    if (dragDx > 32) {
-                      HapticFeedback.lightImpact();
-                      widget.controller.startReply({
-                        "id": doc.id,
-                        "text": widget.controller.decryptedCache[doc.id] ?? "…",
-                      });
-                    }
-                    setState(() => dragDx = 0);
-                  },
-                  child: Stack(
-                    alignment: Alignment.centerLeft,
-                    children: [
-                      Positioned(
-                        left: 12 + dragDx * 0.5,
-                        child: Opacity(
-                          opacity: (dragDx / 40).clamp(0, 1),
-                          child: Icon(
-                            Iconsax.rotate_right,
-                            color: theme.colorScheme.primary,
-                            size: 26,
+                      final dx = event.delta.dx;
+                      final dy = event.delta.dy;
+
+                      if (dx <= 0) return;
+                      if (dx.abs() < dy.abs()) return;
+
+                      dragDx += dx;
+                      dragDx = dragDx.clamp(0, 80);
+                      setState(() {});
+                    },
+                    onPointerUp: (_) {
+                      if (dragDx > 32) {
+                        HapticFeedback.lightImpact();
+                        widget.controller.startReply({
+                          "id": doc.id,
+                          "text":
+                              widget.controller.decryptedCache[doc.id] ?? "…",
+                        });
+                      }
+                      setState(() => dragDx = 0);
+                    },
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      children: [
+                        Positioned(
+                          left: 12 + dragDx * 0.5,
+                          child: Opacity(
+                            opacity: (dragDx / 40).clamp(0, 1),
+                            child: Icon(
+                              Iconsax.rotate_right,
+                              color: theme.colorScheme.primary,
+                              size: 26,
+                            ),
                           ),
                         ),
-                      ),
-                      Transform.translate(
-                        offset: Offset(dragDx, 0),
-                        child: Opacity(
-                          opacity: (1 - dragDx / 120).clamp(0.7, 1),
-                          child: Obx(() {
-                            final unread = widget.controller.otherUnread.value;
-                            final otherUid = widget.controller.otherUid.value;
-                            final isMyLastMessage = isMe && messageIndex == 0;
+                        Transform.translate(
+                          offset: Offset(dragDx, 0),
+                          child: Opacity(
+                            opacity: (1 - dragDx / 120).clamp(0.7, 1),
+                            child: Obx(() {
+                              final unread =
+                                  widget.controller.otherUnread.value;
+                              final otherUid = widget.controller.otherUid.value;
+                              final isMyLastMessage = isMe && messageIndex == 0;
 
-                            final rawText = data["text"];
-                            final fallbackText =
-                                rawText is String ? rawText : "...";
-                            final decryptedText =
-                                widget.controller.decryptedCache[doc.id] ?? fallbackText;
-                            final displayText = isDeleted
-                                ? (isViewOnce
-                                    ? ChatController.viewOnceDeletedText
-                                    : (rawText is String && rawText.isNotEmpty
-                                        ? rawText
-                                        : decryptedText))
-                                : decryptedText;
-                            final isPressed = _activeReactionMessageId == doc.id;
-                            final reactions = Map<String, String>.from(
-                              data["reactions"] ?? {},
-                            );
-                            final canOpenImage =
-                                isViewOnceImage && !isDeleted;
+                              final rawText = data["text"];
+                              final fallbackText =
+                                  rawText is String ? rawText : "...";
+                              final decryptedText =
+                                  widget.controller.decryptedCache[doc.id] ??
+                                  fallbackText;
+                              final displayText =
+                                  isDeleted
+                                      ? (isViewOnce
+                                          ? ChatController.viewOnceDeletedText
+                                          : (rawText is String &&
+                                                  rawText.isNotEmpty
+                                              ? rawText
+                                              : decryptedText))
+                                      : decryptedText;
+                              final isPressed =
+                                  _activeReactionMessageId == doc.id;
+                              final reactions = Map<String, String>.from(
+                                data["reactions"] ?? {},
+                              );
+                              final canOpenImage =
+                                  isViewOnceImage && !isDeleted;
 
-                            return ChatRowPermanent(
-                              key: ValueKey(doc.id), // 🔥 BẮT BUỘC
-                              messageId: doc.id,
-                              senderId: data["senderId"],
-                              text: displayText,
-                              type: effectiveType,
-                              isMe: isMe,
-                              showAvatar: !isMe && isLastInGroup,
-                              status: isMyLastMessage
-                                  ? unread == 0
-                                      ? MessageStatus.seen
-                                      : MessageStatus.sent
-                                  : null,
-                              seenByUid:
-                                  isMyLastMessage && unread == 0 && otherUid != null
-                                      ? otherUid
-                                      : null,
-                              smallMargin: _shouldGroup(docs, messageIndex),
-                              showTime: isLastInGroup && messageIndex != 0,
-                              time: _formatTime(data["createdAt"]),
-                              replyText: data["replyText"],
-                              replyToId: data["replyToId"],
-                              highlighted:
-                                  widget.controller.highlightedMessageId.value == doc.id,
-                              isPressed: isPressed,
-                              onTapReply: data["replyToId"] != null
-                                  ? () => widget.controller.scrollToMessage(
-                                        docs: docs,
-                                        messageId: data["replyToId"],
-                                      )
-                                  : null,
-                              onTapMessage: canOpenImage
-                                  ? () => widget.controller.openViewOnceImage(
-                                        messageId: doc.id,
-                                        senderId: data["senderId"],
-                                        imagePath: imagePath,
-                                        isLatest: isNewestMessage,
-                                      )
-                                  : null,
-                              reactions: isDeleted ? null : reactions,
-                              bubbleKey: bubbleKey,
-                              // ❤️ DOUBLE TAP = LOVE
-                              onDoubleTap: () {
-                                if (isDeleted) return;
-                                if (reactions[uid] == "love") return;
+                              return ChatRowPermanent(
+                                key: ValueKey(doc.id), // 🔥 BẮT BUỘC
+                                messageId: doc.id,
+                                senderId: data["senderId"],
+                                text: displayText,
+                                type: effectiveType,
+                                isMe: isMe,
+                                showAvatar: !isMe && isLastInGroup,
+                                status:
+                                    isMyLastMessage
+                                        ? unread == 0
+                                            ? MessageStatus.seen
+                                            : MessageStatus.sent
+                                        : null,
+                                seenByUid:
+                                    isMyLastMessage &&
+                                            unread == 0 &&
+                                            otherUid != null
+                                        ? otherUid
+                                        : null,
+                                smallMargin: _shouldGroup(docs, messageIndex),
+                                showTime: isLastInGroup && messageIndex != 0,
+                                time: _formatTime(data["createdAt"]),
+                                replyText: data["replyText"],
+                                replyToId: data["replyToId"],
+                                highlighted:
+                                    widget
+                                        .controller
+                                        .highlightedMessageId
+                                        .value ==
+                                    doc.id,
+                                isPressed: isPressed,
+                                onTapReply:
+                                    data["replyToId"] != null
+                                        ? () =>
+                                            widget.controller.scrollToMessage(
+                                              docs: docs,
+                                              messageId: data["replyToId"],
+                                            )
+                                        : null,
+                                onTapMessage:
+                                    canOpenImage
+                                        ? () =>
+                                            widget.controller.openViewOnceImage(
+                                              messageId: doc.id,
+                                              senderId: data["senderId"],
+                                              imagePath: imagePath,
+                                              isLatest: isNewestMessage,
+                                            )
+                                        : null,
+                                reactions: isDeleted ? null : reactions,
+                                callStatus: callStatus,
+                                callType: callType,
+                                callDurationSeconds: callDurationSeconds,
+                                bubbleKey: bubbleKey,
+                                // ❤️ DOUBLE TAP = LOVE
+                                onDoubleTap: () {
+                                  if (isDeleted) return;
+                                  if (reactions[uid] == "love") return;
 
-                                widget.controller.onReactMessage(
-                                  messageId: doc.id,
-                                  reactionId: "love",
-                                );
-                              },
-                              onLongPress: () {
-                                _showMessageActions(
-                                  context: context,
-                                  controller: widget.controller,
-                                  messageId: doc.id,
-                                  messageText: decryptedText,
-                                  bubbleKey: bubbleKey,
-                                  isMe: isMe,
-                                  messageType: messageType,
-                                  isDeleted: isDeleted,
-                                );
-                              },
-                            );
-                          }),
+                                  widget.controller.onReactMessage(
+                                    messageId: doc.id,
+                                    reactionId: "love",
+                                  );
+                                },
+                                onLongPress: () {
+                                  _showMessageActions(
+                                    context: context,
+                                    controller: widget.controller,
+                                    messageId: doc.id,
+                                    messageText: decryptedText,
+                                    bubbleKey: bubbleKey,
+                                    isMe: isMe,
+                                    messageType: messageType,
+                                    isDeleted: isDeleted,
+                                  );
+                                },
+                              );
+                            }),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (createdAt != null &&
-                    _shouldShowDateSeparator(docs, messageIndex))
-                  DateSeparator(
-                    text: formatDateLabel(createdAt),
-                  ),
+                      ],
+                    ),
+                  );
+                },
+              );
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (createdAt != null &&
+                      _shouldShowDateSeparator(docs, messageIndex))
+                    DateSeparator(text: formatDateLabel(createdAt)),
 
-                isNewestMessage
-                    ? AnimatedMessageBubble(child: bubbleContent)
-                    : bubbleContent,
-              ],
-            );
-          },
+                  isNewestMessage
+                      ? AnimatedMessageBubble(child: bubbleContent)
+                      : bubbleContent,
+                ],
+              );
+            },
           );
         });
       },
@@ -374,11 +406,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Iconsax.gallery,
-                                size: 20,
-                                color: textColor,
-                              ),
+                              Icon(Iconsax.gallery, size: 20, color: textColor),
                               const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
@@ -394,13 +422,15 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                           ),
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
-                            value: failed
-                                ? null
-                                : (progress > 0 ? progress : null),
+                            value:
+                                failed
+                                    ? null
+                                    : (progress > 0 ? progress : null),
                             minHeight: 3,
                             backgroundColor: textColor.withOpacity(0.2),
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(textColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              textColor,
+                            ),
                           ),
                         ],
                       ),
@@ -415,7 +445,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     });
   }
 
-// ================= HELPER =================
+  // ================= HELPER =================
 
   DateTime? _getTime(dynamic value) {
     if (value == null) return null;
@@ -423,11 +453,10 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     return null;
   }
 
-  bool _shouldGroup(
-      List<QueryDocumentSnapshot> docs, int index) {
+  bool _shouldGroup(List<QueryDocumentSnapshot> docs, int index) {
     // ✅ Kiểm tra bounds
     if (index < 0 || index >= docs.length) return false;
-    
+
     // Với reverse: true, index 0 là tin mới nhất
     // Tin mới hơn có index nhỏ hơn
     if (index == docs.length - 1) return false; // Tin cũ nhất
@@ -449,11 +478,10 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     return currTime.difference(nextTime).inMinutes < 2;
   }
 
-  bool _isLastInGroup(
-      List<QueryDocumentSnapshot> docs, int index) {
+  bool _isLastInGroup(List<QueryDocumentSnapshot> docs, int index) {
     // ✅ Kiểm tra bounds
     if (index < 0 || index >= docs.length) return true;
-    
+
     // Với reverse: true, index 0 là tin mới nhất
     if (index == 0) return true; // Tin mới nhất luôn show time
 
@@ -480,10 +508,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     return "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
   }
 
-  bool _shouldShowDateSeparator(
-    List<QueryDocumentSnapshot> docs,
-    int index,
-  ) {
+  bool _shouldShowDateSeparator(List<QueryDocumentSnapshot> docs, int index) {
     // index là messageIndex (0 → mới nhất)
     if (index == docs.length - 1) return true; // tin cũ nhất → luôn show
 
@@ -493,8 +518,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     if (curr == null || next == null) return false;
 
     return curr.year != next.year ||
-          curr.month != next.month ||
-          curr.day != next.day;
+        curr.month != next.month ||
+        curr.day != next.day;
   }
 
   void _showMessageActions({
@@ -548,10 +573,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
           label: "Chỉnh sửa",
           onTap: () {
             _dismissMessageActions();
-            controller.startEdit(
-              messageId: messageId,
-              text: messageText,
-            );
+            controller.startEdit(messageId: messageId, text: messageText);
           },
         ),
       if (canDelete)
@@ -583,13 +605,10 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     const actionWidth = 200.0;
     const actionRowHeight = 44.0;
 
-    final actionHeight = actions.isEmpty
-        ? 0.0
-        : actions.length * actionRowHeight + 12.0;
+    final actionHeight =
+        actions.isEmpty ? 0.0 : actions.length * actionRowHeight + 12.0;
 
-    final pickerLeft = (isMe
-            ? pos.dx + size.width - pickerWidth
-            : pos.dx)
+    final pickerLeft = (isMe ? pos.dx + size.width - pickerWidth : pos.dx)
         .clamp(8.0, screenSize.width - pickerWidth - 8.0);
 
     double pickerTop = pos.dy - pickerHeight - verticalGap;
@@ -598,9 +617,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
       pickerTop = safeTop;
     }
 
-    final actionLeft = (isMe
-            ? pos.dx + size.width - actionWidth
-            : pos.dx)
+    final actionLeft = (isMe ? pos.dx + size.width - actionWidth : pos.dx)
         .clamp(8.0, screenSize.width - actionWidth - 8.0);
 
     double actionsTop = pos.dy + size.height + verticalGap;
@@ -620,54 +637,53 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     }
 
     _actionsEntry = OverlayEntry(
-      builder: (_) => Material(
-        color: Colors.transparent,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _dismissMessageActions,
-                child: ClipPath(
-                  clipper: _HoleClipper(
-                    holeRect: holeRect,
-                    radius: holeRadius,
-                  ),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                    child: Container(
-                      color: Colors.black.withOpacity(0.25),
+      builder:
+          (_) => Material(
+            color: Colors.transparent,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _dismissMessageActions,
+                    child: ClipPath(
+                      clipper: _HoleClipper(
+                        holeRect: holeRect,
+                        radius: holeRadius,
+                      ),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                        child: Container(color: Colors.black.withOpacity(0.25)),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                if (canReact)
+                  Positioned(
+                    left: pickerLeft,
+                    top: pickerTop,
+                    child: ReactionPicker(
+                      onSelect: (reactionId) {
+                        controller.onReactMessage(
+                          messageId: messageId,
+                          reactionId: reactionId,
+                        );
+                        _dismissMessageActions();
+                      },
+                    ),
+                  ),
+                if (actions.isNotEmpty)
+                  Positioned(
+                    left: actionLeft,
+                    top: actionsTop,
+                    child: SizedBox(
+                      width: actionWidth,
+                      child: _MessageActionList(actions: actions),
+                    ),
+                  ),
+              ],
             ),
-            if (canReact)
-              Positioned(
-                left: pickerLeft,
-                top: pickerTop,
-                child: ReactionPicker(
-                  onSelect: (reactionId) {
-                    controller.onReactMessage(
-                      messageId: messageId,
-                      reactionId: reactionId,
-                    );
-                    _dismissMessageActions();
-                  },
-                ),
-              ),
-            if (actions.isNotEmpty)
-              Positioned(
-                left: actionLeft,
-                top: actionsTop,
-                child: SizedBox(
-                  width: actionWidth,
-                  child: _MessageActionList(actions: actions),
-                ),
-              ),
-          ],
-        ),
-      ),
+          ),
     );
 
     final overlay = Overlay.of(context);
@@ -703,8 +719,6 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     _dismissMessageActions(notify: false);
     super.dispose();
   }
-
-
 }
 
 class _MessageActionItem {
@@ -724,9 +738,7 @@ class _MessageActionItem {
 class _MessageActionList extends StatelessWidget {
   final List<_MessageActionItem> actions;
 
-  const _MessageActionList({
-    required this.actions,
-  });
+  const _MessageActionList({required this.actions});
 
   @override
   Widget build(BuildContext context) {
@@ -740,10 +752,7 @@ class _MessageActionList extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(
-              blurRadius: 12,
-              color: Colors.black.withOpacity(0.2),
-            )
+            BoxShadow(blurRadius: 12, color: Colors.black.withOpacity(0.2)),
           ],
         ),
         child: Column(
@@ -798,27 +807,18 @@ class _HoleClipper extends CustomClipper<Path> {
   final Rect holeRect;
   final double radius;
 
-  const _HoleClipper({
-    required this.holeRect,
-    required this.radius,
-  });
+  const _HoleClipper({required this.holeRect, required this.radius});
 
   @override
   Path getClip(Size size) {
     final path = Path()..fillType = PathFillType.evenOdd;
     path.addRect(Offset.zero & size);
-    path.addRRect(
-      RRect.fromRectAndRadius(
-        holeRect,
-        Radius.circular(radius),
-      ),
-    );
+    path.addRRect(RRect.fromRectAndRadius(holeRect, Radius.circular(radius)));
     return path;
   }
 
   @override
   bool shouldReclip(_HoleClipper oldClipper) {
-    return oldClipper.holeRect != holeRect ||
-        oldClipper.radius != radius;
+    return oldClipper.holeRect != holeRect || oldClipper.radius != radius;
   }
 }
