@@ -622,7 +622,7 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
                     ),
                     child: Text(
                       'Đến lượt bạn',
-                      style: theme.textTheme.labelSmall?.copyWith(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: accent,
                         fontWeight: FontWeight.w700,
                       ),
@@ -687,7 +687,7 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
             ),
             label: Text(
               'SOS • Cầu cứu',
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: sosMuted,
                 fontWeight: FontWeight.w600,
               ),
@@ -932,7 +932,7 @@ class _WordChainMicroReward extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             'Chuẩn rồi! +1',
-            style: theme.textTheme.labelMedium?.copyWith(
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: accent,
               fontWeight: FontWeight.w700,
             ),

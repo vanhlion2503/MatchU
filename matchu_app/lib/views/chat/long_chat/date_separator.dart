@@ -19,7 +19,7 @@ class DateSeparator extends StatelessWidget {
           ),
           child: Text(
             text,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.outline,
             ),
           ),

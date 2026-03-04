@@ -18,7 +18,6 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 
-
 class ChatController extends GetxController {
   final String roomId;
   ChatController(this.roomId);
@@ -59,14 +58,16 @@ class ChatController extends GetxController {
   /// 👉 số lượng message hiện tại
   int lastMessageCount = 0;
   final RxInt otherUnread = 0.obs;
-  
+
   /// 👉 Pagination state - lưu tất cả messages đã load
-  final RxList<QueryDocumentSnapshot<Map<String, dynamic>>> allMessages = <QueryDocumentSnapshot<Map<String, dynamic>>>[].obs;
+  final RxList<QueryDocumentSnapshot<Map<String, dynamic>>> allMessages =
+      <QueryDocumentSnapshot<Map<String, dynamic>>>[].obs;
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
   bool _initialLoadComplete = false;
   String? _messageSourceRoot;
-  DocumentSnapshot<Map<String, dynamic>>? _oldestDocument; // Tin nhắn cũ nhất đã load
+  DocumentSnapshot<Map<String, dynamic>>?
+  _oldestDocument; // Tin nhắn cũ nhất đã load
 
   final replyingMessage = Rxn<Map<String, dynamic>>();
   final editingMessage = Rxn<Map<String, dynamic>>();
@@ -84,7 +85,8 @@ class ChatController extends GetxController {
   final RxMap<String, String> decryptedCache = <String, String>{}.obs;
   final Set<String> _decrypting = {};
   StreamSubscription? _sessionKeySub;
-  StreamSubscription? _sessionKeyListenerSub; // Realtime listener cho session key
+  StreamSubscription?
+  _sessionKeyListenerSub; // Realtime listener cho session key
   int _currentKeyId = 0;
   bool _isEnsuringKey = false;
 
@@ -100,8 +102,7 @@ class ChatController extends GetxController {
 
     _presence = Get.find<PresenceController>();
 
-    _sessionKeySub =
-        SessionKeyService.onSessionKeyUpdated(roomId).listen((_) {
+    _sessionKeySub = SessionKeyService.onSessionKeyUpdated(roomId).listen((_) {
       decryptedCache.clear();
       _decrypting.clear();
 
@@ -117,12 +118,10 @@ class ChatController extends GetxController {
   }
 
   Future<void> _bootstrap() async {
-    await _initRoom();        // ⬅️ đảm bảo có otherUid
-    await _ensureSessionKey();// ⬅️ đảm bảo có AES key
+    await _initRoom(); // ⬅️ đảm bảo có otherUid
+    await _ensureSessionKey(); // ⬅️ đảm bảo có AES key
     await loadInitialMessages();
   }
-
-
 
   void _onOtherTypingChanged(bool isTyping) {
     if (!isTyping) return;
@@ -172,12 +171,10 @@ class ChatController extends GetxController {
     // 🔥 LISTEN PRESENCE Ở ĐÂY (CHUẨN)
     _presence.listen(uidOther);
 
-    Get.find<ChatUserCacheController>()
-        .loadIfNeeded(uidOther);
+    Get.find<ChatUserCacheController>().loadIfNeeded(uidOther);
 
     _listenRoomTyping();
   }
-
 
   // ================= ROOM LISTENER =================
   void _listenRoomTyping() {
@@ -207,7 +204,6 @@ class ChatController extends GetxController {
           otherTyping.value = false;
         });
       }
-
     });
   }
 
@@ -215,31 +211,30 @@ class ChatController extends GetxController {
   // Stream chỉ để listen messages mới nhất (realtime)
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessages() {
     return _service.listenMessagesWithFallback(
-      roomId, 
+      roomId,
       tempRoomId,
       limit: _pageSize, // Chỉ lấy 20 tin mới nhất để detect tin mới
     );
   }
-  
+
   // Load messages ban đầu
   Future<void> loadInitialMessages() async {
     if (_initialLoadComplete) return;
     try {
-      final snapshot = await _service.listenMessagesWithFallback(
-        roomId,
-        tempRoomId,
-        limit: _pageSize,
-      ).first;
+      final snapshot =
+          await _service
+              .listenMessagesWithFallback(roomId, tempRoomId, limit: _pageSize)
+              .first;
 
       if (_initialLoadComplete) return;
-      
+
       final docs = snapshot.docs;
       if (docs.isEmpty) {
         _hasMoreMessages = false;
         _initialLoadComplete = true;
         return;
       }
-      
+
       _applySnapshotAsBaseline(docs, _resolveSourceRoot(docs.first));
     } catch (e) {
       print('Error loading initial messages: $e');
@@ -253,10 +248,7 @@ class ChatController extends GetxController {
     }
   }
 
-  void _updateDeletedFlag(
-    String messageId,
-    Map<String, dynamic> data,
-  ) {
+  void _updateDeletedFlag(String messageId, Map<String, dynamic> data) {
     if (data["type"] == _deletedType) {
       deletedMessageIds.add(messageId);
     } else {
@@ -264,9 +256,7 @@ class ChatController extends GetxController {
     }
   }
 
-  String _resolveSourceRoot(
-    QueryDocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+  String _resolveSourceRoot(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final segments = doc.reference.path.split('/');
     return segments.isNotEmpty ? segments.first : "";
   }
@@ -275,7 +265,8 @@ class ChatController extends GetxController {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
     String sourceRoot,
   ) {
-    _messageSourceRoot = sourceRoot.isNotEmpty ? sourceRoot : _messageSourceRoot;
+    _messageSourceRoot =
+        sourceRoot.isNotEmpty ? sourceRoot : _messageSourceRoot;
     allMessages.value = docs;
     _rebuildIndexMap();
 
@@ -317,6 +308,8 @@ class ChatController extends GetxController {
     }
 
     bool hasChange = false;
+    bool hasInsertedNewMessage = false;
+    bool newestInsertedFromMe = false;
 
     for (final snap in docs) {
       final id = snap.id;
@@ -327,6 +320,10 @@ class ChatController extends GetxController {
         // ===============================
         // 🆕 MESSAGE MỚI
         // ===============================
+        if (!hasInsertedNewMessage) {
+          newestInsertedFromMe = data["senderId"] == uid;
+        }
+        hasInsertedNewMessage = true;
         allMessages.insert(0, snap);
 
         // shift index map
@@ -378,8 +375,9 @@ class ChatController extends GetxController {
 
     lastMessageCount = allMessages.length;
 
-    final newest = docs.first;
-    final isFromMe = newest["senderId"] == uid;
+    if (!hasInsertedNewMessage) {
+      return;
+    }
 
     if (!userScrolledUp.value) {
       _service.markAsRead(roomId);
@@ -388,17 +386,15 @@ class ChatController extends GetxController {
     // ===============================
     // 🧭 SCROLL LOGIC (GIỮ NGUYÊN)
     // ===============================
-    if (_justSentMessage && isFromMe) {
+    if (_justSentMessage && newestInsertedFromMe) {
       _justSentMessage = false;
       _scrollToBottom(0);
-    } else if (!isFromMe && !userScrolledUp.value) {
+    } else if (!newestInsertedFromMe && !userScrolledUp.value) {
       _scrollToBottom(0);
     } else if (userScrolledUp.value) {
       showNewMessageBtn.value = true;
     }
   }
-
-
 
   bool _mapEquals(Map a, Map b) {
     if (a.length != b.length) return false;
@@ -433,8 +429,9 @@ class ChatController extends GetxController {
       if (positions.isEmpty) return;
 
       // Với reverse: true, index 0 ở đáy màn hình
-      final minIndex =
-          positions.map((e) => e.index).reduce((a, b) => a < b ? a : b);
+      final minIndex = positions
+          .map((e) => e.index)
+          .reduce((a, b) => a < b ? a : b);
 
       // Ở đáy nếu index 0 hoặc 1 đang visible
       final atBottom = minIndex <= 1;
@@ -447,12 +444,12 @@ class ChatController extends GetxController {
 
       // Load more khi scroll đến đầu list (index cao - tin cũ nhất)
       if (!_isLoadingMore && _hasMoreMessages && _oldestDocument != null) {
-        final maxIndex =
-            positions.map((e) => e.index).reduce((a, b) => a > b ? a : b);
-        
+        final maxIndex = positions
+            .map((e) => e.index)
+            .reduce((a, b) => a > b ? a : b);
+
         // Khi scroll đến 90% của list hiện tại (gần đầu), load more
-        final totalItems =
-            allMessages.length + 1 + pendingImageMessages.length;
+        final totalItems = allMessages.length + 1 + pendingImageMessages.length;
         if (maxIndex >= totalItems * 0.9) {
           // Gọi method trực tiếp để tránh lỗi lookup
           Future.microtask(() => loadMoreMessages());
@@ -464,26 +461,29 @@ class ChatController extends GetxController {
   // ================= LOAD MORE MESSAGES =================
   Future<void> loadMoreMessages() async {
     if (_isLoadingMore || !_hasMoreMessages || _oldestDocument == null) return;
-    
+
     _isLoadingMore = true;
-    
+
     try {
       // Lấy thêm 20 tin nhắn cũ hơn
-      final snapshot = await _service.listenMessagesWithFallback(
-        roomId,
-        tempRoomId,
-        limit: _pageSize,
-        startAfter: _oldestDocument,
-      ).first;
-      
+      final snapshot =
+          await _service
+              .listenMessagesWithFallback(
+                roomId,
+                tempRoomId,
+                limit: _pageSize,
+                startAfter: _oldestDocument,
+              )
+              .first;
+
       final newDocs = snapshot.docs;
-      
+
       if (newDocs.isEmpty) {
         _hasMoreMessages = false;
         _isLoadingMore = false;
         return;
       }
-      
+
       // Thêm vào cuối list (vì reverse: true, cuối list là tin cũ nhất)
       allMessages.addAll(newDocs);
 
@@ -498,7 +498,7 @@ class ChatController extends GetxController {
       }
       _oldestDocument = newDocs.last; // Cập nhật tin cũ nhất
       lastMessageCount = allMessages.length;
-      
+
       // Nếu load được ít hơn 20, không còn tin nào nữa
       if (newDocs.length < _pageSize) {
         _hasMoreMessages = false;
@@ -509,7 +509,7 @@ class ChatController extends GetxController {
       _isLoadingMore = false;
     }
   }
-  
+
   // Getter để check loading state
   bool get isLoadingMore => _isLoadingMore;
   bool get hasMoreMessages => _hasMoreMessages;
@@ -521,14 +521,11 @@ class ChatController extends GetxController {
 
     final editing = editingMessage.value;
     if (editing != null) {
-      await _submitEdit(
-        messageId: editing["id"] as String,
-        newText: text,
-      );
+      await _submitEdit(messageId: editing["id"] as String, newText: text);
       return;
     }
 
-    _justSentMessage = true; 
+    _justSentMessage = true;
     _typingTimer?.cancel();
     isTyping.value = false;
     await _service.setTyping(roomId: roomId, isTyping: false);
@@ -569,10 +566,7 @@ class ChatController extends GetxController {
   }) async {
     if (editingMessage.value != null) return;
 
-    final picked = await _picker.pickImage(
-      source: source,
-      imageQuality: 85,
-    );
+    final picked = await _picker.pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
     _justSentMessage = true;
@@ -622,10 +616,12 @@ class ChatController extends GetxController {
     required String messageType,
   }) {
     return {
-      "lastMessage": messageType == _deletedType
-          ? _deletedPlaceholder
-          : _encryptedPlaceholder,
-      "lastMessageType": messageType == _deletedType ? _deletedType : "encrypted",
+      "lastMessage":
+          messageType == _deletedType
+              ? _deletedPlaceholder
+              : _encryptedPlaceholder,
+      "lastMessageType":
+          messageType == _deletedType ? _deletedType : "encrypted",
       "lastMessageCipher": ciphertext,
       "lastMessageIv": iv,
       "lastMessageKeyId": keyId,
@@ -647,10 +643,7 @@ class ChatController extends GetxController {
     }
 
     if (!hasKey) {
-      Get.snackbar(
-        "Loi",
-        "Dang thiet lap ma hoa, vui long thu lai.",
-      );
+      Get.snackbar("Loi", "Dang thiet lap ma hoa, vui long thu lai.");
       return false;
     }
     return true;
@@ -684,14 +677,15 @@ class ChatController extends GetxController {
       "editedBy": uid,
     };
 
-    final roomUpdate = _isLatestMessage(messageId)
-        ? _buildRoomPreviewUpdate(
-            ciphertext: encrypted["ciphertext"]!,
-            iv: encrypted["iv"]!,
-            keyId: _currentKeyId,
-            messageType: "text",
-          )
-        : null;
+    final roomUpdate =
+        _isLatestMessage(messageId)
+            ? _buildRoomPreviewUpdate(
+              ciphertext: encrypted["ciphertext"]!,
+              iv: encrypted["iv"]!,
+              keyId: _currentKeyId,
+              messageType: "text",
+            )
+            : null;
 
     try {
       await _service.updateMessage(
@@ -709,9 +703,7 @@ class ChatController extends GetxController {
     }
   }
 
-  Future<void> deleteMessage({
-    required String messageId,
-  }) async {
+  Future<void> deleteMessage({required String messageId}) async {
     if (!await _ensureEditableKey()) return;
 
     final encrypted = await MessageCryptoService.encrypt(
@@ -729,14 +721,15 @@ class ChatController extends GetxController {
       "deletedBy": uid,
     };
 
-    final roomUpdate = _isLatestMessage(messageId)
-        ? _buildRoomPreviewUpdate(
-            ciphertext: encrypted["ciphertext"]!,
-            iv: encrypted["iv"]!,
-            keyId: _currentKeyId,
-            messageType: _deletedType,
-          )
-        : null;
+    final roomUpdate =
+        _isLatestMessage(messageId)
+            ? _buildRoomPreviewUpdate(
+              ciphertext: encrypted["ciphertext"]!,
+              iv: encrypted["iv"]!,
+              keyId: _currentKeyId,
+              messageType: _deletedType,
+            )
+            : null;
 
     try {
       await _service.updateMessage(
@@ -772,17 +765,16 @@ class ChatController extends GetxController {
       () => ViewOnceImageView(
         imagePath: imagePath,
         canDelete: canDelete,
-        onViewed: canDelete
-            ? () => _markViewOnceImageViewed(messageId)
-            : null,
-        onExit: canDelete
-            ? () => _deleteViewedImage(
+        onViewed: canDelete ? () => _markViewOnceImageViewed(messageId) : null,
+        onExit:
+            canDelete
+                ? () => _deleteViewedImage(
                   messageId: messageId,
                   senderId: senderId,
                   imagePath: imagePath,
                   isLatest: isLatest,
                 )
-            : null,
+                : null,
       ),
     );
   }
@@ -792,9 +784,7 @@ class ChatController extends GetxController {
       await _service.updateMessage(
         roomId: roomId,
         messageId: messageId,
-        messageUpdate: {
-          "viewedBy.$uid": FieldValue.serverTimestamp(),
-        },
+        messageUpdate: {"viewedBy.$uid": FieldValue.serverTimestamp()},
       );
     } catch (_) {}
   }
@@ -814,16 +804,17 @@ class ChatController extends GetxController {
       "deletedBy": uid,
     };
 
-    final roomUpdate = isLatest
-        ? {
-            "lastMessage": viewOnceDeletedText,
-            "lastMessageType": _deletedType,
-            "lastMessageCipher": FieldValue.delete(),
-            "lastMessageIv": FieldValue.delete(),
-            "lastMessageKeyId": 0,
-            "lastSenderId": senderId,
-          }
-        : null;
+    final roomUpdate =
+        isLatest
+            ? {
+              "lastMessage": viewOnceDeletedText,
+              "lastMessageType": _deletedType,
+              "lastMessageCipher": FieldValue.delete(),
+              "lastMessageIv": FieldValue.delete(),
+              "lastMessageKeyId": 0,
+              "lastSenderId": senderId,
+            }
+            : null;
 
     try {
       await _service.updateMessage(
@@ -863,20 +854,12 @@ class ChatController extends GetxController {
   }
 
   // ================= EDIT =================
-  void startEdit({
-    required String messageId,
-    required String text,
-  }) {
+  void startEdit({required String messageId, required String text}) {
     replyingMessage.value = null;
-    editingMessage.value = {
-      "id": messageId,
-      "text": text,
-    };
+    editingMessage.value = {"id": messageId, "text": text};
 
     inputController.text = text;
-    inputController.selection = TextSelection.collapsed(
-      offset: text.length,
-    );
+    inputController.selection = TextSelection.collapsed(offset: text.length);
 
     showEmoji.value = false;
     if (inputFocusNode.canRequestFocus) {
@@ -928,10 +911,7 @@ class ChatController extends GetxController {
     });
   }
 
-  void onReactMessage({
-    required String messageId,
-    required String reactionId,
-  }) {
+  void onReactMessage({required String messageId, required String reactionId}) {
     _service.toggleReaction(
       roomId: roomId,
       messageId: messageId,
@@ -943,7 +923,6 @@ class ChatController extends GetxController {
     String messageId,
     Map<String, dynamic> data,
   ) async {
-
     if (!data.containsKey("ciphertext") || !data.containsKey("iv")) {
       final rawText = data["text"];
       if (rawText is String) {
@@ -991,7 +970,7 @@ class ChatController extends GetxController {
         keyId: keyId,
       );
       debugPrint("🔍 Session key exists: $hasKey");
-      
+
       final fallbackText = data["text"];
       if (fallbackText is String && fallbackText.isNotEmpty) {
         decryptedCache[messageId] = fallbackText;
@@ -1062,12 +1041,13 @@ class ChatController extends GetxController {
         roomId,
         keyId: _currentKeyId,
       )) {
-        final hasAnyKeys = _currentKeyId == 0
-            ? await SessionKeyService.hasAnySessionKeys(roomId)
-            : await SessionKeyService.hasAnySessionKeysForKeyId(
-                roomId,
-                _currentKeyId,
-              );
+        final hasAnyKeys =
+            _currentKeyId == 0
+                ? await SessionKeyService.hasAnySessionKeys(roomId)
+                : await SessionKeyService.hasAnySessionKeysForKeyId(
+                  roomId,
+                  _currentKeyId,
+                );
         if (hasAnyKeys) {
           print("Room has keys, listening for session key...");
 
@@ -1099,8 +1079,6 @@ class ChatController extends GetxController {
     }
   }
 
-
-
   // ================= CLEAN UP =================
   @override
   void onClose() {
@@ -1128,7 +1106,5 @@ class PendingImageMessage {
   final RxDouble progress = 0.0.obs;
   final RxBool failed = false.obs;
 
-  PendingImageMessage({
-    required this.id,
-  });
+  PendingImageMessage({required this.id});
 }

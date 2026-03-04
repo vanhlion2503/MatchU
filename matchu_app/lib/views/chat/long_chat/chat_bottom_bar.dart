@@ -22,6 +22,7 @@ class ChatBottomBar extends StatefulWidget {
 class _ChatBottomBarState extends State<ChatBottomBar> {
   static const Duration _kLeadingAnimDuration = Duration(milliseconds: 240);
   static const double _kIconSlot = 48;
+  static const double _kEmojiPickerHeight = 280;
 
   final GlobalKey _leadingActionsKey = GlobalKey();
   final GlobalKey _inputFieldKey = GlobalKey();
@@ -41,6 +42,7 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
 
   void _onInputFocusChanged() {
     if (!mounted) return;
+    if (!_showLeftActions) return;
 
     setState(() {
       _showLeftActions = false;
@@ -53,6 +55,7 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
   }
 
   void _toggleLeftActions() {
+    if (!widget.controller.inputFocusNode.hasFocus) return;
     setState(() => _showLeftActions = !_showLeftActions);
   }
 
@@ -84,6 +87,36 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
     if (_isTapInside(_inputFieldKey, tapPosition)) return;
 
     _collapseLeftActions();
+  }
+
+  int _clampInt(int value, int min, int max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  void _insertEmoji(String emoji) {
+    final inputController = widget.controller.inputController;
+    final text = inputController.text;
+    final selection = inputController.selection;
+    final textLength = text.length;
+    final hasValidSelection = selection.start >= 0 && selection.end >= 0;
+
+    final start =
+        hasValidSelection
+            ? _clampInt(selection.start, 0, textLength)
+            : textLength;
+    final end =
+        hasValidSelection ? _clampInt(selection.end, start, textLength) : start;
+
+    final updatedText = text.replaceRange(start, end, emoji);
+    inputController.value = inputController.value.copyWith(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+      composing: TextRange.empty,
+    );
+
+    widget.controller.onTypingChanged(updatedText);
   }
 
   Widget _buildCameraButton() {
@@ -280,8 +313,8 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(
-                                  0.8,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.8,
                                 ),
                               ),
                             ),
@@ -344,8 +377,8 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(
-                                  0.8,
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.8,
                                 ),
                               ),
                             ),
@@ -442,29 +475,14 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                   child:
                       controller.showEmoji.value
                           ? SizedBox(
-                            height: 280,
+                            height: _kEmojiPickerHeight,
                             width: MediaQuery.of(context).size.width,
                             child: EmojiPicker(
                               onEmojiSelected: (_, emoji) {
-                                final ctrl = controller.inputController;
-                                final text = ctrl.text;
-                                final selection = ctrl.selection;
-
-                                final newText = text.replaceRange(
-                                  selection.start,
-                                  selection.end,
-                                  emoji.emoji,
-                                );
-
-                                ctrl.text = newText;
-                                ctrl.selection = TextSelection.collapsed(
-                                  offset: selection.start + emoji.emoji.length,
-                                );
-
-                                controller.isTyping.value = true;
+                                _insertEmoji(emoji.emoji);
                               },
                               config: Config(
-                                height: 280,
+                                height: _kEmojiPickerHeight,
                                 emojiViewConfig: EmojiViewConfig(
                                   columns: 8,
                                   emojiSizeMax: 28,
@@ -473,7 +491,9 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                                 categoryViewConfig: CategoryViewConfig(
                                   backgroundColor: scheme.surface,
                                   indicatorColor: scheme.primary,
-                                  iconColor: scheme.onSurface.withOpacity(0.6),
+                                  iconColor: scheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   iconColorSelected: scheme.primary,
                                 ),
                                 bottomActionBarConfig: BottomActionBarConfig(

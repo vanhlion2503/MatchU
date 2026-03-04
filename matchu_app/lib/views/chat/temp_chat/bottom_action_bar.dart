@@ -25,6 +25,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
   static const Duration _kLeadingAnimDuration = Duration(milliseconds: 240);
   static const double _kActionSize = ActionIcon.size;
   static const double _kActionGap = 6;
+  static const double _kEmojiPickerHeight = 280;
 
   final FocusNode _inputFocusNode = FocusNode();
   final GlobalKey _leadingActionsKey = GlobalKey();
@@ -49,8 +50,11 @@ class _BottomActionBarState extends State<BottomActionBar> {
 
   void _onInputFocusChanged() {
     if (!mounted) return;
+    final nextFocused = _inputFocusNode.hasFocus;
+    if (_isInputFocused == nextFocused && !_showLeftActions) return;
+
     setState(() {
-      _isInputFocused = _inputFocusNode.hasFocus;
+      _isInputFocused = nextFocused;
       _showLeftActions = false;
     });
   }
@@ -61,6 +65,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
   }
 
   void _toggleLeftActions() {
+    if (!_isInputFocused) return;
     setState(() => _showLeftActions = !_showLeftActions);
   }
 
@@ -98,6 +103,36 @@ class _BottomActionBarState extends State<BottomActionBar> {
     _collapseLeftActions();
   }
 
+  int _clampInt(int value, int min, int max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  void _insertEmoji(String emoji) {
+    final inputController = controller.inputController;
+    final text = inputController.text;
+    final selection = inputController.selection;
+    final textLength = text.length;
+    final hasValidSelection = selection.start >= 0 && selection.end >= 0;
+
+    final start =
+        hasValidSelection
+            ? _clampInt(selection.start, 0, textLength)
+            : textLength;
+    final end =
+        hasValidSelection ? _clampInt(selection.end, start, textLength) : start;
+
+    final updatedText = text.replaceRange(start, end, emoji);
+    inputController.value = inputController.value.copyWith(
+      text: updatedText,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+      composing: TextRange.empty,
+    );
+
+    controller.onTypingChanged(updatedText);
+  }
+
   Widget _buildLeaveAction(BuildContext context, ThemeData theme) {
     return ActionIcon(
       onTap: () => _confirmLeave(context),
@@ -126,14 +161,16 @@ class _BottomActionBarState extends State<BottomActionBar> {
         },
         backgroundColor:
             canInvite
-                ? theme.colorScheme.surfaceVariant
-                : theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                ? theme.colorScheme.surfaceContainerHighest
+                : theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
         child: Icon(
           Iconsax.game,
           color:
               canInvite
                   ? color.primary
-                  : theme.colorScheme.onSurface.withOpacity(0.4),
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.4),
           size: 32,
         ),
       );
@@ -312,8 +349,9 @@ class _BottomActionBarState extends State<BottomActionBar> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.8),
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.8,
+                                  ),
                                 ),
                               ),
                             ],
@@ -326,8 +364,8 @@ class _BottomActionBarState extends State<BottomActionBar> {
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.onSurface.withOpacity(
-                                0.08,
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.08,
                               ),
                               shape: BoxShape.circle,
                             ),
@@ -477,29 +515,14 @@ class _BottomActionBarState extends State<BottomActionBar> {
                   child:
                       controller.showEmoji.value
                           ? SizedBox(
-                            height: 280,
+                            height: _kEmojiPickerHeight,
                             width: MediaQuery.of(context).size.width,
                             child: EmojiPicker(
                               onEmojiSelected: (_, emoji) {
-                                final ctrl = controller.inputController;
-                                final text = ctrl.text;
-                                final selection = ctrl.selection;
-
-                                final newText = text.replaceRange(
-                                  selection.start,
-                                  selection.end,
-                                  emoji.emoji,
-                                );
-
-                                ctrl.text = newText;
-                                ctrl.selection = TextSelection.collapsed(
-                                  offset: selection.start + emoji.emoji.length,
-                                );
-
-                                controller.isTyping.value = true;
+                                _insertEmoji(emoji.emoji);
                               },
                               config: Config(
-                                height: 280,
+                                height: _kEmojiPickerHeight,
                                 emojiViewConfig: EmojiViewConfig(
                                   columns: 8,
                                   emojiSizeMax: 28,
@@ -508,7 +531,9 @@ class _BottomActionBarState extends State<BottomActionBar> {
                                 categoryViewConfig: CategoryViewConfig(
                                   backgroundColor: scheme.surface,
                                   indicatorColor: scheme.primary,
-                                  iconColor: scheme.onSurface.withOpacity(0.6),
+                                  iconColor: scheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   iconColorSelected: scheme.primary,
                                 ),
                                 bottomActionBarConfig: BottomActionBarConfig(
@@ -592,7 +617,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurface.withOpacity(0.2),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),

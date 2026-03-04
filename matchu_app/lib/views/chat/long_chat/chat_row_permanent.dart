@@ -249,7 +249,7 @@ class ChatRowPermanent extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             time,
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.outline,
                             ),
                           ),
@@ -269,7 +269,7 @@ class ChatRowPermanent extends StatelessWidget {
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
-                                  style: theme.textTheme.labelSmall?.copyWith(
+                                  style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),
                                 ),
@@ -392,7 +392,7 @@ class ChatRowPermanent extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             time,
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.outline,
                             ),
                           ),
@@ -408,8 +408,8 @@ class ChatRowPermanent extends StatelessWidget {
                                 SeenAvatarAnimated(userId: seenByUid, size: 14)
                               else if (status == MessageStatus.sent)
                                 Text(
-                                  "ÄÃ£ gá»­i",
-                                  style: theme.textTheme.labelSmall?.copyWith(
+                                  "Đã gửi",
+                                  style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),
                                 ),
@@ -538,7 +538,7 @@ class ChatRowPermanent extends StatelessWidget {
                                       const SizedBox(height: 6),
                                       Text(
                                         "Chạm để xem",
-                                        style: theme.textTheme.labelSmall
+                                        style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                               fontWeight: FontWeight.w600,
                                               color: textColor.withOpacity(0.8),
@@ -568,7 +568,7 @@ class ChatRowPermanent extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             time,
-                            style: theme.textTheme.labelSmall?.copyWith(
+                            style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.outline,
                             ),
                           ),
@@ -585,7 +585,7 @@ class ChatRowPermanent extends StatelessWidget {
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
-                                  style: theme.textTheme.labelSmall?.copyWith(
+                                  style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),
                                 ),
@@ -677,7 +677,7 @@ class _MessengerReactionBadge extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(
                         e.value.toString(),
-                        style: Theme.of(context).textTheme.labelSmall,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ],

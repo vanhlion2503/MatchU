@@ -426,7 +426,7 @@ class _MessengerReactionBadge extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(
                         e.value.toString(),
-                        style: Theme.of(context).textTheme.labelSmall,
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                   ],

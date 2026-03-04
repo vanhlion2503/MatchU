@@ -480,7 +480,7 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
             const SizedBox(width: 6),
             Text(
               text,
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 color: color,
                 fontWeight: FontWeight.w600,
               ),

@@ -49,10 +49,6 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     final uid = Get.find<AuthController>().user!.uid;
     final theme = Theme.of(context);
 
-    final bottomPadding =
-        widget.controller.bottomBarHeight.value +
-        MediaQuery.of(context).padding.bottom;
-
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: widget.controller.listenMessages(),
       builder: (context, snap) {
@@ -72,6 +68,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
           final docs = widget.controller.allMessages;
           final pending = widget.controller.pendingImageMessages;
           final pendingCount = pending.length;
+          const bottomPadding = 10.0;
 
           if (docs.isEmpty && !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -427,7 +424,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                     ? null
                                     : (progress > 0 ? progress : null),
                             minHeight: 3,
-                            backgroundColor: textColor.withOpacity(0.2),
+                            backgroundColor: textColor.withValues(alpha: 0.2),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               textColor,
                             ),
@@ -653,7 +650,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                       ),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                        child: Container(color: Colors.black.withOpacity(0.25)),
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.25),
+                        ),
                       ),
                     ),
                   ),
@@ -686,7 +685,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
           ),
     );
 
-    final overlay = Overlay.of(context);
+    final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
     overlay.insert(_actionsEntry!);
   }
@@ -752,7 +751,10 @@ class _MessageActionList extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(blurRadius: 12, color: Colors.black.withOpacity(0.2)),
+            BoxShadow(
+              blurRadius: 12,
+              color: Colors.black.withValues(alpha: 0.2),
+            ),
           ],
         ),
         child: Column(
@@ -792,7 +794,7 @@ class _MessageActionList extends StatelessWidget {
                   Divider(
                     height: 1,
                     thickness: 0.6,
-                    color: theme.dividerColor.withOpacity(0.4),
+                    color: theme.dividerColor.withValues(alpha: 0.4),
                   ),
               ],
             );

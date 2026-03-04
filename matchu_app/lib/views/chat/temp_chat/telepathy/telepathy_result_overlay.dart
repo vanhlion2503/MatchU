@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
-import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
 import 'package:matchu_app/models/telepathy_question.dart';
 import 'package:matchu_app/models/telepathy_result.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_motion.dart';
@@ -488,7 +487,7 @@ class _AnswerChip extends StatelessWidget {
         children: [
           Text(
             label,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w700,
             ),

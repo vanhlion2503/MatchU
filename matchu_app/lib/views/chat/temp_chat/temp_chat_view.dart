@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:matchu_app/controllers/matching/matching_controller.dart';
+// import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/views/chat/chat_widget/gender_icon.dart';
 import 'package:matchu_app/views/chat/temp_chat/bottom_action_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/heart_rain_overlay.dart';
@@ -21,7 +21,7 @@ class TempChatView extends StatelessWidget {
 
     final controller = Get.put(TempChatController(roomId), tag: roomId);
 
-    final matchController = Get.find<MatchingController>();
+    // final matchController = Get.find<MatchingController>();
     
     controller.onOtherLiked = () {
       HeartRainOverlay.show(
