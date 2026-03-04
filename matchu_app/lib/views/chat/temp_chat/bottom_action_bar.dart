@@ -22,6 +22,10 @@ class BottomActionBar extends StatefulWidget {
 }
 
 class _BottomActionBarState extends State<BottomActionBar> {
+  static const Duration _kLeadingAnimDuration = Duration(milliseconds: 240);
+  static const double _kActionSize = ActionIcon.size;
+  static const double _kActionGap = 6;
+
   final FocusNode _inputFocusNode = FocusNode();
   bool _isInputFocused = false;
   bool _showLeftActions = false;
@@ -53,6 +57,16 @@ class _BottomActionBarState extends State<BottomActionBar> {
 
   void _toggleLeftActions() {
     setState(() => _showLeftActions = !_showLeftActions);
+  }
+
+  double _leadingWidth() {
+    if (!_isInputFocused) {
+      return (_kActionSize * 2) + (_kActionGap * 2);
+    }
+    if (_showLeftActions) {
+      return (_kActionSize * 3) + (_kActionGap * 3);
+    }
+    return _kActionSize + _kActionGap;
   }
 
   Widget _buildLeaveAction(BuildContext context, ThemeData theme) {
@@ -97,36 +111,116 @@ class _BottomActionBarState extends State<BottomActionBar> {
     });
   }
 
-  List<Widget> _buildLeadingActions(
+  Widget _buildToggleAction() {
+    return ActionIcon(
+      onTap: _toggleLeftActions,
+      child: Icon(
+        _showLeftActions ? Icons.close_rounded : Icons.menu_rounded,
+        size: 28,
+      ),
+    );
+  }
+
+  Widget _buildLeadingContent(
     BuildContext context,
     ThemeData theme,
     ColorScheme color,
   ) {
     if (!_isInputFocused) {
-      return [
-        _buildLeaveAction(context, theme),
-        const SizedBox(width: 6),
-        _buildGameAction(context, theme, color),
-        const SizedBox(width: 6),
-      ];
+      return OverflowBox(
+        key: const ValueKey("leading_idle"),
+        alignment: Alignment.centerLeft,
+        minWidth: 0,
+        maxWidth: double.infinity,
+        minHeight: 0,
+        maxHeight: _kActionSize,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildLeaveAction(context, theme),
+            const SizedBox(width: _kActionGap),
+            _buildGameAction(context, theme, color),
+            const SizedBox(width: _kActionGap),
+          ],
+        ),
+      );
     }
 
-    return [
-      ActionIcon(
-        onTap: _toggleLeftActions,
-        child: Icon(
-          _showLeftActions ? Icons.close_rounded : Icons.menu_rounded,
-          size: 28,
+    if (!_showLeftActions) {
+      return OverflowBox(
+        key: const ValueKey("leading_compact"),
+        alignment: Alignment.centerLeft,
+        minWidth: 0,
+        maxWidth: double.infinity,
+        minHeight: 0,
+        maxHeight: _kActionSize,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [_buildToggleAction(), const SizedBox(width: _kActionGap)],
+        ),
+      );
+    }
+
+    return OverflowBox(
+      key: const ValueKey("leading_expanded"),
+      alignment: Alignment.centerLeft,
+      minWidth: 0,
+      maxWidth: double.infinity,
+      minHeight: 0,
+      maxHeight: _kActionSize,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildToggleAction(),
+          const SizedBox(width: _kActionGap),
+          _buildLeaveAction(context, theme),
+          const SizedBox(width: _kActionGap),
+          _buildGameAction(context, theme, color),
+          const SizedBox(width: _kActionGap),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadingActions(
+    BuildContext context,
+    ThemeData theme,
+    ColorScheme color,
+  ) {
+    return AnimatedContainer(
+      duration: _kLeadingAnimDuration,
+      curve: Curves.easeOutCubic,
+      width: _leadingWidth(),
+      height: _kActionSize,
+      child: ClipRect(
+        child: AnimatedSwitcher(
+          duration: _kLeadingAnimDuration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          layoutBuilder: (currentChild, previousChildren) {
+            return Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
+            );
+          },
+          transitionBuilder: (child, animation) {
+            final offset = Tween<Offset>(
+              begin: const Offset(-0.08, 0),
+              end: Offset.zero,
+            ).animate(animation);
+
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: offset, child: child),
+            );
+          },
+          child: _buildLeadingContent(context, theme, color),
         ),
       ),
-      if (_showLeftActions) ...[
-        const SizedBox(width: 6),
-        _buildLeaveAction(context, theme),
-        const SizedBox(width: 6),
-        _buildGameAction(context, theme, color),
-        const SizedBox(width: 6),
-      ],
-    ];
+    );
   }
 
   @override
@@ -223,7 +317,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                ..._buildLeadingActions(context, theme, color),
+                _buildLeadingActions(context, theme, color),
                 Expanded(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 120),

@@ -20,6 +20,9 @@ class ChatBottomBar extends StatefulWidget {
 }
 
 class _ChatBottomBarState extends State<ChatBottomBar> {
+  static const Duration _kLeadingAnimDuration = Duration(milliseconds: 240);
+  static const double _kIconSlot = 48;
+
   bool _showLeftActions = false;
 
   @override
@@ -47,6 +50,12 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
 
   void _toggleLeftActions() {
     setState(() => _showLeftActions = !_showLeftActions);
+  }
+
+  double _leadingWidth(bool isInputFocused) {
+    if (!isInputFocused) return _kIconSlot * 3;
+    if (_showLeftActions) return _kIconSlot * 4;
+    return _kIconSlot;
   }
 
   Widget _buildCameraButton() {
@@ -82,6 +91,107 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
     );
   }
 
+  Widget _buildToggleButton() {
+    return IconButton(
+      icon: Icon(
+        _showLeftActions ? Icons.close_rounded : Icons.menu_rounded,
+        size: 24,
+      ),
+      onPressed: _toggleLeftActions,
+    );
+  }
+
+  Widget _buildLeadingContent(BuildContext context, bool isInputFocused) {
+    if (!isInputFocused) {
+      return OverflowBox(
+        key: const ValueKey("leading_idle"),
+        alignment: Alignment.centerLeft,
+        minWidth: 0,
+        maxWidth: double.infinity,
+        minHeight: 0,
+        maxHeight: _kIconSlot,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildCameraButton(),
+            _buildGalleryButton(),
+            _buildEmojiButton(context),
+          ],
+        ),
+      );
+    }
+
+    if (!_showLeftActions) {
+      return OverflowBox(
+        key: const ValueKey("leading_compact"),
+        alignment: Alignment.centerLeft,
+        minWidth: 0,
+        maxWidth: double.infinity,
+        minHeight: 0,
+        maxHeight: _kIconSlot,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [_buildToggleButton()],
+        ),
+      );
+    }
+
+    return OverflowBox(
+      key: const ValueKey("leading_expanded"),
+      alignment: Alignment.centerLeft,
+      minWidth: 0,
+      maxWidth: double.infinity,
+      minHeight: 0,
+      maxHeight: _kIconSlot,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildToggleButton(),
+          _buildCameraButton(),
+          _buildGalleryButton(),
+          _buildEmojiButton(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeadingActions(BuildContext context, bool isInputFocused) {
+    return AnimatedContainer(
+      duration: _kLeadingAnimDuration,
+      curve: Curves.easeOutCubic,
+      width: _leadingWidth(isInputFocused),
+      height: _kIconSlot,
+      child: ClipRect(
+        child: AnimatedSwitcher(
+          duration: _kLeadingAnimDuration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          layoutBuilder: (currentChild, previousChildren) {
+            return Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                ...previousChildren,
+                if (currentChild != null) currentChild,
+              ],
+            );
+          },
+          transitionBuilder: (child, animation) {
+            final offset = Tween<Offset>(
+              begin: const Offset(-0.08, 0),
+              end: Offset.zero,
+            ).animate(animation);
+
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: offset, child: child),
+            );
+          },
+          child: _buildLeadingContent(context, isInputFocused),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -93,7 +203,6 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
         final isTyping = controller.isTyping.value;
         final isEditing = controller.editingMessage.value != null;
         final isInputFocused = controller.inputFocusNode.hasFocus;
-        final showCompactLeftActions = isInputFocused && !_showLeftActions;
 
         return Column(
           key: ChatBottomBar.bottomBarKey,
@@ -229,31 +338,7 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (isInputFocused)
-                    IconButton(
-                      icon: Icon(
-                        _showLeftActions
-                            ? Icons.close_rounded
-                            : Icons.menu_rounded,
-                        size: 24,
-                      ),
-                      onPressed: _toggleLeftActions,
-                    ),
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (!showCompactLeftActions) ...[
-                          _buildCameraButton(),
-                          _buildGalleryButton(),
-                          _buildEmojiButton(context),
-                        ],
-                      ],
-                    ),
-                  ),
+                  _buildLeadingActions(context, isInputFocused),
                   Expanded(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 120),
