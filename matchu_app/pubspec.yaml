@@ -72,6 +72,7 @@ dependencies:
   permission_handler: ^11.3.1
   http: ^1.2.2
   http_parser: ^4.0.2
+  flutter_svg: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -102,9 +103,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-     - assets/icon/Icon.png
-     - assets/icon/google.png
-     - assets/icon/facebook.png
+     - assets/icon/
      - assets/avatas/avataMd.png
      - assets/anonymous/
      - assets/games/

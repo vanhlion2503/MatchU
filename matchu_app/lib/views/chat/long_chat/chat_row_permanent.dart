@@ -5,6 +5,7 @@ import 'package:matchu_app/utils/reaction_registry.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
+import 'package:matchu_app/views/chat/long_chat/call_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
 import 'package:matchu_app/views/chat/long_chat/seen_avatar_animated.dart';
 
@@ -38,6 +39,7 @@ class ChatRowPermanent extends StatelessWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onTapMessage;
+  final VoidCallback? onRecallPressed;
 
   final GlobalKey bubbleKey;
 
@@ -67,6 +69,7 @@ class ChatRowPermanent extends StatelessWidget {
     this.onLongPress,
     this.onDoubleTap,
     this.onTapMessage,
+    this.onRecallPressed,
   });
 
   @override
@@ -132,7 +135,7 @@ class ChatRowPermanent extends StatelessWidget {
     }
 
     if (type == "call") {
-      return _buildCallMessage(context, bubbleColor, resolvedTextColor);
+      return _buildCallMessage(context, bubbleColor);
     }
 
     // ================= TEXT MESSAGE =================
@@ -287,30 +290,40 @@ class ChatRowPermanent extends StatelessWidget {
     );
   }
 
-  Widget _buildCallMessage(
-    BuildContext context,
-    Color bubbleColor,
-    Color textColor,
-  ) {
+  Widget _buildCallMessage(BuildContext context, Color bubbleColor) {
     final theme = Theme.of(context);
     final normalizedCallStatus = (callStatus ?? "").toLowerCase();
-    final normalizedCallType = callType == "video" ? "video" : "audio";
-    final isMissedCall = normalizedCallStatus == "missed";
+    final isVideoCall = callType == "video";
     final duration = callDurationSeconds ?? 0;
+    final isMissedCall = normalizedCallStatus == "missed";
+    final isSuccessfulCall = normalizedCallStatus == "ended" && duration > 0;
+    final callLabel = isVideoCall ? "Cuộc gọi video" : "Cuộc gọi thoại";
+    final fallbackTitle =
+        text.trim().isNotEmpty
+            ? text.trim()
+            : (isMe
+                ? "Bạn đã gọi ${isVideoCall ? "video" : "thoại"}"
+                : "$callLabel đến");
 
-    final iconData =
-        isMissedCall
-            ? Iconsax.call_slash
-            : (normalizedCallType == "video" ? Iconsax.video : Iconsax.call);
-    final iconColor = isMissedCall ? Colors.redAccent : textColor;
+    final callTitle =
+        normalizedCallStatus == "missed"
+            ? "Đã bỏ lỡ ${isVideoCall ? "cuộc gọi video" : "cuộc gọi thoại"}"
+            : normalizedCallStatus == "rejected"
+            ? "$callLabel đã bị từ chối"
+            : normalizedCallStatus == "busy"
+            ? "Đối phương đang bận"
+            : isSuccessfulCall
+            ? "$callLabel • ${_formatCallDuration(duration)}"
+            : normalizedCallStatus == "ended"
+            ? "$callLabel đã kết thúc"
+            : fallbackTitle;
 
-    final fallbackText =
+    final bubbleType =
         isMissedCall
-            ? "Cuộc gọi bị bỏ lỡ"
-            : (duration > 0
-                ? "${normalizedCallType == "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"} • ${_formatCallDuration(duration)}"
-                : "${normalizedCallType == "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"} đã kết thúc");
-    final displayText = text.trim().isNotEmpty ? text : fallbackText;
+            ? CallMessageBubbleType.missed
+            : (isMe
+                ? CallMessageBubbleType.outgoing
+                : CallMessageBubbleType.incoming);
 
     return Padding(
       padding: EdgeInsets.only(top: smallMargin ? 6 : 10),
@@ -346,7 +359,7 @@ class ChatRowPermanent extends StatelessWidget {
                           GestureDetector(
                             onLongPress: onLongPress,
                             onDoubleTap: onDoubleTap,
-                            onTap: onTapMessage,
+                            onTap: onTapMessage ?? onRecallPressed,
                             child: Container(
                               key: bubbleKey,
                               child: AnimatedBubble(
@@ -354,22 +367,14 @@ class ChatRowPermanent extends StatelessWidget {
                                 highlighted: highlighted,
                                 pressed: isPressed,
                                 bubbleColor: bubbleColor,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(iconData, size: 18, color: iconColor),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        displayText,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: textColor,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
+                                child: CallMessageBubble(
+                                  title: callTitle,
+                                  time: time,
+                                  onRecallPressed: onRecallPressed,
+                                  callType: bubbleType,
+                                  isVideoCall: isVideoCall,
+                                  isSuccessful: isSuccessfulCall,
+                                  isMe: isMe,
                                 ),
                               ),
                             ),
@@ -387,16 +392,6 @@ class ChatRowPermanent extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      if (showTime && time.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            time,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                        ),
                       if (isMe && status != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),

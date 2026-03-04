@@ -11,6 +11,7 @@ import 'package:matchu_app/views/chat/long_chat/messenger_typing_bubble.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_row_permanent.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
@@ -47,6 +48,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
   @override
   Widget build(BuildContext context) {
     final uid = Get.find<AuthController>().user!.uid;
+    final callController = Get.find<CallController>();
     final theme = Theme.of(context);
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -144,6 +146,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                       : null;
               final callStatus = callData?["status"] as String?;
               final callType = callData?["callType"] as String?;
+              final normalizedRecallCallType =
+                  callType == "video" ? "video" : "audio";
               final callDurationRaw = callData?["durationSeconds"];
               final int? callDurationSeconds =
                   callDurationRaw is int
@@ -313,6 +317,22 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                 callStatus: callStatus,
                                 callType: callType,
                                 callDurationSeconds: callDurationSeconds,
+                                onRecallPressed:
+                                    effectiveType == "call"
+                                        ? () {
+                                          final otherUidForCall =
+                                              widget.controller.otherUid.value;
+                                          if (otherUidForCall == null ||
+                                              otherUidForCall.isEmpty) {
+                                            return;
+                                          }
+                                          callController.startCall(
+                                            widget.controller.roomId,
+                                            otherUidForCall,
+                                            normalizedRecallCallType,
+                                          );
+                                        }
+                                        : null,
                                 bubbleKey: bubbleKey,
                                 // ❤️ DOUBLE TAP = LOVE
                                 onDoubleTap: () {
