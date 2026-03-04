@@ -27,6 +27,8 @@ class _BottomActionBarState extends State<BottomActionBar> {
   static const double _kActionGap = 6;
 
   final FocusNode _inputFocusNode = FocusNode();
+  final GlobalKey _leadingActionsKey = GlobalKey();
+  final GlobalKey _inputFieldKey = GlobalKey();
   bool _isInputFocused = false;
   bool _showLeftActions = false;
 
@@ -49,10 +51,13 @@ class _BottomActionBarState extends State<BottomActionBar> {
     if (!mounted) return;
     setState(() {
       _isInputFocused = _inputFocusNode.hasFocus;
-      if (!_isInputFocused) {
-        _showLeftActions = false;
-      }
+      _showLeftActions = false;
     });
+  }
+
+  void _collapseLeftActions() {
+    if (!_showLeftActions) return;
+    setState(() => _showLeftActions = false);
   }
 
   void _toggleLeftActions() {
@@ -64,9 +69,33 @@ class _BottomActionBarState extends State<BottomActionBar> {
       return (_kActionSize * 2) + (_kActionGap * 2);
     }
     if (_showLeftActions) {
-      return (_kActionSize * 3) + (_kActionGap * 3);
+      return (_kActionSize * 2) + (_kActionGap * 2);
     }
     return _kActionSize + _kActionGap;
+  }
+
+  bool _isTapInside(GlobalKey key, Offset globalPosition) {
+    final context = key.currentContext;
+    if (context == null) return false;
+
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return false;
+
+    final localPosition = box.globalToLocal(globalPosition);
+    return localPosition.dx >= 0 &&
+        localPosition.dx <= box.size.width &&
+        localPosition.dy >= 0 &&
+        localPosition.dy <= box.size.height;
+  }
+
+  void _onBottomBarPointerDown(PointerDownEvent event) {
+    if (!_showLeftActions) return;
+
+    final tapPosition = event.position;
+    if (_isTapInside(_leadingActionsKey, tapPosition)) return;
+    if (_isTapInside(_inputFieldKey, tapPosition)) return;
+
+    _collapseLeftActions();
   }
 
   Widget _buildLeaveAction(BuildContext context, ThemeData theme) {
@@ -114,10 +143,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
   Widget _buildToggleAction() {
     return ActionIcon(
       onTap: _toggleLeftActions,
-      child: Icon(
-        _showLeftActions ? Icons.close_rounded : Icons.menu_rounded,
-        size: 28,
-      ),
+      child: const Icon(Icons.menu_rounded, size: 28),
     );
   }
 
@@ -171,8 +197,6 @@ class _BottomActionBarState extends State<BottomActionBar> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildToggleAction(),
-          const SizedBox(width: _kActionGap),
           _buildLeaveAction(context, theme),
           const SizedBox(width: _kActionGap),
           _buildGameAction(context, theme, color),
@@ -233,262 +257,278 @@ class _BottomActionBarState extends State<BottomActionBar> {
         final isTyping = controller.isTyping.value;
         final liked = controller.userLiked.value;
 
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TelepathyInviteBar(controller: controller),
-            WordChainInviteBar(controller: controller),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Obx(() {
-                final reply = controller.replyingMessage.value;
-                if (reply == null) return const SizedBox();
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: _onBottomBarPointerDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TelepathyInviteBar(controller: controller),
+              WordChainInviteBar(controller: controller),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Obx(() {
+                  final reply = controller.replyingMessage.value;
+                  if (reply == null) return const SizedBox();
 
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        theme.brightness == Brightness.dark
-                            ? const Color(0xFF2A2A2A)
-                            : const Color(0xFFF1F3F5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 3,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(2),
+                  return Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          theme.brightness == Brightness.dark
+                              ? const Color(0xFF2A2A2A)
+                              : const Color(0xFFF1F3F5),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              "Đang trả lời",
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              reply["text"],
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(
-                                  0.8,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                "Đang trả lời",
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      GestureDetector(
-                        onTap: controller.cancelReply,
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.onSurface.withOpacity(
-                              0.08,
-                            ),
-                            shape: BoxShape.circle,
+                              Text(
+                                reply["text"],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.8),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: const Icon(Icons.close, size: 18),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: controller.cancelReply,
+                          child: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.08,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, size: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+              QuickMessageBar(controller: controller),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  KeyedSubtree(
+                    key: _leadingActionsKey,
+                    child: _buildLeadingActions(context, theme, color),
                   ),
-                );
-              }),
-            ),
-            QuickMessageBar(controller: controller),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _buildLeadingActions(context, theme, color),
-                Expanded(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    child: TextField(
-                      controller: controller.inputController,
-                      focusNode: _inputFocusNode,
-                      minLines: 1,
-                      maxLines: null,
-                      onChanged: controller.onTypingChanged,
-                      onTap: controller.hideEmoji,
-                      decoration: InputDecoration(
-                        hintText: "Nhập tin nhắn...",
-                        isDense: true,
-                        prefixIcon: GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            FocusScope.of(context).unfocus();
-                            controller.toggleEmoji();
-                          },
-                          child: const Icon(Iconsax.emoji_happy, size: 22),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(
-                            color:
-                                theme.brightness == Brightness.dark
-                                    ? AppTheme.darkBorder
-                                    : AppTheme.lightBorder,
+                  Expanded(
+                    child: ConstrainedBox(
+                      key: _inputFieldKey,
+                      constraints: const BoxConstraints(maxHeight: 120),
+                      child: TextField(
+                        controller: controller.inputController,
+                        focusNode: _inputFocusNode,
+                        minLines: 1,
+                        maxLines: null,
+                        onChanged: (value) {
+                          controller.onTypingChanged(value);
+                          _collapseLeftActions();
+                        },
+                        onTap: () {
+                          controller.hideEmoji();
+                          _collapseLeftActions();
+                        },
+                        decoration: InputDecoration(
+                          hintText: "Nhập tin nhắn...",
+                          isDense: true,
+                          prefixIcon: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              FocusScope.of(context).unfocus();
+                              controller.toggleEmoji();
+                            },
+                            child: const Icon(Iconsax.emoji_happy, size: 22),
                           ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: color.primary),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color:
+                                  theme.brightness == Brightness.dark
+                                      ? AppTheme.darkBorder
+                                      : AppTheme.lightBorder,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(color: color.primary),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (child, anim) {
-                    return ScaleTransition(
-                      scale: Tween<double>(begin: 0.9, end: 1.0).animate(anim),
-                      child: FadeTransition(opacity: anim, child: child),
-                    );
-                  },
-                  child:
-                      isTyping
-                          ? ActionIcon(
-                            key: const ValueKey("send"),
-                            onTap: () {
-                              final text =
-                                  controller.inputController.text.trim();
-                              if (text.isEmpty) return;
+                  const SizedBox(width: 6),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    transitionBuilder: (child, anim) {
+                      return ScaleTransition(
+                        scale: Tween<double>(
+                          begin: 0.9,
+                          end: 1.0,
+                        ).animate(anim),
+                        child: FadeTransition(opacity: anim, child: child),
+                      );
+                    },
+                    child:
+                        isTyping
+                            ? ActionIcon(
+                              key: const ValueKey("send"),
+                              onTap: () {
+                                final text =
+                                    controller.inputController.text.trim();
+                                if (text.isEmpty) return;
 
-                              final isEmojiOnly = _isEmojiOnly(text);
+                                final isEmojiOnly = _isEmojiOnly(text);
 
-                              controller.send(
-                                text,
-                                type: isEmojiOnly ? "emoji" : "text",
-                              );
+                                controller.send(
+                                  text,
+                                  type: isEmojiOnly ? "emoji" : "text",
+                                );
 
-                              controller.inputController.clear();
-                              controller.stopTyping();
-                              controller.hideEmoji();
-                            },
-                            child: Icon(
-                              Iconsax.send_1,
-                              color: color.primary,
-                              size: 28,
-                            ),
-                          )
-                          : ActionIcon(
-                            key: const ValueKey("like"),
-                            onTap: () {
-                              if (liked == true) return;
-                              HapticFeedback.lightImpact();
-                              controller.like(true);
-                            },
-                            child: AnimatedScale(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOutBack,
-                              scale: liked == true ? 1.2 : 1.0,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 150),
-                                transitionBuilder: (child, anim) {
-                                  return ScaleTransition(
-                                    scale: anim,
-                                    child: child,
-                                  );
-                                },
-                                child: Icon(
-                                  liked == true
-                                      ? Iconsax.lovely5
-                                      : Iconsax.lovely,
-                                  key: ValueKey(liked == true),
-                                  color: Colors.red,
-                                  size: 32,
+                                controller.inputController.clear();
+                                controller.stopTyping();
+                                controller.hideEmoji();
+                              },
+                              child: Icon(
+                                Iconsax.send_1,
+                                color: color.primary,
+                                size: 28,
+                              ),
+                            )
+                            : ActionIcon(
+                              key: const ValueKey("like"),
+                              onTap: () {
+                                if (liked == true) return;
+                                HapticFeedback.lightImpact();
+                                controller.like(true);
+                              },
+                              child: AnimatedScale(
+                                duration: const Duration(milliseconds: 180),
+                                curve: Curves.easeOutBack,
+                                scale: liked == true ? 1.2 : 1.0,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 150),
+                                  transitionBuilder: (child, anim) {
+                                    return ScaleTransition(
+                                      scale: anim,
+                                      child: child,
+                                    );
+                                  },
+                                  child: Icon(
+                                    liked == true
+                                        ? Iconsax.lovely5
+                                        : Iconsax.lovely,
+                                    key: ValueKey(liked == true),
+                                    color: Colors.red,
+                                    size: 32,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                ),
-              ],
-            ),
-            Obx(() {
-              final scheme = Theme.of(context).colorScheme;
+                  ),
+                ],
+              ),
+              Obx(() {
+                final scheme = Theme.of(context).colorScheme;
 
-              return AnimatedSize(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topCenter,
-                child:
-                    controller.showEmoji.value
-                        ? SizedBox(
-                          height: 280,
-                          width: MediaQuery.of(context).size.width,
-                          child: EmojiPicker(
-                            onEmojiSelected: (_, emoji) {
-                              final ctrl = controller.inputController;
-                              final text = ctrl.text;
-                              final selection = ctrl.selection;
+                return AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child:
+                      controller.showEmoji.value
+                          ? SizedBox(
+                            height: 280,
+                            width: MediaQuery.of(context).size.width,
+                            child: EmojiPicker(
+                              onEmojiSelected: (_, emoji) {
+                                final ctrl = controller.inputController;
+                                final text = ctrl.text;
+                                final selection = ctrl.selection;
 
-                              final newText = text.replaceRange(
-                                selection.start,
-                                selection.end,
-                                emoji.emoji,
-                              );
+                                final newText = text.replaceRange(
+                                  selection.start,
+                                  selection.end,
+                                  emoji.emoji,
+                                );
 
-                              ctrl.text = newText;
-                              ctrl.selection = TextSelection.collapsed(
-                                offset: selection.start + emoji.emoji.length,
-                              );
+                                ctrl.text = newText;
+                                ctrl.selection = TextSelection.collapsed(
+                                  offset: selection.start + emoji.emoji.length,
+                                );
 
-                              controller.isTyping.value = true;
-                            },
-                            config: Config(
-                              height: 280,
-                              emojiViewConfig: EmojiViewConfig(
-                                columns: 8,
-                                emojiSizeMax: 28,
-                                backgroundColor: scheme.surface,
-                              ),
-                              categoryViewConfig: CategoryViewConfig(
-                                backgroundColor: scheme.surface,
-                                indicatorColor: scheme.primary,
-                                iconColor: scheme.onSurface.withOpacity(0.6),
-                                iconColorSelected: scheme.primary,
-                              ),
-                              bottomActionBarConfig: BottomActionBarConfig(
-                                backgroundColor: scheme.surface,
-                                buttonColor: scheme.primary,
-                              ),
-                              searchViewConfig: SearchViewConfig(
-                                backgroundColor: scheme.surface,
-                              ),
-                              skinToneConfig: const SkinToneConfig(
-                                enabled: true,
+                                controller.isTyping.value = true;
+                              },
+                              config: Config(
+                                height: 280,
+                                emojiViewConfig: EmojiViewConfig(
+                                  columns: 8,
+                                  emojiSizeMax: 28,
+                                  backgroundColor: scheme.surface,
+                                ),
+                                categoryViewConfig: CategoryViewConfig(
+                                  backgroundColor: scheme.surface,
+                                  indicatorColor: scheme.primary,
+                                  iconColor: scheme.onSurface.withOpacity(0.6),
+                                  iconColorSelected: scheme.primary,
+                                ),
+                                bottomActionBarConfig: BottomActionBarConfig(
+                                  backgroundColor: scheme.surface,
+                                  buttonColor: scheme.primary,
+                                ),
+                                searchViewConfig: SearchViewConfig(
+                                  backgroundColor: scheme.surface,
+                                ),
+                                skinToneConfig: const SkinToneConfig(
+                                  enabled: true,
+                                ),
                               ),
                             ),
-                          ),
-                        )
-                        : const SizedBox.shrink(),
-              );
-            }),
-          ],
+                          )
+                          : const SizedBox.shrink(),
+                );
+              }),
+            ],
+          ),
         );
       }),
     );
