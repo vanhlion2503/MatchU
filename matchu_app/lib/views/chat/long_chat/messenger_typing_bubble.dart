@@ -15,21 +15,33 @@ class MessengerTypingBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSize(
+    return AnimatedSwitcher(
       duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOut,
-        opacity: show ? 1 : 0,
-        child: show
-            ? TypingBubbleRowPermanent(
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.08),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut));
+
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: 1,
+            child: SlideTransition(position: slide, child: child),
+          ),
+        );
+      },
+      child:
+          show
+              ? TypingBubbleRowPermanent(
+                key: const ValueKey('typing-long-visible'),
                 senderId: senderId,
                 showAvatar: showAvatar,
               )
-            : const SizedBox(height: 0),
-      ),
+              : const SizedBox.shrink(key: ValueKey('typing-long-hidden')),
     );
   }
 }

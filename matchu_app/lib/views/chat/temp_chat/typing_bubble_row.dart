@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
-import 'package:matchu_app/widgets/animated_dots.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
+import 'package:matchu_app/widgets/chat_typing_dots.dart';
 
 class TypingBubbleRow extends StatelessWidget {
   final TempChatController controller;
 
-  const TypingBubbleRow({
-    super.key,
-    required this.controller,
-  });
+  const TypingBubbleRow({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bubbleColor =
+        theme.brightness == Brightness.dark
+            ? theme.colorScheme.surface
+            : const Color(0xFFEEF2F7);
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -27,25 +28,18 @@ class TypingBubbleRow extends StatelessWidget {
               final key = controller.otherAnonymousAvatar.value;
               if (key == null) return const SizedBox();
 
-              return AnonymousAvatar(
-                avatarKey: key,
-                radius: 16,
-              );
+              return AnonymousAvatar(avatarKey: key, radius: 16);
             }),
           ),
           const SizedBox(width: 6),
-
           Padding(
             padding: const EdgeInsets.only(bottom: 18),
             child: SizedBox(
-              width: 52,
-              height: 36,
-              child: Container(
-                alignment: Alignment.center,
+              width: 56,
+              height: 34,
+              child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? theme.colorScheme.surface
-                      : const Color(0xFFEEF2F7),
+                  color: bubbleColor,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     topRight: Radius.circular(16),
@@ -53,9 +47,12 @@ class TypingBubbleRow extends StatelessWidget {
                     bottomRight: Radius.circular(16),
                   ),
                 ),
-                child: AnimatedDots(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  size: 3,
+                child: Center(
+                  child: ChatTypingDots(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                    dotSize: 5,
+                    spacing: 3,
+                  ),
                 ),
               ),
             ),
@@ -66,7 +63,6 @@ class TypingBubbleRow extends StatelessWidget {
   }
 }
 
-/// Typing bubble với animation như long_chat
 class MessengerTypingBubbleTemp extends StatelessWidget {
   final bool show;
   final TempChatController controller;
@@ -79,19 +75,32 @@ class MessengerTypingBubbleTemp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSize(
+    return AnimatedSwitcher(
       duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOut,
-        opacity: show ? 1 : 0,
-        child: show
-            ? TypingBubbleRow(controller: controller)
-            : const SizedBox(height: 0),
-      ),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.08),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut));
+
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: 1,
+            child: SlideTransition(position: slide, child: child),
+          ),
+        );
+      },
+      child:
+          show
+              ? TypingBubbleRow(
+                key: const ValueKey('typing-temp-visible'),
+                controller: controller,
+              )
+              : const SizedBox.shrink(key: ValueKey('typing-temp-hidden')),
     );
   }
 }
-

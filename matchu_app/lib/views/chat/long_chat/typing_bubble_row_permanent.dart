@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
-import 'package:matchu_app/widgets/animated_dots.dart';
+import 'package:matchu_app/widgets/chat_typing_dots.dart';
 
 class TypingBubbleRowPermanent extends StatelessWidget {
   final String senderId;
   final bool showAvatar;
+
   const TypingBubbleRowPermanent({
     super.key,
     required this.senderId,
     this.showAvatar = true,
-    });
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bubbleColor =
+        theme.brightness == Brightness.dark
+            ? theme.colorScheme.surface
+            : const Color(0xFFEEF2F7);
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -22,31 +27,31 @@ class TypingBubbleRowPermanent extends StatelessWidget {
         children: [
           SizedBox(
             width: 36,
-            child: showAvatar
-                ? UserAvatar(userId: senderId)
-                : const SizedBox(),
-            ), // chừa avatar
+            child: showAvatar ? UserAvatar(userId: senderId) : const SizedBox(),
+          ),
           const SizedBox(width: 6),
           Padding(
             padding: const EdgeInsets.only(bottom: 18),
-            child: Container(
-              width: 52,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: theme.brightness == Brightness.dark
-                    ? theme.colorScheme.surface
-                    : const Color(0xFFEEF2F7),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(16),
+            child: SizedBox(
+              width: 56,
+              height: 34,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: bubbleColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                    bottomLeft: Radius.circular(4),
+                    bottomRight: Radius.circular(16),
+                  ),
                 ),
-              ),
-              child: AnimatedDots(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                size: 3,
+                child: Center(
+                  child: ChatTypingDots(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                    dotSize: 5,
+                    spacing: 3,
+                  ),
+                ),
               ),
             ),
           ),

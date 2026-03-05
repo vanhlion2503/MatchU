@@ -786,6 +786,98 @@ function calculatePenalty(violationCount) {
   return Math.pow(2, violationCount - 1);
 }
 
+function getCurrentReputationScore(userData) {
+  const candidates = [];
+  if (isNumber(userData?.reputation)) {
+    candidates.push(userData.reputation);
+  }
+  if (isNumber(userData?.reputationScore)) {
+    candidates.push(userData.reputationScore);
+  }
+
+  if (candidates.length === 0) return 100;
+  return Math.min(...candidates);
+}
+
+async function applyViolationPenaltyAndBlock({
+  snap,
+  roomId,
+  senderId,
+  reason,
+  blockedBy,
+  aiScore,
+}) {
+  const roomRef = db.collection("tempChats").doc(roomId);
+  const userRef = db.collection("users").doc(senderId);
+
+  await db.runTransaction(async (tx) => {
+    const [latestMsgSnap, roomSnap, userSnap] = await Promise.all([
+      tx.get(snap.ref),
+      tx.get(roomRef),
+      tx.get(userRef),
+    ]);
+
+    if (!latestMsgSnap.exists) return;
+
+    const latestMsg = latestMsgSnap.data() || {};
+    if (
+      typeof latestMsg.status === "string" &&
+      latestMsg.status !== "pending"
+    ) {
+      return;
+    }
+
+    const roomData = roomSnap.exists ? roomSnap.data() : {};
+    const participants = normalizeParticipants(
+      roomData?.participants,
+      roomData?.userA,
+      roomData?.userB
+    );
+    const violationCount = normalizeViolationCountMap(
+      roomData?.violationCount,
+      participants
+    );
+
+    const previousCount = isNumber(violationCount[senderId])
+      ? violationCount[senderId]
+      : 0;
+    const nextCount = previousCount + 1;
+    violationCount[senderId] = nextCount;
+
+    const roomPatch = { violationCount };
+    if (participants.length > 0) {
+      roomPatch.participants = participants;
+    }
+    tx.set(roomRef, roomPatch, { merge: true });
+
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const currentReputation = getCurrentReputationScore(userData);
+    const penalty = calculatePenalty(nextCount);
+    const nextReputation = Math.max(0, currentReputation - penalty);
+
+    tx.set(
+      userRef,
+      {
+        reputation: nextReputation,
+        reputationScore: nextReputation,
+      },
+      { merge: true }
+    );
+
+    tx.set(
+      snap.ref,
+      {
+        status: "blocked",
+        blockedBy,
+        reason,
+        warning: true,
+        aiScore: isNumber(aiScore) ? aiScore : null,
+      },
+      { merge: true }
+    );
+  });
+}
+
 function ruleCheck(text) {
   const normalizedText = normalizeModerationText(text);
 
@@ -870,9 +962,18 @@ exports.ensureUserReputationDefault = onDocumentCreated(
     if (!snap) return;
 
     const userData = snap.data() || {};
-    if (isNumber(userData.reputation)) return;
+    const hasReputation = isNumber(userData.reputation);
+    const hasReputationScore = isNumber(userData.reputationScore);
+    if (hasReputation && hasReputationScore) return;
 
-    await snap.ref.set({ reputation: 100 }, { merge: true });
+    const baseScore = getCurrentReputationScore(userData);
+    await snap.ref.set(
+      {
+        reputation: baseScore,
+        reputationScore: baseScore,
+      },
+      { merge: true }
+    );
   }
 );
 
@@ -920,16 +1021,14 @@ exports.moderateTempChatMessage = onDocumentCreated(
 
     const ruleResult = ruleCheck(text);
     if (ruleResult.isViolation) {
-      await snap.ref.set(
-        {
-          status: "blocked",
-          blockedBy: "rule",
-          reason: ruleResult.reason,
-          warning: true,
-          aiScore: null,
-        },
-        { merge: true }
-      );
+      await applyViolationPenaltyAndBlock({
+        snap,
+        roomId,
+        senderId,
+        reason: ruleResult.reason,
+        blockedBy: "rule",
+        aiScore: null,
+      });
       return;
     }
 
@@ -1004,84 +1103,13 @@ exports.moderateTempChatMessage = onDocumentCreated(
     }
 
     // score >= 0.8 + non-scam harmful label => block + penalty policy
-    const roomRef = db.collection("tempChats").doc(roomId);
-    const userRef = db.collection("users").doc(senderId);
-
-    await db.runTransaction(async (tx) => {
-      const [latestMsgSnap, roomSnap, userSnap] = await Promise.all([
-        tx.get(snap.ref),
-        tx.get(roomRef),
-        tx.get(userRef),
-      ]);
-
-      if (!latestMsgSnap.exists) return;
-
-      const latestMsg = latestMsgSnap.data() || {};
-      if (
-        typeof latestMsg.status === "string" &&
-        latestMsg.status !== "pending"
-      ) {
-        return;
-      }
-
-      const roomData = roomSnap.exists ? roomSnap.data() : {};
-      const participants = normalizeParticipants(
-        roomData?.participants,
-        roomData?.userA,
-        roomData?.userB
-      );
-      const violationCount = normalizeViolationCountMap(
-        roomData?.violationCount,
-        participants
-      );
-
-      const previousCount = isNumber(violationCount[senderId])
-        ? violationCount[senderId]
-        : 0;
-      const nextCount = previousCount + 1;
-      violationCount[senderId] = nextCount;
-
-      const roomPatch = { violationCount };
-      if (participants.length > 0) {
-        roomPatch.participants = participants;
-      }
-      tx.set(roomRef, roomPatch, { merge: true });
-
-      const penalty = calculatePenalty(nextCount);
-
-      if (penalty > 0) {
-        const userData = userSnap.exists ? userSnap.data() : {};
-        const currentReputation = isNumber(userData?.reputation)
-          ? userData.reputation
-          : 100;
-        const nextReputation = Math.max(0, currentReputation - penalty);
-
-        const userPatch = { reputation: nextReputation };
-
-        // Keep legacy score field synced if it already exists in this project.
-        if (isNumber(userData?.reputationScore)) {
-          userPatch.reputationScore = Math.max(
-            0,
-            userData.reputationScore - penalty
-          );
-        }
-
-        tx.set(userRef, userPatch, { merge: true });
-      } else if (!userSnap.exists || !isNumber(userSnap.data()?.reputation)) {
-        tx.set(userRef, { reputation: 100 }, { merge: true });
-      }
-
-      tx.set(
-        snap.ref,
-        {
-          status: "blocked",
-          blockedBy: "ai",
-          reason: aiLabel,
-          warning: true,
-          aiScore,
-        },
-        { merge: true }
-      );
+    await applyViolationPenaltyAndBlock({
+      snap,
+      roomId,
+      senderId,
+      reason: aiLabel,
+      blockedBy: "ai",
+      aiScore,
     });
     } catch (error) {
       console.error("Temp chat moderation crashed; fallback approve:", {
