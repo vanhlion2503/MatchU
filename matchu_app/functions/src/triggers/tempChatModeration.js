@@ -1,4 +1,5 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const https = require("https");
 const axios = require("axios");
 
 const { admin, db } = require("../shared/firebase");
@@ -17,6 +18,10 @@ const {
 
 const AI_MODERATION_CACHE = new Map();
 const KEYWORD_MIN_LENGTH = 3;
+const AI_HTTP_CLIENT = axios.create({
+  timeout: AI_MODERATION_TIMEOUT_MS,
+  httpsAgent: new https.Agent({ keepAlive: true }),
+});
 
 function isNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
@@ -251,6 +256,14 @@ function parseAiScore(score) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isAllowedStatus(status, allowedStatuses) {
+  if (typeof status !== "string") return false;
+  if (!Array.isArray(allowedStatuses) || allowedStatuses.length === 0) {
+    return false;
+  }
+  return allowedStatuses.includes(status);
+}
+
 function calculatePenalty(violationCount) {
   if (violationCount <= 1) return 0;
   if (violationCount === 2) return 2;
@@ -277,6 +290,7 @@ async function applyViolationPenaltyAndBlock({
   reason,
   blockedBy,
   aiScore,
+  allowedStatuses = ["pending"],
 }) {
   const roomRef = db.collection("tempChats").doc(roomId);
   const userRef = db.collection("users").doc(senderId);
@@ -291,10 +305,7 @@ async function applyViolationPenaltyAndBlock({
     if (!latestMsgSnap.exists) return;
 
     const latestMsg = latestMsgSnap.data() || {};
-    if (
-      typeof latestMsg.status === "string" &&
-      latestMsg.status !== "pending"
-    ) {
+    if (!isAllowedStatus(latestMsg.status, allowedStatuses)) {
       return;
     }
 
@@ -349,6 +360,55 @@ async function applyViolationPenaltyAndBlock({
   });
 }
 
+async function applyAiModerationResult({
+  snap,
+  roomId,
+  senderId,
+  aiResult,
+  allowedBlockStatuses,
+}) {
+  const aiLabel = aiResult.label;
+  const aiScore = aiResult.score;
+
+  if (aiLabel === "normal" || aiScore < MODERATION_THRESHOLD) {
+    await snap.ref.set(
+      {
+        status: "approved",
+        blockedBy: null,
+        reason: null,
+        warning: false,
+        aiScore,
+      },
+      { merge: true }
+    );
+    return;
+  }
+
+  if (aiLabel === "scam") {
+    await snap.ref.set(
+      {
+        status: "approved",
+        blockedBy: null,
+        reason: "scam",
+        warning: true,
+        aiScore,
+      },
+      { merge: true }
+    );
+    return;
+  }
+
+  await applyViolationPenaltyAndBlock({
+    snap,
+    roomId,
+    senderId,
+    reason: aiLabel,
+    blockedBy: "ai",
+    aiScore,
+    allowedStatuses: allowedBlockStatuses,
+  });
+}
+
 function ruleCheck(text) {
   const normalizedText = normalizeModerationText(text);
   const ruleCheckText = normalizeRuleCheckText(text);
@@ -385,11 +445,7 @@ async function callAiModeration(text) {
     if (cachedResult) return cachedResult;
   }
 
-  const response = await axios.post(
-    MODERATION_ENDPOINT,
-    { text },
-    { timeout: AI_MODERATION_TIMEOUT_MS }
-  );
+  const response = await AI_HTTP_CLIENT.post(MODERATION_ENDPOINT, { text });
 
   const result = {
     label: normalizeAiLabel(response?.data?.label),
@@ -517,6 +573,32 @@ const moderateTempChatMessage = onDocumentCreated(
         return;
       }
 
+      const normalizedText = normalizeModerationText(text);
+      const cachedAiResult = normalizedText
+        ? getCachedAiModerationResult(normalizedText)
+        : null;
+      if (cachedAiResult) {
+        await applyAiModerationResult({
+          snap,
+          roomId,
+          senderId,
+          aiResult: cachedAiResult,
+          allowedBlockStatuses: ["pending"],
+        });
+        return;
+      }
+
+      await snap.ref.set(
+        {
+          status: "approved",
+          blockedBy: null,
+          reason: null,
+          warning: false,
+          aiScore: null,
+        },
+        { merge: true }
+      );
+
       let aiResult;
       try {
         aiResult = await callAiModeration(text);
@@ -527,57 +609,15 @@ const moderateTempChatMessage = onDocumentCreated(
           error: error?.message || String(error),
         });
 
-        await snap.ref.set(
-          {
-            status: "approved",
-            blockedBy: null,
-            reason: null,
-            warning: false,
-            aiScore: null,
-          },
-          { merge: true }
-        );
         return;
       }
 
-      const aiLabel = aiResult.label;
-      const aiScore = aiResult.score;
-
-      if (aiLabel === "normal" || aiScore < MODERATION_THRESHOLD) {
-        await snap.ref.set(
-          {
-            status: "approved",
-            blockedBy: null,
-            reason: null,
-            warning: false,
-            aiScore,
-          },
-          { merge: true }
-        );
-        return;
-      }
-
-      if (aiLabel === "scam") {
-        await snap.ref.set(
-          {
-            status: "approved",
-            blockedBy: null,
-            reason: "scam",
-            warning: true,
-            aiScore,
-          },
-          { merge: true }
-        );
-        return;
-      }
-
-      await applyViolationPenaltyAndBlock({
+      await applyAiModerationResult({
         snap,
         roomId,
         senderId,
-        reason: aiLabel,
-        blockedBy: "ai",
-        aiScore,
+        aiResult,
+        allowedBlockStatuses: ["approved", "pending"],
       });
     } catch (error) {
       console.error("Temp chat moderation crashed; fallback approve:", {

@@ -1,7 +1,7 @@
 const MODERATION_THRESHOLD = 0.8;
 const MODERATION_ENDPOINT =
   "https://ai-moderation-376071505252.asia-southeast1.run.app/moderate";
-const AI_MODERATION_TIMEOUT_MS = 4000;
+const AI_MODERATION_TIMEOUT_MS = 1000;
 const AI_MODERATION_CACHE_TTL_MS = 5 * 60 * 1000;
 const AI_MODERATION_CACHE_MAX_ENTRIES = 512;
 const LINK_PATTERN = /(?:https?:\/\/|www\.)\S+/i;
@@ -106,21 +106,6 @@ const DANGEROUS_KEYWORDS = {
     "doa giet",
   ],
   grooming: [
-    "chưa đủ 18",
-    "chua du 18",
-    "dưới 18",
-    "duoi 18",
-    "vị thành niên",
-    "vi thanh nien",
-    "em mới 15",
-    "em moi 15",
-    "em mới 16",
-    "em moi 16",
-    "em mới 17",
-    "em moi 17",
-    "minor",
-    "underage",
-    "jailbait",
   ],
 };
 
