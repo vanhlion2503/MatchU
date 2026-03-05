@@ -20,6 +20,7 @@ import 'package:matchu_app/views/chat/call/screens/incoming_call_view.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/matching/matching_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
+import 'package:matchu_app/views/profile/reputation_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
@@ -113,6 +114,7 @@ class AppPages {
         Get.lazyPut<RatingController>(() => RatingController());
       }),
     ),
+    GetPage(name: AppRouter.reputation, page: () => const ReputationView()),
 
     /// TEMP CHAT ROOM
     GetPage(name: AppRouter.tempChat, page: () => TempChatView()),

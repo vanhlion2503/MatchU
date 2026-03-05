@@ -10,6 +10,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
+import 'package:matchu_app/routes/app_router.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
@@ -32,7 +33,9 @@ class ProfileView extends StatelessWidget {
 
         // ====== KHÔNG CÓ USER ======
         if (c.user.value == null) {
-          return const Center(child: Text("Không tìm thấy hồ sơ người dùng."));
+          return const Center(
+            child: Text("Không tìm thấy hồ sơ người dùng."),
+          );
         }
         final user = c.user.value!;
         return SingleChildScrollView(
@@ -117,7 +120,7 @@ class ProfileView extends StatelessWidget {
                                                       AvatarController
                                                           .defaultAvatarUrl
                                                   ? user
-                                                      .avatarUrl // ❗ placeholder → KHÔNG cache busting
+                                                      .avatarUrl // Default placeholder: no cache-busting
                                                   : "${user.avatarUrl}?v=${user.updatedAt?.millisecondsSinceEpoch ?? 0}",
                                             )
                                             : const AssetImage(
@@ -230,7 +233,9 @@ class ProfileView extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 30),
                         child: Text(
-                          c.bio.isNotEmpty ? c.bio : "Chưa có mô tả bản thân.",
+                          c.bio.isNotEmpty
+                              ? c.bio
+                              : "Chưa có mô tả bản thân.",
                           textAlign: TextAlign.center,
                           style: textTheme.bodyMedium?.copyWith(
                             color:
@@ -272,7 +277,7 @@ class ProfileView extends StatelessWidget {
                         Get.to(
                           () => FollowTabView(
                             userId: c.user.value!.uid,
-                            initialIndex: 0, // ⭐ mở tab Followers
+                            initialIndex: 0, // Open Followers tab
                           ),
                         );
                       },
@@ -287,7 +292,7 @@ class ProfileView extends StatelessWidget {
                         Get.to(
                           () => FollowTabView(
                             userId: c.user.value!.uid,
-                            initialIndex: 1, // ⭐ mở tab Following
+                            initialIndex: 1, // Open Following tab
                           ),
                         );
                       },
@@ -298,99 +303,101 @@ class ProfileView extends StatelessWidget {
               ),
               const SizedBox(height: 25),
 
-              // ---------------- REPUTATION CARD ----------------
-              Card(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Điểm uy tín",
-                            style: textTheme.titleMedium?.copyWith(
-                              color:
-                                  Theme.of(context).brightness ==
-                                          Brightness.dark
-                                      ? AppTheme.darkTextPrimary
-                                      : AppTheme.lightTextPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.successColor.withValues(
-                                alpha: 0.15,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              c.reputationLabel.toUpperCase(),
-                              style: textTheme.bodySmall?.copyWith(
-                                color: AppTheme.successColor,
-                                fontWeight: FontWeight.bold,
+              InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Get.toNamed(AppRouter.reputation),
+                child: Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Điểm uy tín",
+                              style: textTheme.titleMedium?.copyWith(
+                                color:
+                                    Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? AppTheme.darkTextPrimary
+                                        : AppTheme.lightTextPrimary,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
 
-                      const SizedBox(height: 15),
-
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 60,
-                            height: 60,
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                CircularProgressIndicator(
-                                  value: c.reputationPercent,
-                                  strokeWidth: 6,
-                                  color: colorScheme.primary,
-                                  backgroundColor:
-                                      theme.brightness == Brightness.dark
-                                          ? AppTheme.darkBorder
-                                          : AppTheme.lightBorder,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.successColor.withValues(
+                                  alpha: 0.15,
                                 ),
-                                Center(
-                                  child: Text(
-                                    "${user.reputationScore}%",
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                c.reputationLabel.toUpperCase(),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.successColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 60,
+                              height: 60,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  CircularProgressIndicator(
+                                    value: c.reputationPercent,
+                                    strokeWidth: 6,
+                                    color: colorScheme.primary,
+                                    backgroundColor:
+                                        theme.brightness == Brightness.dark
+                                            ? AppTheme.darkBorder
+                                            : AppTheme.lightBorder,
+                                  ),
+                                  Center(
+                                    child: Text(
+                                      "${user.reputationScore}%",
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(width: 15),
-
-                          Expanded(
-                            child: Text(
-                              "Giữ cách trò chuyện lịch sự để tăng độ uy tín và mở khóa nhiều tính năng hơn.",
-                              style: textTheme.bodySmall?.copyWith(
-                                color: theme.textTheme.bodySmall?.color,
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+
+                            const SizedBox(width: 15),
+
+                            Expanded(
+                              child: Text(
+                                "Giữ cách trò chuyện lịch sự để tăng độ uy tín và mở khóa nhiều tính năng hơn.",
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: theme.textTheme.bodySmall?.color,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 30),
 
               // ---------------- TABS ----------------
