@@ -16,6 +16,7 @@ const {
 } = require("../shared/moderationConstants");
 
 const AI_MODERATION_CACHE = new Map();
+const KEYWORD_MIN_LENGTH = 3;
 
 function isNumber(value) {
   return typeof value === "number" && Number.isFinite(value);
@@ -24,6 +25,45 @@ function isNumber(value) {
 function normalizeModerationText(value) {
   if (typeof value !== "string") return "";
   return value.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function normalizeLeet(text) {
+  if (typeof text !== "string") return "";
+  return text
+    .replace(/0/g, "o")
+    .replace(/1/g, "i")
+    .replace(/3/g, "e")
+    .replace(/4/g, "a")
+    .replace(/5/g, "s")
+    .replace(/7/g, "t")
+    .replace(/@/g, "a")
+    .replace(/\$/g, "s")
+    .replace(/!/g, "i")
+    .replace(/j/g, "i");
+}
+
+function stripVietnameseDiacritics(text) {
+  if (typeof text !== "string") return "";
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d");
+}
+
+function normalizeRuleCheckText(value) {
+  const normalized = normalizeModerationText(value);
+  if (!normalized) {
+    return { spaced: "", compact: "" };
+  }
+
+  const leetNormalized = normalizeLeet(normalized);
+  const withoutDiacritics = stripVietnameseDiacritics(leetNormalized);
+  const withoutNoise = withoutDiacritics.replace(/[^a-z0-9\u00c0-\u1ef9\s]/g, " ");
+  const spaced = withoutNoise.replace(/\s+/g, " ").trim();
+  const compact = withoutNoise.replace(/[^a-z0-9\u00c0-\u1ef9]/g, "");
+
+  return { spaced, compact };
 }
 
 function normalizeFastPathText(value) {
@@ -80,17 +120,68 @@ function setCachedAiModerationResult(key, result) {
   }
 }
 
-function containsKeyword(normalizedText, keywords) {
-  if (typeof normalizedText !== "string" || !normalizedText) return false;
-  if (!Array.isArray(keywords) || keywords.length === 0) return false;
+function buildKeywordMatcher(keywords) {
+  const spaced = new Set();
+  const compact = new Set();
 
-  return keywords.some((keyword) => {
-    return (
-      typeof keyword === "string" &&
-      keyword.length > 0 &&
-      normalizedText.includes(keyword)
-    );
-  });
+  if (!Array.isArray(keywords)) {
+    return { spaced: [], compact: [] };
+  }
+
+  for (const keyword of keywords) {
+    if (typeof keyword !== "string") continue;
+
+    const normalizedKeyword = normalizeRuleCheckText(keyword);
+    if (normalizedKeyword.spaced.length >= KEYWORD_MIN_LENGTH) {
+      spaced.add(normalizedKeyword.spaced);
+    }
+    if (normalizedKeyword.compact.length >= KEYWORD_MIN_LENGTH) {
+      compact.add(normalizedKeyword.compact);
+    }
+  }
+
+  return {
+    spaced: Array.from(spaced),
+    compact: Array.from(compact),
+  };
+}
+
+const DANGEROUS_KEYWORD_MATCHERS = {
+  sexual: buildKeywordMatcher(DANGEROUS_KEYWORDS.sexual),
+  hate_or_threat: buildKeywordMatcher(DANGEROUS_KEYWORDS.hate_or_threat),
+  grooming: buildKeywordMatcher(DANGEROUS_KEYWORDS.grooming),
+};
+
+function containsKeyword(textVariants, keywordMatcher) {
+  if (!textVariants || typeof textVariants !== "object") return false;
+  if (!keywordMatcher || typeof keywordMatcher !== "object") return false;
+
+  const spacedText =
+    typeof textVariants.spaced === "string" ? textVariants.spaced : "";
+  const compactText =
+    typeof textVariants.compact === "string" ? textVariants.compact : "";
+
+  const spacedKeywords = Array.isArray(keywordMatcher.spaced)
+    ? keywordMatcher.spaced
+    : [];
+  for (const keyword of spacedKeywords) {
+    if (typeof keyword !== "string" || !keyword) continue;
+    if (spacedText.includes(keyword)) {
+      return true;
+    }
+  }
+
+  const compactKeywords = Array.isArray(keywordMatcher.compact)
+    ? keywordMatcher.compact
+    : [];
+  for (const keyword of compactKeywords) {
+    if (typeof keyword !== "string" || !keyword) continue;
+    if (compactText.includes(keyword)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function normalizeParticipants(participants, userA, userB) {
@@ -260,20 +351,23 @@ async function applyViolationPenaltyAndBlock({
 
 function ruleCheck(text) {
   const normalizedText = normalizeModerationText(text);
+  const ruleCheckText = normalizeRuleCheckText(text);
 
   if (!normalizedText) {
     return { isViolation: false, reason: null };
   }
 
-  if (containsKeyword(normalizedText, DANGEROUS_KEYWORDS.sexual)) {
+  if (containsKeyword(ruleCheckText, DANGEROUS_KEYWORD_MATCHERS.sexual)) {
     return { isViolation: true, reason: "sexual" };
   }
 
-  if (containsKeyword(normalizedText, DANGEROUS_KEYWORDS.hate_or_threat)) {
+  if (
+    containsKeyword(ruleCheckText, DANGEROUS_KEYWORD_MATCHERS.hate_or_threat)
+  ) {
     return { isViolation: true, reason: "hate_or_threat" };
   }
 
-  if (containsKeyword(normalizedText, DANGEROUS_KEYWORDS.grooming)) {
+  if (containsKeyword(ruleCheckText, DANGEROUS_KEYWORD_MATCHERS.grooming)) {
     return { isViolation: true, reason: "grooming" };
   }
 
