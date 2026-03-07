@@ -82,6 +82,7 @@ class ReputationService {
       const Duration(milliseconds: 700),
       const Duration(milliseconds: 1500),
       const Duration(milliseconds: 3000),
+      const Duration(milliseconds: 6000),
     ];
 
     Object? lastError;

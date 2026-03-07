@@ -90,12 +90,51 @@ service cloud.firestore {
         ]);
       }
 
+      function isValidReputationCreateDefaults() {
+        return (
+          !("reputation" in request.resource.data)
+          || (
+            request.resource.data.reputation is number
+            && request.resource.data.reputation >= 0
+            && request.resource.data.reputation <= 100
+          )
+        )
+        && (
+          !("reputationScore" in request.resource.data)
+          || (
+            request.resource.data.reputationScore is number
+            && request.resource.data.reputationScore >= 0
+            && request.resource.data.reputationScore <= 100
+          )
+        )
+        && (
+          !("reputationTodayDateKey" in request.resource.data)
+          || request.resource.data.reputationTodayDateKey == null
+        )
+        && (
+          !("reputationTodayClaimed" in request.resource.data)
+          || request.resource.data.reputationTodayClaimed == 0
+        )
+        && (
+          !("reputationTodayCap" in request.resource.data)
+          || request.resource.data.reputationTodayCap == 10
+        )
+        && (
+          !("reputationLastClaimAt" in request.resource.data)
+          || request.resource.data.reputationLastClaimAt == null
+        );
+      }
+
+      function isOwnerSafeCreate() {
+        return isOwner() && isValidReputationCreateDefaults();
+      }
+
       function isOwnerSafeUpdate() {
         return isOwner() && !touchesServerManagedReputationFields();
       }
 
       allow read: if isSignedIn();
-      allow create: if isOwner();
+      allow create: if isOwnerSafeCreate();
       allow update: if isOwnerSafeUpdate()
         || isFollowersOnlyUpdate()
         || isRatingOnlyUpdate()

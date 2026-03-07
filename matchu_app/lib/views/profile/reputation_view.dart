@@ -24,7 +24,10 @@ class ReputationView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Diem uy tin"),
+        title: Text(
+          "Điểm uy tín",
+          style: theme.textTheme.headlineMedium,
+          ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -46,7 +49,7 @@ class ReputationView extends StatelessWidget {
 
         if (user == null) {
           return const Center(
-            child: Text("Khong tim thay thong tin nguoi dung."),
+            child: Text("Không tìn thấy người dùng"),
           );
         }
 
@@ -240,7 +243,7 @@ class ReputationView extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          "Cap $rank",
+                          "Cấp $rank",
                           style: textTheme.bodySmall?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -269,7 +272,7 @@ class ReputationView extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 7),
                     child: Text(
-                      "Uy tin",
+                      "Uy tín",
                       style: textTheme.titleMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.92),
                         fontWeight: FontWeight.w500,
@@ -283,14 +286,14 @@ class ReputationView extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "Tien do hom nay",
+                    "Tiến độ hôm nay",
                     style: textTheme.bodyMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
-                    "$todayClaimed / $dailyCap diem",
+                    "$todayClaimed / $dailyCap điểm",
                     style: textTheme.bodyMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -408,8 +411,8 @@ class ReputationView extends StatelessWidget {
 
   static String _greetingByTime() {
     final hour = DateTime.now().hour;
-    if (hour < 12) return "Chao buoi sang,";
-    if (hour < 18) return "Chao buoi chieu,";
-    return "Chao buoi toi,";
+    if (hour < 12) return "Chào buổi sáng,";
+    if (hour < 18) return "Chào buổi chiều,";
+    return "Chào buổi tối";
   }
 }

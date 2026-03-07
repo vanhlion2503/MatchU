@@ -160,15 +160,17 @@ function buildUserLitePatchIfNeeded({
   todayClaimed,
   cap,
 }) {
+  const hasOwn = (key) =>
+    userData && Object.prototype.hasOwnProperty.call(userData, key);
   const patch = {};
 
   const currentReputationScore = toInt(userData?.reputationScore, reputationScore);
-  if (currentReputationScore !== reputationScore) {
+  if (!hasOwn("reputationScore") || currentReputationScore !== reputationScore) {
     patch.reputationScore = reputationScore;
   }
 
   const currentReputation = toInt(userData?.reputation, reputationScore);
-  if (currentReputation !== reputationScore) {
+  if (!hasOwn("reputation") || currentReputation !== reputationScore) {
     patch.reputation = reputationScore;
   }
 
@@ -176,7 +178,7 @@ function buildUserLitePatchIfNeeded({
     typeof userData?.reputationTodayDateKey === "string"
       ? userData.reputationTodayDateKey
       : null;
-  if (currentDateKey !== dateKey) {
+  if (!hasOwn("reputationTodayDateKey") || currentDateKey !== dateKey) {
     patch.reputationTodayDateKey = dateKey;
   }
 
@@ -184,12 +186,12 @@ function buildUserLitePatchIfNeeded({
     0,
     toInt(userData?.reputationTodayClaimed, 0)
   );
-  if (currentClaimed !== todayClaimed) {
+  if (!hasOwn("reputationTodayClaimed") || currentClaimed !== todayClaimed) {
     patch.reputationTodayClaimed = todayClaimed;
   }
 
   const currentCap = Math.max(1, toInt(userData?.reputationTodayCap, 10));
-  if (currentCap !== cap) {
+  if (!hasOwn("reputationTodayCap") || currentCap !== cap) {
     patch.reputationTodayCap = cap;
   }
 
@@ -388,7 +390,13 @@ const getReputationDailyState = onCall(async (request) => {
   return { state };
 });
 
-const claimReputationTask = onCall(async (request) => {
+const claimReputationTask = onCall(
+  {
+    // Keep one warm instance to avoid transient 429/resource_exhausted
+    // when user taps claim during cold start.
+    minInstances: 1,
+  },
+  async (request) => {
   const uid = assertAuthenticated(request);
   const payload = parsePayload(request.data);
 
@@ -628,7 +636,8 @@ const claimReputationTask = onCall(async (request) => {
     claim: claimResult,
     state,
   };
-});
+  }
+);
 
 module.exports = {
   touchReputationDailyOnAppOpen,

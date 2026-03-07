@@ -17,31 +17,41 @@ const ensureUserReputationDailyDefaults = onDocumentCreated(
 
     const userData = snap.data() || {};
     const reputationScore = getCurrentReputationScore(userData);
+    const hasOwn = (key) => Object.prototype.hasOwnProperty.call(userData, key);
 
     const patch = {};
 
-    if (toInt(userData.reputationScore, reputationScore) !== reputationScore) {
+    if (!hasOwn("reputationScore") ||
+        toInt(userData.reputationScore, reputationScore) !== reputationScore) {
       patch.reputationScore = reputationScore;
     }
-    if (toInt(userData.reputation, reputationScore) !== reputationScore) {
+    if (!hasOwn("reputation") ||
+        toInt(userData.reputation, reputationScore) !== reputationScore) {
       patch.reputation = reputationScore;
     }
 
-    if (typeof userData.reputationTodayDateKey !== "string") {
+    if (!hasOwn("reputationTodayDateKey")) {
+      patch.reputationTodayDateKey = null;
+    } else if (
+      userData.reputationTodayDateKey != null &&
+      typeof userData.reputationTodayDateKey !== "string"
+    ) {
       patch.reputationTodayDateKey = null;
     }
 
-    const todayClaimed = Math.max(0, toInt(userData.reputationTodayClaimed, -1));
-    if (todayClaimed < 0) {
-      patch.reputationTodayClaimed = 0;
+    const todayClaimedRaw = toInt(userData.reputationTodayClaimed, 0);
+    const todayClaimed = Math.max(0, todayClaimedRaw);
+    if (!hasOwn("reputationTodayClaimed") || todayClaimedRaw !== todayClaimed) {
+      patch.reputationTodayClaimed = todayClaimed;
     }
 
-    const todayCap = Math.max(1, toInt(userData.reputationTodayCap, -1));
-    if (todayCap < 1) {
-      patch.reputationTodayCap = REPUTATION_DAILY_CAP;
+    const todayCapRaw = toInt(userData.reputationTodayCap, REPUTATION_DAILY_CAP);
+    const todayCap = Math.max(1, todayCapRaw);
+    if (!hasOwn("reputationTodayCap") || todayCapRaw !== todayCap) {
+      patch.reputationTodayCap = todayCap;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(userData, "reputationLastClaimAt")) {
+    if (!hasOwn("reputationLastClaimAt")) {
       patch.reputationLastClaimAt = null;
     }
 
