@@ -391,7 +391,7 @@ class ReputationView extends StatelessWidget {
                           height: 40,
                           decoration: BoxDecoration(
                             color: Theme.of(context).brightness == Brightness.dark
-                              ? const Color.fromARGB(255, 19, 18, 18)
+                              ? AppTheme.darkSurface
                               : const Color(0xFFFDF2F8),
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -464,7 +464,9 @@ class ReputationView extends StatelessWidget {
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: canClaim ? cardGradient : null,
-                      color: canClaim ? null : const Color(0xFFF1F5F9),
+                      color: canClaim ? null : Theme.of(context).brightness == Brightness.dark
+                                                ? AppTheme.darkSurface
+                                                : Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow:
                           canClaim
@@ -497,7 +499,9 @@ class ReputationView extends StatelessWidget {
                                   color:
                                       canClaim
                                           ? Colors.white
-                                          : const Color(0xFF64748B),
+                                          : Theme.of(context).brightness == Brightness.dark
+                                                  ? AppTheme.darkTextPrimary
+                                                  : const Color(0xFF64748B),
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -507,7 +511,9 @@ class ReputationView extends StatelessWidget {
                                 color:
                                     canClaim
                                         ? Colors.white
-                                        : const Color(0xFF64748B),
+                                        : Theme.of(context).brightness == Brightness.dark
+                                                  ? AppTheme.darkTextPrimary
+                                                  : const Color(0xFF64748B),
                               ),
                             ],
                           ),
