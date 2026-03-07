@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/models/reputation_daily_state.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 
 class ReputationView extends StatelessWidget {
   const ReputationView({super.key});
@@ -24,10 +25,7 @@ class ReputationView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "Điểm uy tín",
-          style: theme.textTheme.headlineMedium,
-          ),
+        title: Text("Điểm uy tín", style: theme.textTheme.headlineMedium),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -48,9 +46,7 @@ class ReputationView extends StatelessWidget {
         }
 
         if (user == null) {
-          return const Center(
-            child: Text("Không tìn thấy người dùng"),
-          );
+          return const Center(child: Text("Không tìn thấy người dùng"));
         }
 
         final dailyCap = dailyState?.dailyCap ?? user.reputationTodayCap;
@@ -326,7 +322,11 @@ class ReputationView extends StatelessWidget {
     required bool isClaiming,
     required VoidCallback onClaim,
   }) {
-    final theme = Theme.of(context);
+    const cardGradient = LinearGradient(
+      colors: [Color(0xFFEC4B79), Color(0xFFFF6D2A)],
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+    );
 
     final bool canClaim =
         task != null &&
@@ -334,78 +334,189 @@ class ReputationView extends StatelessWidget {
         !task.claimed &&
         !hasReachedMax &&
         !isClaiming;
+    final int safeTarget = (task?.target ?? 1) <= 0 ? 1 : (task?.target ?? 1);
+    final double progress =
+        ((task?.progress ?? 0) / safeTarget).clamp(0.0, 1.0).toDouble();
+    final int rewardTextValue =
+        task == null ? 1 : (task.claimed ? task.claimedReward : task.reward);
 
     String buttonLabel;
     if (task == null) {
-      buttonLabel = "Dang tai...";
-    } else if (hasReachedMax) {
-      buttonLabel = "Da dat 100";
-    } else if (task.claimed) {
-      buttonLabel = "Da nhan +${task.claimedReward}";
-    } else if (!task.isCompleted) {
-      buttonLabel = "Chua hoan thanh";
+      buttonLabel = "Đang tải...";
     } else if (isClaiming) {
-      buttonLabel = "Dang nhan...";
+      buttonLabel = "Đang nhận...";
+    } else if (hasReachedMax) {
+      buttonLabel = "Đã đạt 100";
+    } else if (task.claimed) {
+      buttonLabel = "Đã nhận";
+    } else if (!task.isCompleted) {
+      buttonLabel = "Chưa hoàn thành";
     } else {
-      buttonLabel = "Nhan +${task.reward}";
+      buttonLabel = "Nhận thưởng";
     }
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.55,
-        ),
-        borderRadius: BorderRadius.circular(18),
+        color: Theme.of(context).brightness == Brightness.dark
+                ? AppTheme.darkBorder
+                : Colors.white,
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.65),
+          color: Theme.of(context).brightness == Brightness.dark
+                ? const Color.fromARGB(255, 19, 18, 18)
+                : Color(0xFFFCE7F3),
+          width: 2
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Iconsax.medal_star, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  "Nhiem vu moi ngay",
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "Vao app moi ngay",
-            style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Tien do: ${task?.progress ?? 0}/${task?.target ?? 1}  |  Thuong: +${task?.reward ?? 1}",
-            style: textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Nhiem vu se tu hoan thanh khi ban mo app. Sau do bam nut Nhan diem.",
-            style: textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: canClaim ? onClaim : null,
-              child: Text(buttonLabel),
-            ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A0F172A),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
+      child:Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDF2F8),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Iconsax.calendar_2,
+                            size: 25,
+                            color: Color(0xFFEC4899),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Đăng nhập mỗi ngày",
+                                style: textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "Vào app mỗi ngày",
+                                style: textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "+$rewardTextValue Uy tín",
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFEC4899),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: SizedBox(
+                        height: 6,
+                        child: Stack(
+                          children: [
+                            Container(color: const Color(0xFFF1F5F9)),
+                            FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: progress,
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  gradient: cardGradient,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: canClaim ? cardGradient : null,
+                      color: canClaim ? null : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow:
+                          canClaim
+                              ? const [
+                                BoxShadow(
+                                  color: Color(0x33EC4B79),
+                                  blurRadius: 14,
+                                  offset: Offset(0, 4),
+                                ),
+                              ]
+                              : null,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: canClaim ? onClaim : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                buttonLabel,
+                                style: textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color:
+                                      canClaim
+                                          ? Colors.white
+                                          : const Color(0xFF64748B),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Iconsax.star_1,
+                                size: 14,
+                                color:
+                                    canClaim
+                                        ? Colors.white
+                                        : const Color(0xFF64748B),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
     );
   }
 
