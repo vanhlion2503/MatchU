@@ -71,10 +71,11 @@ function normalizeTaskState(taskId, rawTask) {
   if (!config) return null;
 
   const safeTask = isPlainObject(rawTask) ? rawTask : {};
+  const isRepeatable = config.repeatable === true || config.claimMode === "auto";
   const target = Math.max(1, toInt(safeTask.target, config.target));
   const reward = Math.max(0, toInt(safeTask.reward, config.reward));
   const progress = clamp(toInt(safeTask.progress, 0), 0, target);
-  const claimed = toBool(safeTask.claimed, false);
+  const claimed = isRepeatable ? false : toBool(safeTask.claimed, false);
   const claimedReward = claimed
     ? Math.max(0, toInt(safeTask.claimedReward, reward))
     : 0;
@@ -110,9 +111,11 @@ function normalizeRuntime(rawRuntime) {
     Number.isFinite(onlineSessionStartMsRaw)
       ? Math.trunc(onlineSessionStartMsRaw)
       : null;
+  const usageCarryMs = Math.max(0, toInt(safeRuntime.usageCarryMs, 0));
 
   return {
     onlineSessionStartMs,
+    usageCarryMs,
   };
 }
 

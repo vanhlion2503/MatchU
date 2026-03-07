@@ -1,11 +1,20 @@
 const DEFAULT_REPUTATION_TIMEZONE = "Asia/Ho_Chi_Minh";
 const REPUTATION_DAILY_CAP = 10;
 const REPUTATION_MAX_SCORE = 100;
+const APP_USAGE_REWARD_INTERVAL_MINUTES = 15;
 
 const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
   loginDaily: Object.freeze({
     target: 1,
     reward: 1,
+    claimMode: "manual",
+    repeatable: false,
+  }),
+  appUsage15Minutes: Object.freeze({
+    target: APP_USAGE_REWARD_INTERVAL_MINUTES,
+    reward: 1,
+    claimMode: "manual",
+    repeatable: false,
   }),
 });
 
@@ -40,6 +49,7 @@ module.exports = {
   DEFAULT_REPUTATION_TIMEZONE,
   REPUTATION_DAILY_CAP,
   REPUTATION_MAX_SCORE,
+  APP_USAGE_REWARD_INTERVAL_MINUTES,
   REPUTATION_DAILY_TASK_CONFIG,
   getTaskConfig,
   buildDefaultTaskState,

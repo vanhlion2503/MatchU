@@ -13,6 +13,7 @@ class ReputationService {
 
   Future<ReputationDailyState> touchDailyLoginTask({
     String timezone = _defaultTimezone,
+    String source = "app_open",
   }) async {
     final callable = _functions.httpsCallable("touchReputationDailyOnAppOpen");
     const eventId = "loginDaily_app_open";
@@ -20,6 +21,7 @@ class ReputationService {
     final result = await _callWithRetry(callable, <String, dynamic>{
       "timezone": timezone,
       "eventId": eventId,
+      "source": source,
     });
 
     final payload = _asMap(result.data);
@@ -66,9 +68,10 @@ class ReputationService {
 
   Future<void> touchDailyLoginTaskSilently({
     String timezone = _defaultTimezone,
+    String source = "app_open",
   }) async {
     try {
-      await touchDailyLoginTask(timezone: timezone);
+      await touchDailyLoginTask(timezone: timezone, source: source);
     } catch (error) {
       debugPrint("Silent daily login touch failed: $error");
     }

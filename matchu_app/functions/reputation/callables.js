@@ -8,6 +8,7 @@ const {
 const {
   DEFAULT_REPUTATION_TIMEZONE,
   REPUTATION_MAX_SCORE,
+  APP_USAGE_REWARD_INTERVAL_MINUTES,
   getTaskConfig,
 } = require("./taskConfig");
 const {
@@ -23,6 +24,18 @@ const {
 const USERS_COLLECTION = db.collection("users");
 const TASK_ID_PATTERN = /^[a-zA-Z0-9_]{1,48}$/;
 const DOC_ID_PATTERN = /^[a-zA-Z0-9_-]{1,120}$/;
+const APP_USAGE_TASK_ID = "appUsage15Minutes";
+const MINUTE_MS = 60 * 1000;
+const APP_USAGE_REWARD_INTERVAL_MS =
+  APP_USAGE_REWARD_INTERVAL_MINUTES * MINUTE_MS;
+const MAX_SESSION_ELAPSED_MS = 5 * MINUTE_MS;
+const SESSION_END_SOURCES = new Set([
+  "pause",
+  "inactive",
+  "hidden",
+  "detached",
+  "logout",
+]);
 
 function assertAuthenticated(request) {
   if (!request.auth?.uid) {
@@ -47,6 +60,17 @@ function sanitizeDocId(rawValue, fallback) {
   const value = typeof rawValue === "string" ? rawValue.trim() : "";
   if (DOC_ID_PATTERN.test(value)) return value;
   return fallback;
+}
+
+function sanitizeSource(rawValue) {
+  const source =
+    typeof rawValue === "string" ? rawValue.trim().toLowerCase() : "";
+  if (!source) return "app_open";
+  return source.slice(0, 32);
+}
+
+function shouldKeepSessionActive(source) {
+  return !SESSION_END_SOURCES.has(source);
 }
 
 function buildDailyRef(uid, dateKey) {
@@ -138,6 +162,10 @@ function isDailyDifferent(rawDaily, normalizedDaily) {
       : null;
 
   if (rawOnlineStart !== normalizedDaily.runtime.onlineSessionStartMs) {
+    return true;
+  }
+  const rawUsageCarryMs = Math.max(0, toInt(rawRuntime.usageCarryMs, 0));
+  if (rawUsageCarryMs !== normalizedDaily.runtime.usageCarryMs) {
     return true;
   }
 
@@ -238,6 +266,8 @@ const touchReputationDailyOnAppOpen = onCall(async (request) => {
     payload.eventId,
     `loginDaily_${dateKey}_${uid.slice(0, 8)}`
   );
+  const source = sanitizeSource(payload.source);
+  const keepSessionActive = shouldKeepSessionActive(source);
 
   const userRef = USERS_COLLECTION.doc(uid);
   const dailyRef = buildDailyRef(uid, dateKey);
@@ -289,12 +319,77 @@ const touchReputationDailyOnAppOpen = onCall(async (request) => {
       tx.set(dedupRef, {
         eventId,
         taskId: "loginDaily",
-        source: "app_open",
+        source,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
 
     const reputationScore = getCurrentReputationScore(userData);
+    const usageTask = daily.tasks[APP_USAGE_TASK_ID];
+    const nowMs = Date.now();
+    const previousOnlineSessionStartMs =
+      typeof daily.runtime.onlineSessionStartMs === "number" &&
+      Number.isFinite(daily.runtime.onlineSessionStartMs)
+        ? Math.trunc(daily.runtime.onlineSessionStartMs)
+        : null;
+    let elapsedMs = 0;
+    if (previousOnlineSessionStartMs != null) {
+      elapsedMs = Math.max(0, nowMs - previousOnlineSessionStartMs);
+      elapsedMs = Math.min(elapsedMs, MAX_SESSION_ELAPSED_MS);
+    }
+
+    let usageCarryMs = Math.max(0, toInt(daily.runtime.usageCarryMs, 0));
+    if (usageTask && !usageTask.claimed) {
+      usageCarryMs = Math.min(
+        APP_USAGE_REWARD_INTERVAL_MS,
+        usageCarryMs + elapsedMs
+      );
+    } else {
+      usageCarryMs = Math.min(APP_USAGE_REWARD_INTERVAL_MS, usageCarryMs);
+    }
+
+    const nextOnlineSessionStartMs = keepSessionActive ? nowMs : null;
+    const shouldPatchRuntime =
+      daily.runtime.onlineSessionStartMs !== nextOnlineSessionStartMs ||
+      daily.runtime.usageCarryMs !== usageCarryMs;
+
+    let shouldPatchUsageTask = false;
+    let nextUsageTask = usageTask;
+    if (usageTask) {
+      const nextProgressMinutes = clamp(
+        Math.floor(usageCarryMs / MINUTE_MS),
+        0,
+        usageTask.target
+      );
+      shouldPatchUsageTask = usageTask.progress !== nextProgressMinutes;
+
+      if (shouldPatchUsageTask) {
+        nextUsageTask = {
+          ...usageTask,
+          progress: nextProgressMinutes,
+        };
+      }
+    }
+
+    if (shouldPatchRuntime || shouldPatchUsageTask) {
+      daily = {
+        ...daily,
+        runtime: {
+          ...daily.runtime,
+          onlineSessionStartMs: nextOnlineSessionStartMs,
+          usageCarryMs,
+        },
+        tasks:
+          usageTask && nextUsageTask
+            ? {
+              ...daily.tasks,
+              [APP_USAGE_TASK_ID]: nextUsageTask,
+            }
+            : daily.tasks,
+      };
+      shouldWriteDaily = true;
+    }
+
     const userPatch = buildUserLitePatchIfNeeded({
       userData,
       reputationScore,
@@ -303,7 +398,7 @@ const touchReputationDailyOnAppOpen = onCall(async (request) => {
       cap: daily.cap,
     });
 
-    if (userPatch) {
+    if (userPatch && Object.keys(userPatch).length > 0) {
       tx.set(userRef, userPatch, { merge: true });
     }
 
@@ -394,15 +489,22 @@ const claimReputationTask = onCall(
   {
     // Keep one warm instance to avoid transient 429/resource_exhausted
     // when user taps claim during cold start.
-    minInstances: 1,
+    // minInstances: 1,
   },
   async (request) => {
   const uid = assertAuthenticated(request);
   const payload = parsePayload(request.data);
 
   const taskId = sanitizeTaskId(payload.taskId);
-  if (!taskId || !getTaskConfig(taskId)) {
+  const taskConfig = taskId ? getTaskConfig(taskId) : null;
+  if (!taskId || !taskConfig) {
     throw new HttpsError("invalid-argument", "Invalid taskId.");
+  }
+  if (taskConfig.claimMode === "auto") {
+    throw new HttpsError(
+      "failed-precondition",
+      "This task is rewarded automatically."
+    );
   }
 
   const timezone = normalizeTimezone(
