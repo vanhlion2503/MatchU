@@ -390,7 +390,9 @@ class ReputationView extends StatelessWidget {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFDF2F8),
+                            color: Theme.of(context).brightness == Brightness.dark
+                              ? const Color.fromARGB(255, 19, 18, 18)
+                              : const Color(0xFFFDF2F8),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Icon(
@@ -490,7 +492,7 @@ class ReputationView extends StatelessWidget {
                             children: [
                               Text(
                                 buttonLabel,
-                                style: textTheme.labelMedium?.copyWith(
+                                style: textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color:
                                       canClaim
