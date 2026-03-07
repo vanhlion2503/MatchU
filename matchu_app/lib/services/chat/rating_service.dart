@@ -4,7 +4,7 @@ import 'package:matchu_app/models/chat_rating_model.dart';
 class RatingService {
   static final _db = FirebaseFirestore.instance;
 
-  static String _ratingId(String roomId, String fromUid) => "${roomId}_$fromUid";
+  // static String _ratingId(String roomId, String fromUid) => "${roomId}_$fromUid";
 
   static Future<void> autoRate({
     required String roomId,

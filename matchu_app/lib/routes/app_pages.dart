@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
+import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
@@ -114,7 +115,13 @@ class AppPages {
         Get.lazyPut<RatingController>(() => RatingController());
       }),
     ),
-    GetPage(name: AppRouter.reputation, page: () => const ReputationView()),
+    GetPage(
+      name: AppRouter.reputation,
+      page: () => const ReputationView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<ReputationController>(() => ReputationController());
+      }),
+    ),
 
     /// TEMP CHAT ROOM
     GetPage(name: AppRouter.tempChat, page: () => TempChatView()),

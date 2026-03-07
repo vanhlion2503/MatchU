@@ -2,17 +2,31 @@ const fs = require("fs");
 const path = require("path");
 
 const DICT_PATH = path.join(__dirname, "..", "..", "assets", "vi_2words_clean.txt");
-const WORD_SET = new Set();
+let WORD_SET = null;
+let LOAD_ERROR = null;
 
-(function loadDictionary() {
-  const content = fs.readFileSync(DICT_PATH, "utf8");
-  content.split("\n").forEach((line) => {
-    const word = line.trim().toLowerCase();
-    if (word) WORD_SET.add(word);
-  });
+function ensureDictionaryLoaded() {
+  if (WORD_SET) return WORD_SET;
+  if (LOAD_ERROR) {
+    throw LOAD_ERROR;
+  }
 
-  console.log("Vietnamese dictionary loaded:", WORD_SET.size);
-})();
+  try {
+    const set = new Set();
+    const content = fs.readFileSync(DICT_PATH, "utf8");
+    content.split("\n").forEach((line) => {
+      const word = line.trim().toLowerCase();
+      if (word) set.add(word);
+    });
+
+    WORD_SET = set;
+    console.log("Vietnamese dictionary loaded:", WORD_SET.size);
+    return WORD_SET;
+  } catch (error) {
+    LOAD_ERROR = error;
+    throw error;
+  }
+}
 
 function normalizeWord(word) {
   return word
@@ -23,7 +37,15 @@ function normalizeWord(word) {
 
 function isValidVietnameseWord(word) {
   if (!word || typeof word !== "string") return false;
-  return WORD_SET.has(normalizeWord(word));
+
+  try {
+    return ensureDictionaryLoaded().has(normalizeWord(word));
+  } catch (error) {
+    console.error("Vietnamese dictionary load failed:", {
+      message: error?.message || String(error),
+    });
+    return false;
+  }
 }
 
 module.exports = {

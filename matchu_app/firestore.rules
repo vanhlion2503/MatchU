@@ -79,9 +79,24 @@ service cloud.firestore {
           && request.resource.data.totalReports == oldTotal + 1;
       }
 
+      function touchesServerManagedReputationFields() {
+        return request.resource.data.diff(resource.data).changedKeys().hasAny([
+          "reputation",
+          "reputationScore",
+          "reputationTodayDateKey",
+          "reputationTodayClaimed",
+          "reputationTodayCap",
+          "reputationLastClaimAt"
+        ]);
+      }
+
+      function isOwnerSafeUpdate() {
+        return isOwner() && !touchesServerManagedReputationFields();
+      }
+
       allow read: if isSignedIn();
       allow create: if isOwner();
-      allow update: if isOwner()
+      allow update: if isOwnerSafeUpdate()
         || isFollowersOnlyUpdate()
         || isRatingOnlyUpdate()
         || isReportOnlyUpdate();

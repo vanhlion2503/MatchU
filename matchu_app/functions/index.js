@@ -2,6 +2,11 @@ require("./src/shared/firebase");
 
 const { getTurnCredentials } = require("./src/callables/getTurnCredentials");
 const {
+  touchReputationDailyOnAppOpen,
+  getReputationDailyState,
+  claimReputationTask,
+} = require("./reputation/callables");
+const {
   migrateTempChatMessages,
   cleanupViewedImageMessage,
 } = require("./src/triggers/chatRoomEvents");
@@ -16,12 +21,19 @@ const {
   ensureUserReputationDefault,
   moderateTempChatMessage,
 } = require("./src/triggers/tempChatModeration");
+const {
+  ensureUserReputationDailyDefaults,
+} = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
+exports.touchReputationDailyOnAppOpen = touchReputationDailyOnAppOpen;
+exports.getReputationDailyState = getReputationDailyState;
+exports.claimReputationTask = claimReputationTask;
 exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;
 exports.validateWordChainDictionary = validateWordChainDictionary;
 exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
+exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;
 exports.moderateTempChatMessage = moderateTempChatMessage;

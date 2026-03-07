@@ -20,6 +20,10 @@ class UserModel {
 
   final bool nearlyEnabled;
   final int reputationScore;
+  final String? reputationTodayDateKey;
+  final int reputationTodayClaimed;
+  final int reputationTodayCap;
+  final DateTime? reputationLastClaimAt;
   final int trustWarnings;
   final int totalReports;
 
@@ -68,6 +72,10 @@ class UserModel {
 
     this.nearlyEnabled = true,
     this.reputationScore = 100,
+    this.reputationTodayDateKey,
+    this.reputationTodayClaimed = 0,
+    this.reputationTodayCap = 10,
+    this.reputationLastClaimAt,
     this.trustWarnings = 0,
     this.totalReports = 0,
 
@@ -119,6 +127,10 @@ class UserModel {
 
       "nearlyEnabled": nearlyEnabled,
       "reputationScore": reputationScore,
+      "reputationTodayDateKey": reputationTodayDateKey,
+      "reputationTodayClaimed": reputationTodayClaimed,
+      "reputationTodayCap": reputationTodayCap,
+      "reputationLastClaimAt": reputationLastClaimAt?.toIso8601String(),
       "trustWarnings": trustWarnings,
       "totalReports": totalReports,
 
@@ -198,6 +210,10 @@ class UserModel {
 
       nearlyEnabled: json["nearlyEnabled"] ?? true,
       reputationScore: json["reputationScore"] ?? 100,
+      reputationTodayDateKey: json["reputationTodayDateKey"],
+      reputationTodayClaimed: json["reputationTodayClaimed"] ?? 0,
+      reputationTodayCap: json["reputationTodayCap"] ?? 10,
+      reputationLastClaimAt: parseDate(json["reputationLastClaimAt"]),
       trustWarnings: json["trustWarnings"] ?? 0,
       totalReports: json["totalReports"] ?? 0,
 
@@ -250,6 +266,10 @@ class UserModel {
 
     bool? nearlyEnabled,
     int? reputationScore,
+    String? reputationTodayDateKey,
+    int? reputationTodayClaimed,
+    int? reputationTodayCap,
+    DateTime? reputationLastClaimAt,
     int? trustWarnings,
     int? totalReports,
 
@@ -298,6 +318,13 @@ class UserModel {
 
       nearlyEnabled: nearlyEnabled ?? this.nearlyEnabled,
       reputationScore: reputationScore ?? this.reputationScore,
+      reputationTodayDateKey:
+          reputationTodayDateKey ?? this.reputationTodayDateKey,
+      reputationTodayClaimed:
+          reputationTodayClaimed ?? this.reputationTodayClaimed,
+      reputationTodayCap: reputationTodayCap ?? this.reputationTodayCap,
+      reputationLastClaimAt:
+          reputationLastClaimAt ?? this.reputationLastClaimAt,
       trustWarnings: trustWarnings ?? this.trustWarnings,
       totalReports: totalReports ?? this.totalReports,
 

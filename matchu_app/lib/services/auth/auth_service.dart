@@ -140,6 +140,10 @@ class AuthService {
 
       "nearlyEnabled": true,
       "reputationScore": 100,
+      "reputationTodayDateKey": null,
+      "reputationTodayClaimed": 0,
+      "reputationTodayCap": 10,
+      "reputationLastClaimAt": null,
       "trustWarnings": 0,
       "totalReports": 0,
 
