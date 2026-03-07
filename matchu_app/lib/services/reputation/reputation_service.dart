@@ -66,14 +66,15 @@ class ReputationService {
     );
   }
 
-  Future<void> touchDailyLoginTaskSilently({
+  Future<ReputationDailyState?> touchDailyLoginTaskSilently({
     String timezone = _defaultTimezone,
     String source = "app_open",
   }) async {
     try {
-      await touchDailyLoginTask(timezone: timezone, source: source);
+      return await touchDailyLoginTask(timezone: timezone, source: source);
     } catch (error) {
       debugPrint("Silent daily login touch failed: $error");
+      return null;
     }
   }
 
