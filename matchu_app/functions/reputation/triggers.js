@@ -5,13 +5,27 @@ const {
 
 const { admin, db } = require("../src/shared/firebase");
 const { normalizeTimezone, resolveDateKey } = require("../utils/dateKey");
-const { REPUTATION_DAILY_CAP, DEFAULT_REPUTATION_TIMEZONE } = require("./taskConfig");
-const { toInt, toMillis, normalizeDailyDoc, getCurrentReputationScore } = require("./types");
+const {
+  REPUTATION_DAILY_CAP,
+  DEFAULT_REPUTATION_TIMEZONE,
+  FIVE_STAR_RATING_TASK_ID,
+  getTaskConfig,
+} = require("./taskConfig");
+const {
+  toInt,
+  toMillis,
+  normalizeDailyDoc,
+  getCurrentReputationScore,
+  resolveTaskProgressCap,
+} = require("./types");
 
 const TEMP_CHAT_TASK_ID = "tempChat3Rooms3Minutes";
 const TEMP_CHAT_COMPLETION_LOGS_SUBCOLLECTION = "tempChatCompletionLogs";
 const TEMP_CHAT_MIN_DURATION_MS = 3 * 60 * 1000;
 const TEMP_CHAT_FINAL_STATUSES = new Set(["ended", "converted"]);
+const FIVE_STAR_RATING_COMPLETION_LOGS_SUBCOLLECTION =
+  "fiveStarRatingCompletionLogs";
+const FIVE_STAR_RATING_MIN_SCORE = 5;
 
 function normalizeParticipants(rawParticipants, userA, userB) {
   const participants = [];
@@ -166,6 +180,99 @@ async function applyTempChatCompletionProgress({ uid, roomId, completedAtMs }) {
   });
 }
 
+function resolveRatingCreatedAtMillis(event, ratingData) {
+  const snapshotCreatedAtMs = toMillis(event?.data?.createTime);
+  if (snapshotCreatedAtMs != null) return snapshotCreatedAtMs;
+
+  const ratingCreatedAtMs = toMillis(ratingData?.createdAt);
+  if (ratingCreatedAtMs != null) return ratingCreatedAtMs;
+
+  return Date.now();
+}
+
+function toSafeUid(rawUid) {
+  return typeof rawUid === "string" ? rawUid.trim() : "";
+}
+
+async function applyReceivedFiveStarRatingProgress({
+  toUid,
+  fromUid,
+  ratingId,
+  score,
+  ratedAtMs,
+}) {
+  const userRef = db.collection("users").doc(toUid);
+  const taskConfig = getTaskConfig(FIVE_STAR_RATING_TASK_ID);
+  if (!taskConfig) return;
+
+  await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) return;
+
+    const userData = userSnap.data() || {};
+    const timezone = normalizeTimezone(
+      userData?.reputationTimezone,
+      DEFAULT_REPUTATION_TIMEZONE
+    );
+    const ratedAt = new Date(ratedAtMs);
+    const dateKey = resolveDateKey({ timeZone: timezone, now: ratedAt });
+    const dailyRef = buildDailyRef(toUid, dateKey);
+    const completionLogRef = dailyRef
+      .collection(FIVE_STAR_RATING_COMPLETION_LOGS_SUBCOLLECTION)
+      .doc(ratingId);
+
+    const [dailySnap, completionLogSnap] = await Promise.all([
+      tx.get(dailyRef),
+      tx.get(completionLogRef),
+    ]);
+    if (completionLogSnap.exists) return;
+
+    const rawDaily = dailySnap.exists ? dailySnap.data() : null;
+    let daily = normalizeDailyDoc(rawDaily, { dateKey, timezone });
+
+    const task = daily.tasks[FIVE_STAR_RATING_TASK_ID];
+    let didIncrement = false;
+    if (task) {
+      const progressCap = resolveTaskProgressCap(taskConfig, task.target);
+      const nextProgress = Math.min(progressCap, task.progress + 1);
+      didIncrement = nextProgress !== task.progress;
+
+      if (didIncrement) {
+        daily = {
+          ...daily,
+          tasks: {
+            ...daily.tasks,
+            [FIVE_STAR_RATING_TASK_ID]: {
+              ...task,
+              progress: nextProgress,
+            },
+          },
+        };
+      }
+    }
+
+    tx.set(
+      dailyRef,
+      buildDailyWritePayload({
+        daily,
+        includeCreatedAt: !dailySnap.exists,
+      }),
+      { merge: true }
+    );
+
+    tx.set(completionLogRef, {
+      ratingId,
+      taskId: FIVE_STAR_RATING_TASK_ID,
+      fromUid,
+      toUid,
+      score,
+      counted: didIncrement,
+      ratedAtMillis: ratedAtMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
 const progressTempChat3Rooms3MinutesTask = onDocumentUpdated(
   "tempChats/{roomId}",
   async (event) => {
@@ -198,6 +305,37 @@ const progressTempChat3Rooms3MinutesTask = onDocumentUpdated(
         completedAtMs,
       });
     }
+  }
+);
+
+const progressReceivedFiveStarRatingTask = onDocumentCreated(
+  "chatRatings/{ratingId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const rating = snap.data() || {};
+    const toUid = toSafeUid(rating.toUid);
+    const fromUid = toSafeUid(rating.fromUid);
+    if (!toUid || !fromUid) return;
+    if (toUid === fromUid) return;
+    if (rating.skipped === true) return;
+
+    const score = Number(rating.score);
+    if (!Number.isFinite(score) || score < FIVE_STAR_RATING_MIN_SCORE) {
+      return;
+    }
+
+    const ratingId = event.params.ratingId;
+    const ratedAtMs = resolveRatingCreatedAtMillis(event, rating);
+
+    await applyReceivedFiveStarRatingProgress({
+      toUid,
+      fromUid,
+      ratingId,
+      score,
+      ratedAtMs,
+    });
   }
 );
 
@@ -259,4 +397,5 @@ const ensureUserReputationDailyDefaults = onDocumentCreated(
 module.exports = {
   ensureUserReputationDailyDefaults,
   progressTempChat3Rooms3MinutesTask,
+  progressReceivedFiveStarRatingTask,
 };

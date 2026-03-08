@@ -19,6 +19,7 @@ const {
   getCurrentReputationScore,
   normalizeDailyDoc,
   buildDailyStatePayload,
+  resolveTaskProgressCap,
 } = require("./types");
 
 const USERS_COLLECTION = db.collection("users");
@@ -120,13 +121,18 @@ function buildDailyWritePayload({
 }
 
 function isTaskDifferent(rawTask, normalizedTask, taskConfig) {
+  const isRepeatable =
+    taskConfig?.repeatable === true || taskConfig?.claimMode === "auto";
   const target = Math.max(1, toInt(rawTask?.target, taskConfig.target));
+  const progressCap = resolveTaskProgressCap(taskConfig, target);
   const reward = Math.max(0, toInt(rawTask?.reward, taskConfig.reward));
-  const progress = clamp(toInt(rawTask?.progress, 0), 0, target);
-  const claimed = Boolean(rawTask?.claimed);
-  const claimedReward = claimed
-    ? Math.max(0, toInt(rawTask?.claimedReward, reward))
-    : 0;
+  const progress = clamp(toInt(rawTask?.progress, 0), 0, progressCap);
+  const claimed = isRepeatable ? false : Boolean(rawTask?.claimed);
+  const claimedReward = isRepeatable
+    ? Math.max(0, toInt(rawTask?.claimedReward, 0))
+    : claimed
+      ? Math.max(0, toInt(rawTask?.claimedReward, reward))
+      : 0;
   const claimedAtMs = toMillis(rawTask?.claimedAt);
   const normalizedClaimedAtMs = normalizedTask.claimedAt
     ? normalizedTask.claimedAt.getTime()
@@ -561,9 +567,19 @@ const claimReputationTask = onCall(
       throw new HttpsError("invalid-argument", "Task is not configured.");
     }
 
+    const isRepeatableTask = taskConfig.repeatable === true;
+    const claimableCycles = Math.floor(task.progress / task.target);
+    const totalRewardFromProgress = Math.max(0, claimableCycles * task.reward);
+    const alreadyClaimedReward = isRepeatableTask
+      ? Math.max(0, toInt(task.claimedReward, 0))
+      : 0;
+    const requestedReward = isRepeatableTask
+      ? Math.max(0, totalRewardFromProgress - alreadyClaimedReward)
+      : task.reward;
+
     claimResult = {
       taskId,
-      requested: task.reward,
+      requested: requestedReward,
       awarded: 0,
       reason: "unknown",
       reputationBefore,
@@ -589,7 +605,7 @@ const claimReputationTask = onCall(
       const claimLog = claimLogSnap.data() || {};
       claimResult = {
         taskId,
-        requested: Math.max(0, toInt(claimLog.requested, task.reward)),
+        requested: Math.max(0, toInt(claimLog.requested, requestedReward)),
         awarded: Math.max(0, toInt(claimLog.awarded, 0)),
         reason:
           typeof claimLog.reason === "string" && claimLog.reason.trim()
@@ -619,7 +635,7 @@ const claimReputationTask = onCall(
         );
       }
       return;
-    } else if (task.claimed) {
+    } else if (!isRepeatableTask && task.claimed) {
       claimResult.reason = "already_claimed";
       claimResult.awarded = Math.max(0, task.claimedReward);
       patchUserLiteIfNeeded(reputationBefore, daily.claimedPoints);
@@ -634,8 +650,23 @@ const claimReputationTask = onCall(
         );
       }
       return;
-    } else if (task.progress < task.target) {
+    } else if (claimableCycles <= 0) {
       claimResult.reason = "not_completed";
+      patchUserLiteIfNeeded(reputationBefore, daily.claimedPoints);
+      if (shouldWriteDaily) {
+        tx.set(
+          dailyRef,
+          buildDailyWritePayload({
+            daily,
+            includeCreatedAt: !dailySnap.exists,
+          }),
+          { merge: true }
+        );
+      }
+      return;
+    } else if (requestedReward <= 0) {
+      claimResult.reason = "already_claimed";
+      claimResult.awarded = 0;
       patchUserLiteIfNeeded(reputationBefore, daily.claimedPoints);
       if (shouldWriteDaily) {
         tx.set(
@@ -654,7 +685,7 @@ const claimReputationTask = onCall(
     const remainingScore = Math.max(0, REPUTATION_MAX_SCORE - reputationBefore);
     const awarded = Math.max(
       0,
-      Math.min(task.reward, remainingDaily, remainingScore)
+      Math.min(requestedReward, remainingDaily, remainingScore)
     );
     const nextReputation = clamp(
       reputationBefore + awarded,
@@ -670,17 +701,32 @@ const claimReputationTask = onCall(
       reason = "daily_cap_reached";
     }
 
+    let nextTaskState;
+    if (isRepeatableTask) {
+      const nextClaimedReward = Math.max(0, alreadyClaimedReward + awarded);
+
+      nextTaskState = {
+        ...task,
+        progress: task.progress,
+        claimed: false,
+        claimedReward: nextClaimedReward,
+        claimedAt: awarded > 0 ? new Date() : task.claimedAt,
+      };
+    } else {
+      nextTaskState = {
+        ...task,
+        claimed: true,
+        claimedReward: awarded,
+        claimedAt: new Date(),
+      };
+    }
+
     daily = {
       ...daily,
       claimedPoints: nextTodayClaimed,
       tasks: {
         ...daily.tasks,
-        [taskId]: {
-          ...task,
-          claimed: true,
-          claimedReward: awarded,
-          claimedAt: new Date(),
-        },
+        [taskId]: nextTaskState,
       },
     };
     shouldWriteDaily = true;
@@ -711,7 +757,7 @@ const claimReputationTask = onCall(
     tx.set(claimLogRef, {
       claimId,
       taskId,
-      requested: task.reward,
+      requested: requestedReward,
       awarded,
       reputationBefore,
       reputationAfter: nextReputation,
@@ -723,7 +769,7 @@ const claimReputationTask = onCall(
 
     claimResult = {
       taskId,
-      requested: task.reward,
+      requested: requestedReward,
       awarded,
       reason,
       reputationBefore,

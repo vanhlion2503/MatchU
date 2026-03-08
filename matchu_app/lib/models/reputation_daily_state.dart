@@ -21,16 +21,15 @@ class ReputationDailyTask {
 
   factory ReputationDailyTask.fromMap(String id, Map<String, dynamic> data) {
     final target = _asInt(data["target"], fallback: 1, min: 1);
+    final progress = _asInt(data["progress"], min: 0);
     return ReputationDailyTask(
       id: id,
       target: target,
-      progress: _asInt(data["progress"], min: 0, max: target),
+      progress: progress,
       reward: _asInt(data["reward"], min: 0),
       claimed: _asBool(data["claimed"]),
       claimedReward: _asInt(data["claimedReward"], min: 0),
-      isCompleted:
-          _asBool(data["isCompleted"]) ||
-          _asInt(data["progress"], min: 0, max: target) >= target,
+      isCompleted: _asBool(data["isCompleted"]) || progress >= target,
       claimedAtMillis: _asNullableInt(data["claimedAtMillis"]),
     );
   }
@@ -96,6 +95,8 @@ class ReputationDailyState {
   ReputationDailyTask? get appUsage15MinutesTask => tasks["appUsage15Minutes"];
   ReputationDailyTask? get tempChat3Rooms3MinutesTask =>
       tasks["tempChat3Rooms3Minutes"];
+  ReputationDailyTask? get receivedFiveStarRatingTask =>
+      tasks["receivedFiveStarRating"];
 
   int get todayRemaining => (dailyCap - todayClaimed).clamp(0, dailyCap);
 

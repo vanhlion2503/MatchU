@@ -1,0 +1,164 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:matchu_app/controllers/profile/profile_controller.dart';
+import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
+import 'package:matchu_app/views/reputation/widget/build_app_usage_task_card.dart';
+import 'package:matchu_app/views/reputation/widget/build_daily_task_card.dart';
+import 'package:matchu_app/views/reputation/widget/build_received_fire_star_task_card.dart';
+import 'package:matchu_app/views/reputation/widget/build_temp_chat_task_card.dart';
+import 'package:matchu_app/views/reputation/widget/header_card.dart';
+
+class ReputationView extends StatelessWidget {
+  const ReputationView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final ProfileController profileController =
+        Get.isRegistered<ProfileController>()
+            ? Get.find<ProfileController>()
+            : Get.put(ProfileController());
+    final ReputationController reputationController =
+        Get.isRegistered<ReputationController>()
+            ? Get.find<ReputationController>()
+            : Get.put(ReputationController());
+
+    return Scaffold(
+      appBar: AppBar(
+        scrolledUnderElevation: 0,
+        title: Text("Điểm uy tín", style: theme.textTheme.headlineMedium),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => reputationController.refreshState(),
+          ),
+        ],
+      ),
+      body: Obx(() {
+        final user = profileController.user.value;
+        final dailyState = reputationController.state.value;
+
+        final isInitialLoading =
+            profileController.isLoading.value ||
+            (reputationController.isLoading.value && dailyState == null);
+
+        if (isInitialLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (user == null) {
+          return const Center(child: Text("Không tìn thấy người dùng"));
+        }
+
+        final dailyCap = dailyState?.dailyCap ?? user.reputationTodayCap;
+        final todayClaimed =
+            dailyState?.todayClaimed ?? user.reputationTodayClaimed;
+        final safeCap = dailyCap <= 0 ? 10 : dailyCap;
+        final safeClaimed = todayClaimed.clamp(0, safeCap);
+        final todayProgress = (safeClaimed / safeCap).clamp(0.0, 1.0);
+        final reputationScore =
+            dailyState?.reputationScore ?? user.reputationScore;
+        final loginTask = dailyState?.loginDailyTask;
+        final appUsageTask = dailyState?.appUsage15MinutesTask;
+        final tempChatTask = dailyState?.tempChat3Rooms3MinutesTask;
+        final receivedFiveStarTask = dailyState?.receivedFiveStarRatingTask;
+        final isClaimingLoginTask =
+            reputationController.isClaimingTaskId.value == "loginDaily";
+        final isClaimingAppUsageTask =
+            reputationController.isClaimingTaskId.value == "appUsage15Minutes";
+        final isClaimingTempChatTask =
+            reputationController.isClaimingTaskId.value ==
+            "tempChat3Rooms3Minutes";
+        final isClaimingFiveStarTask =
+            reputationController.isClaimingTaskId.value ==
+            "receivedFiveStarRating";
+        final hasReachedMax =
+            dailyState?.hasReachedMax ?? (reputationScore >= 100);
+        final canEarnMore =
+            dailyState?.canEarnMore ??
+            (!hasReachedMax && safeClaimed < safeCap);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          child: Column(
+            children: [
+              buildHeaderCard(
+                textTheme: textTheme,
+                fullName: profileController.fullName,
+                rank: profileController.rank,
+                avatarUrl: user.avatarUrl,
+                avatarVersion: user.updatedAt?.millisecondsSinceEpoch ?? 0,
+                reputationScore: reputationScore,
+                todayClaimed: safeClaimed,
+                dailyCap: safeCap,
+                progress: todayProgress,
+              ),
+              const SizedBox(height: 16),
+              buildDailyTaskCard(
+                context: context,
+                textTheme: textTheme,
+                task: loginTask,
+                hasReachedMax: hasReachedMax,
+                isClaiming: isClaimingLoginTask,
+                onClaim: () => reputationController.claimTask("loginDaily"),
+              ),
+              const SizedBox(height: 12),
+              buildAppUsageTaskCard(
+                context: context,
+                textTheme: textTheme,
+                task: appUsageTask,
+                hasReachedMax: hasReachedMax,
+                isClaiming: isClaimingAppUsageTask,
+                onClaim:
+                    () => reputationController.claimTask("appUsage15Minutes"),
+              ),
+              const SizedBox(height: 12),
+              buildTempChatTaskCard(
+                context: context,
+                textTheme: textTheme,
+                task: tempChatTask,
+                hasReachedMax: hasReachedMax,
+                isClaiming: isClaimingTempChatTask,
+                onClaim:
+                    () => reputationController.claimTask(
+                      "tempChat3Rooms3Minutes",
+                    ),
+              ),
+              const SizedBox(height: 12),
+              buildReceivedFiveStarTaskCard(
+                context: context,
+                textTheme: textTheme,
+                task: receivedFiveStarTask,
+                hasReachedMax: hasReachedMax,
+                canEarnMore: canEarnMore,
+                isClaiming: isClaimingFiveStarTask,
+                onClaim:
+                    () => reputationController.claimTask(
+                      "receivedFiveStarRating",
+                    ),
+              ),
+              if (reputationController.errorMessage.value != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    reputationController.errorMessage.value!,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}

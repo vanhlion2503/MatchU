@@ -24,6 +24,7 @@ const {
 const {
   ensureUserReputationDailyDefaults,
   progressTempChat3Rooms3MinutesTask,
+  progressReceivedFiveStarRatingTask,
 } = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
@@ -38,4 +39,5 @@ exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
 exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;
 exports.progressTempChat3Rooms3MinutesTask = progressTempChat3Rooms3MinutesTask;
+exports.progressReceivedFiveStarRatingTask = progressReceivedFiveStarRatingTask;
 exports.moderateTempChatMessage = moderateTempChatMessage;

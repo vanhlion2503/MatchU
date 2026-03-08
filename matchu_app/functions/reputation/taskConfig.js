@@ -3,6 +3,8 @@ const REPUTATION_DAILY_CAP = 10;
 const REPUTATION_MAX_SCORE = 100;
 const APP_USAGE_REWARD_INTERVAL_MINUTES = 15;
 const TEMP_CHAT_DAILY_TARGET_ROOMS = 3;
+const FIVE_STAR_RATING_TASK_ID = "receivedFiveStarRating";
+const FIVE_STAR_RATING_DAILY_LIMIT = 5;
 
 const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
   loginDaily: Object.freeze({
@@ -22,6 +24,13 @@ const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
     reward: 2,
     claimMode: "manual",
     repeatable: false,
+  }),
+  [FIVE_STAR_RATING_TASK_ID]: Object.freeze({
+    target: 1,
+    reward: 1,
+    claimMode: "manual",
+    repeatable: true,
+    dailyProgressCap: FIVE_STAR_RATING_DAILY_LIMIT,
   }),
 });
 
@@ -58,6 +67,8 @@ module.exports = {
   REPUTATION_MAX_SCORE,
   APP_USAGE_REWARD_INTERVAL_MINUTES,
   TEMP_CHAT_DAILY_TARGET_ROOMS,
+  FIVE_STAR_RATING_TASK_ID,
+  FIVE_STAR_RATING_DAILY_LIMIT,
   REPUTATION_DAILY_TASK_CONFIG,
   getTaskConfig,
   buildDefaultTaskState,

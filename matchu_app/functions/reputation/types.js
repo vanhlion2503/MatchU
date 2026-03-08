@@ -66,6 +66,19 @@ function getCurrentReputationScore(userData) {
   return clamp(score, 0, REPUTATION_MAX_SCORE);
 }
 
+function resolveTaskProgressCap(taskConfig, target) {
+  const safeTarget = Math.max(1, toInt(target, 1));
+  const isRepeatable =
+    taskConfig?.repeatable === true || taskConfig?.claimMode === "auto";
+  if (!isRepeatable) return safeTarget;
+
+  const configuredCap = Math.max(
+    safeTarget,
+    toInt(taskConfig?.dailyProgressCap, safeTarget)
+  );
+  return configuredCap;
+}
+
 function normalizeTaskState(taskId, rawTask) {
   const config = REPUTATION_DAILY_TASK_CONFIG[taskId];
   if (!config) return null;
@@ -73,12 +86,15 @@ function normalizeTaskState(taskId, rawTask) {
   const safeTask = isPlainObject(rawTask) ? rawTask : {};
   const isRepeatable = config.repeatable === true || config.claimMode === "auto";
   const target = Math.max(1, toInt(safeTask.target, config.target));
+  const progressCap = resolveTaskProgressCap(config, target);
   const reward = Math.max(0, toInt(safeTask.reward, config.reward));
-  const progress = clamp(toInt(safeTask.progress, 0), 0, target);
+  const progress = clamp(toInt(safeTask.progress, 0), 0, progressCap);
   const claimed = isRepeatable ? false : toBool(safeTask.claimed, false);
-  const claimedReward = claimed
-    ? Math.max(0, toInt(safeTask.claimedReward, reward))
-    : 0;
+  const claimedReward = isRepeatable
+    ? Math.max(0, toInt(safeTask.claimedReward, 0))
+    : claimed
+      ? Math.max(0, toInt(safeTask.claimedReward, reward))
+      : 0;
   const claimedAtMs = toMillis(safeTask.claimedAt);
 
   return {
@@ -181,4 +197,5 @@ module.exports = {
   normalizeRuntime,
   normalizeDailyDoc,
   buildDailyStatePayload,
+  resolveTaskProgressCap,
 };
