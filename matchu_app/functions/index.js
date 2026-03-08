@@ -23,6 +23,7 @@ const {
 } = require("./src/triggers/tempChatModeration");
 const {
   ensureUserReputationDailyDefaults,
+  progressTempChat3Rooms3MinutesTask,
 } = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
@@ -36,4 +37,5 @@ exports.validateWordChainDictionary = validateWordChainDictionary;
 exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
 exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;
+exports.progressTempChat3Rooms3MinutesTask = progressTempChat3Rooms3MinutesTask;
 exports.moderateTempChatMessage = moderateTempChatMessage;

@@ -94,6 +94,8 @@ class ReputationDailyState {
 
   ReputationDailyTask? get loginDailyTask => tasks["loginDaily"];
   ReputationDailyTask? get appUsage15MinutesTask => tasks["appUsage15Minutes"];
+  ReputationDailyTask? get tempChat3Rooms3MinutesTask =>
+      tasks["tempChat3Rooms3Minutes"];
 
   int get todayRemaining => (dailyCap - todayClaimed).clamp(0, dailyCap);
 

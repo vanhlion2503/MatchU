@@ -48,14 +48,14 @@ class ReputationController extends GetxController {
 
       final reason = response.claim.reason;
       final awarded = response.claim.awarded;
-      final title = awarded > 0 ? "Nhan diem thanh cong" : "Da xu ly claim";
+      final title = awarded > 0 ? "Nhận điểm thành công" : "Đã xử lý claim";
       final message = _reasonMessage(reason, awarded);
       Get.snackbar(title, message, snackPosition: SnackPosition.TOP);
     } catch (error) {
       final message = _toDisplayError(error);
       errorMessage.value = message;
       Get.snackbar(
-        "Khong the nhan diem",
+        "Không thể nhận điểm",
         message,
         snackPosition: SnackPosition.TOP,
       );
@@ -67,19 +67,19 @@ class ReputationController extends GetxController {
   String _reasonMessage(String reason, int awarded) {
     switch (reason) {
       case "claimed":
-        return "Ban vua nhan +$awarded diem uy tin.";
+        return "Bạn vừa nhận +$awarded điểm uy tín.";
       case "daily_cap_reached":
-        return "Hom nay da dat gioi han diem uy tin.";
+        return "Hôm nay đã hết giới hạn nhận điểm.";
       case "reputation_max_reached":
-        return "Tai khoan da dat 100 diem uy tin.";
+        return "Tài khoản này đã đạt 100 uy tín.";
       case "already_claimed":
-        return "Nhiem vu nay da duoc nhan diem.";
+        return "Nhiệm vụ này đã được nhận điểm";
       case "not_completed":
-        return "Nhiem vu chua hoan thanh.";
+        return "Nhiệm vụ này chưa hoàn thành";
       case "claim_request_replayed":
-        return "Yeu cau claim bi lap, da bo qua.";
+        return "Yêu cầu claim bị lặp, đã bỏ qua.";
       default:
-        return "Da cap nhat trang thai nhiem vu.";
+        return "Đã cập nhật trạng thái nhiệm vụ.";
     }
   }
 
