@@ -95,6 +95,8 @@ class ReputationDailyState {
   ReputationDailyTask? get appUsage15MinutesTask => tasks["appUsage15Minutes"];
   ReputationDailyTask? get tempChat3Rooms3MinutesTask =>
       tasks["tempChat3Rooms3Minutes"];
+  ReputationDailyTask? get mutualLikeLongChat5TimesTask =>
+      tasks["mutualLikeLongChat5Times"];
   ReputationDailyTask? get receivedFiveStarRatingTask =>
       tasks["receivedFiveStarRating"];
 

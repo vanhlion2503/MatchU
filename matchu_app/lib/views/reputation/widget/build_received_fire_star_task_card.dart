@@ -40,7 +40,7 @@ Widget buildReceivedFiveStarTaskCard({
     final String subtitle =
         task == null
             ? "Nhận +1 mỗi lượt được vote 5 sao (tối đa 5 lượt/ngày)"
-            : "Nhận 1 uy tín mỗi lượt";
+            : "Nhận đánh giá 5 sao";
 
     String buttonLabel;
     if (task == null) {
@@ -114,7 +114,7 @@ Widget buildReceivedFiveStarTaskCard({
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Được vote 5 sao",
+                            "Người dùng mẫu mực",
                             style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),

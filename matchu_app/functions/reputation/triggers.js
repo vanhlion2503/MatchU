@@ -9,6 +9,7 @@ const {
   REPUTATION_DAILY_CAP,
   DEFAULT_REPUTATION_TIMEZONE,
   FIVE_STAR_RATING_TASK_ID,
+  MUTUAL_LIKE_LONG_CHAT_TASK_ID,
   getTaskConfig,
 } = require("./taskConfig");
 const {
@@ -26,6 +27,8 @@ const TEMP_CHAT_FINAL_STATUSES = new Set(["ended", "converted"]);
 const FIVE_STAR_RATING_COMPLETION_LOGS_SUBCOLLECTION =
   "fiveStarRatingCompletionLogs";
 const FIVE_STAR_RATING_MIN_SCORE = 5;
+const MUTUAL_LIKE_LONG_CHAT_COMPLETION_LOGS_SUBCOLLECTION =
+  "mutualLikeLongChatCompletionLogs";
 
 function normalizeParticipants(rawParticipants, userA, userB) {
   const participants = [];
@@ -58,6 +61,28 @@ function shouldHandleTempChatCompletion(beforeRoom, afterRoom) {
   if (!TEMP_CHAT_FINAL_STATUSES.has(afterStatus)) return false;
   if (TEMP_CHAT_FINAL_STATUSES.has(beforeStatus)) return false;
   return true;
+}
+
+function shouldHandleMutualLikeLongChatConversion(beforeRoom, afterRoom) {
+  const beforeStatus =
+    typeof beforeRoom?.status === "string" ? beforeRoom.status : "";
+  const afterStatus =
+    typeof afterRoom?.status === "string" ? afterRoom.status : "";
+
+  if (afterStatus !== "converted") return false;
+  if (beforeStatus === "converted") return false;
+
+  const permanentRoomId =
+    typeof afterRoom?.permanentRoomId === "string"
+      ? afterRoom.permanentRoomId.trim()
+      : "";
+  if (!permanentRoomId) return false;
+
+  return true;
+}
+
+function hasMutualLikes(roomData) {
+  return roomData?.userALiked === true && roomData?.userBLiked === true;
 }
 
 function resolveTempChatEndMillis(event, beforeRoom, afterRoom) {
@@ -175,6 +200,78 @@ async function applyTempChatCompletionProgress({ uid, roomId, completedAtMs }) {
       taskId: TEMP_CHAT_TASK_ID,
       counted: didIncrement,
       completedAtMillis: completedAtMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+async function applyMutualLikeLongChatProgress({
+  uid,
+  roomId,
+  convertedAtMs,
+}) {
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) return;
+
+    const userData = userSnap.data() || {};
+    const timezone = normalizeTimezone(
+      userData?.reputationTimezone,
+      DEFAULT_REPUTATION_TIMEZONE
+    );
+    const convertedAt = new Date(convertedAtMs);
+    const dateKey = resolveDateKey({ timeZone: timezone, now: convertedAt });
+    const dailyRef = buildDailyRef(uid, dateKey);
+    const completionLogRef = dailyRef
+      .collection(MUTUAL_LIKE_LONG_CHAT_COMPLETION_LOGS_SUBCOLLECTION)
+      .doc(roomId);
+
+    const [dailySnap, completionLogSnap] = await Promise.all([
+      tx.get(dailyRef),
+      tx.get(completionLogRef),
+    ]);
+
+    if (completionLogSnap.exists) return;
+
+    const rawDaily = dailySnap.exists ? dailySnap.data() : null;
+    let daily = normalizeDailyDoc(rawDaily, { dateKey, timezone });
+
+    const task = daily.tasks[MUTUAL_LIKE_LONG_CHAT_TASK_ID];
+    if (!task) return;
+
+    const nextProgress = Math.min(task.target, task.progress + 1);
+    const didIncrement = nextProgress !== task.progress;
+
+    if (didIncrement) {
+      daily = {
+        ...daily,
+        tasks: {
+          ...daily.tasks,
+          [MUTUAL_LIKE_LONG_CHAT_TASK_ID]: {
+            ...task,
+            progress: nextProgress,
+          },
+        },
+      };
+    }
+
+    tx.set(
+      dailyRef,
+      buildDailyWritePayload({
+        daily,
+        includeCreatedAt: !dailySnap.exists,
+      }),
+      { merge: true }
+    );
+
+    tx.set(completionLogRef, {
+      roomId,
+      uid,
+      taskId: MUTUAL_LIKE_LONG_CHAT_TASK_ID,
+      counted: didIncrement,
+      convertedAtMillis: convertedAtMs,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
@@ -308,6 +405,37 @@ const progressTempChat3Rooms3MinutesTask = onDocumentUpdated(
   }
 );
 
+const progressMutualLikeLongChat5TimesTask = onDocumentUpdated(
+  "tempChats/{roomId}",
+  async (event) => {
+    const beforeRoom = event.data.before.data();
+    const afterRoom = event.data.after.data();
+    if (!afterRoom) return;
+
+    if (!shouldHandleMutualLikeLongChatConversion(beforeRoom, afterRoom)) {
+      return;
+    }
+    if (!hasMutualLikes(afterRoom)) return;
+
+    const participants = normalizeParticipants(
+      afterRoom.participants,
+      afterRoom.userA,
+      afterRoom.userB
+    );
+    if (participants.length === 0) return;
+
+    const roomId = event.params.roomId;
+    const convertedAtMs = resolveTempChatEndMillis(event, beforeRoom, afterRoom);
+    for (const uid of participants) {
+      await applyMutualLikeLongChatProgress({
+        uid,
+        roomId,
+        convertedAtMs,
+      });
+    }
+  }
+);
+
 const progressReceivedFiveStarRatingTask = onDocumentCreated(
   "chatRatings/{ratingId}",
   async (event) => {
@@ -397,5 +525,6 @@ const ensureUserReputationDailyDefaults = onDocumentCreated(
 module.exports = {
   ensureUserReputationDailyDefaults,
   progressTempChat3Rooms3MinutesTask,
+  progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
 };

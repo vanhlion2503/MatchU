@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/views/reputation/widget/build_app_usage_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_daily_task_card.dart';
+import 'package:matchu_app/views/reputation/widget/build_mutual_like_long_chat_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_received_fire_star_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_temp_chat_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/header_card.dart';
@@ -62,6 +63,7 @@ class ReputationView extends StatelessWidget {
         final loginTask = dailyState?.loginDailyTask;
         final appUsageTask = dailyState?.appUsage15MinutesTask;
         final tempChatTask = dailyState?.tempChat3Rooms3MinutesTask;
+        final mutualLikeLongChatTask = dailyState?.mutualLikeLongChat5TimesTask;
         final receivedFiveStarTask = dailyState?.receivedFiveStarRatingTask;
         final isClaimingLoginTask =
             reputationController.isClaimingTaskId.value == "loginDaily";
@@ -73,6 +75,9 @@ class ReputationView extends StatelessWidget {
         final isClaimingFiveStarTask =
             reputationController.isClaimingTaskId.value ==
             "receivedFiveStarRating";
+        final isClaimingMutualLikeLongChatTask =
+            reputationController.isClaimingTaskId.value ==
+            "mutualLikeLongChat5Times";
         final hasReachedMax =
             dailyState?.hasReachedMax ?? (reputationScore >= 100);
         final canEarnMore =
@@ -123,6 +128,18 @@ class ReputationView extends StatelessWidget {
                 onClaim:
                     () => reputationController.claimTask(
                       "tempChat3Rooms3Minutes",
+                    ),
+              ),
+              const SizedBox(height: 12),
+              buildMutualLikeLongChatTaskCard(
+                context: context,
+                textTheme: textTheme,
+                task: mutualLikeLongChatTask,
+                hasReachedMax: hasReachedMax,
+                isClaiming: isClaimingMutualLikeLongChatTask,
+                onClaim:
+                    () => reputationController.claimTask(
+                      "mutualLikeLongChat5Times",
                     ),
               ),
               const SizedBox(height: 12),

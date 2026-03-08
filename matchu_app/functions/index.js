@@ -24,6 +24,7 @@ const {
 const {
   ensureUserReputationDailyDefaults,
   progressTempChat3Rooms3MinutesTask,
+  progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
 } = require("./reputation/triggers");
 
@@ -39,5 +40,7 @@ exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
 exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;
 exports.progressTempChat3Rooms3MinutesTask = progressTempChat3Rooms3MinutesTask;
+exports.progressMutualLikeLongChat5TimesTask =
+  progressMutualLikeLongChat5TimesTask;
 exports.progressReceivedFiveStarRatingTask = progressReceivedFiveStarRatingTask;
 exports.moderateTempChatMessage = moderateTempChatMessage;

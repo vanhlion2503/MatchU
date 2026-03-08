@@ -30,7 +30,7 @@ Widget buildAppUsageTaskCard({
     final String subtitle =
         task == null
             ? "Theo thời gian sử dụng trong ngày"
-            : (task.claimed ? "Đã nhận thưởng hôm nay" : "Sử dụng app 30 phút");
+            : (task.claimed ? "Đã nhận thưởng hôm nay" : "Sử dụng app 15 phút");
 
     String buttonLabel;
     if (task == null) {
