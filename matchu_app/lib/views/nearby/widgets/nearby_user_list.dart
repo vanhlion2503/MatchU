@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_empty_state.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_user_card.dart';
+import 'package:matchu_app/views/nearby/widgets/nearby_user_list_shimmer.dart';
 
 class NearbyUserList extends StatelessWidget {
   final NearbyController controller;
@@ -16,7 +17,7 @@ class NearbyUserList extends StatelessWidget {
 
     return Obx(() {
       if (controller.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
+        return const NearbyUserListShimmer();
       }
 
       if (!controller.isLocationVisible.value) {
