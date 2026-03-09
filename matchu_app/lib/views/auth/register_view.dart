@@ -26,6 +26,7 @@ class _RegisterViewState extends State<RegisterView> {
     controllerRegis.passwordC.clear();
     controllerRegis.confirmPasswordC.clear();
     controllerRegis.otpC.clear();
+    controllerRegis.fullPhoneNumber.value = '';
   }
 
   @override

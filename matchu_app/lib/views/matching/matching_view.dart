@@ -258,7 +258,7 @@ class _MatchingViewState extends State<MatchingView>
     }
 
     return AnimatedBuilder(
-      animation: _lineController!,
+      animation: _lineController,
       builder: (context, _) {
         return Stack(
           alignment: Alignment.center,
@@ -267,7 +267,7 @@ class _MatchingViewState extends State<MatchingView>
               child: CustomPaint(
                 painter: DashedLinePainter(
                   color: color.outline.withOpacity(0.3),
-                  progress: _lineController!.value,
+                  progress: _lineController.value,
                 ),
               ),
             ),

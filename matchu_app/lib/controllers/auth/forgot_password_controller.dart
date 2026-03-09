@@ -39,8 +39,14 @@ class ForgotPasswordController extends GetxController {
         "Lỗi",
         firebaseErrorToVietnamese(e.code),
       );
+    } catch (e) {
+      Get.snackbar(
+        "Lỗi",
+        e.toString(),
+      );
+    } finally {
+      isLoading.value = false;
     }
-
   }
 
   @override

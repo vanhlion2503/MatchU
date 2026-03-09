@@ -33,6 +33,7 @@ class AuthGateController extends GetxController {
     // ============================
     if (user == null) {
       _navigated = false;
+      _box.remove('isRegistering');
       Get.offAllNamed('/welcome');
       return;
     }
@@ -64,8 +65,7 @@ class AuthGateController extends GetxController {
         }
         return;
       }
-
-      return;
+      _box.remove('isRegistering');
     }
 
     await user.getIdToken(true);

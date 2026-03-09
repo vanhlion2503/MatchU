@@ -108,7 +108,7 @@ class AuthController extends GetxController {
   //                      REGISTER ACCOUNT
   // =============================================================
   Future<void> register() async {
-    _box.write('isRegistering', true);
+    _box.remove('isRegistering');
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
@@ -124,6 +124,7 @@ class AuthController extends GetxController {
       return;
     }
 
+    _box.write('isRegistering', true);
     isLoadingRegister.value = true;
 
     try {
@@ -136,15 +137,21 @@ class AuthController extends GetxController {
         },
         onFailed: (errorMsg) {
           isLoadingRegister.value = false;
+          _box.remove('isRegistering');
           Get.snackbar("Đăng ký thất bại", errorMsg);
         },
       );
     } on FirebaseAuthException catch (e) {
       isLoadingRegister.value = false;
+      _box.remove('isRegistering');
       Get.snackbar(
         "Đăng ký thất bại",
         firebaseErrorToVietnamese(e.code),
       );
+    } catch (e) {
+      isLoadingRegister.value = false;
+      _box.remove('isRegistering');
+      Get.snackbar("Đăng ký thất bại", e.toString());
     }
   }
 
@@ -165,7 +172,7 @@ class AuthController extends GetxController {
       await user.reload();
       final refreshedUser = FirebaseAuth.instance.currentUser;
 
-      if (refreshedUser!.emailVerified) {
+      if (refreshedUser != null && refreshedUser.emailVerified) {
         isLoadingRegister.value = false;
         Get.toNamed('/enroll-phone');
       } else {
@@ -240,9 +247,12 @@ class AuthController extends GetxController {
       phonenumber: phone,
       onCodeSent: (verId) {
         enrollVerificationId = verId;
+        otpC.clear();
         startEnrollOtpTimer();
         isLoadingRegister.value = false;
-        Get.toNamed('/otp-enroll');
+        if (Get.currentRoute != '/otp-enroll') {
+          Get.toNamed('/otp-enroll');
+        }
       },
       onFailed: (msg) {
         isLoadingRegister.value = false;
@@ -281,8 +291,6 @@ class AuthController extends GetxController {
         smsCode: otpC.text.trim(),
       );
 
-      isLoadingRegister.value = false;
-
       await logoutC();
       _box.remove('isRegistering');
 
@@ -296,8 +304,11 @@ class AuthController extends GetxController {
       );
       Get.offAllNamed('/');
     } on FirebaseAuthException catch (e) {
-      isLoadingRegister.value = false;
       Get.snackbar("Lỗi OTP", firebaseErrorToVietnamese(e.code));
+    } catch (e) {
+      Get.snackbar("Lỗi OTP", e.toString());
+    } finally {
+      isLoadingRegister.value = false;
     }
   }
 
@@ -305,6 +316,8 @@ class AuthController extends GetxController {
   //                       LOGIN
   // =============================================================
   Future<void> loginC() async {
+    _box.remove('isRegistering');
+
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Nhập email và mật khẩu");
       return;
@@ -339,12 +352,27 @@ class AuthController extends GetxController {
       return;
     }
 
+    PhoneMultiFactorInfo? phoneHint;
+    for (final hint in _mfaException!.resolver.hints) {
+      if (hint is PhoneMultiFactorInfo) {
+        phoneHint = hint;
+        break;
+      }
+    }
+    final hintPhone = phoneHint?.phoneNumber.trim();
+    if (hintPhone != null && hintPhone.isNotEmpty) {
+      fullPhoneNumber.value = hintPhone;
+    }
+
     await _auth.resolveMfaLogin(
       e: _mfaException!,
       onCodeSent: (verId) {
         loginVerificationId = verId;
+        otpC.clear();
         startLoginOtpTimer();
-        Get.toNamed('/otp-login');
+        if (Get.currentRoute != '/otp-login') {
+          Get.toNamed('/otp-login');
+        }
       },
       onFailed: (msg) {
         Get.snackbar("Lỗi OTP", msg);

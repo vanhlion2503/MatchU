@@ -26,6 +26,7 @@ class _LoginViewState extends State<LoginView> {
     c.birthdayC.clear();
     c.nicknameC.clear();
     c.fullnameC.clear();
+    c.fullPhoneNumber.value = '';
 
   }
   @override

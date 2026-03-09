@@ -216,7 +216,17 @@ class AuthService {
   }) async {
     try {
       final resolver = e.resolver;
-      final phoneInfo = resolver.hints.first as PhoneMultiFactorInfo;
+      PhoneMultiFactorInfo? phoneInfo;
+      for (final hint in resolver.hints) {
+        if (hint is PhoneMultiFactorInfo) {
+          phoneInfo = hint;
+          break;
+        }
+      }
+      if (phoneInfo == null) {
+        onFailed("Không tìm thấy số điện thoại xác minh MFA.");
+        return;
+      }
 
       await _auth.verifyPhoneNumber(
         multiFactorInfo: phoneInfo,
