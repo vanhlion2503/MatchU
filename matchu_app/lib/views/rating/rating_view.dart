@@ -6,6 +6,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/rating/star_rating.dart';
 import 'package:matchu_app/views/report/report_bottom_sheet.dart';
 import 'package:matchu_app/widgets/circle_icon_button.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class RatingView extends StatelessWidget {
   RatingView({super.key});
@@ -24,10 +25,7 @@ class RatingView extends StatelessWidget {
           centerTitle: true,
           elevation: 0,
           automaticallyImplyLeading: false,
-          title: Text(
-            "Đánh giá",
-            style: theme.textTheme.headlineSmall,
-          ),
+          title: Text("Đánh giá", style: theme.textTheme.headlineSmall),
           leading: Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Center(
@@ -82,9 +80,10 @@ class RatingView extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark 
-                            ? AppTheme.darkBorder 
-                            : AppTheme.lightBorder, // màu viền
+                        color:
+                            Theme.of(context).brightness == Brightness.dark
+                                ? AppTheme.darkBorder
+                                : AppTheme.lightBorder, // màu viền
                         width: 2,
                       ),
                     ),
@@ -92,9 +91,12 @@ class RatingView extends StatelessWidget {
                       final key = controller.otherAnonymousAvatar.value;
                       return CircleAvatar(
                         radius: 50,
-                        backgroundImage: key == null
-                            ? const AssetImage("assets/anonymous/placeholder.png")
-                            : AssetImage("assets/anonymous/$key.png"),
+                        backgroundImage:
+                            key == null
+                                ? const AssetImage(
+                                  "assets/anonymous/placeholder.png",
+                                )
+                                : AssetImage("assets/anonymous/$key.png"),
                       );
                     }),
                   ),
@@ -118,15 +120,24 @@ class RatingView extends StatelessWidget {
                         size: 15,
                         color: Colors.white,
                       ),
-                    )),
+                    ),
+                  ),
                 ],
               ),
 
               SizedBox(height: 32),
 
-              Text(
-                "Người lạ",
-                style: theme.textTheme.headlineMedium,
+              Obx(
+                () => VerifiedNameRow(
+                  isVerified: controller.otherIsFaceVerified.value,
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  useFlexibleChild: false,
+                  child: Text(
+                    "Người lạ",
+                    style: theme.textTheme.headlineMedium,
+                  ),
+                ),
               ),
               const SizedBox(height: 14),
 
@@ -146,60 +157,69 @@ class RatingView extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: colorTheme.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Theme.of(context).brightness == Brightness.dark 
-                            ? AppTheme.darkBorder 
-                            : AppTheme.lightBorder,),
+                  border: Border.all(
+                    color:
+                        Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.darkBorder
+                            : AppTheme.lightBorder,
+                  ),
                 ),
 
                 child: Column(
                   children: [
-                    Obx(() => StarRating(
-                          rating: controller.rating.value,
-                          onChanged: (v) => controller.rating.value = v,
-                        )
+                    Obx(
+                      () => StarRating(
+                        rating: controller.rating.value,
+                        onChanged: (v) => controller.rating.value = v,
                       ),
+                    ),
                     const SizedBox(height: 12),
-                    Obx(() => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 6,
+                    Obx(
+                      () => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFFFC107).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          ratingText(controller.rating.value),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Color.fromARGB(255, 255, 147, 7),
+                            fontWeight: FontWeight.bold,
                           ),
-                          decoration: BoxDecoration(
-                            color: Color(0xFFFFC107).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            ratingText(controller.rating.value),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: Color.fromARGB(255, 255, 147, 7),
-                              fontWeight: FontWeight.bold
-                            ),
-                          ),
-                        )
+                        ),
                       ),
+                    ),
                   ],
                 ),
               ),
               const Spacer(),
-              
-              Obx(() => SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: controller.isSubmitting.value
-                      ? null
-                      : controller.submit,
-                  child: controller.isSubmitting.value
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text("Gửi đánh giá →"),
+
+              Obx(
+                () => SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed:
+                        controller.isSubmitting.value
+                            ? null
+                            : controller.submit,
+                    child:
+                        controller.isSubmitting.value
+                            ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            )
+                            : const Text("Gửi đánh giá →"),
+                  ),
                 ),
-              )),
+              ),
 
               const SizedBox(height: 46),
             ],
@@ -208,6 +228,7 @@ class RatingView extends StatelessWidget {
       ),
     );
   }
+
   String ratingText(double v) {
     switch (v.round()) {
       case 1:

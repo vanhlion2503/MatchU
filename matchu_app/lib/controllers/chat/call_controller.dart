@@ -17,6 +17,7 @@ enum CallUiState { idle, creating, ringing, connecting, active, ended, error }
 class CallEndedSummary {
   const CallEndedSummary({
     required this.peerName,
+    required this.isPeerVerified,
     required this.peerAvatarUrl,
     required this.durationSeconds,
     required this.roomChatId,
@@ -26,6 +27,7 @@ class CallEndedSummary {
   });
 
   final String peerName;
+  final bool isPeerVerified;
   final String peerAvatarUrl;
   final int durationSeconds;
   final String roomChatId;
@@ -46,6 +48,7 @@ class CallController extends GetxController {
   final RxnString currentRoomChatId = RxnString();
   final RxnString peerUserId = RxnString();
   final RxString peerName = 'Unknown user'.obs;
+  final RxBool peerIsFaceVerified = false.obs;
   final RxString peerAvatarUrl = ''.obs;
   final RxString callType = 'audio'.obs; // "audio" or "video"
   final RxBool isCaller = false.obs;
@@ -897,6 +900,7 @@ class CallController extends GetxController {
 
     return CallEndedSummary(
       peerName: safeName.isNotEmpty ? safeName : 'Unknown user',
+      isPeerVerified: peerIsFaceVerified.value,
       peerAvatarUrl: peerAvatarUrl.value,
       durationSeconds: callDurationSeconds.value,
       roomChatId: currentRoomChatId.value ?? '',
@@ -942,6 +946,7 @@ class CallController extends GetxController {
     currentRoomChatId.value = null;
     peerUserId.value = null;
     peerName.value = 'Unknown user';
+    peerIsFaceVerified.value = false;
     peerAvatarUrl.value = '';
     callType.value = 'audio';
     isCaller.value = false;
@@ -995,6 +1000,7 @@ class CallController extends GetxController {
   Future<void> _loadPeerInfo(String uid) async {
     if (uid.isEmpty) {
       peerName.value = 'Unknown user';
+      peerIsFaceVerified.value = false;
       peerAvatarUrl.value = '';
       return;
     }
@@ -1005,6 +1011,7 @@ class CallController extends GetxController {
       if (cached != null) {
         final name = cached.fullname.trim();
         peerName.value = name.isNotEmpty ? name : cached.nickname;
+        peerIsFaceVerified.value = cached.isFaceVerified;
         peerAvatarUrl.value = cached.avatarUrl;
         return;
       }
@@ -1016,6 +1023,7 @@ class CallController extends GetxController {
 
     final name = user.fullname.trim();
     peerName.value = name.isNotEmpty ? name : user.nickname;
+    peerIsFaceVerified.value = user.isFaceVerified;
     peerAvatarUrl.value = user.avatarUrl;
   }
 

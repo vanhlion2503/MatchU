@@ -40,6 +40,7 @@ class CallView extends GetView<CallController> {
           final isCaller = controller.isCaller.value;
           final isVideo = controller.isVideoCall;
           final peerName = controller.peerName.value;
+          final peerVerified = controller.peerIsFaceVerified.value;
           final avatarUrl = controller.peerAvatarUrl.value;
           final statusText = controller.callStatusText;
           final isOutgoingWaiting =
@@ -57,6 +58,7 @@ class CallView extends GetView<CallController> {
                           avatarUrl: avatarUrl,
                           title: peerName,
                           subtitle: statusText,
+                          isVerified: peerVerified,
                         )
                         : (isVideo
                             ? CallVideoLayer(controller: controller)
@@ -64,6 +66,7 @@ class CallView extends GetView<CallController> {
                               avatarUrl: avatarUrl,
                               title: peerName,
                               subtitle: statusText,
+                              isVerified: peerVerified,
                             )),
               ),
               if (!isOutgoingWaiting && isVideo)
@@ -71,7 +74,11 @@ class CallView extends GetView<CallController> {
                   left: 20,
                   right: 20,
                   top: safePadding.top + 16,
-                  child: CallHeaderInfo(title: peerName, subtitle: statusText),
+                  child: CallHeaderInfo(
+                    title: peerName,
+                    subtitle: statusText,
+                    isVerified: peerVerified,
+                  ),
                 ),
               if (isVideo && !isOutgoingWaiting)
                 Positioned(

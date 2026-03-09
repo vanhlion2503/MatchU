@@ -11,7 +11,7 @@ import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_playing_ba
 import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
-
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class TempChatView extends StatelessWidget {
   @override
@@ -22,7 +22,7 @@ class TempChatView extends StatelessWidget {
     final controller = Get.put(TempChatController(roomId), tag: roomId);
 
     // final matchController = Get.find<MatchingController>();
-    
+
     controller.onOtherLiked = () {
       HeartRainOverlay.show(
         context,
@@ -49,9 +49,8 @@ class TempChatView extends StatelessWidget {
             final progress = (sec / total).clamp(0.0, 1.0);
             final isDanger = sec <= 30;
 
-            final color = isDanger
-                ? theme.colorScheme.error
-                : theme.colorScheme.primary;
+            final color =
+                isDanger ? theme.colorScheme.error : theme.colorScheme.primary;
 
             return SizedBox(
               height: 2,
@@ -64,7 +63,6 @@ class TempChatView extends StatelessWidget {
             );
           }),
         ),
-
 
         /// ================= TITLE =================
         title: Obx(() {
@@ -83,9 +81,12 @@ class TempChatView extends StatelessWidget {
                     CircleAvatar(
                       radius: 22,
                       backgroundColor: theme.colorScheme.surfaceVariant,
-                      backgroundImage: key == null
-                          ? const AssetImage("assets/anonymous/placeholder.png")
-                          : AssetImage("assets/anonymous/$key.png"),
+                      backgroundImage:
+                          key == null
+                              ? const AssetImage(
+                                "assets/anonymous/placeholder.png",
+                              )
+                              : AssetImage("assets/anonymous/$key.png"),
                     ),
                     Positioned(
                       right: 1,
@@ -118,20 +119,24 @@ class TempChatView extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            "Người lạ",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
+                          child: VerifiedNameRow(
+                            isVerified: controller.otherIsFaceVerified.value,
+                            mainAxisSize: MainAxisSize.min,
+                            useFlexibleChild: false,
+                            child: Text(
+                              "Người lạ",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Obx(() => genderIcon(
-                              controller.otherGender.value,
-                              theme,
-                            )),
+                        Obx(
+                          () => genderIcon(controller.otherGender.value, theme),
+                        ),
                       ],
                     ),
 
@@ -198,14 +203,16 @@ class TempChatView extends StatelessWidget {
             final minutes = sec ~/ 60;
             final seconds = sec % 60;
 
-            final color = isDanger
-                ? theme.colorScheme.error
-                : theme.colorScheme.primary;
+            final color =
+                isDanger ? theme.colorScheme.error : theme.colorScheme.primary;
 
             return Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(16),
@@ -223,7 +230,6 @@ class TempChatView extends StatelessWidget {
           }),
         ],
       ),
-
 
       body: SafeArea(
         child: Stack(
@@ -247,4 +253,3 @@ class TempChatView extends StatelessWidget {
     );
   }
 }
-

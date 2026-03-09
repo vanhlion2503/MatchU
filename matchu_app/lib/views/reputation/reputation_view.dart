@@ -91,6 +91,7 @@ class ReputationView extends StatelessWidget {
               buildHeaderCard(
                 textTheme: textTheme,
                 fullName: profileController.fullName,
+                isVerified: user.isFaceVerified,
                 rank: profileController.rank,
                 avatarUrl: user.avatarUrl,
                 avatarVersion: user.updatedAt?.millisecondsSinceEpoch ?? 0,

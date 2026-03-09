@@ -11,11 +11,13 @@ class CallOutgoingWaitingView extends StatelessWidget {
     required this.avatarUrl,
     required this.title,
     required this.subtitle,
+    required this.isVerified,
   });
 
   final String avatarUrl;
   final String title;
   final String subtitle;
+  final bool isVerified;
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +79,9 @@ class CallOutgoingWaitingView extends StatelessWidget {
                         radius: 60,
                         backgroundColor: AppTheme.darkBorder,
                         backgroundImage:
-                            avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                            avatarUrl.isNotEmpty
+                                ? NetworkImage(avatarUrl)
+                                : null,
                         child:
                             avatarUrl.isEmpty
                                 ? const Icon(
@@ -90,7 +94,11 @@ class CallOutgoingWaitingView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  CallHeaderInfo(title: title, subtitle: subtitle),
+                  CallHeaderInfo(
+                    title: title,
+                    subtitle: subtitle,
+                    isVerified: isVerified,
+                  ),
                   const Spacer(flex: 3),
                 ],
               ),

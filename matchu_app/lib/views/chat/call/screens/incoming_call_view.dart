@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/call/widgets/incoming_call_action_button.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 import 'package:simple_ripple_animation/simple_ripple_animation.dart';
 
 class IncomingCallView extends GetView<CallController> {
@@ -111,12 +112,19 @@ class IncomingCallView extends GetView<CallController> {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            Text(
-                              controller.peerName.value,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
+                            VerifiedNameRow(
+                              isVerified: controller.peerIsFaceVerified.value,
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              useFlexibleChild: false,
+                              badgeColor: Colors.white,
+                              child: Text(
+                                controller.peerName.value,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                             const SizedBox(height: 8),

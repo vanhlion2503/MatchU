@@ -10,6 +10,7 @@ import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/profile/avatar_fullscreen_view.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class OtherProfileView extends StatelessWidget {
   final String userId;
@@ -153,28 +154,17 @@ class OtherProfileView extends StatelessWidget {
               const SizedBox(height: 10),
 
               // ================= NAME =================
-              Row(
+              VerifiedNameRow(
+                isVerified: u.isFaceVerified,
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      u.fullname,
-                      style: textTheme.headlineSmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  if (u.isFaceVerified)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 6),
-                      child: Icon(
-                        Icons.verified_rounded,
-                        size: 20,
-                        color: Colors.blue,
-                      ),
-                    ),
-                ],
+                badgeSize: 20,
+                child: Text(
+                  u.fullname,
+                  style: textTheme.headlineSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ),
               if (!u.isFaceVerified)
                 Padding(

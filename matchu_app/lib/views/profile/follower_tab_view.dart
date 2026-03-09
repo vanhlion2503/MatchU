@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/profile/followers_controller.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
+
 class FollowersView extends StatelessWidget {
   final String userId;
 
@@ -33,7 +35,7 @@ class FollowersView extends StatelessWidget {
             onTap: () {
               Get.to(
                 () => OtherProfileView(userId: u.uid),
-                preventDuplicates: false,  
+                preventDuplicates: false,
               );
             },
             child: Padding(
@@ -46,37 +48,47 @@ class FollowersView extends StatelessWidget {
                       // Avatar
                       CircleAvatar(
                         radius: 26,
-                        backgroundImage: u.avatarUrl.isNotEmpty
-                            ? CachedNetworkImageProvider(u.avatarUrl)
-                            : null,
-                        child: u.avatarUrl.isEmpty
-                            ? Text(u.nickname[0].toUpperCase())
-                            : null,
+                        backgroundImage:
+                            u.avatarUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(u.avatarUrl)
+                                : null,
+                        child:
+                            u.avatarUrl.isEmpty
+                                ? Text(u.nickname[0].toUpperCase())
+                                : null,
                       ),
-                  
+
                       const SizedBox(width: 12),
-                  
+
                       // Name + Nickname
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              u.fullname, 
-                              style: textTheme.titleMedium?.copyWith(
-                                color: Theme.of(context).brightness == Brightness.dark 
-                                  ? AppTheme.darkTextPrimary 
-                                  : AppTheme.lightTextPrimary,
-                                
-                                fontWeight: FontWeight.w800
-                              )
+                            VerifiedNameRow(
+                              isVerified: u.isFaceVerified,
+                              child: Text(
+                                u.fullname,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.titleMedium?.copyWith(
+                                  color:
+                                      Theme.of(context).brightness ==
+                                              Brightness.dark
+                                          ? AppTheme.darkTextPrimary
+                                          : AppTheme.lightTextPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
+                            ),
                             Text(
                               "@${u.nickname}",
                               style: textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).brightness == Brightness.dark 
-                                  ? AppTheme.darkTextPrimary 
-                                  : AppTheme.lightTextPrimary,
+                                color:
+                                    Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? AppTheme.darkTextPrimary
+                                        : AppTheme.lightTextPrimary,
                               ),
                             ),
                           ],

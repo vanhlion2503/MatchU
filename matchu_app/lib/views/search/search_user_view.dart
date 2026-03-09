@@ -5,10 +5,10 @@ import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class SearchUserView extends StatelessWidget {
   SearchUserView({super.key});
-  
 
   final SearchUserController suc = Get.find();
 
@@ -29,54 +29,57 @@ class SearchUserView extends StatelessWidget {
             iconSize: 20,
           ),
         ),
-        title: Text(
-          "Tìm bạn bè",
-          style: textTheme.headlineMedium,
-          )
-        ),
+        title: Text("Tìm bạn bè", style: textTheme.headlineMedium),
+      ),
       body: SafeArea(
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Obx(() => TextField(
-                focusNode: suc.searchFocus,
-                onChanged: (value) => suc.searchUser(value),
-                decoration: InputDecoration(
-                  hintText: "Nhập nickname...",
-                  prefixIcon: Icon(Icons.search),
-                  filled: true,
-                  fillColor: suc.isFocused.value 
-                      ? theme.colorScheme.background                     
-                      : (theme.brightness == Brightness.dark 
-                          ? AppTheme.darkBorder 
-                          : AppTheme.lightBorder).withOpacity(0.5),
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 12,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: theme.brightness == Brightness.dark 
-                          ? AppTheme.darkBorder 
-                          : AppTheme.lightBorder,
+              child: Obx(
+                () => TextField(
+                  focusNode: suc.searchFocus,
+                  onChanged: (value) => suc.searchUser(value),
+                  decoration: InputDecoration(
+                    hintText: "Nhập nickname...",
+                    prefixIcon: Icon(Icons.search),
+                    filled: true,
+                    fillColor:
+                        suc.isFocused.value
+                            ? theme.colorScheme.background
+                            : (theme.brightness == Brightness.dark
+                                    ? AppTheme.darkBorder
+                                    : AppTheme.lightBorder)
+                                .withOpacity(0.5),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 12,
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: theme.brightness == Brightness.dark 
-                          ? AppTheme.darkBorder 
-                          : AppTheme.lightBorder,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color:
+                            theme.brightness == Brightness.dark
+                                ? AppTheme.darkBorder
+                                : AppTheme.lightBorder,
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: AppTheme.primaryColor),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color:
+                            theme.brightness == Brightness.dark
+                                ? AppTheme.darkBorder
+                                : AppTheme.lightBorder,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: AppTheme.primaryColor),
+                    ),
                   ),
                 ),
-              ))
+              ),
             ),
             Expanded(
               child: Obx(() {
@@ -90,14 +93,16 @@ class SearchUserView extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.person_search, 
-                          size: 50, 
+                          Icons.person_search,
+                          size: 50,
                           color: theme.textTheme.bodySmall?.color,
                         ),
                         SizedBox(height: 10),
                         Text(
                           "Không tìm thấy người dùng",
-                          style: TextStyle(color: theme.textTheme.bodySmall?.color),
+                          style: TextStyle(
+                            color: theme.textTheme.bodySmall?.color,
+                          ),
                         ),
                       ],
                     ),
@@ -109,7 +114,11 @@ class SearchUserView extends StatelessWidget {
                   children: [
                     // =============== TITLE: KẾT QUẢ TÌM KIẾM ===============
                     Padding(
-                      padding: const EdgeInsets.only(left: 18, bottom: 8, top: 10),
+                      padding: const EdgeInsets.only(
+                        left: 18,
+                        bottom: 8,
+                        top: 10,
+                      ),
                       child: Text(
                         "Kết quả tìm kiếm",
                         style: textTheme.bodySmall!.copyWith(
@@ -122,7 +131,10 @@ class SearchUserView extends StatelessWidget {
                     // =============== LIST USER ===============
                     Expanded(
                       child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
                         itemCount: suc.results.length,
                         itemBuilder: (_, index) {
                           final user = suc.results[index];
@@ -130,7 +142,7 @@ class SearchUserView extends StatelessWidget {
                           return GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
-                              Get.to(()=> OtherProfileView(userId: user.uid));
+                              Get.to(() => OtherProfileView(userId: user.uid));
                             },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -139,36 +151,52 @@ class SearchUserView extends StatelessWidget {
                                   // AVATAR
                                   CircleAvatar(
                                     radius: 26,
-                                    backgroundImage: user.avatarUrl.isNotEmpty
-                                        ? CachedNetworkImageProvider(user.avatarUrl)
-                                        : null,
-                                    child: user.avatarUrl.isEmpty
-                                        ? Text(
-                                            user.nickname[0].toUpperCase(),
-                                            style: textTheme.bodyLarge?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          )
-                                        : null,
+                                    backgroundImage:
+                                        user.avatarUrl.isNotEmpty
+                                            ? CachedNetworkImageProvider(
+                                              user.avatarUrl,
+                                            )
+                                            : null,
+                                    child:
+                                        user.avatarUrl.isEmpty
+                                            ? Text(
+                                              user.nickname[0].toUpperCase(),
+                                              style: textTheme.bodyLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            )
+                                            : null,
                                   ),
-                            
+
                                   SizedBox(width: 12),
-                            
+
                                   // NAME & USERNAME
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          user.fullname,
-                                          style: textTheme.bodyLarge?.copyWith(
-                                            fontWeight: FontWeight.w600,
+                                        VerifiedNameRow(
+                                          isVerified: user.isFaceVerified,
+                                          child: Text(
+                                            user.fullname,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: textTheme.bodyLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
                                           ),
                                         ),
                                         Text(
                                           "@${user.nickname}",
                                           style: textTheme.bodyMedium?.copyWith(
-                                            color: theme.textTheme.bodySmall?.color,
+                                            color:
+                                                theme
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.color,
                                           ),
                                         ),
                                       ],
@@ -180,15 +208,14 @@ class SearchUserView extends StatelessWidget {
                           );
                         },
                       ),
-                    )
+                    ),
                   ],
                 );
               }),
-            )
-
+            ),
           ],
         ),
-      )
+      ),
     );
   }
 }

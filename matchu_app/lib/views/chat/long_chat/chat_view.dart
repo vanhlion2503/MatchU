@@ -10,6 +10,7 @@ import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/utils/presence_utils.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_body.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class ChatView extends StatelessWidget {
   const ChatView({super.key});
@@ -120,12 +121,16 @@ class ChatView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        otherUser?.fullname ?? "Người dùng",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      VerifiedNameRow(
+                        isVerified: otherUser?.isFaceVerified == true,
+                        badgeSize: 16,
+                        child: Text(
+                          otherUser?.fullname ?? "Người dùng",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       Text(

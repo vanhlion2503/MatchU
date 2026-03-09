@@ -11,6 +11,7 @@ import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
@@ -33,9 +34,7 @@ class ProfileView extends StatelessWidget {
 
         // ====== KHÔNG CÓ USER ======
         if (c.user.value == null) {
-          return const Center(
-            child: Text("Không tìm thấy hồ sơ người dùng."),
-          );
+          return const Center(child: Text("Không tìm thấy hồ sơ người dùng."));
         }
         final user = c.user.value!;
         return SingleChildScrollView(
@@ -175,28 +174,17 @@ class ProfileView extends StatelessWidget {
               const SizedBox(height: 10),
 
               // ---------------- NAME ----------------
-              Row(
+              VerifiedNameRow(
+                isVerified: user.isFaceVerified,
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: Text(
-                      c.fullName,
-                      style: textTheme.headlineSmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  if (user.isFaceVerified)
-                    const Padding(
-                      padding: EdgeInsets.only(left: 6),
-                      child: Icon(
-                        Icons.verified_rounded,
-                        size: 20,
-                        color: Colors.blue,
-                      ),
-                    ),
-                ],
+                badgeSize: 20,
+                child: Text(
+                  c.fullName,
+                  style: textTheme.headlineSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ),
 
               if (!user.isFaceVerified)
@@ -233,9 +221,7 @@ class ProfileView extends StatelessWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 30),
                         child: Text(
-                          c.bio.isNotEmpty
-                              ? c.bio
-                              : "Chưa có mô tả bản thân.",
+                          c.bio.isNotEmpty ? c.bio : "Chưa có mô tả bản thân.",
                           textAlign: TextAlign.center,
                           style: textTheme.bodyMedium?.copyWith(
                             color:
@@ -306,6 +292,7 @@ class ProfileView extends StatelessWidget {
               InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () => Get.toNamed(AppRouter.reputation),
+                overlayColor: WidgetStatePropertyAll(Colors.transparent),
                 child: Card(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   child: Padding(

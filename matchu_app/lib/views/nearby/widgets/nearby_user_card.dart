@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/nearby_user_vm.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class NearbyUserCard extends StatelessWidget {
   final NearbyUserVM user;
 
-  const NearbyUserCard({
-    super.key,
-    required this.user,
-  });
+  const NearbyUserCard({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -58,13 +56,16 @@ class NearbyUserCard extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
+                          child: VerifiedNameRow(
+                            isVerified: user.isFaceVerified,
+                            child: Text(
+                              fullName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
                             ),
                           ),
                         ),
@@ -74,7 +75,7 @@ class NearbyUserCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "@"+nickname,
+                      "@" + nickname,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
@@ -118,17 +119,18 @@ class _Avatar extends StatelessWidget {
           backgroundColor: colorScheme.surfaceVariant,
           backgroundImage:
               avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-          child: avatarUrl.isEmpty
-              ? Text(
-                  displayName.isEmpty
-                      ? "U"
-                      : displayName.substring(0, 1).toUpperCase(),
-                  style: textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                )
-              : null,
+          child:
+              avatarUrl.isEmpty
+                  ? Text(
+                    displayName.isEmpty
+                        ? "U"
+                        : displayName.substring(0, 1).toUpperCase(),
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  )
+                  : null,
         ),
         Positioned(
           bottom: 0,
@@ -137,14 +139,10 @@ class _Avatar extends StatelessWidget {
             width: 12,
             height: 12,
             decoration: BoxDecoration(
-              color: isOnline
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
+              color:
+                  isOnline ? colorScheme.primary : colorScheme.outlineVariant,
               shape: BoxShape.circle,
-              border: Border.all(
-                color: colorScheme.surface,
-                width: 2,
-              ),
+              border: Border.all(color: colorScheme.surface, width: 2),
             ),
           ),
         ),
@@ -156,9 +154,7 @@ class _Avatar extends StatelessWidget {
 class _DistanceBadge extends StatelessWidget {
   final double distanceKm;
 
-  const _DistanceBadge({
-    required this.distanceKm,
-  });
+  const _DistanceBadge({required this.distanceKm});
 
   @override
   Widget build(BuildContext context) {

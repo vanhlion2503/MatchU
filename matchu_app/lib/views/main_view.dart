@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
+import 'package:matchu_app/services/security/passcode_backup_service.dart';
+import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/views/chat/random_chat_view.dart';
 import 'package:matchu_app/views/game/game_view.dart';
 import 'package:matchu_app/views/home_view.dart';
@@ -27,6 +31,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
   late Animation<double> _boltSlideAnimation;
   late Animation<double> _boltRotateAnimation;
   late Animation<double> _glowOpacityAnimation;
+  bool _passcodeChecked = false;
 
   final List<Widget> pages = [
     HomeView(),
@@ -77,6 +82,80 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
       begin: 0.18,
       end: 0.34,
     ).animate(idleCurve);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensurePasscodeFlow();
+    });
+  }
+
+  Future<void> _ensurePasscodeFlow() async {
+    if (_passcodeChecked) return;
+    _passcodeChecked = true;
+
+    final historyLocked = await PasscodeBackupService.isHistoryLocked();
+    if (historyLocked) return;
+
+    final hasLocal = await PasscodeBackupService.hasLocalBackupKey();
+    if (hasLocal) return;
+
+    final hasBackup = await PasscodeBackupService.hasBackupOnServer();
+    if (!mounted) return;
+
+    if (!hasBackup) {
+      final passcode = await showPasscodeSetupDialog(context);
+      if (passcode == null || passcode.isEmpty) return;
+      await PasscodeBackupService.setPasscode(passcode);
+      return;
+    }
+
+    String? errorText;
+    while (mounted) {
+      if (!mounted) return;
+      final result = await showPasscodeUnlockDialog(
+        context,
+        errorText: errorText,
+      );
+
+      if (result == null) return;
+
+      if (result.action == PasscodePromptAction.skipped) {
+        await PasscodeBackupService.setHistoryLocked(true);
+        return;
+      }
+
+      if (result.action == PasscodePromptAction.reset) {
+        if (!mounted) return;
+        final confirm = await showPasscodeResetConfirmDialog(context);
+        if (!confirm) return;
+
+        await PasscodeBackupService.resetPasscode();
+        if (Get.isRegistered<ChatListController>()) {
+          Get.find<ChatListController>().clearPreviewCache();
+        }
+
+        if (!mounted) return;
+        final newPasscode = await showPasscodeSetupDialog(context);
+        if (newPasscode == null || newPasscode.isEmpty) return;
+        await PasscodeBackupService.setPasscode(newPasscode, lockHistory: true);
+        return;
+      }
+
+      final passcode = result.passcode ?? '';
+      final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
+      if (!unlocked) {
+        errorText = 'Mã pin không đúng';
+        continue;
+      }
+
+      final restoredRooms = await PasscodeBackupService.restoreAllSessionKeys();
+      for (final roomId in restoredRooms) {
+        SessionKeyService.notifyUpdated(roomId);
+      }
+      if (restoredRooms.isNotEmpty && Get.isRegistered<ChatListController>()) {
+        await Get.find<ChatListController>().refreshLastMessagePreviews();
+      }
+      return;
+    }
   }
 
   @override

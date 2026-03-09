@@ -5,6 +5,7 @@ class NearbyUserVM {
   final String avatarUrl;
   final double distanceKm;
   final String activeStatus;
+  final bool isFaceVerified;
 
   NearbyUserVM({
     required this.uid,
@@ -13,5 +14,6 @@ class NearbyUserVM {
     required this.avatarUrl,
     required this.distanceKm,
     required this.activeStatus,
+    required this.isFaceVerified,
   });
 }

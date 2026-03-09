@@ -448,7 +448,7 @@ class _RandomChatViewState extends State<RandomChatView>
               children: [
                 const SizedBox(height: 16),
                 Text(
-                  'Trò chuyện ngay',
+                  'Làm quen ngay',
                   style: theme.textTheme.headlineMedium?.copyWith(fontSize: 26),
                 ),
                 const SizedBox(height: 8),
