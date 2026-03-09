@@ -52,7 +52,7 @@ class NearbyUserList extends StatelessWidget {
 
           final user = items[index - 1];
           return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 0),
             child: NearbyUserCard(user: user),
           );
         },

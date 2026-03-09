@@ -19,9 +19,9 @@ class NearbyUserCard extends StatelessWidget {
     final nickname = user.nickname.isNotEmpty ? user.nickname : fullName;
 
     return Material(
-      color: colorScheme.surface,
+      color: Theme.of(context).scaffoldBackgroundColor,
       borderRadius: BorderRadius.circular(20),
-      elevation: 2,
+      elevation: 0,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () {
@@ -29,17 +29,7 @@ class NearbyUserCard extends StatelessWidget {
           Get.to(() => OtherProfileView(userId: user.uid));
         },
         child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -142,7 +132,10 @@ class _Avatar extends StatelessWidget {
               color:
                   isOnline ? colorScheme.primary : colorScheme.outlineVariant,
               shape: BoxShape.circle,
-              border: Border.all(color: colorScheme.surface, width: 2),
+              border: Border.all(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                width: 2,
+              ),
             ),
           ),
         ),
