@@ -8,6 +8,7 @@ import 'package:matchu_app/views/reputation/widget/build_mutual_like_long_chat_t
 import 'package:matchu_app/views/reputation/widget/build_received_fire_star_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_temp_chat_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/header_card.dart';
+import 'package:matchu_app/views/reputation/widget/reputation_view_shimmer.dart';
 
 class ReputationView extends StatelessWidget {
   const ReputationView({super.key});
@@ -45,7 +46,7 @@ class ReputationView extends StatelessWidget {
             (reputationController.isLoading.value && dailyState == null);
 
         if (isInitialLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const ReputationViewShimmer();
         }
 
         if (user == null) {
@@ -83,6 +84,7 @@ class ReputationView extends StatelessWidget {
         final canEarnMore =
             dailyState?.canEarnMore ??
             (!hasReachedMax && safeClaimed < safeCap);
+        final remainingToday = (safeCap - safeClaimed).clamp(0, safeCap);
 
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
@@ -101,6 +103,36 @@ class ReputationView extends StatelessWidget {
                 progress: todayProgress,
               ),
               const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Nhiệm vụ hôm nay",
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      "$remainingToday điểm còn lại",
+                      style: textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               buildDailyTaskCard(
                 context: context,
                 textTheme: textTheme,

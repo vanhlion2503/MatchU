@@ -305,12 +305,7 @@ class ProfileView extends StatelessWidget {
                           children: [
                             Text(
                               "Điểm uy tín",
-                              style: textTheme.titleMedium?.copyWith(
-                                color:
-                                    Theme.of(context).brightness ==
-                                            Brightness.dark
-                                        ? AppTheme.darkTextPrimary
-                                        : AppTheme.lightTextPrimary,
+                              style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -373,9 +368,7 @@ class ProfileView extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 "Giữ cách trò chuyện lịch sự để tăng độ uy tín và mở khóa nhiều tính năng hơn.",
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: theme.textTheme.bodySmall?.color,
-                                ),
+                                style: textTheme.bodySmall
                               ),
                             ),
                           ],
