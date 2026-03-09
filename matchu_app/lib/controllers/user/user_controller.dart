@@ -6,7 +6,6 @@ import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 
-
 class UserController extends GetxController {
   final UserService _service = UserService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -42,27 +41,27 @@ class UserController extends GetxController {
           Get.find<ChatUserCacheController>().clearAll();
         }
       } else {
+        userRx.value = null;
         _bindUser(u.uid);
         startHeartbeat();
       }
     });
-
   }
 
   void startHeartbeat() {
     _heartbeat?.cancel();
 
-    _heartbeat = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) {
-        if (user == null) return;
+    _heartbeat = Timer.periodic(const Duration(seconds: 60), (_) async {
+      final currentUid = _auth.currentUser?.uid;
+      if (currentUid == null) return;
 
-        _service.updateUser(user!.uid, {
+      try {
+        await _service.updateUser(currentUid, {
           "lastActiveAt": FieldValue.serverTimestamp(),
           "activeStatus": "online",
         });
-      },
-    );
+      } catch (_) {}
+    });
   }
 
   // ====================================================
@@ -76,37 +75,36 @@ class UserController extends GetxController {
 
     // 🔒 thử get 1 lần trước
     try {
-      final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
+      final snap =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
       if (!snap.exists) return;
     } catch (e) {
       return;
     }
 
-    _userSub = _service.streamUser(uid).listen(
-      (user) {
-        // 🔒 Kiểm tra lại user còn đăng nhập không khi nhận data
-        if (_auth.currentUser == null) {
-          _userSub?.cancel();
-          userRx.value = null;
-          return;
-        }
-        userRx.value = user;
-      },
-      onError: (error) {
-        // 🔒 Handle permission denied và các lỗi khác
-        // Không crash app, chỉ cancel stream và clear state
-        _userSub?.cancel();
-        _userSub = null;
-        userRx.value = null;
-      },
-      cancelOnError: false, // Không tự động cancel để có thể handle
-    );
+    _userSub = _service
+        .streamUser(uid)
+        .listen(
+          (user) {
+            // 🔒 Kiểm tra lại user còn đăng nhập không khi nhận data
+            if (_auth.currentUser == null) {
+              _userSub?.cancel();
+              userRx.value = null;
+              return;
+            }
+            userRx.value = user;
+          },
+          onError: (error) {
+            // 🔒 Handle permission denied và các lỗi khác
+            // Không crash app, chỉ cancel stream và clear state
+            _userSub?.cancel();
+            _userSub = null;
+            userRx.value = null;
+          },
+          cancelOnError: false, // Không tự động cancel để có thể handle
+        );
   }
-
 
   // ====================================================
   // GETTERS TIỆN DÙNG CHO UI
@@ -124,8 +122,9 @@ class UserController extends GetxController {
   // 🔥 UPDATE PROFILE (MERGE)
   // ====================================================
   Future<void> updateProfile(Map<String, dynamic> data) async {
-    if (user == null) return;
-    await _service.updateUser(user!.uid, data);
+    final currentUid = _auth.currentUser?.uid;
+    if (currentUid == null) return;
+    await _service.updateUser(currentUid, data);
   }
 
   // ====================================================

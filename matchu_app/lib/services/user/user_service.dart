@@ -40,7 +40,7 @@ class UserService {
   // 🔥 UPDATE USER (MERGE SAFELY)
   // ================================================================
   Future<void> updateUser(String uid, Map<String, dynamic> data) async {
-    await _db.collection("users").doc(uid).set(data, SetOptions(merge: true));
+    await _db.collection("users").doc(uid).update(data);
   }
 
   // ================================================================

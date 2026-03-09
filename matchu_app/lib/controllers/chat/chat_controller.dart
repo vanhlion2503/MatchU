@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
@@ -987,6 +988,8 @@ class ChatController extends GetxController {
     _isEnsuringKey = true;
 
     try {
+      await IdentityKeyService.generateIfNotExists();
+
       final roomSnap = await _service.getRoom(roomId);
       final data = roomSnap.data();
       if (data == null) return;

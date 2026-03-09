@@ -486,7 +486,8 @@ service cloud.firestore {
             "deletedFor",
             "typing",
             "currentKeyId",
-            "currentKeyUpdatedAt"
+            "currentKeyUpdatedAt",
+            "sessionKeyLocks"
           ]);
       
        // ===============================

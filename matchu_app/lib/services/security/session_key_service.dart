@@ -18,6 +18,7 @@ class SessionKeyService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
   static final _storage = FlutterSecureStorage();
+  static const int _keyCreationLockTtlMs = 20000;
 
   static String get uid => _auth.currentUser!.uid;
   static final Map<String, StreamController<void>> _keyUpdateControllers = {};
@@ -40,7 +41,20 @@ class SessionKeyService {
     return "chat_${roomId}_session_key_$keyId";
   }
 
-  static String _sessionKeyDocId(String deviceId, int keyId) {
+  static String _sessionKeyDocId({
+    required String participantUid,
+    required String deviceId,
+    required int keyId,
+  }) {
+    final base = "${participantUid}_$deviceId";
+    if (keyId == 0) return base;
+    return "${base}_$keyId";
+  }
+
+  static String _legacySessionKeyDocId({
+    required String deviceId,
+    required int keyId,
+  }) {
     if (keyId == 0) return deviceId;
     return "${deviceId}_$keyId";
   }
@@ -58,13 +72,9 @@ class SessionKeyService {
   /// ===============================
   /// STEP 2 — RSA ENCRYPT
   /// ===============================
-  static Uint8List _rsaEncrypt(
-    Uint8List data,
-    RSAPublicKey publicKey,
-  ) {
+  static Uint8List _rsaEncrypt(Uint8List data, RSAPublicKey publicKey) {
     final cipher = OAEPEncoding.withSHA256(RSAEngine())
-    ..init(true, PublicKeyParameter<RSAPublicKey>(publicKey));
-
+      ..init(true, PublicKeyParameter<RSAPublicKey>(publicKey));
 
     return _processInBlocks(cipher, data);
   }
@@ -91,62 +101,84 @@ class SessionKeyService {
     // 🔒 QUAN TRỌNG: Kiểm tra xem room đã có session keys trong Firestore chưa
     // Nếu đã có → không tạo key mới (vì tất cả thiết bị phải dùng cùng 1 key)
     // Thiết bị khác sẽ phân phối lại key cho thiết bị mới qua ensureDistributedToAllDevices
-    final hasAnyKeys = keyId == 0
-        ? await hasAnySessionKeys(roomId)
-        : await hasAnySessionKeysForKeyId(roomId, keyId);
+    final hasAnyKeys =
+        keyId == 0
+            ? await hasAnySessionKeys(roomId)
+            : await hasAnySessionKeysForKeyId(roomId, keyId);
     if (hasAnyKeys) {
-      print("🔒 Room $roomId đã có session keys, không tạo key mới");
-      return;
-    }
-
-    // 🔒 FIX RACE CONDITION: Chỉ cho phép leader (uid nhỏ nhất) tạo key
-    final sorted = [...participantUids]..sort();
-    final leaderUid = sorted.first;
-
-    if (uid != leaderUid) {
-      // Không phải leader → chỉ receive, không tạo key
-      print("🔒 Không phải leader ($leaderUid), không tạo key mới");
-      return;
-    }
-
-    // Room chưa có key nào → leader tạo key mới
-    print("🔒 Leader tạo session key cho room $roomId");
-    final sessionKey = _generateAESKey();
-    await _distributeSessionKeyToDevices(
-      roomId: roomId,
-      sessionKey: sessionKey,
-      participantUids: participantUids,
-      keyId: keyId,
-    );
-
-    await _storage.write(
-      key: _localSessionKeyKey(roomId, keyId),
-      value: base64Encode(sessionKey),
-    );
-
-    try {
-      await PasscodeBackupService.backupSessionKey(
-        roomId: roomId,
-        sessionKey: sessionKey,
+      final hasKeysForCurrentUser = await hasAnySessionKeysForUser(
+        roomId,
+        uid,
         keyId: keyId,
       );
-    } catch (e) {
-      print("Passcode backup failed: $e");
+      if (hasKeysForCurrentUser) {
+        print("Room $roomId already has session keys, skip creating new key");
+        return;
+      }
+      print(
+        "Room $roomId has session keys but none for current user, trying recovery create",
+      );
     }
 
-    final roomUpdate = <String, dynamic>{
-      "currentKeyId": keyId,
-    };
-    if (keyId > 0) {
-      roomUpdate["currentKeyUpdatedAt"] = FieldValue.serverTimestamp();
+    final canCreate = await _acquireKeyCreationLock(
+      roomId: roomId,
+      keyId: keyId,
+    );
+    if (!canCreate) {
+      print("Another device is creating session key for room $roomId");
+      return;
     }
-    await _db
-        .collection("chatRooms")
-        .doc(roomId)
-        .set(roomUpdate, SetOptions(merge: true));
 
-    // Notify listeners
-    notifyUpdated(roomId);
+    try {
+      final hasAnyKeysAfterLock =
+          keyId == 0
+              ? await hasAnySessionKeys(roomId)
+              : await hasAnySessionKeysForKeyId(roomId, keyId);
+      if (hasAnyKeysAfterLock) {
+        print(
+          "Room $roomId received session key while waiting for lock, skip creating",
+        );
+        return;
+      }
+
+      print("Creating session key for room $roomId");
+      final sessionKey = _generateAESKey();
+      await _distributeSessionKeyToDevices(
+        roomId: roomId,
+        sessionKey: sessionKey,
+        participantUids: participantUids,
+        keyId: keyId,
+      );
+
+      await _storage.write(
+        key: _localSessionKeyKey(roomId, keyId),
+        value: base64Encode(sessionKey),
+      );
+
+      try {
+        await PasscodeBackupService.backupSessionKey(
+          roomId: roomId,
+          sessionKey: sessionKey,
+          keyId: keyId,
+        );
+      } catch (e) {
+        print("Passcode backup failed: $e");
+      }
+
+      final roomUpdate = <String, dynamic>{"currentKeyId": keyId};
+      if (keyId > 0) {
+        roomUpdate["currentKeyUpdatedAt"] = FieldValue.serverTimestamp();
+      }
+      await _db
+          .collection("chatRooms")
+          .doc(roomId)
+          .set(roomUpdate, SetOptions(merge: true));
+
+      // Notify listeners
+      notifyUpdated(roomId);
+    } finally {
+      await _releaseKeyCreationLock(roomId: roomId, keyId: keyId);
+    }
   }
 
   static Future<int> rotateSessionKey({
@@ -197,9 +229,6 @@ class SessionKeyService {
     });
   }
 
-
-
-
   /// ===============================
   /// STEP 5 — RECEIVE & DECRYPT
   /// ===============================
@@ -208,22 +237,47 @@ class SessionKeyService {
     int keyId = 0,
   }) async {
     final deviceId = await DeviceService.getDeviceId();
-    final docId = _sessionKeyDocId(deviceId, keyId);
+    final docId = _sessionKeyDocId(
+      participantUid: uid,
+      deviceId: deviceId,
+      keyId: keyId,
+    );
 
-    var snap = await _db
-        .collection("chatRooms")
-        .doc(roomId)
-        .collection("sessionKeys")
-        .doc(docId)
-        .get();
+    var snap =
+        await _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .doc(docId)
+            .get();
+
+    if (!snap.exists) {
+      final legacyDocId = _legacySessionKeyDocId(
+        deviceId: deviceId,
+        keyId: keyId,
+      );
+      if (legacyDocId != docId) {
+        final legacy =
+            await _db
+                .collection("chatRooms")
+                .doc(roomId)
+                .collection("sessionKeys")
+                .doc(legacyDocId)
+                .get();
+        if (legacy.exists) {
+          snap = legacy;
+        }
+      }
+    }
 
     if (!snap.exists && keyId == 0) {
-      final fallback = await _db
-          .collection("chatRooms")
-          .doc(roomId)
-          .collection("sessionKeys")
-          .doc("${deviceId}_0")
-          .get();
+      final fallback =
+          await _db
+              .collection("chatRooms")
+              .doc(roomId)
+              .collection("sessionKeys")
+              .doc("${deviceId}_0")
+              .get();
       if (fallback.exists) {
         snap = fallback;
       }
@@ -248,6 +302,10 @@ class SessionKeyService {
     if (data != null && data["keyId"] is int) {
       keyId = data["keyId"] as int;
     }
+    if (data != null && data["userId"] is String && data["userId"] != uid) {
+      print("❌ Session key doc belongs to another user: ${data["userId"]}");
+      return false;
+    }
 
     final encrypted = base64Decode(snap["encryptedKey"]);
     final privateKeyPem = await IdentityKeyService.readPrivateKey();
@@ -263,7 +321,9 @@ class SessionKeyService {
 
       // 🔒 Validate session key length (AES-256 = 32 bytes)
       if (sessionKey.length != 32) {
-        print("❌ Invalid session key length: ${sessionKey.length}, expected 32");
+        print(
+          "❌ Invalid session key length: ${sessionKey.length}, expected 32",
+        );
         print("🔍 Encrypted key length: ${encrypted.length}");
         return false;
       }
@@ -293,38 +353,45 @@ class SessionKeyService {
 
   /// Listen realtime cho session key của device hiện tại
   /// Return StreamSubscription, cancel khi không cần nữa
-  static Future<StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>> listenForSessionKey({
+  static Future<StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>
+  listenForSessionKey({
     required String roomId,
     required Function(bool success) onKeyReceived,
     int keyId = 0,
   }) async {
     final deviceId = await DeviceService.getDeviceId();
-    final docId = _sessionKeyDocId(deviceId, keyId);
-    
-    final stream = _db
-        .collection("chatRooms")
-        .doc(roomId)
-        .collection("sessionKeys")
-        .doc(docId)
-        .snapshots();
+    final docId = _sessionKeyDocId(
+      participantUid: uid,
+      deviceId: deviceId,
+      keyId: keyId,
+    );
 
-    return stream.listen((snap) async {
-      if (snap.exists && snap.data() != null) {
-        print("🔒 Session key document created/updated for device $deviceId");
-        final success = await _decryptAndSaveSessionKey(
-          roomId: roomId,
-          snap: snap,
-          keyId: keyId,
-        );
-        onKeyReceived(success);
-      }
-    }, onError: (e) {
-      print("❌ Error listening for session key: $e");
-      onKeyReceived(false);
-    });
+    final stream =
+        _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .doc(docId)
+            .snapshots();
+
+    return stream.listen(
+      (snap) async {
+        if (snap.exists && snap.data() != null) {
+          print("🔒 Session key document created/updated for device $deviceId");
+          final success = await _decryptAndSaveSessionKey(
+            roomId: roomId,
+            snap: snap,
+            keyId: keyId,
+          );
+          onKeyReceived(success);
+        }
+      },
+      onError: (e) {
+        print("❌ Error listening for session key: $e");
+        onKeyReceived(false);
+      },
+    );
   }
-
-
 
   /// ===============================
   /// UTILS
@@ -333,7 +400,8 @@ class SessionKeyService {
     AsymmetricBlockCipher engine,
     Uint8List input,
   ) {
-    final numBlocks = input.length ~/ engine.inputBlockSize +
+    final numBlocks =
+        input.length ~/ engine.inputBlockSize +
         ((input.length % engine.inputBlockSize != 0) ? 1 : 0);
 
     final out = BytesBuilder();
@@ -362,7 +430,6 @@ class SessionKeyService {
     return RSAPublicKey(modulus, exponent);
   }
 
-
   static RSAPrivateKey _decodePrivateKeyFromPem(String pem) {
     // 1️⃣ loại bỏ header / footer
     final clean = pem
@@ -384,25 +451,20 @@ class SessionKeyService {
     );
   }
 
-
-  static Future<bool> hasLocalSessionKey(
-    String roomId, {
-    int keyId = 0,
-  }) async {
-    final key = await _storage.read(
-      key: _localSessionKeyKey(roomId, keyId),
-    );
+  static Future<bool> hasLocalSessionKey(String roomId, {int keyId = 0}) async {
+    final key = await _storage.read(key: _localSessionKeyKey(roomId, keyId));
     return key != null;
   }
 
   /// Kiểm tra xem room đã có session keys trong Firestore chưa
   static Future<bool> hasAnySessionKeys(String roomId) async {
-    final snap = await _db
-        .collection("chatRooms")
-        .doc(roomId)
-        .collection("sessionKeys")
-        .limit(1)
-        .get();
+    final snap =
+        await _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .limit(1)
+            .get();
     return snap.docs.isNotEmpty;
   }
 
@@ -410,23 +472,102 @@ class SessionKeyService {
     String roomId,
     int keyId,
   ) async {
-    final snap = await _db
-        .collection("chatRooms")
-        .doc(roomId)
-        .collection("sessionKeys")
-        .where("keyId", isEqualTo: keyId)
-        .limit(1)
-        .get();
+    final snap =
+        await _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .where("keyId", isEqualTo: keyId)
+            .limit(1)
+            .get();
     return snap.docs.isNotEmpty;
+  }
+
+  static Future<bool> hasAnySessionKeysForUser(
+    String roomId,
+    String userId, {
+    int? keyId,
+  }) async {
+    final snap =
+        await _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .where("userId", isEqualTo: userId)
+            .limit(20)
+            .get();
+
+    if (keyId == null) return snap.docs.isNotEmpty;
+
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final value = data["keyId"];
+      if (value is int && value == keyId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static String _keyCreationLockPath(int keyId) => "sessionKeyLocks.$keyId";
+
+  static Future<bool> _acquireKeyCreationLock({
+    required String roomId,
+    required int keyId,
+  }) async {
+    final roomRef = _db.collection("chatRooms").doc(roomId);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final expiresAtMs = nowMs + _keyCreationLockTtlMs;
+
+    return _db.runTransaction<bool>((tx) async {
+      final snap = await tx.get(roomRef);
+      final data = snap.data() ?? const <String, dynamic>{};
+
+      String? lockUid;
+      int lockExpiresAt = 0;
+
+      final locksRaw = data["sessionKeyLocks"];
+      if (locksRaw is Map) {
+        final currentLockRaw = locksRaw["$keyId"];
+        if (currentLockRaw is Map) {
+          final uidRaw = currentLockRaw["uid"];
+          final expiresRaw = currentLockRaw["expiresAtMs"];
+          if (uidRaw is String && uidRaw.isNotEmpty) {
+            lockUid = uidRaw;
+          }
+          if (expiresRaw is int) {
+            lockExpiresAt = expiresRaw;
+          }
+        }
+      }
+
+      final lockActive = lockUid != null && lockExpiresAt > nowMs;
+      if (lockActive && lockUid != uid) {
+        return false;
+      }
+
+      tx.update(roomRef, {
+        _keyCreationLockPath(keyId): {"uid": uid, "expiresAtMs": expiresAtMs},
+      });
+      return true;
+    });
+  }
+
+  static Future<void> _releaseKeyCreationLock({
+    required String roomId,
+    required int keyId,
+  }) async {
+    final roomRef = _db.collection("chatRooms").doc(roomId);
+    try {
+      await roomRef.update({_keyCreationLockPath(keyId): FieldValue.delete()});
+    } catch (_) {}
   }
 
   static Future<Uint8List?> _readLocalSessionKey(
     String roomId, {
     int keyId = 0,
   }) async {
-    final key = await _storage.read(
-      key: _localSessionKeyKey(roomId, keyId),
-    );
+    final key = await _storage.read(key: _localSessionKeyKey(roomId, keyId));
     if (key == null) return null;
     return base64Decode(key);
   }
@@ -471,7 +612,13 @@ class SessionKeyService {
             .collection("chatRooms")
             .doc(roomId)
             .collection("sessionKeys")
-            .doc(_sessionKeyDocId(deviceId, keyId));
+            .doc(
+              _sessionKeyDocId(
+                participantUid: participantUid,
+                deviceId: deviceId,
+                keyId: keyId,
+              ),
+            );
 
         // 🔒 Kiểm tra xem device đã có session key chưa (không ghi đè)
         final existing = await docRef.get();
@@ -490,7 +637,9 @@ class SessionKeyService {
             "createdAt": FieldValue.serverTimestamp(),
           });
           distributedCount++;
-          print("🔒 Distributed session key to device $deviceId (user: $participantUid)");
+          print(
+            "🔒 Distributed session key to device $deviceId (user: $participantUid)",
+          );
         } catch (e) {
           // Log error nhưng không throw - tiếp tục với device khác
           print("🔒 sessionKey write error for $deviceId: $e");
@@ -499,23 +648,18 @@ class SessionKeyService {
     }
 
     if (distributedCount > 0 || skippedCount > 0) {
-      print("🔒 Distribution summary: $distributedCount distributed, $skippedCount skipped");
+      print(
+        "🔒 Distribution summary: $distributedCount distributed, $skippedCount skipped",
+      );
     }
   }
 
   static Future<List<Map<String, dynamic>>> _getDevices(String uid) async {
-    final snap = await _db
-        .collection('users')
-        .doc(uid)
-        .collection('devices')
-        .get();
+    final snap =
+        await _db.collection('users').doc(uid).collection('devices').get();
 
-    return snap.docs.map((d) => {
-      'deviceId': d.id,
-      'publicKey': d['publicKey'],
-    }).toList();
+    return snap.docs
+        .map((d) => {'deviceId': d.id, 'publicKey': d['publicKey']})
+        .toList();
   }
-
-
-
 }
