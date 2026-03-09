@@ -138,9 +138,13 @@ class ProfileController extends GetxController{
     if(uid == null){
       return;
     }
+    final trimmedBio = newBio.trim();
+    if (trimmedBio == (user.value?.bio ?? "")) {
+      return;
+    }
+
     await _db.collection("users").doc(uid).update({
-      "bio": newBio.trim(),
-      "updatedAt": FieldValue.serverTimestamp(),
+      "bio": trimmedBio,
     });
   }
 
