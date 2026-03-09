@@ -51,10 +51,19 @@ class AuthController extends GetxController {
   final selectedYear = RxnInt();
   final tempAvatarFile = Rxn<File>();
   final isUploadingAvatar = false.obs;
+  final isCheckingNickname = false.obs;
+  final isNicknameAvailable = RxnBool();
+  final nicknameCheckMessage = ''.obs;
+  final RxString _nicknameDraft = ''.obs;
 
   Timer? _emailTimer;
   Timer? _enrollTimer;
   Timer? _loginTimer;
+  Worker? _nicknameDebounceWorker;
+
+  int _nicknameCheckToken = 0;
+  bool _isNormalizingFullname = false;
+  bool _isNormalizingNickname = false;
 
   // ========= FIREBASE USER STREAM =========
   final Rxn<User> _userRx = Rxn<User>();
@@ -69,6 +78,11 @@ class AuthController extends GetxController {
     super.onInit();
     // Lắng nghe trạng thái đăng nhập nhưng KHÔNG redirect
     _userRx.bindStream(_auth.authStateChanges);
+    _nicknameDebounceWorker = debounce<String>(
+      _nicknameDraft,
+      (value) => _checkNicknameDebounced(value),
+      time: const Duration(milliseconds: 500),
+    );
   }
 
   void updateBirthdayIfReady() {
@@ -102,6 +116,129 @@ class AuthController extends GetxController {
   void onYearChanged(int year) {
     selectedYear.value = year;
     updateBirthdayIfReady();
+  }
+
+  void onFullnameChanged(String value) {
+    if (_isNormalizingFullname) return;
+
+    final normalized = value.replaceAll(RegExp(r' {2,}'), ' ').trimLeft();
+    if (normalized == value) return;
+
+    _isNormalizingFullname = true;
+    _replaceControllerText(fullnameC, normalized);
+    _isNormalizingFullname = false;
+  }
+
+  void onNicknameChanged(String value) {
+    if (_isNormalizingNickname) return;
+
+    final normalized = ProfileInputValidator.sanitizeNicknameRealtime(value);
+    if (normalized != value) {
+      _isNormalizingNickname = true;
+      _replaceControllerText(nicknameC, normalized);
+      _isNormalizingNickname = false;
+    }
+
+    _scheduleNicknameCheck(normalized);
+  }
+
+  void _scheduleNicknameCheck(String nickname) {
+    final localError = ProfileInputValidator.validateNickname(nickname);
+
+    _nicknameCheckToken++;
+    isCheckingNickname.value = false;
+
+    if (nickname.isEmpty) {
+      isNicknameAvailable.value = null;
+      nicknameCheckMessage.value = '';
+      _nicknameDraft.value = '';
+      return;
+    }
+
+    if (localError != null) {
+      isNicknameAvailable.value = null;
+      nicknameCheckMessage.value = localError;
+      _nicknameDraft.value = '';
+      return;
+    }
+
+    isNicknameAvailable.value = null;
+    nicknameCheckMessage.value = '';
+    _nicknameDraft.value = nickname;
+  }
+
+  Future<void> _checkNicknameDebounced(String nickname) async {
+    if (nickname.isEmpty) return;
+
+    final currentNickname = ProfileInputValidator.normalizeNickname(
+      nicknameC.text,
+    );
+    if (currentNickname != nickname) return;
+
+    await _checkNicknameAvailability(nickname);
+  }
+
+  Future<bool?> _checkNicknameAvailability(String nickname) async {
+    final currentToken = ++_nicknameCheckToken;
+    isCheckingNickname.value = true;
+
+    try {
+      final isUnique = await _auth.isNicknameUnique(nickname);
+
+      final latestNickname = ProfileInputValidator.normalizeNickname(
+        nicknameC.text,
+      );
+      if (currentToken != _nicknameCheckToken || latestNickname != nickname) {
+        return null;
+      }
+
+      isNicknameAvailable.value = isUnique;
+      nicknameCheckMessage.value =
+          isUnique ? "Nickname có thể sử dụng" : "Nickname đã được sử dụng";
+      return isUnique;
+    } catch (_) {
+      if (currentToken == _nicknameCheckToken) {
+        isNicknameAvailable.value = null;
+        nicknameCheckMessage.value =
+            "Không thể kiểm tra nickname. Vui lòng thử lại";
+      }
+      return null;
+    } finally {
+      if (currentToken == _nicknameCheckToken) {
+        isCheckingNickname.value = false;
+      }
+    }
+  }
+
+  Future<bool> _ensureNicknameUnique(String nickname) async {
+    if (!isCheckingNickname.value &&
+        ProfileInputValidator.normalizeNickname(nicknameC.text) == nickname &&
+        isNicknameAvailable.value != null) {
+      return isNicknameAvailable.value == true;
+    }
+
+    final checked = await _checkNicknameAvailability(nickname);
+    return checked == true;
+  }
+
+  void _replaceControllerText(
+    TextEditingController controller,
+    String nextText,
+  ) {
+    final oldValue = controller.value;
+    final oldText = oldValue.text;
+    final lengthDelta = oldText.length - nextText.length;
+    final baseOffset = oldValue.selection.baseOffset;
+
+    final nextOffset =
+        baseOffset < 0 ? nextText.length : (baseOffset - lengthDelta);
+
+    controller.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(
+        offset: nextOffset.clamp(0, nextText.length),
+      ),
+    );
   }
 
   // =============================================================
@@ -144,10 +281,7 @@ class AuthController extends GetxController {
     } on FirebaseAuthException catch (e) {
       isLoadingRegister.value = false;
       _box.remove('isRegistering');
-      Get.snackbar(
-        "Đăng ký thất bại",
-        firebaseErrorToVietnamese(e.code),
-      );
+      Get.snackbar("Đăng ký thất bại", firebaseErrorToVietnamese(e.code));
     } catch (e) {
       isLoadingRegister.value = false;
       _box.remove('isRegistering');
@@ -355,7 +489,7 @@ class AuthController extends GetxController {
         "🎉 Đăng ký thành công",
         "Vui lòng đăng nhập để tiếp tục",
         snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.withOpacity(0.9),
+        backgroundColor: Colors.green.withValues(alpha: 0.9),
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
       );
@@ -442,10 +576,11 @@ class AuthController extends GetxController {
     _loginTimer?.cancel();
 
     _loginTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (resendLoginOtpSeconds.value == 0)
+      if (resendLoginOtpSeconds.value == 0) {
         timer.cancel();
-      else
+      } else {
         resendLoginOtpSeconds.value--;
+      }
     });
   }
 
@@ -483,30 +618,40 @@ class AuthController extends GetxController {
   }
 
   Future<void> pickTempAvatar(ImageSource source) async {
-    final picker = ImagePicker();
+    if (isUploadingAvatar.value || isLoadingRegister.value) return;
 
-    final picked = await picker.pickImage(source: source, imageQuality: 100);
-    if (picked == null) return;
+    isUploadingAvatar.value = true;
+    try {
+      final picker = ImagePicker();
 
-    final cropped = await ImageCropper().cropImage(
-      sourcePath: picked.path,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-      compressFormat: ImageCompressFormat.jpg,
-      uiSettings: [
-        AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
-        IOSUiSettings(title: 'Cắt ảnh'),
-      ],
-    );
+      final picked = await picker.pickImage(source: source, imageQuality: 100);
+      if (picked == null) return;
 
-    if (cropped == null) return;
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressFormat: ImageCompressFormat.jpg,
+        uiSettings: [
+          AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
+          IOSUiSettings(title: 'Cắt ảnh'),
+        ],
+      );
 
-    tempAvatarFile.value = File(cropped.path);
+      if (cropped == null) return;
+
+      tempAvatarFile.value = File(cropped.path);
+    } finally {
+      isUploadingAvatar.value = false;
+    }
   }
 
   // =============================================================
   //                     SAVE PROFILE
   // =============================================================
   Future<void> saveProfile() async {
+    if (isLoadingRegister.value) return;
+    if (isUploadingAvatar.value) return;
+
     final fullname = ProfileInputValidator.normalizeFullname(fullnameC.text);
     final nickname = ProfileInputValidator.normalizeNickname(nicknameC.text);
 
@@ -519,6 +664,16 @@ class AuthController extends GetxController {
     final nicknameError = ProfileInputValidator.validateNickname(nickname);
     if (nicknameError != null) {
       Get.snackbar("Lỗi", nicknameError);
+      return;
+    }
+
+    final isNicknameUnique = await _ensureNicknameUnique(nickname);
+    if (!isNicknameUnique) {
+      final message =
+          isNicknameAvailable.value == false
+              ? "Nickname đã được sử dụng"
+              : "Không thể kiểm tra nickname. Vui lòng thử lại";
+      Get.snackbar("Lỗi", message);
       return;
     }
 
@@ -545,6 +700,7 @@ class AuthController extends GetxController {
     try {
       String? avatarUrl;
       if (tempAvatarFile.value != null) {
+        isUploadingAvatar.value = true;
         avatarUrl = await AvatarService.uploadAvatar(tempAvatarFile.value!);
       }
       await _auth.saveUserProfile(
@@ -563,8 +719,6 @@ class AuthController extends GetxController {
         });
       }
 
-      isLoadingRegister.value = false;
-
       final anonAvatarC = Get.find<AnonymousAvatarController>();
       await anonAvatarC.load();
 
@@ -572,8 +726,10 @@ class AuthController extends GetxController {
 
       Get.offAllNamed('/main');
     } catch (e) {
-      isLoadingRegister.value = false;
       Get.snackbar("Lỗi", e.toString());
+    } finally {
+      isLoadingRegister.value = false;
+      isUploadingAvatar.value = false;
     }
   }
 
@@ -604,8 +760,8 @@ class AuthController extends GetxController {
     _emailTimer?.cancel();
     _enrollTimer?.cancel();
     _loginTimer?.cancel();
+    _nicknameDebounceWorker?.dispose();
 
     super.onClose();
   }
 }
-

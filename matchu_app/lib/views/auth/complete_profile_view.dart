@@ -37,6 +37,21 @@ class CompleteProfileView extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Obx(() {
+              final canTapAvatar =
+                  !c.isUploadingAvatar.value && !c.isLoadingRegister.value;
+              final nicknameMessage =
+                  c.isCheckingNickname.value
+                      ? "Đang kiểm tra nickname..."
+                      : c.nicknameCheckMessage.value;
+              final nicknameMessageColor =
+                  c.isCheckingNickname.value
+                      ? Colors.grey.shade600
+                      : c.isNicknameAvailable.value == true
+                      ? Colors.green.shade700
+                      : c.isNicknameAvailable.value == false
+                      ? Colors.red.shade700
+                      : Colors.orange.shade700;
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -48,10 +63,12 @@ class CompleteProfileView extends StatelessWidget {
                       return GestureDetector(
                         behavior: HitTestBehavior.translucent,
                         onTap:
-                            () => showAvatarBottomSheetAuth(
-                              context,
-                              onPick: (source) => c.pickTempAvatar(source),
-                            ),
+                            canTapAvatar
+                                ? () => showAvatarBottomSheetAuth(
+                                  context,
+                                  onPick: (source) => c.pickTempAvatar(source),
+                                )
+                                : null,
                         child: SizedBox(
                           width: 100,
                           height: 100,
@@ -111,7 +128,9 @@ class CompleteProfileView extends StatelessWidget {
                                 Positioned.fill(
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.35),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.35,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Center(
@@ -145,6 +164,7 @@ class CompleteProfileView extends StatelessWidget {
                     maxLength: ProfileInputValidator.maxFullnameLength,
                     inputFormatters:
                         ProfileInputValidator.fullnameInputFormatters,
+                    onChanged: c.onFullnameChanged,
                     decoration: const InputDecoration(
                       labelText: "Họ và tên",
                       prefixIcon: Icon(Icons.person_outline),
@@ -165,11 +185,39 @@ class CompleteProfileView extends StatelessWidget {
                     maxLength: ProfileInputValidator.maxNicknameLength,
                     inputFormatters:
                         ProfileInputValidator.nicknameInputFormatters,
+                    onChanged: c.onNicknameChanged,
                     decoration: const InputDecoration(
                       labelText: "@username",
                       prefixIcon: Icon(Icons.tag_faces_outlined),
                     ),
                   ),
+                  if (nicknameMessage.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          if (c.isCheckingNickname.value) ...[
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              nicknameMessage,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(
+                                color: nicknameMessageColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 16),
 
                   Text(
@@ -264,6 +312,9 @@ class CompleteProfileView extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed:
                           c.isLoadingRegister.value ||
+                                  c.isUploadingAvatar.value ||
+                                  c.isCheckingNickname.value ||
+                                  c.isNicknameAvailable.value == false ||
                                   c.tempAvatarFile.value == null
                               ? null
                               : c.saveProfile,
@@ -287,4 +338,3 @@ class CompleteProfileView extends StatelessWidget {
     );
   }
 }
-

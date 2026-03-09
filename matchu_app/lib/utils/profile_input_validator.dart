@@ -10,10 +10,8 @@ class ProfileInputValidator {
     r'^[\p{Script=Latin}\p{M} ]+$',
     unicode: true,
   );
-  static final RegExp _nicknameAllowed = RegExp(
-    r'^[\p{Script=Latin}\p{M}0-9._]+$',
-    unicode: true,
-  );
+  static final RegExp _nicknameAllowed = RegExp(r'^[A-Za-z0-9._]+$');
+  static final RegExp _nicknameHasLetter = RegExp(r'[A-Za-z]');
   static final RegExp _containsMultiSpaces = RegExp(r' {2,}');
   static final RegExp _startsOrEndsWithDotOrUnderscore = RegExp(r'^[_.]|[_.]$');
   static final RegExp _containsLink = RegExp(
@@ -24,10 +22,7 @@ class ProfileInputValidator {
     r'[\p{Script=Latin}\p{M} ]',
     unicode: true,
   );
-  static final RegExp _nicknameTypingAllowed = RegExp(
-    r'[\p{Script=Latin}\p{M}0-9._]',
-    unicode: true,
-  );
+  static final RegExp _nicknameTypingAllowed = RegExp(r'[A-Za-z0-9._]');
 
   static final List<TextInputFormatter> fullnameInputFormatters = [
     FilteringTextInputFormatter.allow(_fullnameTypingAllowed),
@@ -39,6 +34,8 @@ class ProfileInputValidator {
 
   static String normalizeFullname(String input) => input.trim();
   static String normalizeNickname(String input) => input.trim();
+  static String sanitizeNicknameRealtime(String input) =>
+      input.replaceAll(RegExp(r'[^A-Za-z0-9._]'), '').trim();
 
   static String? validateFullname(String input) {
     final value = normalizeFullname(input);
@@ -72,7 +69,10 @@ class ProfileInputValidator {
       return 'Biệt danh phải từ $minNicknameLength đến $maxNicknameLength ký tự';
     }
     if (!_nicknameAllowed.hasMatch(value)) {
-      return 'Biệt danh chỉ gồm chữ, số, dấu chấm (.) hoặc gạch dưới (_)';
+      return 'Biệt danh chỉ gồm chữ không dấu, số, dấu chấm (.) hoặc gạch dưới (_)';
+    }
+    if (!_nicknameHasLetter.hasMatch(value)) {
+      return 'Biệt danh không được toàn số, phải có ít nhất 1 chữ cái';
     }
     if (_startsOrEndsWithDotOrUnderscore.hasMatch(value)) {
       return 'Biệt danh không được bắt đầu hoặc kết thúc bằng . hoặc _';

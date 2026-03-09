@@ -107,6 +107,25 @@ class AuthService {
     }
   }
 
+  Future<bool> isNicknameUnique(String nickname, {String? excludeUid}) async {
+    final normalized = nickname.trim();
+    if (normalized.isEmpty) return false;
+
+    final snap =
+        await _db
+            .collection('users')
+            .where('nickname', isEqualTo: normalized)
+            .limit(1)
+            .get();
+
+    if (snap.docs.isEmpty) {
+      return true;
+    }
+
+    final currentUid = excludeUid ?? _auth.currentUser?.uid;
+    return currentUid != null && snap.docs.first.id == currentUid;
+  }
+
   /* ======================= SAVE PROFILE ======================= */
 
   Future<void> saveUserProfile({

@@ -33,6 +33,19 @@ class EditProfileView extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               }
 
+              final nicknameMessage =
+                  c.isCheckingNickname.value
+                      ? "Đang kiểm tra nickname..."
+                      : c.nicknameCheckMessage.value;
+              final nicknameMessageColor =
+                  c.isCheckingNickname.value
+                      ? Colors.grey.shade600
+                      : c.isNicknameAvailable.value == true
+                      ? Colors.green.shade700
+                      : c.isNicknameAvailable.value == false
+                      ? Colors.red.shade700
+                      : Colors.orange.shade700;
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -49,6 +62,7 @@ class EditProfileView extends StatelessWidget {
                     maxLength: ProfileInputValidator.maxFullnameLength,
                     inputFormatters:
                         ProfileInputValidator.fullnameInputFormatters,
+                    onChanged: c.onFullnameChanged,
                     decoration: const InputDecoration(
                       labelText: "Họ và tên",
                       prefixIcon: Icon(Icons.person_outline),
@@ -69,11 +83,39 @@ class EditProfileView extends StatelessWidget {
                     maxLength: ProfileInputValidator.maxNicknameLength,
                     inputFormatters:
                         ProfileInputValidator.nicknameInputFormatters,
+                    onChanged: c.onNicknameChanged,
                     decoration: const InputDecoration(
                       labelText: "@username",
                       prefixIcon: Icon(Icons.tag_faces_outlined),
                     ),
                   ),
+                  if (nicknameMessage.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          if (c.isCheckingNickname.value) ...[
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              nicknameMessage,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.copyWith(
+                                color: nicknameMessageColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   const SizedBox(height: 20),
 
@@ -159,7 +201,12 @@ class EditProfileView extends StatelessWidget {
                     height: 56,
                     child: ElevatedButton(
                       onPressed:
-                          c.isSaving.value || !c.hasChanged ? null : c.save,
+                          c.isSaving.value ||
+                                  !c.hasChanged ||
+                                  c.isCheckingNickname.value ||
+                                  c.isNicknameAvailable.value == false
+                              ? null
+                              : c.save,
                       child:
                           c.isSaving.value
                               ? const CircularProgressIndicator()
@@ -178,4 +225,3 @@ class EditProfileView extends StatelessWidget {
     );
   }
 }
-
