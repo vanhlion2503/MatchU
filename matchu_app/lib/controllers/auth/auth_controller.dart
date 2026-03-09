@@ -155,6 +155,63 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<void> cancelRegistrationFlow({
+    String redirectRoute = '/register',
+  }) async {
+    if (isLoadingRegister.value) return;
+
+    isLoadingRegister.value = true;
+    final auth = FirebaseAuth.instance;
+
+    try {
+      final currentUser = auth.currentUser;
+      if (currentUser != null) {
+        try {
+          await currentUser.reload();
+        } catch (_) {}
+
+        final refreshedUser = auth.currentUser;
+        if (refreshedUser != null) {
+          bool shouldDelete = true;
+          try {
+            final userDoc =
+                await _auth.db.collection('users').doc(refreshedUser.uid).get();
+            final completed = userDoc.data()?['isProfileCompleted'] == true;
+            shouldDelete = !completed;
+          } catch (_) {}
+
+          if (shouldDelete) {
+            try {
+              await refreshedUser.delete();
+            } on FirebaseAuthException {
+              await auth.signOut();
+            }
+          } else {
+            await auth.signOut();
+          }
+        }
+      }
+    } catch (e) {
+      Get.snackbar("Lỗi", "Không thể hủy luồng đăng ký: $e");
+    } finally {
+      _box.remove('isRegistering');
+      enrollVerificationId = null;
+      loginVerificationId = null;
+      _mfaException = null;
+      otpC.clear();
+      passwordC.clear();
+      confirmPasswordC.clear();
+      fullPhoneNumber.value = '';
+      resendEmailSeconds.value = 60;
+      _emailTimer?.cancel();
+      isLoadingRegister.value = false;
+    }
+
+    if (Get.currentRoute != redirectRoute) {
+      Get.offAllNamed(redirectRoute);
+    }
+  }
+
   // =============================================================
   //               CHECK EMAIL VERIFIED (AFTER REGISTER)
   // =============================================================

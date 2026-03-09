@@ -122,6 +122,10 @@ class AuthService {
 
     await user.updateDisplayName(nickname);
 
+    final userRef = _db.collection('users').doc(user.uid);
+    final userSnap = await userRef.get();
+    final isCreatingUserDoc = !userSnap.exists;
+
     final data = <String, dynamic>{
       "uid": user.uid,
       "email": user.email,
@@ -139,11 +143,6 @@ class AuthService {
       "location": {"lat": null, "lng": null},
 
       "nearlyEnabled": true,
-      "reputationScore": 100,
-      "reputationTodayDateKey": null,
-      "reputationTodayClaimed": 0,
-      "reputationTodayCap": 10,
-      "reputationLastClaimAt": null,
       "trustWarnings": 0,
       "totalReports": 0,
 
@@ -176,14 +175,21 @@ class AuthService {
     };
 
     // ⭐⭐⭐ CHỈ GHI KHI CÓ AVATAR
+    if (isCreatingUserDoc) {
+      data.addAll({
+        "reputationScore": 100,
+        "reputationTodayDateKey": null,
+        "reputationTodayClaimed": 0,
+        "reputationTodayCap": 10,
+        "reputationLastClaimAt": null,
+      });
+    }
+
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       data["avatarUrl"] = avatarUrl;
     }
 
-    await _db
-        .collection('users')
-        .doc(user.uid)
-        .set(data, SetOptions(merge: true));
+    await userRef.set(data, SetOptions(merge: true));
   }
 
   /* ======================= LOGIN + MFA ======================= */
