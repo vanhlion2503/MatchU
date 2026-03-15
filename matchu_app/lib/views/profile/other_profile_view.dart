@@ -349,47 +349,7 @@ class OtherProfileView extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              // ---------------- TABS ----------------
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  tabItem("Posts", true, textTheme),
-                  tabItem("Media", false, textTheme),
-                  tabItem("Likes", false, textTheme),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // ================= POSTS =================
-              SizedBox(
-                height: 140,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: 4,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, index) {
-                    final theme = Theme.of(context);
-                    final isDark = theme.brightness == Brightness.dark;
-                    return Container(
-                      width: 120,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color:
-                              isDark
-                                  ? AppTheme.darkBorder
-                                  : AppTheme.lightBorder,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 40),
+            
             ],
           ),
         );

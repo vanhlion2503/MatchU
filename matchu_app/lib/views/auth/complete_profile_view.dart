@@ -51,6 +51,12 @@ class CompleteProfileView extends StatelessWidget {
                       : c.isNicknameAvailable.value == false
                       ? Colors.red.shade700
                       : Colors.orange.shade700;
+              final isSavingProfile = c.isLoadingRegister.value;
+              final isSaveDisabled =
+                  c.isUploadingAvatar.value ||
+                  c.isCheckingNickname.value ||
+                  c.isNicknameAvailable.value == false ||
+                  c.tempAvatarFile.value == null;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,24 +315,33 @@ class CompleteProfileView extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     height: 60,
-                    child: ElevatedButton(
-                      onPressed:
-                          c.isLoadingRegister.value ||
-                                  c.isUploadingAvatar.value ||
-                                  c.isCheckingNickname.value ||
-                                  c.isNicknameAvailable.value == false ||
-                                  c.tempAvatarFile.value == null
-                              ? null
-                              : c.saveProfile,
-                      child:
-                          c.isLoadingRegister.value
-                              ? CircularProgressIndicator(
-                                color: Theme.of(context).colorScheme.onPrimary,
-                              )
-                              : const Text(
+                    child: IgnorePointer(
+                      ignoring: isSavingProfile,
+                      child: ElevatedButton(
+                        onPressed: isSaveDisabled ? null : c.saveProfile,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Opacity(
+                              opacity: isSavingProfile ? 0 : 1,
+                              child: const Text(
                                 "Lưu thông tin",
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
+                            ),
+                            if (isSavingProfile)
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color:
+                                      Theme.of(context).colorScheme.onPrimary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],

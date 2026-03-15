@@ -17,7 +17,7 @@ class _LoginViewState extends State<LoginView> {
   late AuthController c;
 
   @override
-  void initState(){
+  void initState() {
     super.initState();
     c = Get.find<AuthController>();
     c.emailC.clear();
@@ -27,8 +27,8 @@ class _LoginViewState extends State<LoginView> {
     c.nicknameC.clear();
     c.fullnameC.clear();
     c.fullPhoneNumber.value = '';
-
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,10 +49,9 @@ class _LoginViewState extends State<LoginView> {
                 Center(
                   child: Text(
                     "Chào mừng trở lại !",
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
 
@@ -63,21 +62,22 @@ class _LoginViewState extends State<LoginView> {
                   child: Text(
                     "Vui lòng nhập thông tin để đăng nhập.",
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey.shade600,
-                          fontSize: 15,
-                        ),
+                      color: Colors.grey.shade600,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
 
                 const SizedBox(height: 25),
                 Text(
                   " Email",
-                  style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                    fontWeight: FontWeight.w700,
-                  )
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 12),
-              /// EMAIL
+
+                /// EMAIL
                 TextField(
                   controller: c.emailC,
                   decoration: const InputDecoration(
@@ -91,10 +91,10 @@ class _LoginViewState extends State<LoginView> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                    " Mật khẩu",
-                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                      fontWeight: FontWeight.w700,
-                    )
+                      " Mật khẩu",
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     GestureDetector(
                       onTap: () {
@@ -110,177 +110,199 @@ class _LoginViewState extends State<LoginView> {
                     ),
                   ],
                 ),
-              const SizedBox(height: 12),
-              /// PASSWORD
-              Obx(() {
-                return TextField(
-                  controller: c.passwordC,
-                  obscureText: c.isPasswordHidden.value,
-                  decoration: InputDecoration(
-                    labelText: "Mật khẩu",
-                    hintText: "Nhập mật khẩu",
-                    prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        c.isPasswordHidden.value
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed:
-                          c.isPasswordHidden.toggle,
-                    ),
-                  ),
-                );
-              }),
-              const SizedBox(height: 32),
-              Obx(() => SizedBox(
-                width: double.infinity,
-                height: 65,
-                child: ElevatedButton(
-                  onPressed: c.isLoadingLogin.value
-                      ? null
-                      : c.loginC,
-                  child: c.isLoadingLogin.value
-                      ? const CircularProgressIndicator()
-                      : const Text("Đăng nhập"),
-                ),
-              )),
-              const SizedBox(height: 24),
-              Builder(
-                builder: (context) {
-                  final isDark = Theme.of(context).brightness == Brightness.dark;
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: Divider(
-                          thickness: 1,
-                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                        )
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          "Hoặc tiếp tục với",
-                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                                color: Theme.of(context).textTheme.bodySmall?.color,
-                                fontWeight: FontWeight.w600,
-                              ),
+                const SizedBox(height: 12),
+
+                /// PASSWORD
+                Obx(() {
+                  return TextField(
+                    controller: c.passwordC,
+                    obscureText: c.isPasswordHidden.value,
+                    decoration: InputDecoration(
+                      labelText: "Mật khẩu",
+                      hintText: "Nhập mật khẩu",
+                      prefixIcon: const Icon(Icons.lock),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          c.isPasswordHidden.value
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
+                        onPressed: c.isPasswordHidden.toggle,
                       ),
-                      Expanded(
-                        child: Divider(
-                          thickness: 1,
-                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                        )),
-                    ],
+                    ),
                   );
-                },
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                      },
-                      icon: Image.asset(
-                        'assets/icon/google.png',
-                        width: 40,
+                }),
+                const SizedBox(height: 32),
+                Obx(() {
+                  final isLoading = c.isLoadingLogin.value;
+                  return SizedBox(
+                    width: double.infinity,
+                    height: 65,
+                    child: IgnorePointer(
+                      ignoring: isLoading,
+                      child: ElevatedButton(
+                        onPressed: c.loginC,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Opacity(
+                              opacity: isLoading ? 0 : 1,
+                              child: const Text("Đăng nhập"),
+                            ),
+                            if (isLoading)
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color:
+                                      Theme.of(context).colorScheme.onPrimary,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                      label: 
-                        Text(
+                    ),
+                  );
+                }),
+                const SizedBox(height: 24),
+                Builder(
+                  builder: (context) {
+                    final isDark =
+                        Theme.of(context).brightness == Brightness.dark;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            thickness: 1,
+                            color:
+                                isDark
+                                    ? AppTheme.darkBorder
+                                    : AppTheme.lightBorder,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            "Hoặc tiếp tục với",
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium!.copyWith(
+                              color:
+                                  Theme.of(context).textTheme.bodySmall?.color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            thickness: 1,
+                            color:
+                                isDark
+                                    ? AppTheme.darkBorder
+                                    : AppTheme.lightBorder,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: Image.asset('assets/icon/google.png', width: 40),
+                        label: Text(
                           "Google",
-                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium!
+                              .copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.darkBorder
+                                    : AppTheme.lightBorder,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? AppTheme.darkBorder 
-                              : AppTheme.lightBorder,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(width: 16),
+                    const SizedBox(width: 16),
 
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                      },
-                      icon: Icon(
-                        Iconsax.mobile,
-                        size: 40,
-                        color: Theme.of(context).iconTheme.color,
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: Icon(
+                          Iconsax.mobile,
+                          size: 40,
+                          color: Theme.of(context).iconTheme.color,
                         ),
-                      label: 
-                        Text(
+                        label: Text(
                           "Số điện thoại",
-                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium!
+                              .copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? AppTheme.darkBorder
+                                    : AppTheme.lightBorder,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          textStyle: const TextStyle(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? AppTheme.darkBorder 
-                              : AppTheme.lightBorder,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Chưa có tài khoản?",
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () {
-                      Get.toNamed(AppRouter.register);
-                    },
-                    child: Text(
-                      "Đăng ký",
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium!
-                          .copyWith(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Chưa có tài khoản?",
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () {
+                        Get.toNamed(AppRouter.register);
+                      },
+                      child: Text(
+                        "Đăng ký",
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            ),
-        )
+          ),
         ),
+      ),
     );
   }
 }

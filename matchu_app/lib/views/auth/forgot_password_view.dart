@@ -23,7 +23,8 @@ class ForgotPasswordView extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height -
+                minHeight:
+                    MediaQuery.of(context).size.height -
                     MediaQuery.of(context).padding.vertical,
               ),
               child: IntrinsicHeight(
@@ -43,9 +44,7 @@ class ForgotPasswordView extends StatelessWidget {
                     // ===== TITLE =====
                     Text(
                       "Quên mật khẩu?",
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium!
+                      style: Theme.of(context).textTheme.headlineMedium!
                           .copyWith(fontWeight: FontWeight.w600),
                     ),
 
@@ -54,10 +53,9 @@ class ForgotPasswordView extends StatelessWidget {
                     // ===== DESCRIPTION =====
                     Text(
                       "Đừng lo lắng! Chúng tôi sẽ gửi cho bạn hướng dẫn đặt lại mật khẩu qua email đã đăng ký.",
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium!
-                          .copyWith(height: 1.5),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium!.copyWith(height: 1.5),
                     ),
 
                     const SizedBox(height: 40),
@@ -65,10 +63,9 @@ class ForgotPasswordView extends StatelessWidget {
                     // ===== EMAIL LABEL =====
                     Text(
                       "Địa chỉ email",
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium!
-                          .copyWith(fontWeight: FontWeight.w600),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
 
                     const SizedBox(height: 10),
@@ -95,41 +92,47 @@ class ForgotPasswordView extends StatelessWidget {
                     const SizedBox(height: 32),
 
                     // ===== SUBMIT BUTTON =====
-                    Obx(
-                      () => SizedBox(
+                    Obx(() {
+                      final isLoading = c.isLoading.value;
+                      return SizedBox(
                         width: double.infinity,
                         height: 56,
-                        child: ElevatedButton(
-                          onPressed: c.isLoading.value
-                              ? null
-                              : c.sendResetEmail,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            transitionBuilder: (child, anim) =>
-                                FadeTransition(opacity: anim, child: child),
-                            child: c.isLoading.value
-                                ? const SizedBox(
-                                    key: ValueKey("loading"),
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Row(
-                                    key: const ValueKey("text"),
+                        child: IgnorePointer(
+                          ignoring: isLoading,
+                          child: ElevatedButton(
+                            onPressed: c.sendResetEmail,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Opacity(
+                                  opacity: isLoading ? 0 : 1,
+                                  child: const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Text("Gửi email đặt lại mật khẩu"),
+                                    children: [
+                                      Text('Gửi email đặt lại mật khẩu'),
                                       SizedBox(width: 8),
                                       Icon(Iconsax.arrow_right_3, size: 18),
                                     ],
                                   ),
+                                ),
+                                if (isLoading)
+                                  SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onPrimary,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
 
                     const SizedBox(height: 32),
 

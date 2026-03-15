@@ -11,10 +11,11 @@ class OtpLoginView extends StatelessWidget {
     if (phone.isEmpty || phone.length < 6) return phone;
 
     final start = phone.substring(0, 3);
-    final end = phone.substring(phone.length - 4); 
+    final end = phone.substring(phone.length - 4);
 
     return '$start***$end';
   }
+
   @override
   Widget build(BuildContext context) {
     final c = Get.find<AuthController>();
@@ -30,22 +31,22 @@ class OtpLoginView extends StatelessWidget {
             iconSize: 20,
           ),
         ),
-        title: 
-        Text('Xác nhận OTP',
-          style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        )
+        title: Text(
+          'Xác nhận OTP',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium!.copyWith(fontWeight: FontWeight.bold),
         ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
-            children: [
-              const Icon(Icons.verified, size: 80),
-              const SizedBox(height: 24),
-              Center(
+              children: [
+                const Icon(Icons.verified, size: 80),
+                const SizedBox(height: 24),
+                Center(
                   child: RichText(
                     textAlign: TextAlign.center,
                     text: TextSpan(
@@ -55,86 +56,112 @@ class OtpLoginView extends StatelessWidget {
                       children: [
                         TextSpan(
                           text: 'Mã xác thực đã được gửi đến số \n',
-                          style: Theme.of(context).textTheme.bodyLarge
+                          style: Theme.of(context).textTheme.bodyLarge,
                         ),
                         TextSpan(
                           text: maskPhone(c.fullPhoneNumber.value.trim()),
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontWeight: FontWeight.bold, 
-                          ),
+                          style: Theme.of(context).textTheme.bodyLarge!
+                              .copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ),
                 ),
-              const SizedBox(height: 24),
-              Pinput(
-                length: 6, // ✅ 6 ô
-                controller: c.otpC,
-                keyboardType: TextInputType.number,
+                const SizedBox(height: 24),
+                Pinput(
+                  length: 6, // ✅ 6 ô
+                  controller: c.otpC,
+                  keyboardType: TextInputType.number,
 
-                defaultPinTheme: PinTheme(
-                  width: 56,
-                  height: 56,
-                  textStyle: Theme.of(context).textTheme.headlineSmall,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                      width: 2,
+                  defaultPinTheme: PinTheme(
+                    width: 56,
+                    height: 56,
+                    textStyle: Theme.of(context).textTheme.headlineSmall,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+
+                  focusedPinTheme: PinTheme(
+                    width: 56,
+                    height: 56,
+                    textStyle: Theme.of(context).textTheme.headlineSmall,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+
+                  submittedPinTheme: PinTheme(
+                    width: 56,
+                    height: 56,
+                    textStyle: Theme.of(context).textTheme.headlineSmall,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 32),
 
-                focusedPinTheme: PinTheme(
-                  width: 56,
-                  height: 56,
-                  textStyle: Theme.of(context).textTheme.headlineSmall,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2
+                Obx(() {
+                  final isLoading = c.isLoadingLogin.value;
+                  return SizedBox(
+                    width: double.infinity,
+                    child: IgnorePointer(
+                      ignoring: isLoading,
+                      child: ElevatedButton(
+                        onPressed: c.confirmLogOtp,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Opacity(
+                              opacity: isLoading ? 0 : 1,
+                              child: const Text('Xác nhận'),
+                            ),
+                            if (isLoading)
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color:
+                                      Theme.of(context).colorScheme.onPrimary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 8),
+                Obx(
+                  () => TextButton(
+                    onPressed:
+                        c.resendLoginOtpSeconds.value == 0
+                            ? c.sendLoginOtp
+                            : null,
+                    child: Text(
+                      c.resendLoginOtpSeconds.value == 0
+                          ? "Gửi lại mã"
+                          : "Gửi lại sau ${c.resendLoginOtpSeconds.value}s",
                     ),
                   ),
                 ),
-
-                submittedPinTheme: PinTheme(
-                  width: 56,
-                  height: 56,
-                  textStyle: Theme.of(context).textTheme.headlineSmall,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              Obx(() => SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: c.isLoadingLogin.value ? null : c.confirmLogOtp,
-                  child: c.isLoadingLogin.value
-                  ? const CircularProgressIndicator()
-                  : const Text('Xác nhận'),
-                ),
-              )),
-              const SizedBox(height: 8),
-              Obx(() => TextButton(
-                onPressed: c.resendLoginOtpSeconds.value == 0
-                    ? c.sendLoginOtp
-                    : null,
-                child: Text(
-                  c.resendLoginOtpSeconds.value == 0
-                      ? "Gửi lại mã"
-                      : "Gửi lại sau ${c.resendLoginOtpSeconds.value}s",
-                ),
-              )),
-            ],
+              ],
             ),
           ),
         ),

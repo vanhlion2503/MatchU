@@ -46,27 +46,27 @@ class _RegisterViewState extends State<RegisterView> {
               SizedBox(height: 8),
               Text(
                 "Tạo tài khoản",
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineLarge!
-                    .copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineLarge!.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               SizedBox(height: 12),
               Text(
                 "Nhập thông tin để bắt đầu hành trình.",
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               SizedBox(height: 35),
               Text(
                 " Email",
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w700,
-                )
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
+
               /// EMAIL
               TextField(
                 controller: controllerRegis.emailC,
@@ -79,11 +79,12 @@ class _RegisterViewState extends State<RegisterView> {
               const SizedBox(height: 12),
               Text(
                 " Mật khẩu",
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w700,
-                )
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
+
               /// PASSWORD
               Obx(() {
                 return TextField(
@@ -99,8 +100,7 @@ class _RegisterViewState extends State<RegisterView> {
                             ? Icons.visibility_off
                             : Icons.visibility,
                       ),
-                      onPressed:
-                          controllerRegis.isPasswordHidden.toggle,
+                      onPressed: controllerRegis.isPasswordHidden.toggle,
                     ),
                   ),
                 );
@@ -108,11 +108,12 @@ class _RegisterViewState extends State<RegisterView> {
               const SizedBox(height: 12),
               Text(
                 " Nhập lại mật khẩu:",
-                style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                  fontWeight: FontWeight.w700,
-                )
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
+
               /// CONFIRM PASSWORD
               Obx(() {
                 return TextField(
@@ -128,8 +129,7 @@ class _RegisterViewState extends State<RegisterView> {
                             ? Icons.visibility_off
                             : Icons.visibility,
                       ),
-                      onPressed:
-                          controllerRegis.isPasswordHidden.toggle,
+                      onPressed: controllerRegis.isPasswordHidden.toggle,
                     ),
                   ),
                 );
@@ -139,20 +139,33 @@ class _RegisterViewState extends State<RegisterView> {
 
               /// REGISTER BUTTON
               Obx(() {
+                final isLoading = controllerRegis.isLoadingRegister.value;
                 return SizedBox(
                   width: double.infinity,
                   height: 56,
-                  child: ElevatedButton(
-                    onPressed:
-                        controllerRegis.isLoadingRegister.value
-                            ? null
-                            : controllerRegis.register,
-                    child: controllerRegis.isLoadingRegister.value
-                        ? CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Theme.of(context).colorScheme.onPrimary,
-                          )
-                        : const Text("Đăng ký"),
+                  child: IgnorePointer(
+                    ignoring: isLoading,
+                    child: ElevatedButton(
+                      onPressed: controllerRegis.register,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Opacity(
+                            opacity: isLoading ? 0 : 1,
+                            child: const Text("Đăng ký"),
+                          ),
+                          if (isLoading)
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               }),
@@ -160,30 +173,40 @@ class _RegisterViewState extends State<RegisterView> {
               const SizedBox(height: 24),
               Builder(
                 builder: (context) {
-                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  final isDark =
+                      Theme.of(context).brightness == Brightness.dark;
                   return Row(
                     children: [
                       Expanded(
                         child: Divider(
                           thickness: 1,
-                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                        )
+                          color:
+                              isDark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
+                        ),
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Text(
                           "Hoặc đăng ký với",
-                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                                color: Theme.of(context).textTheme.bodySmall?.color,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium!.copyWith(
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       Expanded(
                         child: Divider(
                           thickness: 1,
-                          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                        )),
+                          color:
+                              isDark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
+                        ),
+                      ),
                     ],
                   );
                 },
@@ -193,25 +216,21 @@ class _RegisterViewState extends State<RegisterView> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                      },
-                      icon: Image.asset(
-                        'assets/icon/google.png',
-                        width: 40,
-                      ),
-                      label: 
-                        Text(
-                          "Google",
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                      onPressed: () {},
+                      icon: Image.asset('assets/icon/google.png', width: 40),
+                      label: Text(
+                        "Google",
+                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? AppTheme.darkBorder 
-                              : AppTheme.lightBorder,
+                          color:
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -225,26 +244,25 @@ class _RegisterViewState extends State<RegisterView> {
 
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                      },
+                      onPressed: () {},
                       icon: Icon(
                         Icons.phone,
                         size: 40,
                         color: Theme.of(context).iconTheme.color,
+                      ),
+                      label: Text(
+                        "Số điện thoại",
+                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
-                      label: 
-                        Text(
-                          "Số điện thoại",
-                          style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: BorderSide(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? AppTheme.darkBorder 
-                              : AppTheme.lightBorder,
+                          color:
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -261,13 +279,10 @@ class _RegisterViewState extends State<RegisterView> {
                 children: [
                   Text(
                     "Đã có tài khoản?",
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   GestureDetector(
@@ -276,13 +291,10 @@ class _RegisterViewState extends State<RegisterView> {
                     },
                     child: Text(
                       "Đăng nhập",
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium!
-                          .copyWith(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],

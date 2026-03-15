@@ -379,45 +379,6 @@ class ProfileView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 30),
-
-              // ---------------- TABS ----------------
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  tabItem("Posts", true, textTheme),
-                  tabItem("Media", false, textTheme),
-                  tabItem("Likes", false, textTheme),
-                ],
-              ),
-
-              const SizedBox(height: 20),
-
-              // ---------------- POSTS PLACEHOLDER ----------------
-              SizedBox(
-                height: 140,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemBuilder:
-                      (_, index) => Container(
-                        width: 120,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color:
-                                theme.brightness == Brightness.dark
-                                    ? AppTheme.darkBorder
-                                    : AppTheme.lightBorder,
-                          ),
-                        ),
-                      ),
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemCount: 4,
-                ),
-              ),
-
-              const SizedBox(height: 40),
             ],
           ),
         );
