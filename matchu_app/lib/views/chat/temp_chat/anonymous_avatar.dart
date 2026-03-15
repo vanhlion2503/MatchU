@@ -15,7 +15,7 @@ class AnonymousAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor:
-          Theme.of(context).colorScheme.surfaceVariant,
+          Theme.of(context).colorScheme.surfaceContainerHighest,
       backgroundImage: avatarKey == null
           ? const AssetImage(
               "assets/anonymous/placeholder.png",

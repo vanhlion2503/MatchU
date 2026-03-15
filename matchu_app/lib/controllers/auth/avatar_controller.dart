@@ -114,7 +114,7 @@ class AvatarController extends GetxController {
   // ================= COMPRESS =================
   Future<File?> _compress(File file) async {
     final dir = await getTemporaryDirectory();
-    final targetPath = "${dir.path}/avatar_${_uid}.jpg";
+    final targetPath = "${dir.path}/avatar_$_uid.jpg";
 
     final Uint8List? bytes = await FlutterImageCompress.compressWithFile(
       file.path,

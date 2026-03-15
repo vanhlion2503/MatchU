@@ -86,7 +86,7 @@ class _BackCircleButtonState extends State<BackCircleButton> {
             child: Icon(
               Icons.arrow_back_ios_new,
               size: widget.iconSize,
-              color: theme.colorScheme.onBackground,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ),

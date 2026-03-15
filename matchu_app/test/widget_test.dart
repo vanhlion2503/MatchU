@@ -1,30 +1,68 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:matchu_app/main.dart';
+import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:matchu_app/controllers/system/theme_controller.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  setUpAll(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (methodCall) async {
+          return Directory.systemTemp.path;
+        });
+    await GetStorage.init();
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  setUp(() async {
+    await GetStorage().erase();
+    Get.reset();
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('ThemeController defaults to light mode', (
+    WidgetTester tester,
+  ) async {
+    final controller = Get.put(ThemeController());
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        home: const SizedBox.shrink(),
+      ),
+    );
+
+    expect(controller.currentTheme, ThemeMode.light);
+    expect(GetStorage().read('themeMode'), isNull);
+  });
+
+  testWidgets('ThemeController persists dark mode changes', (
+    WidgetTester tester,
+  ) async {
+    final controller = Get.put(ThemeController());
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        home: const SizedBox.shrink(),
+      ),
+    );
+
+    controller.setDark();
+    await tester.pumpAndSettle();
+
+    expect(controller.currentTheme, ThemeMode.dark);
+    expect(GetStorage().read('themeMode'), 'dark');
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, null);
   });
 }

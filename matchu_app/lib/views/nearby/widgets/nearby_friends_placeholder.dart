@@ -22,7 +22,7 @@ class NearbyFriendsPlaceholder extends StatelessWidget {
                   gridColor: colorScheme.outlineVariant,
                   ringColor: colorScheme.primary,
                 ),
-                child: Container(color: colorScheme.surfaceVariant),
+                child: Container(color: colorScheme.surfaceContainerHighest),
               ),
             ),
             Positioned(
@@ -34,7 +34,7 @@ class NearbyFriendsPlaceholder extends StatelessWidget {
                 child: Container(
                   height: 18,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceVariant,
+                    color: colorScheme.surfaceContainerHighest,
                     border: Border.all(color: colorScheme.surface),
                   ),
                 ),
@@ -49,7 +49,7 @@ class NearbyFriendsPlaceholder extends StatelessWidget {
                 child: Container(
                   width: 18,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceVariant,
+                    color: colorScheme.surfaceContainerHighest,
                     border: Border.all(color: colorScheme.surface),
                   ),
                 ),

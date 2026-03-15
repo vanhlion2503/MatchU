@@ -300,7 +300,7 @@ class _GradientActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             gradient: loading ? null : _chainGradient,
-            color: loading ? theme.colorScheme.surfaceVariant : null,
+            color: loading ? theme.colorScheme.surfaceContainerHighest : null,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Center(

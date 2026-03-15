@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
 class HeartRipple extends StatefulWidget {
-  const HeartRipple();
+  const HeartRipple({super.key});
 
   @override
   State<HeartRipple> createState() => _HeartRippleState();

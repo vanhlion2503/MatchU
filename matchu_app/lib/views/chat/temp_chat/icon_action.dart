@@ -22,7 +22,7 @@ class ActionIcon extends StatelessWidget {
       width: size,
       height: size,
       child: Material(
-        color: backgroundColor ?? color.surfaceVariant,
+        color: backgroundColor ?? color.surfaceContainerHighest,
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),

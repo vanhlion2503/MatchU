@@ -36,7 +36,7 @@ BoxDecoration rewardCardDecoration(
 class RewardHeroCard extends StatelessWidget {
   final bool isWinner;
 
-  const RewardHeroCard({
+  const RewardHeroCard({super.key, 
     required this.isWinner,
   });
 
@@ -123,7 +123,7 @@ class RewardHeroCard extends StatelessWidget {
 }
 
 class RewardMotto extends StatelessWidget {
-  const RewardMotto();
+  const RewardMotto({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +249,7 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
             ? AppTheme.successColor.withOpacity(0.18)
             : isActive
                 ? accent.withOpacity(0.15)
-                : theme.colorScheme.surfaceVariant,
+                : theme.colorScheme.surfaceContainerHighest,
         border: Border.all(
           color: color.withOpacity(isActive || isComplete ? 1 : 0.4),
         ),
@@ -433,7 +433,7 @@ class RewardWaitingCard extends StatelessWidget {
 class LockedQuestionCard extends StatelessWidget {
   final String question;
 
-  const LockedQuestionCard({
+  const LockedQuestionCard({super.key, 
     required this.question,
   });
 
@@ -446,7 +446,7 @@ class LockedQuestionCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: rewardCardDecoration(
         theme,
-        color: theme.colorScheme.surfaceVariant,
+        color: theme.colorScheme.surfaceContainerHighest,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,7 +481,7 @@ class LockedQuestionCard extends StatelessWidget {
 class AnswerCard extends StatelessWidget {
   final String answer;
 
-  const AnswerCard({
+  const AnswerCard({super.key, 
     required this.answer,
   });
 
@@ -494,7 +494,7 @@ class AnswerCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: rewardCardDecoration(
         theme,
-        color: theme.colorScheme.surfaceVariant,
+        color: theme.colorScheme.surfaceContainerHighest,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,7 +529,7 @@ class AnswerCard extends StatelessWidget {
 class CountdownChip extends StatelessWidget {
   final int secondsLeft;
 
-  const CountdownChip({
+  const CountdownChip({super.key, 
     required this.secondsLeft,
   });
 
@@ -569,7 +569,7 @@ class CountdownChip extends StatelessWidget {
 class SafetyNote extends StatelessWidget {
   final String text;
 
-  const SafetyNote({
+  const SafetyNote({super.key, 
     required this.text,
   });
 
@@ -605,7 +605,7 @@ class RewardTextField extends StatelessWidget {
   final int maxLines;
   final ValueChanged<String>? onChanged;
 
-  const RewardTextField({
+  const RewardTextField({super.key, 
     required this.controller,
     required this.focusNode,
     required this.hintText,
@@ -638,7 +638,7 @@ class LengthRow extends StatelessWidget {
   final TextEditingController controller;
   final int maxLength;
 
-  const LengthRow({
+  const LengthRow({super.key, 
     required this.label,
     required this.controller,
     required this.maxLength,

@@ -7,7 +7,7 @@ class GameSheetItem extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
-  const GameSheetItem({
+  const GameSheetItem({super.key, 
     this.icon,
     this.imageAsset,
     required this.title,

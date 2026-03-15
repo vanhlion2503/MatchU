@@ -56,7 +56,7 @@ class UserService {
           await _db
               .collection("users")
               .where("nickname", isGreaterThanOrEqualTo: query)
-              .where("nickname", isLessThan: query + '\uf8ff')
+              .where("nickname", isLessThan: '$query\uf8ff')
               .limit(20)
               .get();
 
@@ -125,7 +125,7 @@ class UserService {
 
       if (!snap.exists) return false;
 
-      final data = snap.data() as Map<String, dynamic>?;
+      final data = snap.data();
 
       final following = List<String>.from(data?["following"] ?? []);
       return following.contains(targetUserId);

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
-import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/views/matching/widgets/animated_progress_bar.dart';
 import 'package:matchu_app/views/matching/widgets/floating_avatar.dart';
 import 'package:matchu_app/views/matching/widgets/heart_ripple.dart';

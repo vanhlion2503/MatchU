@@ -58,7 +58,7 @@ class EnrollPhoneView extends StatelessWidget {
 
                   // 🇻🇳 Fix riêng cho VN: +840xxx → +84xxx
                   if (number.startsWith('+840')) {
-                    number = '+84' + number.substring(4);
+                    number = '+84${number.substring(4)}';
                   }
 
                   c.fullPhoneNumber.value = number;

@@ -46,7 +46,7 @@ class SearchUserView extends StatelessWidget {
                     filled: true,
                     fillColor:
                         suc.isFocused.value
-                            ? theme.colorScheme.background
+                            ? theme.colorScheme.surface
                             : (theme.brightness == Brightness.dark
                                     ? AppTheme.darkBorder
                                     : AppTheme.lightBorder)

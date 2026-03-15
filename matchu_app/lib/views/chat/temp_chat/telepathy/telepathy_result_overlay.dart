@@ -215,7 +215,7 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  aiText!,
+                                  aiText,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     height: 1.4,
                                   ),
@@ -387,7 +387,7 @@ class _AnswerList extends StatelessWidget {
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.dividerColor),
       ),

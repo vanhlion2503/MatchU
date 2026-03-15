@@ -304,7 +304,7 @@ class _GradientActionButton extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: loading ? null : _brandGradient,
             color: loading
-                ? theme.colorScheme.surfaceVariant
+                ? theme.colorScheme.surfaceContainerHighest
                 : null,
             borderRadius: BorderRadius.circular(16),
           ),

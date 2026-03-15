@@ -24,7 +24,7 @@ class UserAvatar extends StatelessWidget {
 
       return CircleAvatar(
         radius: radius,
-        backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: ClipOval(
           child: FadeInImage(
             width: radius * 2,

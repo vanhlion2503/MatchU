@@ -215,7 +215,7 @@ class _MatchingViewState extends State<MatchingView>
                 child: CircleAvatar(
                   radius: 42,
                   backgroundColor:
-                      Theme.of(context).colorScheme.surfaceVariant,
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                   backgroundImage: key == null
                       ? const AssetImage(
                           "assets/anonymous/placeholder.png",
@@ -237,7 +237,7 @@ class _MatchingViewState extends State<MatchingView>
                   color: Colors.green,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.background,
+                    color: Theme.of(context).colorScheme.surface,
                     width: 2,
                   ),
                 ),
@@ -319,7 +319,7 @@ class _MatchingViewState extends State<MatchingView>
                 ),
                 child: CircleAvatar(
                   radius: 38,
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   child: Icon(
                     Icons.help_outline,
                     color: theme.hintColor,

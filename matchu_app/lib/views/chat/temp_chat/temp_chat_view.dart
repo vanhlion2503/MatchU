@@ -14,6 +14,8 @@ import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class TempChatView extends StatelessWidget {
+  const TempChatView({super.key});
+
   @override
   Widget build(BuildContext context) {
     final args = Get.arguments as Map<String, dynamic>;
@@ -80,7 +82,7 @@ class TempChatView extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 22,
-                      backgroundColor: theme.colorScheme.surfaceVariant,
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
                       backgroundImage:
                           key == null
                               ? const AssetImage(

@@ -6,7 +6,7 @@ class AnimatedEmoji extends StatelessWidget {
   final bool isMe;
   final bool pressed;
 
-  const AnimatedEmoji({
+  const AnimatedEmoji({super.key, 
     required this.text,
     required this.highlighted,
     required this.isMe,

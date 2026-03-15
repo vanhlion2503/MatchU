@@ -181,7 +181,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
           clipBehavior: Clip.none,
           children: [
             Container(
-              height: 95,
+              height: 75,
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
@@ -229,7 +229,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                           curve: Curves.easeOut,
                           child: Icon(
                             Iconsax.home_2,
-                            size: c.currentIndex.value == 0 ? 32 : 27,
+                            size: c.currentIndex.value == 0 ? 28 : 24,
                           ),
                         ),
                         label: 'Home',
@@ -240,7 +240,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                           curve: Curves.easeOut,
                           child: Icon(
                             Iconsax.location,
-                            size: c.currentIndex.value == 1 ? 32 : 27,
+                            size: c.currentIndex.value == 1 ? 28 : 24,
                           ),
                         ),
                         label: 'Nearby',
@@ -255,7 +255,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                           curve: Curves.easeOut,
                           child: Icon(
                             Iconsax.game,
-                            size: c.currentIndex.value == 3 ? 32 : 27,
+                            size: c.currentIndex.value == 3 ? 28 : 24,
                           ),
                         ),
                         label: 'Game',
@@ -266,7 +266,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                           curve: Curves.easeOut,
                           child: Icon(
                             Iconsax.profile_circle,
-                            size: c.currentIndex.value == 4 ? 32 : 27,
+                            size: c.currentIndex.value == 4 ? 28 : 24,
                           ),
                         ),
                         label: 'Profile',
@@ -277,7 +277,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
               ),
             ),
             Positioned(
-              top: -38,
+              top: -35,
               left: 0,
               right: 0,
               child: GestureDetector(
@@ -299,8 +299,8 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                         strokeWidth: 2,
                       ),
                       child: Container(
-                        width: 80,
-                        height: 80,
+                        width: 70,
+                        height: 70,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: ringColor,
@@ -322,8 +322,8 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                           child: ScaleTransition(
                             scale: _tapScaleAnimation,
                             child: Container(
-                              width: 68,
-                              height: 68,
+                              width: 60,
+                              height: 60,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [

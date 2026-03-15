@@ -7,7 +7,7 @@ class AnimatedBubble extends StatelessWidget {
   final bool isMe;
   final Color bubbleColor;
 
-  const AnimatedBubble({
+  const AnimatedBubble({super.key, 
     required this.child,
     required this.highlighted,
     this.pressed = false,

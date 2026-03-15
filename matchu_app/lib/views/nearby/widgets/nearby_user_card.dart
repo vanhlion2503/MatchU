@@ -65,7 +65,7 @@ class NearbyUserCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "@" + nickname,
+                      "@$nickname",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.bodySmall?.copyWith(
@@ -106,7 +106,7 @@ class _Avatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 26,
-          backgroundColor: colorScheme.surfaceVariant,
+          backgroundColor: colorScheme.surfaceContainerHighest,
           backgroundImage:
               avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
           child:

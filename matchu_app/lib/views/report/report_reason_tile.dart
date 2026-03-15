@@ -52,7 +52,7 @@ class ReportReasonTile extends StatelessWidget {
                 reason.icon,
                 color: selected
                     ? AppTheme.errorColor
-                    : theme.colorScheme.onBackground,
+                    : theme.colorScheme.onSurface,
                 size: 20,
               ),
             ),

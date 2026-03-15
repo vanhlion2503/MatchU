@@ -71,7 +71,7 @@ class _CircleIconButtonState extends State<CircleIconButton> {
               widget.icon,
               size: widget.iconSize,
               color: widget.iconColor ??
-                  theme.colorScheme.onBackground,
+                  theme.colorScheme.onSurface,
             ),
           ),
         ),

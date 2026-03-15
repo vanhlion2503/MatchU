@@ -657,7 +657,7 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: WordChainInlineFeedback(
-                        message: feedbackMessage!,
+                        message: feedbackMessage,
                         accentColor: errorAccent,
                       ),
                     ),
@@ -887,7 +887,7 @@ class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
             height: 48,
             width: 200,
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant,
+              color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(14),
             ),
           ),
