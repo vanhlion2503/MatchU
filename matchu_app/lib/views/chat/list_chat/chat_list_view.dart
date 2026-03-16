@@ -13,7 +13,9 @@ import 'package:matchu_app/views/chat/list_chat/swipe_chat_item.dart';
 import 'package:matchu_app/views/chat/list_chat/ui_item_chat.dart';
 
 class ChatListView extends StatefulWidget {
-  const ChatListView({super.key});
+  final bool embedInMainNavigation;
+
+  const ChatListView({super.key, this.embedInMainNavigation = false});
 
   @override
   State<ChatListView> createState() => _ChatListViewState();
@@ -26,7 +28,10 @@ class _ChatListViewState extends State<ChatListView> {
   @override
   void initState() {
     super.initState();
-    controller = Get.put(ChatListController());
+    controller =
+        Get.isRegistered<ChatListController>()
+            ? Get.find<ChatListController>()
+            : Get.put(ChatListController());
   }
 
   @override
@@ -34,10 +39,15 @@ class _ChatListViewState extends State<ChatListView> {
     final userC = Get.find<UserController>();
     final theme = Theme.of(context);
     final myUid = ChatService().uid;
+    final bottomListPadding = widget.embedInMainNavigation ? 108.0 : 12.0;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         titleSpacing: 0,
         title: Row(
           children: [
@@ -91,13 +101,13 @@ class _ChatListViewState extends State<ChatListView> {
             ),
 
             /// ❌ NÚT THOÁT
-            IconButton(
-              icon: const Icon(Iconsax.logout_1, size: 32),
-              onPressed: () {
-                Get.back();
-              },
-            ),
-            const SizedBox(width: 4),
+            if (!widget.embedInMainNavigation) ...[
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 28),
+                onPressed: Get.back,
+              ),
+              const SizedBox(width: 4),
+            ],
           ],
         ),
       ),
@@ -176,6 +186,7 @@ class _ChatListViewState extends State<ChatListView> {
                             controller: controller,
                             myUid: myUid,
                             listKey: _listKey,
+                            bottomPadding: bottomListPadding,
                           ),
                 );
               }),
@@ -191,6 +202,7 @@ Widget _buildChatList({
   required ChatListController controller,
   required String myUid,
   required GlobalKey<AnimatedListState> listKey,
+  required double bottomPadding,
   Key? key,
 }) {
   final isSearching = controller.searchText.isNotEmpty;
@@ -208,6 +220,7 @@ Widget _buildChatList({
   if (isSearching) {
     return ListView.builder(
       key: key,
+      padding: EdgeInsets.only(bottom: bottomPadding),
       itemCount: rooms.length,
       itemBuilder: (context, index) {
         final room = rooms[index];
@@ -236,6 +249,7 @@ Widget _buildChatList({
   return AnimatedList(
     key: listKey,
     initialItemCount: rooms.length,
+    padding: EdgeInsets.only(bottom: bottomPadding),
     itemBuilder: (context, index, animation) {
       final room = rooms[index];
       return SizeTransition(

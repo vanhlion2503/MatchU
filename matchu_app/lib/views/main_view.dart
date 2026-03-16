@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
+import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/chat/list_chat/chat_list_view.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/views/chat/random_chat_view.dart';
-import 'package:matchu_app/views/game/game_view.dart';
 import 'package:matchu_app/views/home_view.dart';
 import 'package:matchu_app/views/nearby/nearby_view.dart';
 import 'package:matchu_app/views/profile/profile_view.dart';
@@ -22,7 +23,8 @@ class MainView extends StatefulWidget {
 }
 
 class _MainViewState extends State<MainView> with TickerProviderStateMixin {
-  final MainController c = Get.put(MainController());
+  final MainController c = Get.find<MainController>();
+  final UnreadController unreadController = Get.find<UnreadController>();
 
   late AnimationController _centerTapController;
   late AnimationController _centerIdleController;
@@ -33,11 +35,11 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
   late Animation<double> _glowOpacityAnimation;
   bool _passcodeChecked = false;
 
-  final List<Widget> pages = [
+  late final List<Widget> pages = const [
     HomeView(),
     NearbyView(),
     RandomChatView(),
-    GameView(),
+    ChatListView(embedInMainNavigation: true),
     ProfileView(),
   ];
 
@@ -165,10 +167,59 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  Widget _buildUnreadBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavIcon(
+    IconData icon, {
+    required bool selected,
+    int badgeCount = 0,
+  }) {
+    final iconWidget = AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      child: Icon(icon, size: selected ? 26 : 24),
+    );
+
+    if (badgeCount <= 0) {
+      return iconWidget;
+    }
+
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: iconWidget),
+          Positioned(top: -4, right: -8, child: _buildUnreadBadge(badgeCount)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final bool isDark = Theme.of(context).brightness == Brightness.dark;
+      final int unreadCount = unreadController.totalUnread.value;
       final Color borderColor =
           isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
       final Color ringColor =
@@ -224,24 +275,16 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                     elevation: 0,
                     items: [
                       BottomNavigationBarItem(
-                        icon: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOut,
-                          child: Icon(
-                            Iconsax.home_2,
-                            size: c.currentIndex.value == 0 ? 26 : 24,
-                          ),
+                        icon: _buildNavIcon(
+                          Iconsax.home_2,
+                          selected: c.currentIndex.value == 0,
                         ),
                         label: 'Home',
                       ),
                       BottomNavigationBarItem(
-                        icon: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOut,
-                          child: Icon(
-                            Iconsax.location,
-                            size: c.currentIndex.value == 1 ? 26 : 24,
-                          ),
+                        icon: _buildNavIcon(
+                          Iconsax.location,
+                          selected: c.currentIndex.value == 1,
                         ),
                         label: 'Nearby',
                       ),
@@ -250,24 +293,17 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
                         label: 'Center',
                       ),
                       BottomNavigationBarItem(
-                        icon: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOut,
-                          child: Icon(
-                            Iconsax.game,
-                            size: c.currentIndex.value == 3 ? 26 : 24,
-                          ),
+                        icon: _buildNavIcon(
+                          Iconsax.messages,
+                          selected: c.currentIndex.value == 3,
+                          badgeCount: unreadCount,
                         ),
-                        label: 'Game',
+                        label: 'Chat',
                       ),
                       BottomNavigationBarItem(
-                        icon: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOut,
-                          child: Icon(
-                            Iconsax.profile_circle,
-                            size: c.currentIndex.value == 4 ? 26 : 24,
-                          ),
+                        icon: _buildNavIcon(
+                          Iconsax.profile_circle,
+                          selected: c.currentIndex.value == 4,
                         ),
                         label: 'Profile',
                       ),

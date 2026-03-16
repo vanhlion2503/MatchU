@@ -4,7 +4,6 @@ import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
-import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
@@ -388,57 +387,6 @@ class _RandomChatViewState extends State<RandomChatView>
             Text('100 trực tuyến', style: theme.textTheme.headlineSmall),
           ],
         ),
-        actions: [
-          Stack(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(right: 15),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color.surface.withValues(alpha: 0.6),
-                  border: Border.all(
-                    color: color.outline.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: IconButton(
-                  icon: const Icon(Iconsax.messages, size: 25),
-                  onPressed: () => Get.toNamed('/chat-list'),
-                ),
-              ),
-              Obx(() {
-                final unreadC = Get.find<UnreadController>();
-                if (unreadC.totalUnread.value == 0) return const SizedBox();
-
-                return Positioned(
-                  right: 10,
-                  top: -4,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 18,
-                      minHeight: 18,
-                    ),
-                    child: Text(
-                      unreadC.totalUnread.value > 99
-                          ? '99+'
-                          : unreadC.totalUnread.value.toString(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -678,7 +626,7 @@ class _RandomChatViewState extends State<RandomChatView>
           SizedBox(height: contentGap),
           Container(
             width: double.infinity,
-            height: 50,
+            height: compact ? 46 : 60,
             padding: EdgeInsets.all(segmentPadding),
             decoration: BoxDecoration(
               color:
