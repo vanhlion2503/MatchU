@@ -420,7 +420,7 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                             _collapseLeftActions();
                           },
                           decoration: InputDecoration(
-                            hintText: "Nhập tin nhắn...",
+                            hintText: "Aa...",
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14,

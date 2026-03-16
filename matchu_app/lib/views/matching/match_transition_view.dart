@@ -104,8 +104,8 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final mq = MediaQuery.of(context);
-    final isLandscape = mq.orientation == Orientation.landscape;
+    // final mq = MediaQuery.of(context);
+    // final isLandscape = mq.orientation == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -144,7 +144,7 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                   builder: (context, constraints) {
                     final maxW = MediaQuery.of(context).size.width;
                     final maxH = MediaQuery.of(context).size.height;
-                    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+                    // final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
                     final avatarSize =
                         (maxW * 0.22).clamp(60.0, 92.0);

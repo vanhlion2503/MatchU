@@ -55,6 +55,7 @@ class _ChatBodyState extends State<ChatBody> {
 
         /// ================= INPUT =================
         ChatBottomBar(controller: controller),
+        const SizedBox(height: 8,),
       ],
     );
   }

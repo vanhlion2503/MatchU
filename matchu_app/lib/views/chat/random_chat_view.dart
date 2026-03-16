@@ -243,7 +243,8 @@ class _RandomChatViewState extends State<RandomChatView>
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Row(
                         children: [
-                          Expanded( // 👈 QUAN TRỌNG
+                          Expanded(
+                            // 👈 QUAN TRỌNG
                             child: InkWell(
                               onTap: () {
                                 setStateDialog(() {
@@ -262,7 +263,8 @@ class _RandomChatViewState extends State<RandomChatView>
                                       });
                                     },
                                   ),
-                                  Expanded( // 👈 text được phép xuống dòng
+                                  Expanded(
+                                    // 👈 text được phép xuống dòng
                                     child: Text(
                                       'Không hiển thị lần sau nữa',
                                       style: theme.textTheme.bodySmall,
@@ -276,8 +278,9 @@ class _RandomChatViewState extends State<RandomChatView>
                           ),
                           const SizedBox(width: 8),
                           TextButton(
-                            onPressed: () =>
-                                Navigator.of(dialogContext).pop(localValue),
+                            onPressed:
+                                () =>
+                                    Navigator.of(dialogContext).pop(localValue),
                             child: const Text('Đã hiểu'),
                           ),
                         ],
@@ -349,7 +352,6 @@ class _RandomChatViewState extends State<RandomChatView>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.colorScheme;
-    final isLight = theme.brightness == Brightness.light;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -439,134 +441,274 @@ class _RandomChatViewState extends State<RandomChatView>
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                Text(
-                  'Làm quen ngay',
-                  style: theme.textTheme.headlineMedium?.copyWith(fontSize: 26),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Kết nối ẩn danh. Chủ động \nlộ diện khi bạn sẵn sàng.',
-                  style: theme.textTheme.bodyLarge,
-                ),
-                Center(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      RippleAnimation(
-                        animation: _rippleController,
-                        color: color.primary,
-                        size: 250,
-                      ),
-                      Container(
-                        width: 110,
-                        height: 110,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: color.primary, width: 3),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: AvatarOverlayService.show,
-                        child: Obx(() {
-                          final key = anonAvatarC.selectedAvatar.value;
+        top: false,
+        bottom: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const bottomNavigationClearance = 96.0;
+            const contentMaxWidth = 560.0;
 
-                          return Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              CircleAvatar(
-                                radius: 50,
-                                backgroundColor: color.surface,
-                                backgroundImage:
-                                    key == null
-                                        ? const AssetImage(
-                                          'assets/anonymous/placeholder.png',
-                                        )
-                                        : AssetImage(
-                                          'assets/anonymous/$key.png',
-                                        ),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: color.primary,
-                                    border: Border.all(
-                                      color: theme.scaffoldBackgroundColor,
-                                      width: 1.5,
+            final viewPadding = MediaQuery.viewPaddingOf(context);
+            final isCompactHeight = constraints.maxHeight < 700;
+            final isNarrowWidth = constraints.maxWidth < 360;
+            final horizontalPadding = isNarrowWidth ? 16.0 : 24.0;
+            final topPadding = isCompactHeight ? 12.0 : 20.0;
+            final sectionGap = isCompactHeight ? 12.0 : 18.0;
+            final buttonHeight = isCompactHeight ? 54.0 : 60.0;
+            final titleFontSize =
+                isNarrowWidth
+                    ? 24.0
+                    : (constraints.maxWidth > 460 ? 30.0 : 27.0);
+            final subtitleFontSize = isCompactHeight ? 16.0 : 18.0;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: contentMaxWidth),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    topPadding,
+                    horizontalPadding,
+                    viewPadding.bottom + bottomNavigationClearance,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildIntroSection(
+                        theme,
+                        titleFontSize: titleFontSize,
+                        subtitleFontSize: subtitleFontSize,
+                      ),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, middleConstraints) {
+                            final middleHeight = middleConstraints.maxHeight;
+                            final middleGap =
+                                middleHeight < 340 ? 10.0 : sectionGap;
+                            final targetHeight =
+                                (middleHeight * (isCompactHeight ? 0.34 : 0.3))
+                                    .clamp(108.0, 132.0)
+                                    .toDouble();
+                            final avatarAreaHeight =
+                                (middleHeight - targetHeight - middleGap)
+                                    .clamp(120.0, middleHeight)
+                                    .toDouble();
+                            final rippleSize =
+                                avatarAreaHeight.clamp(120.0, 250.0).toDouble();
+                            final avatarRadius =
+                                (rippleSize * 0.38)
+                                    .clamp(38.0, 56.0)
+                                    .toDouble();
+                            final compactMiddle =
+                                isCompactHeight || middleHeight < 420;
+
+                            return Column(
+                              children: [
+                                SizedBox(
+                                  height: avatarAreaHeight,
+                                  child: Center(
+                                    child: _buildAvatarStage(
+                                      theme,
+                                      rippleSize: rippleSize,
+                                      avatarRadius: avatarRadius,
+                                      compact: compactMiddle,
                                     ),
                                   ),
-                                  child: const Icon(
-                                    Iconsax.edit_2,
-                                    size: 14,
-                                    color: Colors.white,
+                                ),
+                                SizedBox(
+                                  height: targetHeight,
+                                  child: _buildTargetSection(
+                                    theme,
+                                    compact: compactMiddle,
                                   ),
                                 ),
-                              ),
-                            ],
-                          );
-                        }),
+                              ],
+                            );
+                          },
+                        ),
                       ),
+                      SizedBox(height: sectionGap),
+                      SizedBox(
+                        width: double.infinity,
+                        height: buttonHeight,
+                        child: ElevatedButton(
+                          onPressed:
+                              (_isLoadingQuota || _isStarting)
+                                  ? null
+                                  : _onStartPressed,
+                          child: Text(_startButtonLabel()),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Muốn tìm…',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroSection(
+    ThemeData theme, {
+    required double titleFontSize,
+    required double subtitleFontSize,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Làm quen ngay',
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontSize: titleFontSize,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Kết nối ẩn danh.\nChủ động lộ diện khi bạn sẵn sàng.',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontSize: subtitleFontSize,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatarStage(
+    ThemeData theme, {
+    required double rippleSize,
+    required double avatarRadius,
+    required bool compact,
+  }) {
+    final color = theme.colorScheme;
+    final ringSize = avatarRadius * 2 + (compact ? 14 : 18);
+    final editBadgeSize = compact ? 22.0 : 24.0;
+
+    return SizedBox(
+      width: rippleSize,
+      height: rippleSize,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          RippleAnimation(
+            animation: _rippleController,
+            color: color.primary,
+            size: rippleSize,
+          ),
+          Container(
+            width: ringSize,
+            height: ringSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: color.primary, width: 3),
+            ),
+          ),
+          GestureDetector(
+            onTap: AvatarOverlayService.show,
+            child: Obx(() {
+              final key = anonAvatarC.selectedAvatar.value;
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: avatarRadius,
+                    backgroundColor: color.surface,
+                    backgroundImage:
+                        key == null
+                            ? const AssetImage(
+                              'assets/anonymous/placeholder.png',
+                            )
+                            : AssetImage('assets/anonymous/$key.png'),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color:
-                        isLight
-                            ? const Color(0xFFF1F4F7).withValues(alpha: 0.65)
-                            : color.surface.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(child: _genderChip(theme, 'Nam', 'male')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _genderChip(theme, 'Nữ', 'female')),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _genderChip(theme, 'Ngẫu nhiên', 'random'),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: editBadgeSize,
+                      height: editBadgeSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color.primary,
+                        border: Border.all(
+                          color: theme.scaffoldBackgroundColor,
+                          width: 1.5,
+                        ),
                       ),
-                    ],
+                      child: Icon(
+                        Iconsax.edit_2,
+                        size: compact ? 13 : 14,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTargetSection(ThemeData theme, {required bool compact}) {
+    final color = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
+    final outerPadding = compact ? 1.0 : 6.0;
+    final contentGap = compact ? 10.0 : 16.0;
+    final segmentPadding = compact ? 4.0 : 6.0;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(outerPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Muốn tìm...',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              // fontSize: titleFontSize,
+            ),
+          ),
+          SizedBox(height: contentGap),
+          Container(
+            width: double.infinity,
+            height: 50,
+            padding: EdgeInsets.all(segmentPadding),
+            decoration: BoxDecoration(
+              color:
+                  isLight
+                      ? const Color(0xFFF1F4F7).withValues(alpha: 0.9)
+                      : color.surface.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _genderChip(theme, 'Nam', 'male', compact: compact),
                 ),
-                const SizedBox(height: 100),
-                SizedBox(
-                  width: double.infinity,
-                  height: 60,
-                  child: ElevatedButton(
-                    onPressed:
-                        (_isLoadingQuota || _isStarting)
-                            ? null
-                            : _onStartPressed,
-                    child: Text(_startButtonLabel()),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _genderChip(theme, 'Nữ', 'female', compact: compact),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _genderChip(
+                    theme,
+                    'Ngẫu nhiên',
+                    'random',
+                    compact: compact,
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -623,7 +765,12 @@ class _RandomChatViewState extends State<RandomChatView>
     );
   }
 
-  Widget _genderChip(ThemeData theme, String label, String value) {
+  Widget _genderChip(
+    ThemeData theme,
+    String label,
+    String value, {
+    bool compact = false,
+  }) {
     final color = theme.colorScheme;
     final selected = selectedTarget == value;
     final isLight = theme.brightness == Brightness.light;
@@ -634,7 +781,7 @@ class _RandomChatViewState extends State<RandomChatView>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: compact ? 8 : 12),
         decoration: BoxDecoration(
           color:
               selected
@@ -652,8 +799,9 @@ class _RandomChatViewState extends State<RandomChatView>
         child: Text(
           label,
           textAlign: TextAlign.center,
-          maxLines: 2, 
+          maxLines: 2,
           style: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: compact ? 14 : 16,
             fontWeight: FontWeight.w600,
             color:
                 selected

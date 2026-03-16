@@ -79,7 +79,7 @@ void main() async {
 
   // ✅ 2. ACTIVATE APP CHECK (SAU FIREBASE)
   await FirebaseAppCheck.instance.activate(
-    providerAndroid: const AndroidDebugProvider(),
+    androidProvider: AndroidProvider.debug,
     providerApple: const AppleDebugProvider(),
   );
 
