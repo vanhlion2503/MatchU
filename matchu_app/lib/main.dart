@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
@@ -8,9 +9,11 @@ import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/controllers/system/app_lifecycle_controller.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/routes/app_pages.dart';
 import 'package:matchu_app/services/game/word_chain_service.dart';
+import 'package:matchu_app/services/notification/app_notification_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
@@ -76,10 +79,13 @@ void main() async {
 
   // ✅ 1. INIT FIREBASE ĐÚNG CÁCH (CHỈ 1 LẦN)
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (AppNotificationService.isSupportedPlatform) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
 
   // ✅ 2. ACTIVATE APP CHECK (SAU FIREBASE)
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
+    providerAndroid: const AndroidDebugProvider(),
     providerApple: const AppleDebugProvider(),
   );
 
@@ -95,9 +101,14 @@ void main() async {
   Get.put(AuthController(), permanent: true);
   Get.put(AuthGateController(), permanent: true);
   Get.put(AppLifecycleController(), permanent: true);
+  final notificationController = Get.put(
+    NotificationController(),
+    permanent: true,
+  );
   Get.put(CallController(), permanent: true);
   Get.put(AnonymousAvatarController(), permanent: true);
   Get.put(MatchingController(), permanent: true);
+  await notificationController.initialize();
 
   runApp(const MyApp());
 }

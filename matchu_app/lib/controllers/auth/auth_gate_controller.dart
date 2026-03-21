@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/services/auth/auth_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 
@@ -100,6 +101,12 @@ class AuthGateController extends GetxController {
     // 5️⃣ ROUTE CUỐI CÙNG
     // ============================
     Get.offAllNamed(completed ? '/main' : '/complete-profile');
+    if (completed && Get.isRegistered<NotificationController>()) {
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (!Get.isRegistered<NotificationController>()) return;
+        Get.find<NotificationController>().flushPendingNavigation();
+      });
+    }
   }
 
   /// ============================

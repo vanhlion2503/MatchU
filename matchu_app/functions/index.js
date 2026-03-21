@@ -11,6 +11,10 @@ const {
   cleanupViewedImageMessage,
 } = require("./src/triggers/chatRoomEvents");
 const {
+  queueChatMessageNotification,
+  dispatchQueuedChatNotification,
+} = require("./src/triggers/chatMessageNotifications");
+const {
   generateTelepathyAiInsight,
 } = require("./src/triggers/telepathyInsight");
 const {
@@ -32,6 +36,8 @@ exports.getTurnCredentials = getTurnCredentials;
 exports.touchReputationDailyOnAppOpen = touchReputationDailyOnAppOpen;
 exports.getReputationDailyState = getReputationDailyState;
 exports.claimReputationTask = claimReputationTask;
+exports.queueChatMessageNotification = queueChatMessageNotification;
+exports.dispatchQueuedChatNotification = dispatchQueuedChatNotification;
 exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;

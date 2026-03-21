@@ -143,32 +143,85 @@ service cloud.firestore {
       
       match /devices/{deviceId} {
 
-        // 👀 READ PUBLIC KEY (cho E2EE)
+        // Read device metadata for E2EE and push delivery.
         allow read: if request.auth != null;
 
-        // ➕ CREATE DEVICE (chỉ chủ user)
-        allow create: if request.auth != null
-          && request.auth.uid == userId
-          && request.resource.data.keys().hasOnly([
+        function isOwnerDeviceWrite() {
+          return request.auth != null && request.auth.uid == userId;
+        }
+
+        function hasOnlyAllowedDeviceKeys() {
+          return request.resource.data.keys().hasOnly([
             "publicKey",
             "algorithm",
             "platform",
             "createdAt",
-            "lastActiveAt"
-          ])
-          && request.resource.data.publicKey is string
-          && request.resource.data.algorithm == "RSA-2048";
+            "lastActiveAt",
+            "fcmToken",
+            "fcmTokenUpdatedAt",
+            "pushEnabled",
+            "notificationPermission",
+            "notificationUpdatedAt",
+            "lastNotificationOpenedAt"
+          ]);
+        }
 
-        // ✏️ UPDATE
-        // - CHỈ cho update lastActiveAt
-        allow update: if request.auth != null
-          && request.auth.uid == userId
-          && request.resource.data.diff(resource.data).changedKeys()
-              .hasOnly(["lastActiveAt"]);
+        function hasValidDeviceFieldTypes() {
+          return (
+            !("publicKey" in request.resource.data)
+            || request.resource.data.publicKey is string
+          )
+          && (
+            !("algorithm" in request.resource.data)
+            || request.resource.data.algorithm == "RSA-2048"
+          )
+          && (
+            !("platform" in request.resource.data)
+            || request.resource.data.platform is string
+          )
+          && (
+            !("createdAt" in request.resource.data)
+            || request.resource.data.createdAt is timestamp
+          )
+          && (
+            !("lastActiveAt" in request.resource.data)
+            || request.resource.data.lastActiveAt is timestamp
+          )
+          && (
+            !("fcmToken" in request.resource.data)
+            || request.resource.data.fcmToken is string
+          )
+          && (
+            !("fcmTokenUpdatedAt" in request.resource.data)
+            || request.resource.data.fcmTokenUpdatedAt is timestamp
+          )
+          && (
+            !("pushEnabled" in request.resource.data)
+            || request.resource.data.pushEnabled is bool
+          )
+          && (
+            !("notificationPermission" in request.resource.data)
+            || request.resource.data.notificationPermission is string
+          )
+          && (
+            !("notificationUpdatedAt" in request.resource.data)
+            || request.resource.data.notificationUpdatedAt is timestamp
+          )
+          && (
+            !("lastNotificationOpenedAt" in request.resource.data)
+            || request.resource.data.lastNotificationOpenedAt is timestamp
+          );
+        }
 
-        // 🗑️ DELETE DEVICE (revoke)
-        allow delete: if request.auth != null
-          && request.auth.uid == userId;
+        allow create: if isOwnerDeviceWrite()
+          && hasOnlyAllowedDeviceKeys()
+          && hasValidDeviceFieldTypes();
+
+        allow update: if isOwnerDeviceWrite()
+          && hasOnlyAllowedDeviceKeys()
+          && hasValidDeviceFieldTypes();
+
+        allow delete: if isOwnerDeviceWrite();
       }
 
     }
@@ -348,10 +401,10 @@ service cloud.firestore {
       }
 
       function onlyUpdateMyAvatar() {
-        // Các field thay đổi
+        // CÃ¡c field thay Ä‘á»•i
         let changed = request.resource.data.diff(resource.data).changedKeys();
 
-        // Chỉ được thay đổi đúng 1 field
+        // Chá»‰ Ä‘Æ°á»£c thay Ä‘á»•i Ä‘Ãºng 1 field
         return changed.size() == 1
           && changed.hasOnly(["anonymousAvatars"])
           && request.resource.data.anonymousAvatars.keys().hasOnly(
@@ -361,16 +414,16 @@ service cloud.firestore {
               == request.resource.data.anonymousAvatars[request.auth.uid];
       }
 
-      // 👀 READ temp chat room
+      // ðŸ‘€ READ temp chat room
       allow read: if request.auth != null;
 
 
-      // ➕ Create room
+      // âž• Create room
       allow create: if request.auth != null
         && request.resource.data.participants is list
         && request.auth.uid in request.resource.data.participants;
 
-      // ✏️ Update
+      // âœï¸ Update
       allow update: if isParticipant()
         && (
           request.resource.data.diff(resource.data).changedKeys()
@@ -463,10 +516,10 @@ service cloud.firestore {
           && request.auth.uid in resource.data.participants;
       }
 
-      // 👀 đọc room
+      // ðŸ‘€ Ä‘á»c room
       allow read: if isParticipant();
 
-      // ➕ tạo room (khi convert)
+      // âž• táº¡o room (khi convert)
       allow create: if request.auth != null
         && request.resource.data.participants is list
         && request.auth.uid in request.resource.data.participants;
@@ -491,7 +544,7 @@ service cloud.firestore {
           ]);
       
        // ===============================
-      // 🔐 SESSION KEYS (E2EE) - KHÔNG ROTATE KEY
+      // ðŸ” SESSION KEYS (E2EE) - KHÃ”NG ROTATE KEY
       // ===============================
       match /sessionKeys/{deviceId} {
 
@@ -502,7 +555,7 @@ service cloud.firestore {
                 .data.participants;
         }
 
-        // ✅ BỎ epoch - chỉ cần userId, encryptedKey, createdAt
+        // âœ… Bá»Ž epoch - chá»‰ cáº§n userId, encryptedKey, createdAt
         allow create, update: if isRoomParticipant()
           && (
             request.resource.data.keys().hasOnly([
@@ -524,7 +577,7 @@ service cloud.firestore {
             || request.resource.data.keyId is int
           );
 
-        // cho phép participant đọc
+        // cho phÃ©p participant Ä‘á»c
         allow read: if isRoomParticipant();
 
         allow delete: if false;
@@ -540,10 +593,10 @@ service cloud.firestore {
                 .data.participants;
         }
 
-        // 👀 đọc tin nhắn
+        // ðŸ‘€ Ä‘á»c tin nháº¯n
         allow read: if isRoomParticipant();
 
-        // ➕ gửi / copy tin nhắn
+        // âž• gá»­i / copy tin nháº¯n
         allow create: if isRoomParticipant()
           && request.resource.data.senderId is string
           && request.resource.data.createdAt != null;
@@ -780,28 +833,29 @@ service cloud.firestore {
   
     match /chatRatings/{id} {
 
-      // 👀 Transaction cần read
+      // ðŸ‘€ Transaction cáº§n read
       allow read: if request.auth != null;
 
-      // ➕ Create rating (mỗi user chỉ rate từ UID của mình)
+      // âž• Create rating (má»—i user chá»‰ rate tá»« UID cá»§a mÃ¬nh)
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid;
 
-      // ❌ Không update / delete
+      // âŒ KhÃ´ng update / delete
       allow update, delete: if false;
     }
 		
     // ================= USER MATCHING REPORT =================
     match /userMatchingReports/{reportId} {
 
-      // ➕ Create report
+      // âž• Create report
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid;
 
-      // ❌ Không cho đọc / sửa / xóa
+      // âŒ KhÃ´ng cho Ä‘á»c / sá»­a / xÃ³a
       allow read, update, delete: if false;
     }
 
   }
 }
+
 

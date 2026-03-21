@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/models/reputation_daily_state.dart';
 import 'package:matchu_app/services/reputation/reputation_service.dart';
 import 'package:matchu_app/services/user/presence_service.dart';
@@ -39,6 +40,9 @@ class AppLifecycleController extends GetxController
     }
 
     PresenceService.setOnline();
+    if (Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().setForegroundState(true);
+    }
     _touchDailyLoginTask(
       source: wasLoggedIn ? "auth_refresh" : "auth_login",
       force: true,
@@ -80,11 +84,17 @@ class AppLifecycleController extends GetxController
 
     if (state == AppLifecycleState.resumed) {
       PresenceService.setOnline();
+      if (Get.isRegistered<NotificationController>()) {
+        Get.find<NotificationController>().setForegroundState(true);
+      }
       _touchDailyLoginTask(source: "resume", force: true);
       _startUsageHeartbeat();
       return;
     }
 
+    if (Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().setForegroundState(false);
+    }
     _touchDailyLoginTask(source: _sourceForInactiveState(state), force: true);
     _stopUsageHeartbeat();
   }

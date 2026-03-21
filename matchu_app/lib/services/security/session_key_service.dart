@@ -299,15 +299,31 @@ class SessionKeyService {
     int keyId = 0,
   }) async {
     final data = snap.data();
-    if (data != null && data["keyId"] is int) {
+    if (data == null) {
+      print("Session key document ${snap.id} is empty");
+      return false;
+    }
+    if (data["keyId"] is int) {
       keyId = data["keyId"] as int;
     }
-    if (data != null && data["userId"] is String && data["userId"] != uid) {
+    if (data["userId"] is String && data["userId"] != uid) {
       print("❌ Session key doc belongs to another user: ${data["userId"]}");
       return false;
     }
 
-    final encrypted = base64Decode(snap["encryptedKey"]);
+    final encryptedKeyB64 = data["encryptedKey"];
+    if (encryptedKeyB64 is! String || encryptedKeyB64.isEmpty) {
+      print("Session key doc ${snap.id} is missing encryptedKey");
+      return false;
+    }
+
+    late final Uint8List encrypted;
+    try {
+      encrypted = base64Decode(encryptedKeyB64);
+    } catch (e) {
+      print("Invalid encryptedKey encoding for ${snap.id}: $e");
+      return false;
+    }
     final privateKeyPem = await IdentityKeyService.readPrivateKey();
     if (privateKeyPem == null) return false;
 
@@ -602,27 +618,33 @@ class SessionKeyService {
 
     for (final participantUid in uniqueParticipants) {
       final devices = await _getDevices(participantUid);
+      if (devices.isEmpty) {
+        continue;
+      }
 
-      for (final d in devices) {
-        final deviceId = d['deviceId'];
-        final publicKeyPem = d['publicKey'];
-        if (deviceId == null || publicKeyPem == null) continue;
+      final existingDocIds = await _getExistingSessionKeyDocIds(
+        roomId: roomId,
+        participantUid: participantUid,
+        keyId: keyId,
+      );
+
+      for (final device in devices) {
+        final deviceId = device.deviceId;
+        final publicKeyPem = device.publicKeyPem;
+        final docId = _sessionKeyDocId(
+          participantUid: participantUid,
+          deviceId: deviceId,
+          keyId: keyId,
+        );
 
         final docRef = _db
             .collection("chatRooms")
             .doc(roomId)
             .collection("sessionKeys")
-            .doc(
-              _sessionKeyDocId(
-                participantUid: participantUid,
-                deviceId: deviceId,
-                keyId: keyId,
-              ),
-            );
+            .doc(docId);
 
         // 🔒 Kiểm tra xem device đã có session key chưa (không ghi đè)
-        final existing = await docRef.get();
-        if (existing.exists) {
+        if (existingDocIds.contains(docId)) {
           skippedCount++;
           continue; // Đã có key, bỏ qua
         }
@@ -654,12 +676,67 @@ class SessionKeyService {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> _getDevices(String uid) async {
+  static Future<List<_SessionDeviceInfo>> _getDevices(String uid) async {
     final snap =
         await _db.collection('users').doc(uid).collection('devices').get();
 
-    return snap.docs
-        .map((d) => {'deviceId': d.id, 'publicKey': d['publicKey']})
-        .toList();
+    final devices = <_SessionDeviceInfo>[];
+    var skippedInvalid = 0;
+
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final publicKey = data["publicKey"];
+
+      if (publicKey is! String || publicKey.trim().isEmpty) {
+        skippedInvalid++;
+        continue;
+      }
+
+      devices.add(
+        _SessionDeviceInfo(deviceId: doc.id, publicKeyPem: publicKey.trim()),
+      );
+    }
+
+    if (skippedInvalid > 0) {
+      print(
+        "Skipping $skippedInvalid invalid device docs for user $uid because publicKey is missing",
+      );
+    }
+
+    return devices;
   }
+
+  static Future<Set<String>> _getExistingSessionKeyDocIds({
+    required String roomId,
+    required String participantUid,
+    required int keyId,
+  }) async {
+    final snap =
+        await _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .where("userId", isEqualTo: participantUid)
+            .get();
+
+    final existingDocIds = <String>{};
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final existingKeyId = data["keyId"] is int ? data["keyId"] as int : 0;
+      if (existingKeyId == keyId) {
+        existingDocIds.add(doc.id);
+      }
+    }
+    return existingDocIds;
+  }
+}
+
+class _SessionDeviceInfo {
+  const _SessionDeviceInfo({
+    required this.deviceId,
+    required this.publicKeyPem,
+  });
+
+  final String deviceId;
+  final String publicKeyPem;
 }

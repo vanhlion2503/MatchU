@@ -10,6 +10,7 @@ import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_bottom_bar.dart';
 import 'package:matchu_app/views/chat/long_chat/view_once_image_view.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -102,6 +103,9 @@ class ChatController extends GetxController {
     super.onInit();
 
     _presence = Get.find<PresenceController>();
+    if (Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().enterChatRoom(roomId);
+    }
 
     _sessionKeySub = SessionKeyService.onSessionKeyUpdated(roomId).listen((_) {
       decryptedCache.clear();
@@ -1077,6 +1081,9 @@ class ChatController extends GetxController {
           print("Waiting for another device to distribute key...");
         }
       }
+    } catch (e, st) {
+      debugPrint("Session key setup failed for room $roomId: $e");
+      debugPrintStack(stackTrace: st);
     } finally {
       _isEnsuringKey = false;
     }
@@ -1100,6 +1107,9 @@ class ChatController extends GetxController {
     deletedMessageIds.clear();
     pendingImageMessages.clear();
     allMessages.clear();
+    if (Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().restoreAfterChatClosed(roomId);
+    }
     super.onClose();
   }
 }

@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/list_chat/confirm_delete_chat.dart';
@@ -32,6 +33,20 @@ class _ChatListViewState extends State<ChatListView> {
         Get.isRegistered<ChatListController>()
             ? Get.find<ChatListController>()
             : Get.put(ChatListController());
+
+    if (!widget.embedInMainNavigation &&
+        Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().enterChatList();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!widget.embedInMainNavigation &&
+        Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().leaveChatList();
+    }
+    super.dispose();
   }
 
   @override

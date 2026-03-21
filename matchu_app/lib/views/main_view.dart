@@ -4,6 +4,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -33,6 +34,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
   late Animation<double> _boltSlideAnimation;
   late Animation<double> _boltRotateAnimation;
   late Animation<double> _glowOpacityAnimation;
+  Worker? _tabIndexWorker;
   bool _passcodeChecked = false;
 
   late final List<Widget> pages = const [
@@ -88,6 +90,15 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensurePasscodeFlow();
     });
+
+    if (Get.isRegistered<NotificationController>()) {
+      final notificationController = Get.find<NotificationController>();
+      _tabIndexWorker = ever<int>(
+        c.currentIndex,
+        notificationController.setMainTabIndex,
+      );
+      notificationController.setMainTabIndex(c.currentIndex.value);
+    }
   }
 
   Future<void> _ensurePasscodeFlow() async {
@@ -162,6 +173,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _tabIndexWorker?.dispose();
     _centerTapController.dispose();
     _centerIdleController.dispose();
     super.dispose();
@@ -232,7 +244,7 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
           clipBehavior: Clip.none,
           children: [
             Container(
-              height: 85,
+              height: 88,
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(

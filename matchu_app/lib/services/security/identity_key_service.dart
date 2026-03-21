@@ -71,7 +71,12 @@ class IdentityKeyService {
     final snap = await docRef.get();
 
     if (snap.exists) {
-      await docRef.update({'lastActiveAt': FieldValue.serverTimestamp()});
+      await docRef.set({
+        'publicKey': publicPem,
+        'algorithm': 'RSA-2048',
+        'platform': _platformName(),
+        'lastActiveAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       return;
     }
 
@@ -81,7 +86,7 @@ class IdentityKeyService {
       'platform': _platformName(),
       'createdAt': FieldValue.serverTimestamp(),
       'lastActiveAt': FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge: true));
   }
 
   static String _platformName() {
