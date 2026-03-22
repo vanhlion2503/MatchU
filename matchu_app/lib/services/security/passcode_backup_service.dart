@@ -23,7 +23,11 @@ class PasscodeBackupService {
   static String _historyLockedKey(String uid) => 'backup_history_locked_$uid';
 
   static DocumentReference<Map<String, dynamic>> _backupDoc() {
-    return _db.collection('users').doc(uid).collection('security').doc('backup');
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('security')
+        .doc('backup');
   }
 
   static CollectionReference<Map<String, dynamic>> _backupKeysCollection() {
@@ -146,10 +150,7 @@ class PasscodeBackupService {
         mac: Mac(macBytes),
       );
 
-      final backupKey = await _aesGcm.decrypt(
-        secretBox,
-        secretKey: derivedKey,
-      );
+      final backupKey = await _aesGcm.decrypt(secretBox, secretKey: derivedKey);
 
       await _storage.write(
         key: _backupStorageKey(uid),
@@ -201,6 +202,27 @@ class PasscodeBackupService {
     return restored.toList();
   }
 
+  static Future<bool> restoreSessionKeyForRoom(
+    String roomId, {
+    int keyId = 0,
+  }) async {
+    final backupKey = await _loadBackupKey();
+    if (backupKey == null) return false;
+
+    final snap = await _backupKeyDoc(roomId, keyId).get();
+    if (!snap.exists) return false;
+
+    final data = snap.data();
+    if (data == null) return false;
+
+    return _restoreKeyFromData(
+      roomId: roomId,
+      keyId: keyId,
+      backupKey: backupKey,
+      data: data,
+    );
+  }
+
   static Future<void> backupSessionKey({
     required String roomId,
     required Uint8List sessionKey,
@@ -231,9 +253,7 @@ class PasscodeBackupService {
     String roomId, {
     int keyId = 0,
   }) async {
-    final b64 = await _storage.read(
-      key: _localSessionKeyKey(roomId, keyId),
-    );
+    final b64 = await _storage.read(key: _localSessionKeyKey(roomId, keyId));
     if (b64 == null) return;
     await backupSessionKey(
       roomId: roomId,
@@ -246,8 +266,7 @@ class PasscodeBackupService {
     final keys = await _storage.readAll();
     for (final entry in keys.entries) {
       final keyName = entry.key;
-      if (!keyName.startsWith('chat_') ||
-          !keyName.contains('_session_key')) {
+      if (!keyName.startsWith('chat_') || !keyName.contains('_session_key')) {
         continue;
       }
 

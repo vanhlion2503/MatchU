@@ -23,7 +23,6 @@ class ChatListView extends StatefulWidget {
 }
 
 class _ChatListViewState extends State<ChatListView> {
-  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
   late final ChatListController controller;
 
   @override
@@ -200,7 +199,6 @@ class _ChatListViewState extends State<ChatListView> {
                             key: const ValueKey("list"),
                             controller: controller,
                             myUid: myUid,
-                            listKey: _listKey,
                             bottomPadding: bottomListPadding,
                           ),
                 );
@@ -216,7 +214,6 @@ class _ChatListViewState extends State<ChatListView> {
 Widget _buildChatList({
   required ChatListController controller,
   required String myUid,
-  required GlobalKey<AnimatedListState> listKey,
   required double bottomPadding,
   Key? key,
 }) {
@@ -261,31 +258,31 @@ Widget _buildChatList({
     );
   }
 
-  return AnimatedList(
-    key: listKey,
-    initialItemCount: rooms.length,
+  return ListView.builder(
+    key: key,
     padding: EdgeInsets.only(bottom: bottomPadding),
-    itemBuilder: (context, index, animation) {
+    itemCount: rooms.length,
+    itemBuilder: (context, index) {
+      if (index < 0 || index >= rooms.length) {
+        return const SizedBox.shrink();
+      }
+
       final room = rooms[index];
-      return SizeTransition(
-        sizeFactor: animation,
-        child: SwipeChatItemMessage(
-          onPin: () => controller.pin(room),
-          onDelete:
-              () => showConfirmDeleteChat(
-                onConfirm: () => controller.delete(room),
-              ),
-          onMore: () {},
-          child: chatItem(
-            context: context,
-            room: room,
-            myUid: myUid,
-            searchQuery: controller.searchText.value,
-            onTap: () async {
-              await ChatService().markAsRead(room.id);
-              Get.toNamed(AppRouter.chat, arguments: {"roomId": room.id});
-            },
-          ),
+      return SwipeChatItemMessage(
+        onPin: () => controller.pin(room),
+        onDelete:
+            () =>
+                showConfirmDeleteChat(onConfirm: () => controller.delete(room)),
+        onMore: () {},
+        child: chatItem(
+          context: context,
+          room: room,
+          myUid: myUid,
+          searchQuery: controller.searchText.value,
+          onTap: () async {
+            await ChatService().markAsRead(room.id);
+            Get.toNamed(AppRouter.chat, arguments: {"roomId": room.id});
+          },
         ),
       );
     },

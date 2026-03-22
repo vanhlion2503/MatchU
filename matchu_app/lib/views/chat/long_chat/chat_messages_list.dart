@@ -105,6 +105,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
               }
 
               if (pendingCount > 0 && i <= pendingCount) {
+                if (i - 1 < 0 || i - 1 >= pending.length) {
+                  return const SizedBox.shrink();
+                }
                 final pendingItem = pending[i - 1];
                 return _buildPendingImageBubble(context, pendingItem);
               }
@@ -470,19 +473,15 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     return null;
   }
 
+  QueryDocumentSnapshot? _docAt(List<QueryDocumentSnapshot> docs, int index) {
+    if (index < 0 || index >= docs.length) return null;
+    return docs[index];
+  }
+
   bool _shouldGroup(List<QueryDocumentSnapshot> docs, int index) {
-    // ✅ Kiểm tra bounds
-    if (index < 0 || index >= docs.length) return false;
-
-    // Với reverse: true, index 0 là tin mới nhất
-    // Tin mới hơn có index nhỏ hơn
-    if (index == docs.length - 1) return false; // Tin cũ nhất
-
-    // ✅ Kiểm tra bounds cho next
-    if (index + 1 >= docs.length) return false;
-
-    final curr = docs[index];
-    final next = docs[index + 1]; // Tin cũ hơn
+    final curr = _docAt(docs, index);
+    final next = _docAt(docs, index + 1);
+    if (curr == null || next == null) return false;
 
     if (curr["senderId"] != next["senderId"]) return false;
 
@@ -496,17 +495,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
   }
 
   bool _isLastInGroup(List<QueryDocumentSnapshot> docs, int index) {
-    // ✅ Kiểm tra bounds
-    if (index < 0 || index >= docs.length) return true;
-
-    // Với reverse: true, index 0 là tin mới nhất
-    if (index == 0) return true; // Tin mới nhất luôn show time
-
-    // ✅ Kiểm tra bounds cho prev
-    if (index - 1 < 0) return true;
-
-    final curr = docs[index];
-    final prev = docs[index - 1]; // Tin mới hơn
+    final curr = _docAt(docs, index);
+    final prev = _docAt(docs, index - 1);
+    if (curr == null || prev == null) return true;
 
     if (curr["senderId"] != prev["senderId"]) return true;
 
@@ -526,17 +517,22 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
   }
 
   bool _shouldShowDateSeparator(List<QueryDocumentSnapshot> docs, int index) {
-    // index là messageIndex (0 → mới nhất)
-    if (index == docs.length - 1) return true; // tin cũ nhất → luôn show
+    if (docs.isEmpty) return false;
 
-    final curr = _getTime(docs[index]["createdAt"]);
-    final next = _getTime(docs[index + 1]["createdAt"]); // tin cũ hơn
+    final curr = _docAt(docs, index);
+    if (curr == null) return false;
 
-    if (curr == null || next == null) return false;
+    final next = _docAt(docs, index + 1);
+    if (next == null) return true;
 
-    return curr.year != next.year ||
-        curr.month != next.month ||
-        curr.day != next.day;
+    final currTime = _getTime(curr["createdAt"]);
+    final nextTime = _getTime(next["createdAt"]);
+
+    if (currTime == null || nextTime == null) return false;
+
+    return currTime.year != nextTime.year ||
+        currTime.month != nextTime.month ||
+        currTime.day != nextTime.day;
   }
 
   void _showMessageActions({

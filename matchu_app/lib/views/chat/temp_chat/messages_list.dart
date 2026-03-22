@@ -429,14 +429,24 @@ class _MessagesListState extends State<MessagesList> {
     return null;
   }
 
+  QueryDocumentSnapshot<Map<String, dynamic>>? _docAt(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+    int index,
+  ) {
+    if (index < 0 || index >= docs.length) return null;
+    return docs[index];
+  }
+
   bool _shouldGroup(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
     int index,
   ) {
-    if (index == 0) return false;
+    final prevDoc = _docAt(docs, index - 1);
+    final currDoc = _docAt(docs, index);
+    if (prevDoc == null || currDoc == null) return false;
 
-    final prev = docs[index - 1].data();
-    final curr = docs[index].data();
+    final prev = prevDoc.data();
+    final curr = currDoc.data();
 
     // ✅ CÙNG NGƯỜI GỬI
     if (prev["senderId"] != curr["senderId"]) return false;
@@ -454,10 +464,12 @@ class _MessagesListState extends State<MessagesList> {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
     int index,
   ) {
-    if (index == docs.length - 1) return true;
+    final currDoc = _docAt(docs, index);
+    final nextDoc = _docAt(docs, index + 1);
+    if (currDoc == null || nextDoc == null) return true;
 
-    final curr = docs[index].data();
-    final next = docs[index + 1].data();
+    final curr = currDoc.data();
+    final next = nextDoc.data();
 
     if (curr["senderId"] != next["senderId"]) return true;
 

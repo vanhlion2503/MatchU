@@ -106,18 +106,16 @@ class SessionKeyService {
             ? await hasAnySessionKeys(roomId)
             : await hasAnySessionKeysForKeyId(roomId, keyId);
     if (hasAnyKeys) {
-      final hasKeysForCurrentUser = await hasAnySessionKeysForUser(
+      final hasKeyForCurrentDevice = await hasSessionKeyForCurrentDevice(
         roomId,
-        uid,
         keyId: keyId,
       );
-      if (hasKeysForCurrentUser) {
-        print("Room $roomId already has session keys, skip creating new key");
-        return;
-      }
       print(
-        "Room $roomId has session keys but none for current user, trying recovery create",
+        hasKeyForCurrentDevice
+            ? "Room $roomId already has a session key for this device, skip creating new key"
+            : "Room $roomId already has session keys for keyId=$keyId, skip creating duplicate key",
       );
+      return;
     }
 
     final canCreate = await _acquireKeyCreationLock(
@@ -523,6 +521,41 @@ class SessionKeyService {
       }
     }
     return false;
+  }
+
+  static Future<bool> hasSessionKeyForDevice({
+    required String roomId,
+    required String participantUid,
+    required String deviceId,
+    int keyId = 0,
+  }) async {
+    final docId = _sessionKeyDocId(
+      participantUid: participantUid,
+      deviceId: deviceId,
+      keyId: keyId,
+    );
+
+    final snap =
+        await _db
+            .collection("chatRooms")
+            .doc(roomId)
+            .collection("sessionKeys")
+            .doc(docId)
+            .get();
+    return snap.exists;
+  }
+
+  static Future<bool> hasSessionKeyForCurrentDevice(
+    String roomId, {
+    int keyId = 0,
+  }) async {
+    final deviceId = await DeviceService.getDeviceId();
+    return hasSessionKeyForDevice(
+      roomId: roomId,
+      participantUid: uid,
+      deviceId: deviceId,
+      keyId: keyId,
+    );
   }
 
   static String _keyCreationLockPath(int keyId) => "sessionKeyLocks.$keyId";
