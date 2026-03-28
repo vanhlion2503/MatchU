@@ -17,13 +17,28 @@ class ChatView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roomId = Get.arguments["roomId"] as String;
+    final args =
+        Get.arguments is Map
+            ? Map<String, dynamic>.from(Get.arguments)
+            : const <String, dynamic>{};
+    final roomId = (args["roomId"] ?? "").toString();
+    final messageId = (args["messageId"] ?? "").toString().trim();
 
     // ✅ Controller theo room (tagged)
     final ChatController controller = Get.put(
-      ChatController(roomId),
+      ChatController(
+        roomId,
+        initialMessageId: messageId.isEmpty ? null : messageId,
+      ),
       tag: roomId,
     );
+    if (messageId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!controller.isClosed) {
+          controller.focusMessageFromNotification(messageId);
+        }
+      });
+    }
     final CallController callController = Get.find<CallController>();
 
     // ✅ Global controllers (đã put ở main)

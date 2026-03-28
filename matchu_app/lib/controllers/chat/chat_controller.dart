@@ -22,7 +22,8 @@ import 'package:matchu_app/controllers/user/presence_controller.dart';
 
 class ChatController extends GetxController {
   final String roomId;
-  ChatController(this.roomId);
+  ChatController(this.roomId, {String? initialMessageId})
+    : _pendingFocusMessageId = _normalizeMessageId(initialMessageId);
 
   final RxDouble bottomBarHeight = 0.0.obs;
   bool _justSentMessage = false;
@@ -71,6 +72,9 @@ class ChatController extends GetxController {
   DocumentSnapshot<Map<String, dynamic>>?
   _oldestDocument; // Tin nhắn cũ nhất đã load
 
+  String? _pendingFocusMessageId;
+  bool _isResolvingPendingFocus = false;
+
   final replyingMessage = Rxn<Map<String, dynamic>>();
   final editingMessage = Rxn<Map<String, dynamic>>();
   final highlightedMessageId = RxnString();
@@ -97,6 +101,12 @@ class ChatController extends GetxController {
   static const String _deletedType = "deleted";
   static const String viewOnceImageText = "Ảnh";
   static const String viewOnceDeletedText = "Ảnh đã bị xóa";
+
+  static String? _normalizeMessageId(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 
   @override
   void onInit() {
@@ -237,6 +247,7 @@ class ChatController extends GetxController {
       if (docs.isEmpty) {
         _hasMoreMessages = false;
         _initialLoadComplete = true;
+        _schedulePendingFocusResolution();
         return;
       }
 
@@ -283,6 +294,7 @@ class ChatController extends GetxController {
     lastMessageCount = docs.length;
     _hasMoreMessages = docs.length >= _pageSize;
     _initialLoadComplete = true;
+    _schedulePendingFocusResolution();
   }
 
   // ================= AUTO SCROLL CORE =================
@@ -379,6 +391,7 @@ class ChatController extends GetxController {
     if (!hasChange) return;
 
     lastMessageCount = allMessages.length;
+    _schedulePendingFocusResolution();
 
     if (!hasInsertedNewMessage) {
       return;
@@ -508,6 +521,7 @@ class ChatController extends GetxController {
       if (newDocs.length < _pageSize) {
         _hasMoreMessages = false;
       }
+      _schedulePendingFocusResolution();
     } catch (e) {
       print('Error loading more messages: $e');
     } finally {
@@ -889,31 +903,107 @@ class ChatController extends GetxController {
   }
 
   // ================= SCROLL TO MESSAGE =================
-  void scrollToMessage({
-    required List<QueryDocumentSnapshot> docs,
-    required String messageId,
-  }) {
-    final index = docs.indexWhere((e) => e.id == messageId);
-    if (index == -1) return;
+  void focusMessageFromNotification(String messageId) {
+    final normalized = _normalizeMessageId(messageId);
+    if (normalized == null) return;
+
+    _pendingFocusMessageId = normalized;
+    _schedulePendingFocusResolution();
+  }
+
+  void _schedulePendingFocusResolution() {
+    if (_pendingFocusMessageId == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!itemScrollController.isAttached) return;
+      if (isClosed) return;
+      unawaited(_resolvePendingFocusMessage());
+    });
+  }
+
+  Future<void> _resolvePendingFocusMessage() async {
+    if (_isResolvingPendingFocus || !_initialLoadComplete) return;
+
+    _isResolvingPendingFocus = true;
+    try {
+      var attempt = 0;
+      while (!isClosed) {
+        final targetMessageId = _pendingFocusMessageId;
+        if (targetMessageId == null) return;
+
+        final listIndex = _messageListIndexForMessage(targetMessageId);
+        if (listIndex != null) {
+          _pendingFocusMessageId = null;
+          userScrolledUp.value = false;
+          showNewMessageBtn.value = false;
+          _scrollToListIndex(listIndex, messageId: targetMessageId);
+          unawaited(_service.markAsRead(roomId));
+          return;
+        }
+
+        if (!_hasMoreMessages || _oldestDocument == null || attempt >= 12) {
+          _pendingFocusMessageId = null;
+          return;
+        }
+
+        attempt += 1;
+        await loadMoreMessages();
+        await Future.delayed(const Duration(milliseconds: 90));
+      }
+    } finally {
+      _isResolvingPendingFocus = false;
+    }
+  }
+
+  int? _messageListIndexForMessage(String messageId) {
+    final messageIndex = _messageIndexMap[messageId];
+    if (messageIndex == null) return null;
+    return 1 + pendingImageMessages.length + messageIndex;
+  }
+
+  void _scrollToListIndex(int index, {String? messageId}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!itemScrollController.isAttached) {
+        Future.delayed(const Duration(milliseconds: 120), () {
+          if (isClosed) return;
+          _scrollToListIndex(index, messageId: messageId);
+        });
+        return;
+      }
 
       itemScrollController.scrollTo(
         index: index,
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 420),
         curve: Curves.easeOutCubic,
         alignment: 0.3,
       );
 
+      if (messageId == null) return;
+
       highlightedMessageId.value = messageId;
 
-      Future.delayed(const Duration(milliseconds: 900), () {
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (isClosed) return;
         if (highlightedMessageId.value == messageId) {
           highlightedMessageId.value = null;
         }
       });
     });
+  }
+
+  void scrollToMessage({
+    required List<QueryDocumentSnapshot> docs,
+    required String messageId,
+  }) {
+    final listIndex =
+        _messageListIndexForMessage(messageId) ??
+        (() {
+          final index = docs.indexWhere((e) => e.id == messageId);
+          if (index == -1) return null;
+          return 1 + pendingImageMessages.length + index;
+        })();
+    if (listIndex == null) return;
+
+    _scrollToListIndex(listIndex, messageId: messageId);
   }
 
   void onReactMessage({required String messageId, required String reactionId}) {

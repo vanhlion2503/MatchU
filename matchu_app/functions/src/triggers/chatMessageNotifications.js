@@ -9,10 +9,11 @@ const REGION = "asia-southeast1";
 const NOTIFICATION_QUEUE_COLLECTION = "chatNotificationQueues";
 const SENDER_RATE_LIMIT_COLLECTION = "chatNotificationSenderRateLimits";
 
-const BASE_NOTIFICATION_DELAY_MS = 3500;
-const MIN_GAP_BETWEEN_NOTIFICATIONS_MS = 5000;
+const INITIAL_NOTIFICATION_DELAY_MS = 650;
+const MIN_GAP_BETWEEN_NOTIFICATIONS_MS = 1800;
 const RATE_LIMIT_WINDOW_MS = 2000;
 const RATE_LIMIT_MAX_MESSAGES = 5;
+const MAX_NOTIFICATION_PREVIEW_LENGTH = 160;
 
 const DELIVERY_MODE_FOREGROUND = "foreground_data";
 const DELIVERY_MODE_PUSH = "push";
@@ -52,6 +53,7 @@ const queueChatMessageNotification = onDocumentCreated(
       "MatchU";
 
     const messageType = messageData.type === "image" ? "image" : "text";
+    const messagePreview = extractMessagePreview(messageData, messageType);
     const nowMs = Date.now();
     const rateLimitDelayMs = await computeSenderDelayMs(senderUid, nowMs);
     const queueRef = db
@@ -62,24 +64,26 @@ const queueChatMessageNotification = onDocumentCreated(
       const queueSnap = await transaction.get(queueRef);
       const current = queueSnap.exists ? queueSnap.data() || {} : {};
 
+      const hasPendingNotification = current.status === "pending";
       const pendingCount =
-        current.status === "pending" ? (toInt(current.pendingCount) || 0) + 1 : 1;
+        hasPendingNotification ? (toInt(current.pendingCount) || 0) + 1 : 1;
       const existingScheduledAtMs = timestampToMillis(current.scheduledAt);
       const lastSentAtMs = timestampToMillis(current.lastSentAt);
       const minGapDelayMs = Math.max(
         0,
         lastSentAtMs + MIN_GAP_BETWEEN_NOTIFICATIONS_MS - nowMs
       );
-
-      const scheduledAtMs = Math.max(
-        existingScheduledAtMs,
-        nowMs +
+      const scheduledAtMs = hasPendingNotification && existingScheduledAtMs > 0
+        ? Math.max(
+            existingScheduledAtMs,
+            nowMs + Math.max(rateLimitDelayMs, minGapDelayMs)
+          )
+        : nowMs +
           Math.max(
-            BASE_NOTIFICATION_DELAY_MS,
+            INITIAL_NOTIFICATION_DELAY_MS,
             rateLimitDelayMs,
             minGapDelayMs
-          )
-      );
+          );
 
       transaction.set(
         queueRef,
@@ -90,6 +94,7 @@ const queueChatMessageNotification = onDocumentCreated(
           senderName,
           lastMessageId: event.params.messageId,
           lastMessageType: messageType,
+          lastMessagePreview: messagePreview,
           lastMessageAt:
             messageData.createdAt || admin.firestore.Timestamp.fromMillis(nowMs),
           pendingCount,
@@ -103,6 +108,15 @@ const queueChatMessageNotification = onDocumentCreated(
         { merge: true }
       );
     });
+
+    if (cleanString(messageData.notificationPreview)) {
+      await snapshot.ref.set(
+        {
+          notificationPreview: admin.firestore.FieldValue.delete(),
+        },
+        { merge: true }
+      );
+    }
   }
 );
 
@@ -349,26 +363,55 @@ function buildDataPayload(queueData, title, body, deliveryMode) {
 function buildNotificationText(queueData) {
   const senderName = cleanString(queueData.senderName) || "MatchU";
   const pendingCount = toInt(queueData.pendingCount) || 1;
-  const messageType = cleanString(queueData.lastMessageType);
+  const title = pendingCount > 1 ? `${senderName} (${pendingCount})` : senderName;
+  const body = resolveQueuedPreview(queueData);
 
-  if (pendingCount > 1) {
-    return {
-      title: senderName,
-      body: `${pendingCount} tin nhan moi`,
-    };
+  return {
+    title,
+    body,
+  };
+}
+
+function extractMessagePreview(messageData, messageType) {
+  const directPreview = truncateNotificationText(
+    cleanString(messageData.notificationPreview)
+  );
+  if (directPreview) {
+    return directPreview;
   }
 
   if (messageType === "image") {
-    return {
-      title: senderName,
-      body: "Da gui mot anh",
-    };
+    return "Da gui mot anh";
   }
 
-  return {
-    title: senderName,
-    body: "Da gui mot tin nhan moi",
-  };
+  const plaintext = truncateNotificationText(cleanString(messageData.text));
+  if (plaintext) {
+    return plaintext;
+  }
+
+  return "Da gui mot tin nhan moi";
+}
+
+function resolveQueuedPreview(queueData) {
+  const messageType = cleanString(queueData.lastMessageType);
+  const preview = truncateNotificationText(cleanString(queueData.lastMessagePreview));
+  if (preview) {
+    return preview;
+  }
+
+  if (messageType === "image") {
+    return "Da gui mot anh";
+  }
+
+  return "Da gui mot tin nhan moi";
+}
+
+function truncateNotificationText(value) {
+  if (!value) return "";
+  if (value.length <= MAX_NOTIFICATION_PREVIEW_LENGTH) {
+    return value;
+  }
+  return `${value.slice(0, MAX_NOTIFICATION_PREVIEW_LENGTH).trimEnd()}...`;
 }
 
 async function computeSenderDelayMs(senderUid, nowMs) {

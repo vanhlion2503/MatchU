@@ -93,6 +93,10 @@ class _MainViewState extends State<MainView> with TickerProviderStateMixin {
 
     if (Get.isRegistered<NotificationController>()) {
       final notificationController = Get.find<NotificationController>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !Get.isRegistered<NotificationController>()) return;
+        notificationController.flushPendingNavigation(allowMainRedirect: true);
+      });
       _tabIndexWorker = ever<int>(
         c.currentIndex,
         notificationController.setMainTabIndex,

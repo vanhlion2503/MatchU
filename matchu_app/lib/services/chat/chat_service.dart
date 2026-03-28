@@ -28,8 +28,7 @@ class ChatService {
         .where("participants", arrayContains: uid)
         .orderBy("lastMessageAt", descending: true)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map(ChatRoomModel.fromDoc).toList());
+        .map((snap) => snap.docs.map(ChatRoomModel.fromDoc).toList());
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessagesWithFallback(
@@ -76,7 +75,6 @@ class ChatService {
     });
   }
 
-
   Future<void> setTyping({
     required String roomId,
     required bool isTyping,
@@ -116,6 +114,7 @@ class ChatService {
       "iv": encrypted["iv"],
       "keyId": keyId,
       "type": type,
+      "notificationPreview": _buildNotificationPreview(text),
       "replyToId": replyToId,
       "replyText": replyText,
       "createdAt": FieldValue.serverTimestamp(),
@@ -129,7 +128,7 @@ class ChatService {
       "lastMessageCipher": encrypted["ciphertext"],
       "lastMessageIv": encrypted["iv"],
       "lastMessageKeyId": keyId,
-      
+
       "lastSenderId": uid,
       "lastMessageAt": FieldValue.serverTimestamp(),
       "deletedFor.$otherUid": FieldValue.delete(),
@@ -159,10 +158,7 @@ class ChatService {
 
     final uploadTask = storageRef.putFile(
       file,
-      SettableMetadata(
-        contentType: "image/jpeg",
-        cacheControl: "no-store",
-      ),
+      SettableMetadata(contentType: "image/jpeg", cacheControl: "no-store"),
     );
 
     StreamSubscription<TaskSnapshot>? uploadSub;
@@ -187,6 +183,7 @@ class ChatService {
       "senderId": uid,
       "text": "Ảnh",
       "type": "image",
+      "notificationPreview": _buildImageNotificationPreview(),
       "imagePath": imagePath,
       "viewOnce": true,
       "viewedBy": {},
@@ -211,11 +208,8 @@ class ChatService {
     await batch.commit();
   }
 
-
   Future<void> markAsRead(String roomId) async {
-    await _db.collection("chatRooms").doc(roomId).update({
-      "unread.$uid": 0,
-    });
+    await _db.collection("chatRooms").doc(roomId).update({"unread.$uid": 0});
   }
 
   Future<void> setPinned(String roomId, bool value) async {
@@ -230,17 +224,20 @@ class ChatService {
     });
   }
 
-  Stream<int> listenTotalUnread(){
-    return _db.collection("chatRooms").where("participants", arrayContains: uid)
-            .snapshots().map((snap){
-              int total = 0;
-              for (final doc in snap.docs){
-                final data = doc.data();
-                final unread = data["unread"]?[uid] ?? 0;
-                total += unread as int;
-              }
-              return total;
-            });
+  Stream<int> listenTotalUnread() {
+    return _db
+        .collection("chatRooms")
+        .where("participants", arrayContains: uid)
+        .snapshots()
+        .map((snap) {
+          int total = 0;
+          for (final doc in snap.docs) {
+            final data = doc.data();
+            final unread = data["unread"]?[uid] ?? 0;
+            total += unread as int;
+          }
+          return total;
+        });
   }
 
   Future<void> toggleReaction({
@@ -261,13 +258,9 @@ class ChatService {
     final current = data["reactions"]?[uid];
 
     if (current == reactionId) {
-      await msgRef.update({
-        "reactions.$uid": FieldValue.delete(),
-      });
+      await msgRef.update({"reactions.$uid": FieldValue.delete()});
     } else {
-      await msgRef.update({
-        "reactions.$uid": reactionId,
-      });
+      await msgRef.update({"reactions.$uid": reactionId});
     }
   }
 
@@ -298,10 +291,11 @@ class ChatService {
   Future<String> getOrCreateRoom(String otherUid) async {
     final myUid = uid;
 
-    final query = await _db
-        .collection("chatRooms")
-        .where("participants", arrayContains: myUid)
-        .get();
+    final query =
+        await _db
+            .collection("chatRooms")
+            .where("participants", arrayContains: myUid)
+            .get();
 
     for (final doc in query.docs) {
       final participants = List<String>.from(doc["participants"]);
@@ -319,15 +313,25 @@ class ChatService {
       "lastMessage": "",
       "lastMessageAt": FieldValue.serverTimestamp(),
       "typing": {},
-      "unread": {
-        myUid: 0,
-        otherUid: 0,
-      },
+      "unread": {myUid: 0, otherUid: 0},
     });
 
     return roomRef.id;
   }
 
+  String _buildNotificationPreview(String text) {
+    const maxLength = 160;
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) {
+      return "Tin nhan moi";
+    }
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return "${normalized.substring(0, maxLength).trimRight()}...";
+  }
 
-
+  String _buildImageNotificationPreview() {
+    return "Da gui mot anh";
+  }
 }

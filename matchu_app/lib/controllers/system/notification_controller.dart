@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/models/chat_notification_payload.dart';
@@ -34,6 +35,9 @@ class NotificationController extends GetxController {
 
   ChatNotificationPayload? _pendingNavigation;
   String? _lastHandledNavigationKey;
+  int? _lastHandledNavigationAtMs;
+
+  static const int _navigationDedupWindowMs = 1500;
 
   bool get supportsNotifications => AppNotificationService.isSupportedPlatform;
 
@@ -177,10 +181,7 @@ class NotificationController extends GetxController {
           message.notification?.title ??
           payload.senderName ??
           'Tin nhan moi',
-      body:
-          payload.body ??
-          message.notification?.body ??
-          'Ban co tin nhan moi',
+      body: payload.body ?? message.notification?.body ?? 'Ban co tin nhan moi',
     );
 
     _showForegroundSnackbar(resolvedPayload);
@@ -240,7 +241,10 @@ class NotificationController extends GetxController {
     if (payload == null || _auth.currentUser == null) return;
 
     final navigationKey = '${payload.roomId}:${payload.messageId ?? ''}';
-    if (_lastHandledNavigationKey == navigationKey) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (_lastHandledNavigationKey == navigationKey &&
+        _lastHandledNavigationAtMs != null &&
+        nowMs - _lastHandledNavigationAtMs! < _navigationDedupWindowMs) {
       return;
     }
 
@@ -273,26 +277,37 @@ class NotificationController extends GetxController {
 
     final currentArgs = Get.arguments;
     final currentRoomId =
-        currentArgs is Map<String, dynamic>
-            ? currentArgs['roomId'] as String?
-            : null;
+        currentArgs is Map ? currentArgs['roomId']?.toString() : null;
 
-    _pendingNavigation = null;
-    _lastHandledNavigationKey = navigationKey;
+    _markNavigationHandled(navigationKey);
 
     if (Get.currentRoute == AppRouter.chat) {
       if (currentRoomId == payload.roomId) {
+        final messageId = payload.messageId?.trim();
+        if (messageId != null && messageId.isNotEmpty) {
+          if (Get.isRegistered<ChatController>(tag: payload.roomId)) {
+            Get.find<ChatController>(
+              tag: payload.roomId,
+            ).focusMessageFromNotification(messageId);
+            return;
+          }
+
+          await Get.offNamed(
+            AppRouter.chat,
+            arguments: _buildChatArguments(payload),
+          );
+        }
         return;
       }
 
       await Get.offNamed(
         AppRouter.chat,
-        arguments: {'roomId': payload.roomId},
+        arguments: _buildChatArguments(payload),
       );
       return;
     }
 
-    await Get.toNamed(AppRouter.chat, arguments: {'roomId': payload.roomId});
+    await Get.toNamed(AppRouter.chat, arguments: _buildChatArguments(payload));
   }
 
   Future<void> setForegroundState(bool isForeground) async {
@@ -421,6 +436,21 @@ class NotificationController extends GetxController {
       case TargetPlatform.fuchsia:
         return 'fuchsia';
     }
+  }
+
+  void _markNavigationHandled(String navigationKey) {
+    _pendingNavigation = null;
+    _lastHandledNavigationKey = navigationKey;
+    _lastHandledNavigationAtMs = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  Map<String, dynamic> _buildChatArguments(ChatNotificationPayload payload) {
+    final args = <String, dynamic>{'roomId': payload.roomId};
+    final messageId = payload.messageId?.trim();
+    if (messageId != null && messageId.isNotEmpty) {
+      args['messageId'] = messageId;
+    }
+    return args;
   }
 
   @override

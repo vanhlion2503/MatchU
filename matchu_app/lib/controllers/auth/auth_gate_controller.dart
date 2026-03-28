@@ -104,7 +104,9 @@ class AuthGateController extends GetxController {
     if (completed && Get.isRegistered<NotificationController>()) {
       Future.delayed(const Duration(milliseconds: 250), () {
         if (!Get.isRegistered<NotificationController>()) return;
-        Get.find<NotificationController>().flushPendingNavigation();
+        Get.find<NotificationController>().flushPendingNavigation(
+          allowMainRedirect: true,
+        );
       });
     }
   }
