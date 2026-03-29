@@ -18,9 +18,10 @@ class PostComposerController extends GetxController {
   final ImagePicker _picker = ImagePicker();
 
   final TextEditingController contentController = TextEditingController();
-  final TextEditingController tagsController = TextEditingController();
+  final TextEditingController tagInputController = TextEditingController();
 
   final RxList<PostMediaDraft> mediaDrafts = <PostMediaDraft>[].obs;
+  final RxList<String> tags = <String>[].obs;
   final RxInt contentLength = 0.obs;
   final RxBool isSubmitting = false.obs;
   final RxBool isPickingMedia = false.obs;
@@ -38,6 +39,7 @@ class PostComposerController extends GetxController {
   void onInit() {
     super.onInit();
     contentController.addListener(_handleContentChanged);
+    tagInputController.addListener(_handleTagInputChanged);
     _handleContentChanged();
   }
 
@@ -93,9 +95,18 @@ class PostComposerController extends GetxController {
     mediaDrafts.remove(draft);
   }
 
+  void removeTag(String tag) {
+    tags.remove(tag);
+  }
+
+  void commitPendingTag() {
+    _appendTagsFromRaw(tagInputController.text, clearInput: true);
+  }
+
   Future<PostModel?> submit() async {
     if (isSubmitting.value) return null;
 
+    commitPendingTag();
     final content = contentController.text.trim();
     if (content.isEmpty && mediaDrafts.isEmpty) {
       _showError('Bai viet can co noi dung hoac media.');
@@ -112,7 +123,7 @@ class PostComposerController extends GetxController {
       final post = await _service.createPost(
         content: content,
         mediaDrafts: mediaDrafts.toList(growable: false),
-        tags: _parseTags(tagsController.text),
+        tags: tags.toList(growable: false),
         isPublic: isPublic.value,
       );
       return post;
@@ -140,12 +151,42 @@ class PostComposerController extends GetxController {
     );
   }
 
+  void _appendTagsFromRaw(String rawText, {required bool clearInput}) {
+    final parsedTags = _parseTags(rawText);
+    if (parsedTags.isEmpty) {
+      if (clearInput) {
+        tagInputController.clear();
+      }
+      return;
+    }
+
+    final current = tags.toSet();
+    final next = [...tags];
+
+    for (final tag in parsedTags) {
+      if (current.contains(tag)) continue;
+      current.add(tag);
+      next.add(tag);
+    }
+
+    tags.assignAll(next);
+    if (clearInput) {
+      tagInputController.clear();
+    }
+  }
+
   List<String> _parseTags(String rawText) {
     return rawText
         .split(RegExp(r'[\s,]+'))
-        .map((tag) => tag.replaceAll('#', '').trim())
+        .map((tag) => tag.replaceAll('#', '').trim().toLowerCase())
         .where((tag) => tag.isNotEmpty)
         .toList(growable: false);
+  }
+
+  void _handleTagInputChanged() {
+    final currentValue = tagInputController.text;
+    if (!RegExp(r'[\s,]+').hasMatch(currentValue)) return;
+    _appendTagsFromRaw(currentValue, clearInput: true);
   }
 
   void _showError(String message) {
@@ -160,8 +201,9 @@ class PostComposerController extends GetxController {
   @override
   void onClose() {
     contentController.removeListener(_handleContentChanged);
+    tagInputController.removeListener(_handleTagInputChanged);
     contentController.dispose();
-    tagsController.dispose();
+    tagInputController.dispose();
     super.onClose();
   }
 
