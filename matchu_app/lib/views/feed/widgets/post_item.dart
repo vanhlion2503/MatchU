@@ -23,6 +23,8 @@ class PostItem extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
     final statsLabel = _buildStatsLabel(post);
+    final authorName = _authorName(post);
+    final authorHandle = _authorHandle(post);
 
     return Material(
       color: Colors.transparent,
@@ -40,10 +42,12 @@ class PostItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _PostHeader(post: post),
-                    if (_authorHandle(post).isNotEmpty) ...[
+                    if (authorHandle.isNotEmpty &&
+                        authorHandle.toLowerCase() !=
+                            authorName.toLowerCase()) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '@${_authorHandle(post)}',
+                        '@$authorHandle',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -393,9 +397,13 @@ String _authorName(PostModel post) {
 }
 
 String _authorHandle(PostModel post) {
-  final handle = post.author.id.trim();
-  if (handle.isNotEmpty) return handle;
-  return post.authorId.trim();
+  final nickname = post.author.nickname.trim();
+  if (nickname.isNotEmpty) return nickname;
+
+  final displayName = post.author.name.trim();
+  if (displayName.isNotEmpty) return displayName;
+
+  return '';
 }
 
 String _formatRelativeTime(DateTime? dateTime) {

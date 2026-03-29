@@ -344,13 +344,13 @@ class PostService {
   }
 
   PostAuthorModel _authorFromUser(UserModel user) {
+    final nickname = user.nickname.trim();
     final displayName =
-        user.fullname.trim().isNotEmpty
-            ? user.fullname.trim()
-            : user.nickname.trim();
+        user.fullname.trim().isNotEmpty ? user.fullname.trim() : nickname;
 
     return PostAuthorModel(
       id: user.uid,
+      nickname: nickname,
       name: displayName.isNotEmpty ? displayName : 'Nguoi dung',
       avatar: user.avatarUrl,
     );

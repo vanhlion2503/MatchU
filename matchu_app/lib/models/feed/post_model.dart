@@ -6,29 +6,38 @@ class PostAuthorModel {
   const PostAuthorModel({
     required this.id,
     required this.name,
+    required this.nickname,
     required this.avatar,
   });
 
   final String id;
   final String name;
+  final String nickname;
   final String avatar;
 
   factory PostAuthorModel.fromJson(Map<String, dynamic>? json) {
     return PostAuthorModel(
       id: (json?['id'] ?? '').toString(),
       name: (json?['name'] ?? '').toString(),
+      nickname: (json?['nickname'] ?? '').toString(),
       avatar: (json?['avatar'] ?? '').toString(),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'name': name, 'avatar': avatar};
+    return {'id': id, 'name': name, 'nickname': nickname, 'avatar': avatar};
   }
 
-  PostAuthorModel copyWith({String? id, String? name, String? avatar}) {
+  PostAuthorModel copyWith({
+    String? id,
+    String? name,
+    String? nickname,
+    String? avatar,
+  }) {
     return PostAuthorModel(
       id: id ?? this.id,
       name: name ?? this.name,
+      nickname: nickname ?? this.nickname,
       avatar: avatar ?? this.avatar,
     );
   }
