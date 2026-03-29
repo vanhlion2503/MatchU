@@ -238,6 +238,148 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // ================= POSTS / SOCIAL FEED =================
+    match /posts/{postId} {
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isAuthor() {
+        return isSignedIn() && request.auth.uid == resource.data.authorId;
+      }
+
+      function isAuthorCreate() {
+        return isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      }
+
+      function canReadPost() {
+        return resource.data.isPublic == true || isAuthor();
+      }
+
+      function oldStatsValue(key) {
+        return resource.data.stats is map
+          && resource.data.stats[key] is number
+          ? resource.data.stats[key]
+          : 0;
+      }
+
+      function newStatsValue(key) {
+        return request.resource.data.stats is map
+          && request.resource.data.stats[key] is number
+          ? request.resource.data.stats[key]
+          : 0;
+      }
+
+      function isCounterDelta(key) {
+        return newStatsValue(key) >= 0
+          && (
+            newStatsValue(key) == oldStatsValue(key) + 1
+            || newStatsValue(key) == oldStatsValue(key) - 1
+          );
+      }
+
+      function isStatsCounterOnlyUpdate() {
+        return isSignedIn()
+          && request.resource.data.stats is map
+          && resource.data.stats is map
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["stats", "updatedAt"])
+          && (
+            request.resource.data.stats.diff(resource.data.stats)
+              .changedKeys()
+              .hasOnly(["likeCount"])
+            && isCounterDelta("likeCount")
+            || (
+              request.resource.data.stats.diff(resource.data.stats)
+                .changedKeys()
+                .hasOnly(["commentCount"])
+              && isCounterDelta("commentCount")
+            )
+          );
+      }
+
+      allow read: if canReadPost();
+      allow create: if isAuthorCreate();
+      allow update: if isAuthor() || isStatsCounterOnlyUpdate();
+      allow delete: if isAuthor();
+
+      match /likes/{userId} {
+
+        function parentPost() {
+          return get(/databases/$(database)/documents/posts/$(postId)).data;
+        }
+
+        function canAccessParentPost() {
+          return parentPost().isPublic == true
+            || (
+              request.auth != null
+              && request.auth.uid == parentPost().authorId
+            );
+        }
+
+        allow read: if request.auth != null
+          && request.auth.uid == userId
+          && canAccessParentPost();
+
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && canAccessParentPost()
+          && request.resource.data.userId == request.auth.uid;
+
+        allow delete: if request.auth != null
+          && request.auth.uid == userId
+          && canAccessParentPost();
+
+        allow update: if false;
+      }
+
+      match /comments/{commentId} {
+
+        function parentPost() {
+          return get(/databases/$(database)/documents/posts/$(postId)).data;
+        }
+
+        function canAccessParentPost() {
+          return parentPost().isPublic == true
+            || (
+              request.auth != null
+              && request.auth.uid == parentPost().authorId
+            );
+        }
+
+        allow read: if canAccessParentPost();
+
+        allow create: if request.auth != null
+          && canAccessParentPost()
+          && request.resource.data.userId == request.auth.uid;
+
+        function oldReplyCount() {
+          return resource.data.replyCount is number
+            ? resource.data.replyCount
+            : 0;
+        }
+
+        function newReplyCount() {
+          return request.resource.data.replyCount is number
+            ? request.resource.data.replyCount
+            : 0;
+        }
+
+        allow update: if request.auth != null
+          && canAccessParentPost()
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(["replyCount"])
+          && newReplyCount() >= 0
+          && (
+            newReplyCount() == oldReplyCount() + 1
+            || newReplyCount() == oldReplyCount() - 1
+          );
+
+        allow delete: if false;
+      }
+    }
+
     // ================= TEMP CHAT ROOM =================
     match /tempChats/{roomId} {
 

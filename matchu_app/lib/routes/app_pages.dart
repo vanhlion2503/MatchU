@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
+import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
@@ -62,7 +63,13 @@ class AppPages {
     ),
 
     // GetPage(name: AppRouter.changePassword, page: ()=> const ChangePasswordView()),
-    GetPage(name: AppRouter.home, page: () => const HomeView()),
+    GetPage(
+      name: AppRouter.home,
+      page: () => const HomeView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
+      }),
+    ),
     GetPage(
       name: AppRouter.main,
       page: () => MainView(),
@@ -79,6 +86,7 @@ class AppPages {
 
         // 🔹 Feature
         Get.put(AvatarController());
+        Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
 
         // 🔥 NEARBY
         Get.put(NearbyController());

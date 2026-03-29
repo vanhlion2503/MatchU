@@ -1,0 +1,153 @@
+import 'dart:math' as math;
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
+
+class CommentTreeItem extends StatelessWidget {
+  const CommentTreeItem({
+    super.key,
+    required this.entry,
+    required this.onReplyTap,
+  });
+
+  final CommentThreadEntry entry;
+  final VoidCallback onReplyTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final comment = entry.comment;
+    final author = comment.author;
+    final theme = Theme.of(context);
+    final indent = math.min(entry.depth, 4) * 18.0;
+    final avatarUrl = author?.avatarUrl ?? '';
+    final displayName = author?.displayName ?? 'Nguoi dung';
+    final nickname = author?.nickname ?? '';
+
+    return Padding(
+      padding: EdgeInsets.only(left: indent),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundImage:
+                avatarUrl.isNotEmpty
+                    ? CachedNetworkImageProvider(avatarUrl)
+                    : null,
+            child:
+                avatarUrl.isEmpty
+                    ? Text(
+                      _initialOf(displayName),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                    : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? AppTheme.darkBorder
+                          : AppTheme.lightBorder,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            VerifiedNameRow(
+                              isVerified: author?.isVerified ?? false,
+                              child: Text(
+                                displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              nickname.isNotEmpty
+                                  ? '@$nickname • ${_formatRelativeTime(comment.createdAt)}'
+                                  : _formatRelativeTime(comment.createdAt),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    comment.content,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 14,
+                    runSpacing: 6,
+                    children: [
+                      GestureDetector(
+                        onTap: onReplyTap,
+                        child: Text(
+                          'Tra loi',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (comment.replyCount > 0)
+                        Text(
+                          '${comment.replyCount} phan hoi',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatRelativeTime(DateTime? dateTime) {
+  if (dateTime == null) return 'Vua xong';
+
+  final now = DateTime.now();
+  final diff = now.difference(dateTime);
+
+  if (diff.inSeconds < 60) return 'Vua xong';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} phut truoc';
+  if (diff.inHours < 24) return '${diff.inHours} gio truoc';
+  if (diff.inDays < 7) return '${diff.inDays} ngay truoc';
+
+  final day = dateTime.day.toString().padLeft(2, '0');
+  final month = dateTime.month.toString().padLeft(2, '0');
+  return '$day/$month/${dateTime.year}';
+}
+
+String _initialOf(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return '?';
+  return String.fromCharCode(trimmed.runes.first).toUpperCase();
+}
