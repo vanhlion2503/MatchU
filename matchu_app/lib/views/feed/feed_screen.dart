@@ -4,10 +4,10 @@ import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/post_comments_sheet.dart';
-import 'package:matchu_app/views/feed/widgets/feed_create_entry_card.dart';
 import 'package:matchu_app/views/feed/widgets/feed_empty_state.dart';
 import 'package:matchu_app/views/feed/widgets/feed_error_state.dart';
 import 'package:matchu_app/views/feed/widgets/feed_header.dart';
+import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/feed_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 
@@ -20,14 +20,15 @@ class FeedScreen extends GetView<FeedController> {
 
     if (createdPost.isPublic) {
       controller.prependPost(createdPost);
-    } else {
-      Get.snackbar(
-        'Thong bao',
-        'Bai viet da duoc tao o che do rieng tu nen se khong hien trong feed cong khai.',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(12),
-      );
+      return;
     }
+
+    Get.snackbar(
+      'Thong bao',
+      'Bai viet duoc tao o che do rieng tu nen se khong hien trong feed cong khai.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
   }
 
   Future<void> _openCommentsSheet(BuildContext context, PostModel post) {
@@ -41,8 +42,11 @@ class FeedScreen extends GetView<FeedController> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: palette.pageBackground,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -51,65 +55,101 @@ class FeedScreen extends GetView<FeedController> {
               () => FeedHeader(
                 isRefreshing: controller.isRefreshing.value,
                 onRefresh: controller.refreshFeed,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-              child: FeedCreateEntryCard(
-                onTap: () => _openCreatePostSheet(context),
+                onCreatePost: () => _openCreatePostSheet(context),
               ),
             ),
             Expanded(
               child: Obx(() {
                 final status = controller.status.value;
 
-                if (status == FeedStatus.loading && controller.posts.isEmpty) {
+                if ((status == FeedStatus.initial ||
+                        status == FeedStatus.loading) &&
+                    controller.posts.isEmpty) {
                   return const FeedShimmer();
                 }
 
                 if (status == FeedStatus.error && controller.posts.isEmpty) {
-                  return FeedErrorState(
-                    message:
-                        controller.errorMessage.value ??
-                        'Da xay ra loi khi tai bang tin.',
-                    onRetry: controller.loadInitialFeed,
+                  return _FeedStateScrollView(
+                    onRefresh: controller.refreshFeed,
+                    children: [
+                      const SizedBox(height: 72),
+                      FeedErrorState(
+                        message:
+                            controller.errorMessage.value ??
+                            'Da xay ra loi khi tai bang tin.',
+                        onRetry: controller.loadInitialFeed,
+                      ),
+                    ],
                   );
                 }
 
                 if (status == FeedStatus.empty) {
-                  return FeedEmptyState(onRefresh: controller.refreshFeed);
+                  return _FeedStateScrollView(
+                    onRefresh: controller.refreshFeed,
+                    children: [
+                      const SizedBox(height: 72),
+                      FeedEmptyState(onRefresh: controller.refreshFeed),
+                    ],
+                  );
                 }
+
+                final itemCount =
+                    controller.posts.length +
+                    (controller.isLoadingMore.value ? 1 : 0);
 
                 return RefreshIndicator(
                   onRefresh: controller.refreshFeed,
-                  child: ListView.separated(
+                  color: theme.colorScheme.primary,
+                  backgroundColor: palette.surface,
+                  child: ListView.builder(
                     controller: controller.scrollController,
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: BouncingScrollPhysics(),
                     ),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                    itemCount:
-                        controller.posts.length +
-                        (controller.isLoadingMore.value ? 1 : 0),
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+                    itemCount: itemCount,
                     itemBuilder: (context, index) {
-                      if (index >= controller.posts.length) {
+                      final postIndex = index;
+                      if (postIndex >= controller.posts.length) {
                         return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
+                          padding: EdgeInsets.symmetric(vertical: 18),
                           child: Center(
-                            child: CircularProgressIndicator(strokeWidth: 2.4),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.3,
+                              ),
+                            ),
                           ),
                         );
                       }
 
-                      final post = controller.posts[index];
+                      final post = controller.posts[postIndex];
 
-                      return PostItem(
-                        key: ValueKey(post.postId),
-                        post: post,
-                        onLikeTap: () => controller.toggleLike(post.postId),
-                        onCommentTap: () => _openCommentsSheet(context, post),
-                        onShareTap: controller.onShareTap,
+                      return Column(
+                        children: [
+                          if (postIndex > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 68,
+                                right: 16,
+                              ),
+                              child: Divider(
+                                height: 1,
+                                thickness: 1,
+                                color: palette.border,
+                              ),
+                            ),
+                          PostItem(
+                            key: ValueKey(post.postId),
+                            post: post,
+                            onLikeTap: () => controller.toggleLike(post.postId),
+                            onCommentTap:
+                                () => _openCommentsSheet(context, post),
+                            onShareTap: controller.onShareTap,
+                          ),
+                        ],
                       );
                     },
                   ),
@@ -118,6 +158,27 @@ class FeedScreen extends GetView<FeedController> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FeedStateScrollView extends StatelessWidget {
+  const _FeedStateScrollView({required this.onRefresh, required this.children});
+
+  final Future<void> Function() onRefresh;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+        children: children,
       ),
     );
   }

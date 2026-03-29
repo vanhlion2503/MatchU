@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class FeedEmptyState extends StatelessWidget {
   const FeedEmptyState({super.key, required this.onRefresh});
@@ -8,6 +9,7 @@ class FeedEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = FeedPalette.of(context);
 
     return Center(
       child: Padding(
@@ -15,29 +17,40 @@ class FeedEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.newspaper_rounded,
-              size: 58,
-              color: theme.colorScheme.primary,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: palette.surfaceMuted,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.forum_outlined,
+                size: 34,
+                color: theme.colorScheme.primary,
+              ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Text(
-              'Chưa có bài viết công khai nào.',
+              'Chua co bai viet cong khai nao.',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
+                color: palette.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Kéo xuống để làm mới hoặc quay lại sau khi có thêm nội dung mới.',
+              'Hay tao bai viet moi hoac keo xuong de lam moi bang tin.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+              ),
             ),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: () => onRefresh(),
-              child: const Text('Làm mới'),
+              child: const Text('Lam moi'),
             ),
           ],
         ),
