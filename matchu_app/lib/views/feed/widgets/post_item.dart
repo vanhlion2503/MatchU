@@ -96,17 +96,14 @@ class PostItem extends StatelessWidget {
                       children: [
                         _ActionStatButton(
                           icon:
-                              post.isLikePending
-                                  ? null
-                                  : (post.isLiked
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded),
+                              post.isLiked
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
                           color:
                               post.isLiked
                                   ? palette.likeColor
                                   : palette.iconMuted,
                           onTap: onLikeTap,
-                          isLoading: post.isLikePending,
                           countLabel: _countLabelOrNull(post.stats.likeCount),
                           isActive: post.isLiked,
                         ),
@@ -340,7 +337,6 @@ class _ActionStatButton extends StatelessWidget {
     required this.onTap,
     required this.color,
     this.icon,
-    this.isLoading = false,
     this.countLabel,
     this.isActive = false,
   });
@@ -348,7 +344,6 @@ class _ActionStatButton extends StatelessWidget {
   final VoidCallback onTap;
   final Color color;
   final IconData? icon;
-  final bool isLoading;
   final String? countLabel;
   final bool isActive;
 
@@ -361,23 +356,17 @@ class _ActionStatButton extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: isLoading ? null : onTap,
+        onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
         child: Padding(
           padding: EdgeInsets.fromLTRB(0, 8, 24, 0),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (isLoading)
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: color,
-                  ),
-                )
-              else
-                Icon(icon, size: 22, color: color),
+              Icon(icon, size: 22, color: color),
               if (hasCount) ...[
                 const SizedBox(width: 6),
                 Text(
