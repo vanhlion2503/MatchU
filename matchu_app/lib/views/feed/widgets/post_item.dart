@@ -24,7 +24,6 @@ class PostItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
-    final statsLabel = _buildStatsLabel(post);
     final authorName = _authorName(post);
     final authorHandle = _authorHandle(post);
 
@@ -91,9 +90,11 @@ class PostItem extends StatelessWidget {
                       PostMediaGallery(media: post.media),
                     ],
                     const SizedBox(height: 12),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        _ActionIconButton(
+                        _ActionStatButton(
                           icon:
                               post.isLikePending
                                   ? null
@@ -106,38 +107,30 @@ class PostItem extends StatelessWidget {
                                   : palette.iconMuted,
                           onTap: onLikeTap,
                           isLoading: post.isLikePending,
+                          countLabel: _countLabelOrNull(post.stats.likeCount),
+                          isActive: post.isLiked,
                         ),
-                        const SizedBox(width: 6),
-                        _ActionIconButton(
+                        _ActionStatButton(
                           icon: Icons.chat_bubble_outline_rounded,
                           color: palette.iconMuted,
                           onTap: onCommentTap,
+                          countLabel: _countLabelOrNull(
+                            post.stats.commentCount,
+                          ),
                         ),
-                        const SizedBox(width: 6),
-                        _ActionIconButton(
+                        _ActionStatButton(
                           icon: Icons.repeat_rounded,
                           color: palette.iconMuted,
                           onTap: onShareTap,
+                          countLabel: _countLabelOrNull(post.stats.shareCount),
                         ),
-                        const SizedBox(width: 6),
-                        _ActionIconButton(
+                        _ActionStatButton(
                           icon: Icons.send_rounded,
                           color: palette.iconMuted,
                           onTap: onShareTap,
                         ),
                       ],
                     ),
-                    if (statsLabel != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        statsLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: palette.textTertiary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -342,41 +335,61 @@ class _PostHeader extends StatelessWidget {
   }
 }
 
-class _ActionIconButton extends StatelessWidget {
-  const _ActionIconButton({
+class _ActionStatButton extends StatelessWidget {
+  const _ActionStatButton({
     required this.onTap,
     required this.color,
     this.icon,
     this.isLoading = false,
+    this.countLabel,
+    this.isActive = false,
   });
 
   final VoidCallback onTap;
   final Color color;
   final IconData? icon;
   final bool isLoading;
+  final String? countLabel;
+  final bool isActive;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = FeedPalette.of(context);
+    final hasCount = countLabel != null;
+
     return Material(
       color: Colors.transparent,
-      child: InkResponse(
-        radius: 18,
+      child: InkWell(
         onTap: isLoading ? null : onTap,
-        child: SizedBox(
-          width: 32,
-          height: 32,
-          child: Center(
-            child:
-                isLoading
-                    ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: color,
-                      ),
-                    )
-                    : Icon(icon, size: 22, color: color),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(0, 8, 24, 0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isLoading)
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                )
+              else
+                Icon(icon, size: 22, color: color),
+              if (hasCount) ...[
+                const SizedBox(width: 6),
+                Text(
+                  countLabel!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isActive ? color : palette.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -384,23 +397,9 @@ class _ActionIconButton extends StatelessWidget {
   }
 }
 
-String? _buildStatsLabel(PostModel post) {
-  final parts = <String>[];
-
-  if (post.stats.commentCount > 0) {
-    parts.add('${_formatCount(post.stats.commentCount)} phản hồi');
-  }
-
-  if (post.stats.likeCount > 0) {
-    parts.add('${_formatCount(post.stats.likeCount)} lượt thích');
-  }
-
-  if (parts.isEmpty && post.stats.shareCount > 0) {
-    parts.add('${_formatCount(post.stats.shareCount)} lượt chia sẻ');
-  }
-
-  if (parts.isEmpty) return null;
-  return parts.join(' · ');
+String? _countLabelOrNull(int value) {
+  if (value <= 0) return null;
+  return _formatCount(value);
 }
 
 String _authorName(PostModel post) {
