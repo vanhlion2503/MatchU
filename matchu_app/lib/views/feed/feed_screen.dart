@@ -9,6 +9,7 @@ import 'package:matchu_app/views/feed/widgets/feed_error_state.dart';
 import 'package:matchu_app/views/feed/widgets/feed_header.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/feed_shimmer.dart';
+import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 
 class FeedScreen extends GetView<FeedController> {
@@ -24,8 +25,8 @@ class FeedScreen extends GetView<FeedController> {
     }
 
     Get.snackbar(
-      'Thong bao',
-      'Bai viet duoc tao o che do rieng tu nen se khong hien trong feed cong khai.',
+      'Thông báo',
+      'Bài viết được tạo ở chế độ riêng tư nên sẽ không hiển thị trong bảng tin công khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -40,125 +41,121 @@ class FeedScreen extends GetView<FeedController> {
     );
   }
 
+  Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
+    return PostActionSheet.show(context, post: post);
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: palette.pageBackground,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Obx(
-              () => FeedHeader(
-                isRefreshing: controller.isRefreshing.value,
-                onRefresh: controller.refreshFeed,
-                onCreatePost: () => _openCreatePostSheet(context),
-              ),
-            ),
-            Expanded(
-              child: Obx(() {
-                final status = controller.status.value;
-
-                if ((status == FeedStatus.initial ||
-                        status == FeedStatus.loading) &&
-                    controller.posts.isEmpty) {
-                  return const FeedShimmer();
-                }
-
-                if (status == FeedStatus.error && controller.posts.isEmpty) {
-                  return _FeedStateScrollView(
-                    onRefresh: controller.refreshFeed,
-                    children: [
-                      const SizedBox(height: 72),
-                      FeedErrorState(
-                        message:
-                            controller.errorMessage.value ??
-                            'Da xay ra loi khi tai bang tin.',
-                        onRetry: controller.loadInitialFeed,
-                      ),
-                    ],
-                  );
-                }
-
-                if (status == FeedStatus.empty) {
-                  return _FeedStateScrollView(
-                    onRefresh: controller.refreshFeed,
-                    children: [
-                      const SizedBox(height: 72),
-                      FeedEmptyState(onRefresh: controller.refreshFeed),
-                    ],
-                  );
-                }
-
-                final itemCount =
-                    controller.posts.length +
-                    (controller.isLoadingMore.value ? 1 : 0);
-
-                return RefreshIndicator(
-                  onRefresh: controller.refreshFeed,
-                  color: theme.colorScheme.primary,
-                  backgroundColor: palette.surface,
-                  child: ListView.builder(
-                    controller: controller.scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: BouncingScrollPhysics(),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
-                    itemCount: itemCount,
-                    itemBuilder: (context, index) {
-                      final postIndex = index;
-                      if (postIndex >= controller.posts.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 18),
-                          child: Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.3,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final post = controller.posts[postIndex];
-
-                      return Column(
-                        children: [
-                          if (postIndex > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 68,
-                                right: 16,
-                              ),
-                              child: Divider(
-                                height: 1,
-                                thickness: 1,
-                                color: palette.border,
-                              ),
-                            ),
-                          PostItem(
-                            key: ValueKey(post.postId),
-                            post: post,
-                            onLikeTap: () => controller.toggleLike(post.postId),
-                            onCommentTap:
-                                () => _openCommentsSheet(context, post),
-                            onShareTap: controller.onShareTap,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                );
-              }),
-            ),
-          ],
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight + 6),
+        child: Obx(
+          () => FeedAppBar(
+            isRefreshing: controller.isRefreshing.value,
+            onRefresh: controller.refreshFeed,
+          ),
         ),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset + 10),
+        child: FloatingActionButton(
+          heroTag: 'feed_create_post_fab',
+          tooltip: 'Tạo bài viết',
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: theme.colorScheme.onPrimary,
+          onPressed: () => _openCreatePostSheet(context),
+          child: const Icon(Icons.edit_rounded),
+        ),
+      ),
+      body: Obx(() {
+        final status = controller.status.value;
+
+        if ((status == FeedStatus.initial || status == FeedStatus.loading) &&
+            controller.posts.isEmpty) {
+          return const FeedShimmer();
+        }
+
+        if (status == FeedStatus.error && controller.posts.isEmpty) {
+          return _FeedStateScrollView(
+            onRefresh: controller.refreshFeed,
+            children: [
+              const SizedBox(height: 72),
+              FeedErrorState(
+                message:
+                    controller.errorMessage.value ??
+                    'Đã xảy ra lỗi khi tải bảng tin.',
+                onRetry: controller.loadInitialFeed,
+              ),
+            ],
+          );
+        }
+
+        if (status == FeedStatus.empty) {
+          return _FeedStateScrollView(
+            onRefresh: controller.refreshFeed,
+            children: [
+              const SizedBox(height: 72),
+              FeedEmptyState(onRefresh: controller.refreshFeed),
+            ],
+          );
+        }
+
+        final itemCount =
+            controller.posts.length + (controller.isLoadingMore.value ? 1 : 0);
+
+        return RefreshIndicator(
+          onRefresh: controller.refreshFeed,
+          color: theme.colorScheme.primary,
+          backgroundColor: palette.surface,
+          child: ListView.builder(
+            controller: controller.scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+            itemCount: itemCount,
+            itemBuilder: (context, index) {
+              final postIndex = index;
+              if (postIndex >= controller.posts.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2.3),
+                    ),
+                  ),
+                );
+              }
+
+              final post = controller.posts[postIndex];
+
+              return Column(
+                children: [
+                  if (postIndex > 0)
+                    Divider(height: 1, thickness: 1, color: palette.border),
+                  PostItem(
+                    key: ValueKey(post.postId),
+                    post: post,
+                    onLikeTap: () => controller.toggleLike(post.postId),
+                    onCommentTap: () => _openCommentsSheet(context, post),
+                    onShareTap: controller.onShareTap,
+                    onMoreTap: () => _openPostActionSheet(context, post),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      }),
     );
   }
 }

@@ -37,7 +37,7 @@ class FeedErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Khong the tai bang tin',
+              'Không thể tải bảng tin',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
@@ -55,7 +55,7 @@ class FeedErrorState extends StatelessWidget {
             const SizedBox(height: 18),
             FilledButton(
               onPressed: () => onRetry(),
-              child: const Text('Thu lai'),
+              child: const Text('Thử lại'),
             ),
           ],
         ),

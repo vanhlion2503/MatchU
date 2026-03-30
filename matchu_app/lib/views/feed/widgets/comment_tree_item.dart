@@ -23,7 +23,7 @@ class CommentTreeItem extends StatelessWidget {
     final theme = Theme.of(context);
     final indent = math.min(entry.depth, 4) * 18.0;
     final avatarUrl = author?.avatarUrl ?? '';
-    final displayName = author?.displayName ?? 'Nguoi dung';
+    final displayName = author?.displayName ?? 'Người dùng';
     final nickname = author?.nickname ?? '';
 
     return Padding(
@@ -67,20 +67,16 @@ class CommentTreeItem extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
+                      Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            VerifiedNameRow(
-                              isVerified: author?.isVerified ?? false,
-                              child: Text(
+                            Text(
                                 displayName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
-                              ),
                             ),
                             Text(
                               nickname.isNotEmpty
@@ -90,7 +86,6 @@ class CommentTreeItem extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -106,7 +101,7 @@ class CommentTreeItem extends StatelessWidget {
                       GestureDetector(
                         onTap: onReplyTap,
                         child: Text(
-                          'Tra loi',
+                          'Trả lời',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.w700,
@@ -115,7 +110,7 @@ class CommentTreeItem extends StatelessWidget {
                       ),
                       if (comment.replyCount > 0)
                         Text(
-                          '${comment.replyCount} phan hoi',
+                          '${comment.replyCount} phản hồi',
                           style: theme.textTheme.bodySmall,
                         ),
                     ],
@@ -131,15 +126,15 @@ class CommentTreeItem extends StatelessWidget {
 }
 
 String _formatRelativeTime(DateTime? dateTime) {
-  if (dateTime == null) return 'Vua xong';
+  if (dateTime == null) return 'Vừa xong';
 
   final now = DateTime.now();
   final diff = now.difference(dateTime);
 
-  if (diff.inSeconds < 60) return 'Vua xong';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} phut truoc';
-  if (diff.inHours < 24) return '${diff.inHours} gio truoc';
-  if (diff.inDays < 7) return '${diff.inDays} ngay truoc';
+  if (diff.inSeconds < 60) return 'Vừa xong';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+  if (diff.inHours < 24) return '${diff.inHours} giờ trước';
+  if (diff.inDays < 7) return '${diff.inDays} ngày trước';
 
   final day = dateTime.day.toString().padLeft(2, '0');
   final month = dateTime.month.toString().padLeft(2, '0');

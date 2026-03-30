@@ -164,8 +164,8 @@ class FeedController extends GetxController {
 
   void onShareTap() {
     Get.snackbar(
-      'Thong bao',
-      'Tinh nang chia se se duoc trien khai o buoc tiep theo.',
+      'Thông báo',
+      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -264,12 +264,12 @@ class FeedController extends GetxController {
       return error.message.toString();
     }
 
-    return 'Khong the tai bang tin luc nay. Vui long thu lai.';
+    return 'Không thể tải bảng tin lúc này. Vui lòng thử lại.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Loi',
+      'Lỗi',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

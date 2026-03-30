@@ -107,7 +107,7 @@ class PostCommentsController extends GetxController {
       onCommentCountChanged?.call(1);
     } catch (error) {
       Get.snackbar(
-        'Loi',
+        'Lỗi',
         error.toString(),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),

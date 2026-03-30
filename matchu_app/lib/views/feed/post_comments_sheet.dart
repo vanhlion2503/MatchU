@@ -97,7 +97,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     Expanded(
                       child: Obx(
                         () => Text(
-                          'Binh luan (${_controller.comments.length})',
+                          'Bình luận (${_controller.comments.length})',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
@@ -135,7 +135,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                             const SizedBox(height: 16),
                             FilledButton(
                               onPressed: _controller.loadComments,
-                              child: const Text('Thu lai'),
+                              child: const Text('Thử lại'),
                             ),
                           ],
                         ),
@@ -148,7 +148,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Text(
-                          'Chua co binh luan nao. Hay mo dau cuoc tro chuyen.',
+                          'Chưa có bình luận nào. Hãy mở đầu cuộc trò chuyện.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodySmall,
                         ),
@@ -186,7 +186,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Dang tra loi ${replyingTo.author?.displayName ?? 'nguoi dung'}',
+                                'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodySmall?.copyWith(
@@ -213,7 +213,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                               minLines: 1,
                               maxLines: 4,
                               decoration: const InputDecoration(
-                                hintText: 'Nhap binh luan...',
+                                hintText: 'Nhập bình luận...',
                               ),
                               onSubmitted: (_) => _controller.submitComment(),
                             ),

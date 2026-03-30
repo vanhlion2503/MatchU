@@ -170,12 +170,12 @@ class _SheetHeader extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              child: const Text('Huy'),
+              child: const Text('Hủy'),
             ),
             Expanded(
               child: Center(
                 child: Text(
-                  'Tao bai viet',
+                  'Tạo bài viết',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: palette.textPrimary,
@@ -215,7 +215,7 @@ class _SheetHeader extends StatelessWidget {
                           color: palette.publishButtonForeground,
                         ),
                       )
-                      : const Text('Dang'),
+                      : const Text('Đăng'),
             ),
           ],
         ),
@@ -247,7 +247,7 @@ class _ComposerBody extends StatelessWidget {
         controller: controller,
         palette: palette,
         avatarUrl: '',
-        handle: 'nguoi.dung',
+        handle: 'người.dùng',
         contentFocusNode: contentFocusNode,
         tagFocusNode: tagFocusNode,
       );
@@ -323,7 +323,7 @@ class _ComposerLayout extends StatelessWidget {
                 ),
                 cursorColor: theme.colorScheme.primary,
                 decoration: InputDecoration.collapsed(
-                  hintText: 'Co gi moi?',
+                  hintText: 'Có gì mới?',
                   hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     fontSize: 16,
                     color: palette.placeholder,
@@ -499,7 +499,7 @@ class _TagEditor extends StatelessWidget {
                 ),
                 cursorColor: theme.colorScheme.primary,
                 decoration: InputDecoration.collapsed(
-                  hintText: 'Them tags...',
+                  hintText: 'Thêm thẻ...',
                   hintStyle: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 14,
                     color: palette.placeholder,
@@ -619,8 +619,8 @@ class _PrivacySelector extends StatelessWidget {
               PopupMenuItem<bool>(
                 value: true,
                 child: _PrivacyMenuItem(
-                  title: 'Cong khai',
-                  subtitle: 'Hien thi trong feed cong khai',
+                  title: 'Công khai',
+                  subtitle: 'Hiển thị trong bảng tin công khai',
                   icon: Icons.public_rounded,
                   selected: controller.isPublic.value,
                 ),
@@ -628,8 +628,8 @@ class _PrivacySelector extends StatelessWidget {
               PopupMenuItem<bool>(
                 value: false,
                 child: _PrivacyMenuItem(
-                  title: 'Rieng tu',
-                  subtitle: 'Chi luu cho ban, khong len feed cong khai',
+                  title: 'Riêng tư',
+                  subtitle: 'Chỉ lưu cho bạn, không lên bảng tin công khai',
                   icon: Icons.lock_outline_rounded,
                   selected: !controller.isPublic.value,
                 ),
@@ -654,7 +654,7 @@ class _PrivacySelector extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                controller.isPublic.value ? 'Cong khai' : 'Rieng tu',
+                controller.isPublic.value ? 'Công khai' : 'Riêng tư',
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: palette.textSecondary,
@@ -907,7 +907,7 @@ String _composerHandleOf(UserController? controller) {
     return fullname.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
   }
 
-  return 'nguoi.dung';
+  return 'người.dùng';
 }
 
 String _initialOf(String value) {

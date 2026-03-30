@@ -11,12 +11,14 @@ class PostItem extends StatelessWidget {
     required this.onLikeTap,
     required this.onCommentTap,
     required this.onShareTap,
+    required this.onMoreTap,
   });
 
   final PostModel post;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
   final VoidCallback onShareTap;
+  final VoidCallback onMoreTap;
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +43,10 @@ class PostItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _PostHeader(post: post),
+                    _PostHeader(post: post, onMoreTap: onMoreTap),
                     if (authorHandle.isNotEmpty &&
                         authorHandle.toLowerCase() !=
                             authorName.toLowerCase()) ...[
-                      const SizedBox(height: 2),
                       Text(
                         '@$authorHandle',
                         maxLines: 1,
@@ -286,9 +287,10 @@ class _MiniReplyDot extends StatelessWidget {
 }
 
 class _PostHeader extends StatelessWidget {
-  const _PostHeader({required this.post});
+  const _PostHeader({required this.post, required this.onMoreTap});
 
   final PostModel post;
+  final VoidCallback onMoreTap;
 
   @override
   Widget build(BuildContext context) {
@@ -318,8 +320,23 @@ class _PostHeader extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        const SizedBox(width: 8),
-        Icon(Icons.more_horiz_rounded, size: 18, color: palette.iconMuted),
+        const SizedBox(width: 4),
+        Material(
+          color: Colors.transparent,
+          child: InkResponse(
+            radius: 18,
+            onTap: onMoreTap,
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: Icon(
+                Icons.more_horiz_rounded,
+                size: 18,
+                color: palette.iconMuted,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -371,15 +388,15 @@ String? _buildStatsLabel(PostModel post) {
   final parts = <String>[];
 
   if (post.stats.commentCount > 0) {
-    parts.add('${_formatCount(post.stats.commentCount)} phan hoi');
+    parts.add('${_formatCount(post.stats.commentCount)} phản hồi');
   }
 
   if (post.stats.likeCount > 0) {
-    parts.add('${_formatCount(post.stats.likeCount)} luot thich');
+    parts.add('${_formatCount(post.stats.likeCount)} lượt thích');
   }
 
   if (parts.isEmpty && post.stats.shareCount > 0) {
-    parts.add('${_formatCount(post.stats.shareCount)} luot chia se');
+    parts.add('${_formatCount(post.stats.shareCount)} lượt chia sẻ');
   }
 
   if (parts.isEmpty) return null;
@@ -393,7 +410,7 @@ String _authorName(PostModel post) {
   final handle = _authorHandle(post);
   if (handle.isNotEmpty) return handle;
 
-  return 'Nguoi dung';
+  return 'Người dùng';
 }
 
 String _authorHandle(PostModel post) {
@@ -407,15 +424,15 @@ String _authorHandle(PostModel post) {
 }
 
 String _formatRelativeTime(DateTime? dateTime) {
-  if (dateTime == null) return 'now';
+  if (dateTime == null) return 'Vừa xong';
 
   final now = DateTime.now();
   final diff = now.difference(dateTime);
 
-  if (diff.inSeconds < 60) return 'now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}m';
-  if (diff.inHours < 24) return '${diff.inHours}h';
-  if (diff.inDays < 7) return '${diff.inDays}d';
+  if (diff.inSeconds < 60) return 'Vừa xong';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} phút';
+  if (diff.inHours < 24) return '${diff.inHours} giờ';
+  if (diff.inDays < 7) return '${diff.inDays} ngày';
 
   final day = dateTime.day.toString().padLeft(2, '0');
   final month = dateTime.month.toString().padLeft(2, '0');
