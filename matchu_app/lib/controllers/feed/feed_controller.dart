@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -23,6 +25,9 @@ class FeedController extends GetxController {
   final ScrollController scrollController = ScrollController();
 
   final Map<String, bool> _likeCache = <String, bool>{};
+  final Map<String, bool> _confirmedLikeStates = <String, bool>{};
+  final Map<String, bool> _queuedLikeStates = <String, bool>{};
+  final Set<String> _likeSyncingPosts = <String>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   @override
@@ -53,6 +58,7 @@ class FeedController extends GetxController {
     if (!post.isPublic) return;
 
     _likeCache[post.postId] = post.isLiked;
+    _confirmedLikeStates[post.postId] = post.isLiked;
     posts.assignAll(_mergePosts([post, ...posts], const []));
     status.value = FeedStatus.success;
   }
@@ -131,9 +137,7 @@ class FeedController extends GetxController {
 
   Future<void> toggleLike(String postId) async {
     final currentPost = _findPost(postId);
-    if (currentPost == null || currentPost.isLikePending) {
-      return;
-    }
+    if (currentPost == null) return;
 
     final shouldLike = !currentPost.isLiked;
     final optimisticPost = currentPost.copyWith(
@@ -146,20 +150,8 @@ class FeedController extends GetxController {
 
     _replacePost(optimisticPost);
     _likeCache[postId] = shouldLike;
-
-    try {
-      if (shouldLike) {
-        await _service.likePost(postId);
-      } else {
-        await _service.unlikePost(postId);
-      }
-
-      _replacePost(optimisticPost.copyWith(isLikePending: false));
-    } catch (error) {
-      _likeCache[postId] = currentPost.isLiked;
-      _replacePost(currentPost);
-      _showError(_mapError(error));
-    }
+    _queuedLikeStates[postId] = shouldLike;
+    unawaited(_syncLikeState(postId));
   }
 
   void onShareTap() {
@@ -187,16 +179,33 @@ class FeedController extends GetxController {
 
     if (idsToFetch.isNotEmpty) {
       final latestStates = await _service.getLikeStates(idsToFetch);
-      _likeCache.addAll(latestStates);
+      _confirmedLikeStates.addAll(latestStates);
+
+      for (final entry in latestStates.entries) {
+        if (_isLikeSyncPending(entry.key)) continue;
+        _likeCache[entry.key] = entry.value;
+      }
     }
 
     return incoming
-        .map(
-          (post) => post.copyWith(
-            isLiked: _likeCache[post.postId] ?? false,
-            isLikePending: false,
-          ),
-        )
+        .map((post) {
+          final currentPost = _findPost(post.postId);
+          final hasPendingSync = _isLikeSyncPending(post.postId);
+
+          return post.copyWith(
+            isLiked:
+                _likeCache[post.postId] ??
+                _confirmedLikeStates[post.postId] ??
+                false,
+            isLikePending: hasPendingSync,
+            stats:
+                hasPendingSync && currentPost != null
+                    ? post.stats.copyWith(
+                      likeCount: currentPost.stats.likeCount,
+                    )
+                    : post.stats,
+          );
+        })
         .toList(growable: false);
   }
 
@@ -233,6 +242,87 @@ class FeedController extends GetxController {
     if (index == -1) return;
     posts[index] = updatedPost;
     posts.refresh();
+  }
+
+  bool _isLikeSyncPending(String postId) {
+    return _queuedLikeStates.containsKey(postId) ||
+        _likeSyncingPosts.contains(postId);
+  }
+
+  Future<void> _syncLikeState(String postId) async {
+    if (_likeSyncingPosts.contains(postId)) return;
+
+    _likeSyncingPosts.add(postId);
+    _updateLikePendingState(postId);
+
+    try {
+      while (true) {
+        final targetState = _queuedLikeStates[postId];
+        if (targetState == null) break;
+
+        final confirmedState = _confirmedLikeStates[postId] ?? false;
+        if (targetState == confirmedState) {
+          _queuedLikeStates.remove(postId);
+          _updateLikePendingState(postId);
+          continue;
+        }
+
+        try {
+          if (targetState) {
+            await _service.likePost(postId);
+          } else {
+            await _service.unlikePost(postId);
+          }
+
+          _confirmedLikeStates[postId] = targetState;
+          if (_queuedLikeStates[postId] == targetState) {
+            _queuedLikeStates.remove(postId);
+          }
+        } catch (error) {
+          _queuedLikeStates.remove(postId);
+          _revertLikeState(postId);
+          _showError(_mapError(error));
+          break;
+        }
+      }
+    } finally {
+      _likeSyncingPosts.remove(postId);
+      _updateLikePendingState(postId);
+      if (_queuedLikeStates.containsKey(postId)) {
+        unawaited(_syncLikeState(postId));
+      }
+    }
+  }
+
+  void _updateLikePendingState(String postId) {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+
+    final shouldBePending = _isLikeSyncPending(postId);
+    if (currentPost.isLikePending == shouldBePending) return;
+
+    _replacePost(currentPost.copyWith(isLikePending: shouldBePending));
+  }
+
+  void _revertLikeState(String postId) {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+
+    final confirmedState = _confirmedLikeStates[postId] ?? false;
+    _likeCache[postId] = confirmedState;
+
+    final resolvedLikeCount =
+        currentPost.isLiked == confirmedState
+            ? currentPost.stats.likeCount
+            : _nextLikeCount(currentPost.stats.likeCount, confirmedState);
+
+    _replacePost(
+      currentPost.copyWith(
+        isLiked: confirmedState,
+        isLikePending: false,
+        stats: currentPost.stats.copyWith(likeCount: resolvedLikeCount),
+      ),
+    );
   }
 
   void _handleScroll() {
