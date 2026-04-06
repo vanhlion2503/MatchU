@@ -16,6 +16,7 @@ class AppRouter {
   static const String profile = '/profile';
   static const String reputation = '/reputation';
   static const String settings = '/settings';
+  static const String postDetail = '/post-detail';
   static const String searchUser = '/search-user';
   static const String displayMode = '/display-mode';
   static const String editProfile = '/edit-profile';

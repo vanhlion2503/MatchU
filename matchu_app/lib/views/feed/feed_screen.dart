@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/feed/create_post_sheet.dart';
-import 'package:matchu_app/views/feed/post_comments_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/feed_empty_state.dart';
 import 'package:matchu_app/views/feed/widgets/feed_error_state.dart';
 import 'package:matchu_app/views/feed/widgets/feed_header.dart';
@@ -32,12 +34,10 @@ class FeedScreen extends GetView<FeedController> {
     );
   }
 
-  Future<void> _openCommentsSheet(BuildContext context, PostModel post) {
-    return PostCommentsSheet.show(
-      context,
-      post: post,
-      onCommentCountChanged:
-          (delta) => controller.adjustCommentCount(post.postId, delta: delta),
+  void _openPostDetail(PostModel post, {bool focusComposer = false}) {
+    Get.toNamed(
+      AppRouter.postDetail,
+      arguments: PostDetailRouteArgs(post: post, focusComposer: focusComposer),
     );
   }
 
@@ -71,7 +71,7 @@ class FeedScreen extends GetView<FeedController> {
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: theme.colorScheme.onPrimary,
           onPressed: () => _openCreatePostSheet(context),
-          child: const Icon(Icons.edit_rounded),
+          child: const Icon(Iconsax.edit_2),
         ),
       ),
       body: Obx(() {
@@ -145,8 +145,10 @@ class FeedScreen extends GetView<FeedController> {
                   PostItem(
                     key: ValueKey(post.postId),
                     post: post,
+                    onTap: () => _openPostDetail(post),
                     onLikeTap: () => controller.toggleLike(post.postId),
-                    onCommentTap: () => _openCommentsSheet(context, post),
+                    onCommentTap:
+                        () => _openPostDetail(post, focusComposer: true),
                     onShareTap: controller.onShareTap,
                     onMoreTap: () => _openPostActionSheet(context, post),
                   ),

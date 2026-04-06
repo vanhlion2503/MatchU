@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class FeedErrorState extends StatelessWidget {
@@ -30,7 +31,7 @@ class FeedErrorState extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.cloud_off_rounded,
+                Iconsax.cloud_cross,
                 size: 34,
                 color: theme.colorScheme.error,
               ),

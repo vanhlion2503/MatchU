@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
@@ -133,7 +134,7 @@ class PostActionSheet extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               _PostActionTile(
-                icon: Icons.visibility_off_rounded,
+                icon: Iconsax.eye_slash,
                 title: 'Ẩn bài viết',
                 subtitle: 'Ẩn bài viết này khỏi bảng tin của bạn.',
                 palette: palette,
@@ -141,7 +142,7 @@ class PostActionSheet extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _PostActionTile(
-                icon: Icons.bookmark_border_rounded,
+                icon: Iconsax.bookmark,
                 title: 'Lưu bài viết',
                 subtitle: 'Đánh dấu để xem lại sau.',
                 palette: palette,
@@ -149,7 +150,7 @@ class PostActionSheet extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _PostActionTile(
-                icon: Icons.link_rounded,
+                icon: Iconsax.link_2,
                 title: 'Sao chép liên kết',
                 subtitle: 'Chuẩn bị giao diện cho thao tác chia sẻ liên kết.',
                 palette: palette,
@@ -157,7 +158,7 @@ class PostActionSheet extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _PostActionTile(
-                icon: Icons.person_off_rounded,
+                icon: Iconsax.user_remove,
                 title:
                     authorHandle.isNotEmpty
                         ? 'Ẩn bài viết từ @$authorHandle'
@@ -169,7 +170,7 @@ class PostActionSheet extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _PostActionTile(
-                icon: Icons.flag_outlined,
+                icon: Iconsax.flag,
                 title: 'Báo cáo bài viết',
                 subtitle: 'Gửi báo cáo nếu nội dung này không phù hợp.',
                 palette: palette,
@@ -267,7 +268,7 @@ class _PostActionTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              Icon(Icons.chevron_right_rounded, color: palette.iconMuted),
+              Icon(Iconsax.arrow_right_3, color: palette.iconMuted),
             ],
           ),
         ),

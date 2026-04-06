@@ -1,13 +1,16 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
+import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class PostItem extends StatelessWidget {
   const PostItem({
     super.key,
     required this.post,
+    required this.onTap,
     required this.onLikeTap,
     required this.onCommentTap,
     required this.onShareTap,
@@ -15,6 +18,7 @@ class PostItem extends StatelessWidget {
   });
 
   final PostModel post;
+  final VoidCallback onTap;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
   final VoidCallback onShareTap;
@@ -24,13 +28,13 @@ class PostItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
-    final authorName = _authorName(post);
-    final authorHandle = _authorHandle(post);
+    final authorName = postAuthorName(post);
+    final authorHandle = postAuthorHandle(post);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onCommentTap,
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
           child: Row(
@@ -95,10 +99,7 @@ class PostItem extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         _ActionStatButton(
-                          icon:
-                              post.isLiked
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
+                          icon: post.isLiked ? Iconsax.heart5 : Iconsax.heart,
                           color:
                               post.isLiked
                                   ? palette.likeColor
@@ -108,7 +109,7 @@ class PostItem extends StatelessWidget {
                           isActive: post.isLiked,
                         ),
                         _ActionStatButton(
-                          icon: Icons.chat_bubble_outline_rounded,
+                          icon: Iconsax.message_text,
                           color: palette.iconMuted,
                           onTap: onCommentTap,
                           countLabel: _countLabelOrNull(
@@ -116,13 +117,13 @@ class PostItem extends StatelessWidget {
                           ),
                         ),
                         _ActionStatButton(
-                          icon: Icons.repeat_rounded,
+                          icon: Iconsax.repeat,
                           color: palette.iconMuted,
                           onTap: onShareTap,
                           countLabel: _countLabelOrNull(post.stats.shareCount),
                         ),
                         _ActionStatButton(
-                          icon: Icons.send_rounded,
+                          icon: Iconsax.send_1,
                           color: palette.iconMuted,
                           onTap: onShareTap,
                         ),
@@ -147,39 +148,17 @@ class _PostRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = FeedPalette.of(context);
-    final avatarUrl = post.author.avatar.trim();
-    final authorName = _authorName(post);
     final showReplyCluster = post.stats.commentCount > 0;
 
     return SizedBox(
       width: 40,
       child: Column(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: palette.border),
-            ),
-            child: CircleAvatar(
-              radius: 20,
-              backgroundColor: palette.surfaceMuted,
-              backgroundImage:
-                  avatarUrl.isNotEmpty
-                      ? CachedNetworkImageProvider(avatarUrl)
-                      : null,
-              child:
-                  avatarUrl.isEmpty
-                      ? Text(
-                        _initialOf(authorName),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: palette.textPrimary,
-                        ),
-                      )
-                      : null,
-            ),
+          FeedAvatar(
+            imageUrl: post.author.avatar,
+            fallbackLabel: postAuthorName(post),
+            size: 40,
+            borderColor: palette.border,
           ),
           const SizedBox(height: 8),
           Container(
@@ -291,20 +270,25 @@ class _PostHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            _authorName(post),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: palette.textPrimary,
+          child: VerifiedNameRow(
+            isVerified: post.author.isVerified,
+            badgeSize: 15,
+            badgePadding: const EdgeInsets.only(left: 4),
+            child: Text(
+              postAuthorName(post),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: palette.textPrimary,
+              ),
             ),
           ),
         ),
         const SizedBox(width: 12),
         Text(
-          _formatRelativeTime(post.createdAt),
+          formatRelativeTime(post.createdAt),
           style: theme.textTheme.bodySmall?.copyWith(
             color: palette.textTertiary,
             fontSize: 12,
@@ -319,11 +303,7 @@ class _PostHeader extends StatelessWidget {
             child: SizedBox(
               width: 28,
               height: 28,
-              child: Icon(
-                Icons.more_horiz_rounded,
-                size: 18,
-                color: palette.iconMuted,
-              ),
+              child: Icon(Iconsax.more, size: 18, color: palette.iconMuted),
             ),
           ),
         ),
@@ -362,7 +342,7 @@ class _ActionStatButton extends StatelessWidget {
         hoverColor: Colors.transparent,
         focusColor: Colors.transparent,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(0, 8, 24, 0),
+          padding: const EdgeInsets.fromLTRB(0, 8, 24, 0),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -388,62 +368,5 @@ class _ActionStatButton extends StatelessWidget {
 
 String? _countLabelOrNull(int value) {
   if (value <= 0) return null;
-  return _formatCount(value);
-}
-
-String _authorName(PostModel post) {
-  final trimmedName = post.author.name.trim();
-  if (trimmedName.isNotEmpty) return trimmedName;
-
-  final handle = _authorHandle(post);
-  if (handle.isNotEmpty) return handle;
-
-  return 'Người dùng';
-}
-
-String _authorHandle(PostModel post) {
-  final nickname = post.author.nickname.trim();
-  if (nickname.isNotEmpty) return nickname;
-
-  final displayName = post.author.name.trim();
-  if (displayName.isNotEmpty) return displayName;
-
-  return '';
-}
-
-String _formatRelativeTime(DateTime? dateTime) {
-  if (dateTime == null) return 'Vừa xong';
-
-  final now = DateTime.now();
-  final diff = now.difference(dateTime);
-
-  if (diff.inSeconds < 60) return 'Vừa xong';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} phút';
-  if (diff.inHours < 24) return '${diff.inHours} giờ';
-  if (diff.inDays < 7) return '${diff.inDays} ngày';
-
-  final day = dateTime.day.toString().padLeft(2, '0');
-  final month = dateTime.month.toString().padLeft(2, '0');
-  return '$day/$month';
-}
-
-String _formatCount(int value) {
-  if (value < 1000) return '$value';
-  if (value < 1000000) {
-    final compact = value / 1000;
-    return compact % 1 == 0
-        ? '${compact.toStringAsFixed(0)}K'
-        : '${compact.toStringAsFixed(1)}K';
-  }
-
-  final compact = value / 1000000;
-  return compact % 1 == 0
-      ? '${compact.toStringAsFixed(0)}M'
-      : '${compact.toStringAsFixed(1)}M';
-}
-
-String _initialOf(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) return '?';
-  return String.fromCharCode(trimmed.runes.first).toUpperCase();
+  return formatCompactCount(value);
 }

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/models/feed/media_model.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_video_thumbnail.dart';
@@ -119,9 +120,7 @@ class _MediaTile extends StatelessWidget {
         errorWidget:
             (_, __, ___) => ColoredBox(
               color: palette.surfaceMuted,
-              child: const Center(
-                child: Icon(Icons.broken_image_outlined, size: 30),
-              ),
+              child: const Center(child: Icon(Iconsax.gallery_slash, size: 30)),
             ),
       ),
     );

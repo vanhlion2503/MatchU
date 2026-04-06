@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_composer_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_media_draft.dart';
@@ -471,7 +472,7 @@ class _TagEditor extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                     onTap: () => controller.removeTag(tag),
                     child: Icon(
-                      Icons.close_rounded,
+                      Iconsax.close_circle,
                       size: 15,
                       color: palette.iconMuted,
                     ),
@@ -544,7 +545,7 @@ class _BottomToolbar extends StatelessWidget {
         () => Row(
           children: [
             _ToolbarIconButton(
-              icon: Icons.add_photo_alternate_outlined,
+              icon: Iconsax.gallery_add,
               onTap:
                   controller.isPickingMedia.value
                       ? null
@@ -553,14 +554,14 @@ class _BottomToolbar extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             _ToolbarIconButton(
-              icon: Icons.video_collection_outlined,
+              icon: Iconsax.video_add,
               onTap:
                   controller.isPickingMedia.value ? null : controller.pickVideo,
               palette: palette,
             ),
             const SizedBox(width: 14),
             _ToolbarIconButton(
-              icon: Icons.tag_rounded,
+              icon: Iconsax.tag,
               onTap: onFocusTag,
               palette: palette,
             ),
@@ -621,7 +622,7 @@ class _PrivacySelector extends StatelessWidget {
                 child: _PrivacyMenuItem(
                   title: 'Công khai',
                   subtitle: 'Hiển thị trong bảng tin công khai',
-                  icon: Icons.public_rounded,
+                  icon: Iconsax.global,
                   selected: controller.isPublic.value,
                 ),
               ),
@@ -630,7 +631,7 @@ class _PrivacySelector extends StatelessWidget {
                 child: _PrivacyMenuItem(
                   title: 'Riêng tư',
                   subtitle: 'Chỉ lưu cho bạn, không lên bảng tin công khai',
-                  icon: Icons.lock_outline_rounded,
+                  icon: Iconsax.lock,
                   selected: !controller.isPublic.value,
                 ),
               ),
@@ -646,9 +647,7 @@ class _PrivacySelector extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                controller.isPublic.value
-                    ? Icons.public_rounded
-                    : Icons.lock_outline_rounded,
+                controller.isPublic.value ? Iconsax.global : Iconsax.lock,
                 size: 18,
                 color: palette.iconMuted,
               ),
@@ -661,11 +660,7 @@ class _PrivacySelector extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 2),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 18,
-                color: palette.iconMuted,
-              ),
+              Icon(Iconsax.arrow_down_1, size: 18, color: palette.iconMuted),
             ],
           ),
         ),
@@ -779,7 +774,7 @@ class _DraftMediaPreviewCard extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Icon(
-                                  Icons.play_circle_fill_rounded,
+                                  Iconsax.play_circle,
                                   color: Colors.white,
                                   size: 34,
                                 ),
@@ -824,7 +819,7 @@ class _DraftMediaPreviewCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.close_rounded,
+                    Iconsax.close_circle,
                     size: 16,
                     color: Colors.white,
                   ),

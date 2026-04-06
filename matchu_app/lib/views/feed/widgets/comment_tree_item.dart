@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CommentTreeItem extends StatelessWidget {
   const CommentTreeItem({
@@ -68,24 +67,24 @@ class CommentTreeItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                                displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
-                            Text(
-                              nickname.isNotEmpty
-                                  ? '@$nickname • ${_formatRelativeTime(comment.createdAt)}'
-                                  : _formatRelativeTime(comment.createdAt),
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
+                          ),
+                          Text(
+                            nickname.isNotEmpty
+                                ? '@$nickname • ${_formatRelativeTime(comment.createdAt)}'
+                                : _formatRelativeTime(comment.createdAt),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),

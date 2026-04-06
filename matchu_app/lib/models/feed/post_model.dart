@@ -8,12 +8,14 @@ class PostAuthorModel {
     required this.name,
     required this.nickname,
     required this.avatar,
+    required this.isVerified,
   });
 
   final String id;
   final String name;
   final String nickname;
   final String avatar;
+  final bool isVerified;
 
   factory PostAuthorModel.fromJson(Map<String, dynamic>? json) {
     return PostAuthorModel(
@@ -21,11 +23,18 @@ class PostAuthorModel {
       name: (json?['name'] ?? '').toString(),
       nickname: (json?['nickname'] ?? '').toString(),
       avatar: (json?['avatar'] ?? '').toString(),
+      isVerified: json?['isVerified'] == true,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'name': name, 'nickname': nickname, 'avatar': avatar};
+    return {
+      'id': id,
+      'name': name,
+      'nickname': nickname,
+      'avatar': avatar,
+      'isVerified': isVerified,
+    };
   }
 
   PostAuthorModel copyWith({
@@ -33,12 +42,14 @@ class PostAuthorModel {
     String? name,
     String? nickname,
     String? avatar,
+    bool? isVerified,
   }) {
     return PostAuthorModel(
       id: id ?? this.id,
       name: name ?? this.name,
       nickname: nickname ?? this.nickname,
       avatar: avatar ?? this.avatar,
+      isVerified: isVerified ?? this.isVerified,
     );
   }
 }

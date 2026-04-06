@@ -353,6 +353,7 @@ class PostService {
       nickname: nickname,
       name: displayName.isNotEmpty ? displayName : 'Nguoi dung',
       avatar: user.avatarUrl,
+      isVerified: user.isFaceVerified,
     );
   }
 

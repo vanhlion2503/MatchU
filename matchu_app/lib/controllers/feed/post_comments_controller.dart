@@ -20,6 +20,7 @@ class PostCommentsController extends GetxController {
   final RxList<PostCommentModel> comments = <PostCommentModel>[].obs;
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
+  final RxBool hasInputText = false.obs;
   final RxnString errorMessage = RxnString();
   final Rxn<PostCommentModel> replyingTo = Rxn<PostCommentModel>();
 
@@ -62,6 +63,8 @@ class PostCommentsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    inputController.addListener(_handleInputChanged);
+    _handleInputChanged();
     loadComments();
   }
 
@@ -132,8 +135,15 @@ class PostCommentsController extends GetxController {
     comments.refresh();
   }
 
+  void _handleInputChanged() {
+    final nextState = inputController.text.trim().isNotEmpty;
+    if (hasInputText.value == nextState) return;
+    hasInputText.value = nextState;
+  }
+
   @override
   void onClose() {
+    inputController.removeListener(_handleInputChanged);
     inputController.dispose();
     inputFocusNode.dispose();
     super.onClose();

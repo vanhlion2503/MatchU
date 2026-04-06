@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:matchu_app/bindings/feed/post_detail_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
@@ -32,6 +33,7 @@ import 'package:matchu_app/views/auth/login_view.dart';
 import 'package:matchu_app/views/auth/register_view.dart';
 import 'package:matchu_app/views/auth/otp_login_view.dart';
 import 'package:matchu_app/views/auth/complete_profile_view.dart';
+import 'package:matchu_app/views/feed/post_detail_view.dart';
 import 'package:matchu_app/views/home_view.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/views/main_view.dart';
@@ -69,6 +71,11 @@ class AppPages {
       binding: BindingsBuilder(() {
         Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
       }),
+    ),
+    GetPage(
+      name: AppRouter.postDetail,
+      page: () => const PostDetailView(),
+      binding: PostDetailBinding(),
     ),
     GetPage(
       name: AppRouter.main,

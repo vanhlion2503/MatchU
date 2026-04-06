@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class FeedEmptyState extends StatelessWidget {
@@ -25,7 +26,7 @@ class FeedEmptyState extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.forum_outlined,
+                Iconsax.messages_2,
                 size: 34,
                 color: theme.colorScheme.primary,
               ),

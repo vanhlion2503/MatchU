@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -106,7 +107,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     ),
                     IconButton(
                       onPressed: Navigator.of(context).pop,
-                      icon: const Icon(Icons.close_rounded),
+                      icon: const Icon(Iconsax.close_circle),
                     ),
                   ],
                 ),
@@ -126,7 +127,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.error_outline_rounded, size: 44),
+                            const Icon(Iconsax.warning_2, size: 44),
                             const SizedBox(height: 12),
                             Text(
                               _controller.errorMessage.value!,
@@ -197,7 +198,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                             IconButton(
                               visualDensity: VisualDensity.compact,
                               onPressed: _controller.cancelReply,
-                              icon: const Icon(Icons.close_rounded),
+                              icon: const Icon(Iconsax.close_circle),
                             ),
                           ],
                         ),
@@ -241,7 +242,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                           color: Colors.white,
                                         ),
                                       )
-                                      : const Icon(Icons.send_rounded),
+                                      : const Icon(Iconsax.send_1),
                             ),
                           ),
                         ],

@@ -77,6 +77,10 @@ class FeedController extends GetxController {
     );
   }
 
+  PostModel? findPostById(String postId) {
+    return _findPost(postId);
+  }
+
   Future<void> _loadFeed({
     required bool reset,
     bool isManualRefresh = false,

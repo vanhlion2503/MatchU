@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:video_player/video_player.dart';
 
 class PostVideoThumbnail extends StatefulWidget {
@@ -163,7 +164,7 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
                         if (!value.isPlaying)
                           const Center(
                             child: Icon(
-                              Icons.play_circle_fill_rounded,
+                              Iconsax.play_circle,
                               size: 62,
                               color: Colors.white,
                             ),
@@ -216,7 +217,7 @@ class _VideoPlaceholder extends StatelessWidget {
         child:
             hasError
                 ? const Icon(
-                  Icons.videocam_off_rounded,
+                  Iconsax.video_slash,
                   color: Colors.white70,
                   size: 40,
                 )
@@ -230,7 +231,7 @@ class _VideoPlaceholder extends StatelessWidget {
                   ),
                 )
                 : const Icon(
-                  Icons.play_circle_fill_rounded,
+                  Iconsax.play_circle,
                   color: Colors.white70,
                   size: 40,
                 ),
