@@ -28,8 +28,7 @@ class PostItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
-    final authorName = postAuthorName(post);
-    final authorHandle = postAuthorHandle(post);
+    final metaLabel = buildPostMetaLabel(post);
 
     return Material(
       color: Colors.transparent,
@@ -47,11 +46,10 @@ class PostItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _PostHeader(post: post, onMoreTap: onMoreTap),
-                    if (authorHandle.isNotEmpty &&
-                        authorHandle.toLowerCase() !=
-                            authorName.toLowerCase()) ...[
+                    if (metaLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        '@$authorHandle',
+                        metaLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -284,14 +282,6 @@ class _PostHeader extends StatelessWidget {
                 color: palette.textPrimary,
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          formatRelativeTime(post.createdAt),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: palette.textTertiary,
-            fontSize: 12,
           ),
         ),
         const SizedBox(width: 4),

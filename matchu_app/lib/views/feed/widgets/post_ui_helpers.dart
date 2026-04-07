@@ -138,6 +138,22 @@ String formatAbsolutePostTime(DateTime? dateTime) {
   return DateFormat('h:mm a, MMM d, yyyy').format(dateTime.toLocal());
 }
 
+String formatPostMetaDate(DateTime? dateTime) {
+  if (dateTime == null) return 'Vua xong';
+  return DateFormat('dd/MM').format(dateTime.toLocal());
+}
+
+String buildPostMetaLabel(PostModel post) {
+  final authorName = postAuthorName(post);
+  final handle = postAuthorHandle(post);
+  final hasDistinctHandle =
+      handle.isNotEmpty && handle.toLowerCase() != authorName.toLowerCase();
+  final dateLabel = formatPostMetaDate(post.createdAt);
+
+  if (!hasDistinctHandle) return dateLabel;
+  return '@$handle • $dateLabel';
+}
+
 String formatCompactCount(int value) {
   if (value < 1000) return '$value';
   if (value < 1000000) {

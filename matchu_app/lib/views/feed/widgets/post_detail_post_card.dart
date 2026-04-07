@@ -27,8 +27,7 @@ class PostDetailPostCard extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
     final authorName = postAuthorName(post);
-    final authorHandle = postAuthorHandle(post);
-    final showHandle = authorHandle.isNotEmpty;
+    final metaLabel = buildPostMetaLabel(post);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -63,10 +62,10 @@ class PostDetailPostCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (showHandle) ...[
+                    if (metaLabel.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '@$authorHandle',
+                        metaLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
