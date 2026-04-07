@@ -8,6 +8,7 @@ import 'package:matchu_app/models/feed/post_media_draft.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CreatePostSheet extends StatefulWidget {
   const CreatePostSheet({super.key});
@@ -63,25 +64,30 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
   }
 
   void _focusTagInput() {
+    _controller.showTagEditor();
     _contentFocusNode.unfocus();
-    _tagFocusNode.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tagFocusNode.requestFocus();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final palette = _CreatePostPalette.of(context);
+    final keyboardInset = mediaQuery.viewInsets.bottom;
+    const keyboardAnimationDuration = Duration(milliseconds: 260);
+    const keyboardAnimationCurve = Curves.easeOutCubic;
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+    return MediaQuery(
+      data: mediaQuery.removeViewInsets(removeBottom: true),
       child: SafeArea(
         top: false,
         child: Align(
           alignment: Alignment.bottomCenter,
           child: Container(
-            height: mediaQuery.size.height * 0.94,
+            height: mediaQuery.size.height * 0.95,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: palette.sheetBackground,
@@ -121,11 +127,17 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
                     ),
                   ),
                 ),
-                _BottomToolbar(
-                  controller: _controller,
-                  palette: palette,
-                  safeBottom: mediaQuery.padding.bottom,
-                  onFocusTag: _focusTagInput,
+                AnimatedPadding(
+                  duration: keyboardAnimationDuration,
+                  curve: keyboardAnimationCurve,
+                  padding: EdgeInsets.only(bottom: keyboardInset),
+                  child: _BottomToolbar(
+                    controller: _controller,
+                    palette: palette,
+                    safeBottom: mediaQuery.padding.bottom,
+                    keyboardInset: keyboardInset,
+                    onFocusTag: _focusTagInput,
+                  ),
                 ),
               ],
             ),
@@ -248,6 +260,9 @@ class _ComposerBody extends StatelessWidget {
         controller: controller,
         palette: palette,
         avatarUrl: '',
+        fullName: 'Nguoi dung',
+        nicknameLabel: '@nguoi.dung',
+        isVerified: false,
         handle: 'người.dùng',
         contentFocusNode: contentFocusNode,
         tagFocusNode: tagFocusNode,
@@ -259,6 +274,9 @@ class _ComposerBody extends StatelessWidget {
         controller: controller,
         palette: palette,
         avatarUrl: userController.avatarUrl,
+        fullName: _composerFullNameOf(userController),
+        nicknameLabel: _composerNicknameLabelOf(userController),
+        isVerified: _composerIsVerifiedOf(userController),
         handle: _composerHandleOf(userController),
         contentFocusNode: contentFocusNode,
         tagFocusNode: tagFocusNode,
@@ -275,6 +293,9 @@ class _ComposerLayout extends StatelessWidget {
     required this.handle,
     required this.contentFocusNode,
     required this.tagFocusNode,
+    this.fullName = '',
+    this.nicknameLabel = '',
+    this.isVerified = false,
   });
 
   final PostComposerController controller;
@@ -283,17 +304,22 @@ class _ComposerLayout extends StatelessWidget {
   final String handle;
   final FocusNode contentFocusNode;
   final FocusNode tagFocusNode;
+  final String fullName;
+  final String nicknameLabel;
+  final bool isVerified;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final resolvedFullName = fullName.isNotEmpty ? fullName : handle;
+    final resolvedNicknameLabel = nicknameLabel;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ComposerAvatar(
           avatarUrl: avatarUrl,
-          fallbackLabel: handle,
+          fallbackLabel: resolvedFullName,
           palette: palette,
         ),
         const SizedBox(width: 12),
@@ -303,12 +329,36 @@ class _ComposerLayout extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  handle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: palette.textPrimary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    VerifiedNameRow(
+                      isVerified: isVerified,
+                      badgeSize: 15,
+                      badgePadding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        resolvedFullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (resolvedNicknameLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        resolvedNicknameLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textTertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -323,8 +373,9 @@ class _ComposerLayout extends StatelessWidget {
                   color: palette.textPrimary,
                 ),
                 cursorColor: theme.colorScheme.primary,
-                decoration: InputDecoration.collapsed(
+                decoration: _borderlessInputDecoration(
                   hintText: 'Có gì mới?',
+                  fillColor: palette.sheetBackground,
                   hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     fontSize: 16,
                     color: palette.placeholder,
@@ -347,11 +398,21 @@ class _ComposerLayout extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              _TagEditor(
-                controller: controller,
-                palette: palette,
-                tagFocusNode: tagFocusNode,
+              Obx(
+                () => AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child:
+                      controller.isTagEditorVisible.value
+                          ? Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: _TagEditor(
+                              controller: controller,
+                              palette: palette,
+                              tagFocusNode: tagFocusNode,
+                            ),
+                          )
+                          : const SizedBox.shrink(),
+                ),
               ),
               Obx(() {
                 if (controller.mediaDrafts.isEmpty) {
@@ -455,7 +516,6 @@ class _TagEditor extends StatelessWidget {
               decoration: BoxDecoration(
                 color: palette.surfaceMuted,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: palette.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -499,8 +559,9 @@ class _TagEditor extends StatelessWidget {
                   color: palette.textSecondary,
                 ),
                 cursorColor: theme.colorScheme.primary,
-                decoration: InputDecoration.collapsed(
+                decoration: _borderlessInputDecoration(
                   hintText: 'Thêm thẻ...',
+                  fillColor: palette.sheetBackground,
                   hintStyle: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 14,
                     color: palette.placeholder,
@@ -520,12 +581,14 @@ class _BottomToolbar extends StatelessWidget {
     required this.controller,
     required this.palette,
     required this.safeBottom,
+    required this.keyboardInset,
     required this.onFocusTag,
   });
 
   final PostComposerController controller;
   final _CreatePostPalette palette;
   final double safeBottom;
+  final double keyboardInset;
   final VoidCallback onFocusTag;
 
   @override
@@ -535,7 +598,7 @@ class _BottomToolbar extends StatelessWidget {
         16,
         12,
         16,
-        safeBottom > 0 ? safeBottom : 12,
+        keyboardInset > 0 ? 12 : (safeBottom > 0 ? safeBottom : 12),
       ),
       decoration: BoxDecoration(
         color: palette.sheetBackground,
@@ -891,6 +954,56 @@ class _CreatePostPalette {
               : Colors.black.withValues(alpha: 0.08),
     );
   }
+}
+
+InputDecoration _borderlessInputDecoration({
+  required String hintText,
+  required Color fillColor,
+  TextStyle? hintStyle,
+}) {
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: hintStyle,
+    filled: true,
+    fillColor: fillColor,
+    isCollapsed: true,
+    isDense: true,
+    contentPadding: EdgeInsets.zero,
+    border: InputBorder.none,
+    enabledBorder: InputBorder.none,
+    focusedBorder: InputBorder.none,
+    disabledBorder: InputBorder.none,
+    errorBorder: InputBorder.none,
+    focusedErrorBorder: InputBorder.none,
+  );
+}
+
+String _composerFullNameOf(UserController? controller) {
+  final fullname = controller?.fullname.trim() ?? '';
+  if (fullname.isNotEmpty) return fullname;
+
+  final nickname = controller?.nickname.trim() ?? '';
+  if (nickname.isNotEmpty) return nickname;
+
+  return 'Nguoi dung';
+}
+
+String _composerNicknameLabelOf(UserController? controller) {
+  final nickname = controller?.nickname.trim() ?? '';
+  if (nickname.isNotEmpty) return '@$nickname';
+
+  final fullname = controller?.fullname.trim() ?? '';
+  if (fullname.isNotEmpty) {
+    final generatedHandle =
+        fullname.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
+    return '@$generatedHandle';
+  }
+
+  return '@nguoi.dung';
+}
+
+bool _composerIsVerifiedOf(UserController? controller) {
+  return controller?.userRx.value?.isFaceVerified == true;
 }
 
 String _composerHandleOf(UserController? controller) {

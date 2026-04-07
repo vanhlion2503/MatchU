@@ -26,6 +26,7 @@ class PostComposerController extends GetxController {
   final RxBool isSubmitting = false.obs;
   final RxBool isPickingMedia = false.obs;
   final RxBool isPublic = true.obs;
+  final RxBool isTagEditorVisible = false.obs;
 
   int get remainingCharacters =>
       PostService.maxContentLength - contentLength.value;
@@ -101,6 +102,10 @@ class PostComposerController extends GetxController {
 
   void commitPendingTag() {
     _appendTagsFromRaw(tagInputController.text, clearInput: true);
+  }
+
+  void showTagEditor() {
+    isTagEditorVisible.value = true;
   }
 
   Future<PostModel?> submit() async {
