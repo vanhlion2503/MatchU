@@ -124,7 +124,11 @@ class PostDetailPostCard extends StatelessWidget {
           ],
           if (post.hasMedia) ...[
             const SizedBox(height: 16),
-            PostMediaGallery(media: post.media),
+            PostMediaGallery(
+              media: post.media,
+              multiImageLayout:
+                  PostMediaGalleryMultiImageLayout.horizontalScroll,
+            ),
           ],
           const SizedBox(height: 14),
           Text(
