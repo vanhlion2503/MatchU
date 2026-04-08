@@ -93,6 +93,7 @@ class _RandomChatViewState extends State<RandomChatView>
 
   @override
   void dispose() {
+    AvatarOverlayService.hide();
     _rippleController.dispose();
     super.dispose();
   }
@@ -555,7 +556,7 @@ class _RandomChatViewState extends State<RandomChatView>
             ),
           ),
           GestureDetector(
-            onTap: AvatarOverlayService.show,
+            onTap: () => AvatarOverlayService.show(context),
             child: Obx(() {
               final key = anonAvatarC.selectedAvatar.value;
 

@@ -1,17 +1,19 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import 'anonymous_avatar_selector.dart';
 
 class AvatarOverlayService {
   static OverlayEntry? _entry;
 
-  static void show() {
+  static void show(BuildContext context) {
     if (_entry != null) return;
 
-    final overlayContext = Get.overlayContext;
-    if (overlayContext == null) {
-      debugPrint("❌ No overlay context found");
+    final overlay = _resolveOverlay(context);
+    if (overlay == null) {
+      debugPrint('AvatarOverlayService: no overlay available');
       return;
     }
 
@@ -21,12 +23,14 @@ class AvatarOverlayService {
           color: Colors.transparent,
           child: Stack(
             children: [
-              GestureDetector(
-                onTap: hide,
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                  child: Container(
-                    color: Colors.black.withOpacity(0.65),
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: hide,
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.65),
+                    ),
                   ),
                 ),
               ),
@@ -37,7 +41,22 @@ class AvatarOverlayService {
       },
     );
 
-    Overlay.of(overlayContext).insert(_entry!);
+    overlay.insert(_entry!);
+  }
+
+  static OverlayState? _resolveOverlay(BuildContext context) {
+    final navigatorOverlay =
+        Navigator.maybeOf(context, rootNavigator: true)?.overlay;
+    if (navigatorOverlay != null) {
+      return navigatorOverlay;
+    }
+
+    final rootOverlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (rootOverlay != null) {
+      return rootOverlay;
+    }
+
+    return Get.key.currentState?.overlay;
   }
 
   static void hide() {
@@ -45,4 +64,3 @@ class AvatarOverlayService {
     _entry = null;
   }
 }
-

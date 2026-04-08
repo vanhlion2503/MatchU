@@ -15,34 +15,24 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
   late final PageController _pageController;
   final c = Get.find<AnonymousAvatarController>();
   final ValueNotifier<double> _page = ValueNotifier(0);
+  late final Worker _avatarsWorker;
+  late final Worker _selectedAvatarWorker;
 
   int _safeInitialIndex() {
     if (c.avatars.isEmpty) return 0;
+
     final selected = c.selectedAvatar.value;
     if (selected == null) return 0;
+
     final index = c.avatars.indexOf(selected);
     if (index < 0) return 0;
+
     return index;
   }
 
   @override
   void initState() {
     super.initState();
-
-    ever<List<String>>(c.avatars, (_) {
-      if (c.avatars.isEmpty) return;
-
-      final index = _safeInitialIndex();
-      final maxIndex = c.avatars.length - 1;
-      final targetIndex = maxIndex < 0 ? 0 : index.clamp(0, maxIndex);
-
-      if (_pageController.hasClients) {
-        _pageController.jumpToPage(targetIndex);
-      }
-
-      _page.value = targetIndex.toDouble();
-    });
-
 
     final initialIndex = _safeInitialIndex();
     final maxIndex = c.avatars.length - 1;
@@ -53,17 +43,51 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
       viewportFraction: 0.55,
     );
 
-    // ?? DONG QUAN TR?NG
     _page.value = targetIndex.toDouble();
 
     _pageController.addListener(() {
       _page.value = _pageController.page ?? _page.value;
     });
+
+    _avatarsWorker = ever<List<String>>(c.avatars, (_) {
+      _syncPageWithSelection(jump: true);
+    });
+
+    _selectedAvatarWorker = ever<String?>(c.selectedAvatar, (_) {
+      _syncPageWithSelection();
+    });
   }
 
+  void _syncPageWithSelection({bool jump = false}) {
+    if (!mounted || c.avatars.isEmpty || !_pageController.hasClients) {
+      return;
+    }
+
+    final maxIndex = c.avatars.length - 1;
+    final targetIndex = _safeInitialIndex().clamp(0, maxIndex);
+    final currentPage = _pageController.page;
+    final isSamePage =
+        currentPage != null && (currentPage - targetIndex).abs() < 0.01;
+
+    if (!isSamePage) {
+      if (jump) {
+        _pageController.jumpToPage(targetIndex);
+      } else {
+        _pageController.animateToPage(
+          targetIndex,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    }
+
+    _page.value = targetIndex.toDouble();
+  }
 
   @override
   void dispose() {
+    _avatarsWorker.dispose();
+    _selectedAvatarWorker.dispose();
     _pageController.dispose();
     _page.dispose();
     super.dispose();
@@ -97,10 +121,9 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
                       final diff = (page - index).abs();
                       final scale = (1 - diff * 0.35).clamp(0.75, 1.0);
                       final opacity = (1 - diff * 0.6).clamp(0.4, 1.0);
-      
                       final isSelected =
                           c.selectedAvatar.value == c.avatars[index];
-      
+
                       return Center(
                         child: Opacity(
                           opacity: opacity,
@@ -117,21 +140,21 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
                                       shape: BoxShape.circle,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.cyanAccent.withOpacity(0.8),
+                                          color: Colors.cyanAccent.withValues(
+                                            alpha: 0.8,
+                                          ),
                                           blurRadius: 30,
                                           spreadRadius: 6,
                                         ),
                                       ],
                                     ),
                                   ),
-      
                                 CircleAvatar(
                                   radius: isSelected ? 70 : 55,
                                   backgroundImage: AssetImage(
-                                    "assets/anonymous/${c.avatars[index]}.png",
+                                    'assets/anonymous/${c.avatars[index]}.png',
                                   ),
                                 ),
-      
                                 if (isSelected)
                                   Positioned(
                                     bottom: 8,
@@ -161,31 +184,26 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
               );
             }),
           ),
-          /// ===== NAME =====
           Obx(() {
             final key = c.selectedAvatar.value;
+
             return Text(
-              key == null ? "" : c.getAvatarName(key),
+              key == null ? '' : c.getAvatarName(key),
               style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.darkTextPrimary
-                  ),
-              );
-            }),
-      
+                fontWeight: FontWeight.w900,
+                color: AppTheme.darkTextPrimary,
+              ),
+            );
+          }),
           const SizedBox(height: 24),
           ValueListenableBuilder<double>(
             valueListenable: _page,
             builder: (_, page, __) {
-              return AvatarPageIndicator(
-                count: c.avatars.length,
-                page: page,
-              );
+              return AvatarPageIndicator(count: c.avatars.length, page: page);
             },
           ),
         ],
       ),
     );
   }
-
 }
