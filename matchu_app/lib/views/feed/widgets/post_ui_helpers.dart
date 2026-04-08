@@ -90,21 +90,20 @@ String formatRelativeTime(
   bool compact = false,
 }) {
   if (dateTime == null) {
-    return compact ? 'now' : 'Vua xong';
+    return _justNowLabel();
   }
 
   final localTime = dateTime.toLocal();
   final diff = DateTime.now().difference(localTime);
-
-  if (diff.inSeconds < 60) {
-    return compact ? 'now' : 'Vua xong';
+  if (diff.isNegative || diff.inSeconds < 60) {
+    return _justNowLabel();
   }
 
   if (diff.inMinutes < 60) {
     return _formatRelativeUnit(
       value: diff.inMinutes,
-      fullUnit: 'phut',
-      compactUnit: 'm',
+      fullUnit: 'ph\u00FAt',
+      compactUnit: 'p',
       withSuffix: withSuffix,
       compact: compact,
     );
@@ -113,8 +112,8 @@ String formatRelativeTime(
   if (diff.inHours < 24) {
     return _formatRelativeUnit(
       value: diff.inHours,
-      fullUnit: 'gio',
-      compactUnit: 'h',
+      fullUnit: 'gi\u1EDD',
+      compactUnit: 'g',
       withSuffix: withSuffix,
       compact: compact,
     );
@@ -123,23 +122,24 @@ String formatRelativeTime(
   if (diff.inDays < 7) {
     return _formatRelativeUnit(
       value: diff.inDays,
-      fullUnit: 'ngay',
-      compactUnit: 'd',
+      fullUnit: 'ng\u00E0y',
+      compactUnit: 'ng',
       withSuffix: withSuffix,
       compact: compact,
     );
   }
 
-  return DateFormat('dd/MM').format(localTime);
+  final hasSameYear = localTime.year == DateTime.now().year;
+  return DateFormat(hasSameYear ? 'dd/MM' : 'dd/MM/yyyy').format(localTime);
 }
 
 String formatAbsolutePostTime(DateTime? dateTime) {
-  if (dateTime == null) return 'Vua xong';
-  return DateFormat('h:mm a, MMM d, yyyy').format(dateTime.toLocal());
+  if (dateTime == null) return _justNowLabel();
+  return DateFormat('HH:mm, dd/MM/yyyy').format(dateTime.toLocal());
 }
 
 String formatPostMetaDate(DateTime? dateTime) {
-  if (dateTime == null) return 'Vua xong';
+  if (dateTime == null) return _justNowLabel();
   return DateFormat('dd/MM').format(dateTime.toLocal());
 }
 
@@ -148,10 +148,9 @@ String buildPostMetaLabel(PostModel post) {
   final handle = postAuthorHandle(post);
   final hasDistinctHandle =
       handle.isNotEmpty && handle.toLowerCase() != authorName.toLowerCase();
-  final dateLabel = formatPostMetaDate(post.createdAt);
 
-  if (!hasDistinctHandle) return dateLabel;
-  return '@$handle • $dateLabel';
+  if (!hasDistinctHandle) return '';
+  return '@$handle';
 }
 
 String formatCompactCount(int value) {
@@ -186,5 +185,9 @@ String _formatRelativeUnit({
 
   final label = '$value $fullUnit';
   if (!withSuffix) return label;
-  return '$label truoc';
+  return '$label tr\u01B0\u1EDBc';
+}
+
+String _justNowLabel() {
+  return 'V\u1EEBa xong';
 }

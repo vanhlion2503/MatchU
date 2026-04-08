@@ -202,6 +202,12 @@ class _PostDetailComposer extends StatelessWidget {
                         IconButton(
                           onPressed: commentsController.cancelReply,
                           visualDensity: VisualDensity.compact,
+                          style: const ButtonStyle(
+                            overlayColor: WidgetStatePropertyAll(
+                              Colors.transparent,
+                            ),
+                            splashFactory: NoSplash.splashFactory,
+                          ),
                           icon: Icon(
                             Iconsax.close_circle,
                             size: 18,
@@ -356,6 +362,10 @@ class _PostDetailAppBar extends StatelessWidget implements PreferredSizeWidget {
             children: [
               IconButton(
                 onPressed: Get.back,
+                style: const ButtonStyle(
+                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                  splashFactory: NoSplash.splashFactory,
+                ),
                 icon: Icon(Iconsax.arrow_left_2, color: palette.iconPrimary),
               ),
               Expanded(

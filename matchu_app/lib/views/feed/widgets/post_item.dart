@@ -36,12 +36,12 @@ class PostItem extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              _PostRail(post: post),
-              const SizedBox(width: 12),
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: _PostRailLayout.contentLeft,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -134,12 +134,27 @@ class PostItem extends StatelessWidget {
                   ],
                 ),
               ),
+              _PostRail(post: post),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _PostRailLayout {
+  static const double width = 40;
+  static const double gap = 12;
+  static const double avatarSize = 40;
+  static const double lineWidth = 1.4;
+  static const double lineTopOffset = avatarSize + 8;
+  static const double lineBottomOffset = 12;
+  static const double replyClusterWidth = 30;
+  static const double replyClusterBottomOffset = 6;
+  static const double contentLeft = width + gap;
+  static const double lineLeft = (width - lineWidth) / 2;
+  static const double replyClusterLeft = (width - replyClusterWidth) / 2;
 }
 
 class _PostRail extends StatelessWidget {
@@ -152,39 +167,42 @@ class _PostRail extends StatelessWidget {
     final palette = FeedPalette.of(context);
     final showReplyCluster = post.stats.commentCount > 0;
 
-    return SizedBox(
-      width: 40,
-      child: Column(
-        children: [
-          FeedAvatar(
-            imageUrl: post.author.avatar,
-            fallbackLabel: postAuthorName(post),
-            size: 40,
-            borderColor: palette.border,
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: 1.4,
-            height: _threadHeight(post),
-            decoration: BoxDecoration(
-              color: palette.threadLine,
-              borderRadius: BorderRadius.circular(999),
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              child: FeedAvatar(
+                imageUrl: post.author.avatar,
+                fallbackLabel: postAuthorName(post),
+                size: _PostRailLayout.avatarSize,
+                borderColor: palette.border,
+              ),
             ),
-          ),
-          if (showReplyCluster) ...[
-            const SizedBox(height: 8),
-            _ReplyCluster(count: post.stats.commentCount),
+            Positioned(
+              left: _PostRailLayout.lineLeft,
+              top: _PostRailLayout.lineTopOffset,
+              bottom: _PostRailLayout.lineBottomOffset,
+              child: Container(
+                width: _PostRailLayout.lineWidth,
+                decoration: BoxDecoration(
+                  color: palette.threadLine,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            if (showReplyCluster)
+              Positioned(
+                left: _PostRailLayout.replyClusterLeft,
+                bottom: _PostRailLayout.replyClusterBottomOffset,
+                child: _ReplyCluster(count: post.stats.commentCount),
+              ),
           ],
-        ],
+        ),
       ),
     );
-  }
-
-  double _threadHeight(PostModel post) {
-    if (post.hasMedia) return 34;
-    if (post.tags.isNotEmpty) return 28;
-    if (post.hasContent) return 24;
-    return 18;
   }
 }
 

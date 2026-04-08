@@ -82,6 +82,14 @@ class PostDetailPostCard extends StatelessWidget {
                 child: InkResponse(
                   radius: 20,
                   onTap: onMoreTap,
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor: const WidgetStatePropertyAll(
+                    Colors.transparent,
+                  ),
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
+                  focusColor: Colors.transparent,
                   child: Padding(
                     padding: const EdgeInsets.all(4),
                     child: Icon(
@@ -131,11 +139,15 @@ class PostDetailPostCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
-          Text(
-            formatAbsolutePostTime(post.createdAt),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: palette.textSecondary,
-              fontWeight: FontWeight.w600,
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              formatAbsolutePostTime(post.createdAt),
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -213,6 +225,12 @@ class _PostDetailActionButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 13),
           child: Row(
