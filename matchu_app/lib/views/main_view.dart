@@ -26,23 +26,33 @@ class _MainViewState extends State<MainView> {
   final UnreadController unreadController = Get.find<UnreadController>();
 
   Worker? _tabIndexWorker;
+  Worker? _pageIndexWorker;
   bool _passcodeChecked = false;
+  int _lastTabIndex = 0;
+  final ValueNotifier<bool> _isHomeBottomNavigationVisible =
+      ValueNotifier<bool>(true);
 
-  late final List<Widget> pages = const [
-    HomeView(),
-    NearbyView(),
-    RandomChatView(),
-    ChatListView(embedInMainNavigation: true),
-    ProfileView(),
+  late final List<Widget> pages = [
+    HomeView(
+      onBottomNavigationVisibilityChanged:
+          _handleHomeBottomNavigationVisibilityChanged,
+    ),
+    const NearbyView(),
+    const RandomChatView(),
+    const ChatListView(embedInMainNavigation: true),
+    const ProfileView(),
   ];
 
   @override
   void initState() {
     super.initState();
+    _lastTabIndex = c.currentIndex.value;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensurePasscodeFlow();
     });
+
+    _pageIndexWorker = ever<int>(c.currentIndex, _handlePageIndexChanged);
 
     if (Get.isRegistered<NotificationController>()) {
       final notificationController = Get.find<NotificationController>();
@@ -128,27 +138,65 @@ class _MainViewState extends State<MainView> {
     }
   }
 
+  void _handlePageIndexChanged(int index) {
+    if (_lastTabIndex == index) return;
+
+    _lastTabIndex = index;
+    if (_isHomeBottomNavigationVisible.value) return;
+
+    _isHomeBottomNavigationVisible.value = true;
+  }
+
+  void _handleHomeBottomNavigationVisibilityChanged(bool isVisible) {
+    if (c.currentIndex.value != 0) return;
+    if (_isHomeBottomNavigationVisible.value == isVisible) return;
+
+    _isHomeBottomNavigationVisible.value = isVisible;
+  }
+
   @override
   void dispose() {
     _tabIndexWorker?.dispose();
+    _pageIndexWorker?.dispose();
+    _isHomeBottomNavigationVisible.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final int unreadCount = unreadController.totalUnread.value;
+    return Scaffold(
+      extendBody: true,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Obx(() {
+            final int currentIndex = c.currentIndex.value;
+            return IndexedStack(index: currentIndex, children: pages);
+          }),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _isHomeBottomNavigationVisible,
+              builder: (context, isHomeBottomNavigationVisible, _) {
+                return Obx(() {
+                  final int currentIndex = c.currentIndex.value;
+                  final int unreadCount = unreadController.totalUnread.value;
+                  final bool isBottomNavigationVisible =
+                      currentIndex == 0 ? isHomeBottomNavigationVisible : true;
 
-      return Scaffold(
-        body: IndexedStack(index: c.currentIndex.value, children: pages),
-        extendBody: true,
-        bottomNavigationBar: MainBottomNavigationBar(
-          currentIndex: c.currentIndex.value,
-          unreadCount: unreadCount,
-          onTabSelected: c.changePage,
-          onCenterTap: () => c.changePage(2),
-        ),
-      );
-    });
+                  return MainBottomNavigationBar(
+                    currentIndex: currentIndex,
+                    isVisible: isBottomNavigationVisible,
+                    unreadCount: unreadCount,
+                    onTabSelected: c.changePage,
+                    onCenterTap: () => c.changePage(2),
+                  );
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

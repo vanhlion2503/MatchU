@@ -64,7 +64,7 @@ class FeedScreen extends GetView<FeedController> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset + 10),
+        padding: EdgeInsets.only(bottom: bottomInset + 80),
         child: FloatingActionButton(
           heroTag: 'feed_create_post_fab',
           tooltip: 'Tạo bài viết',

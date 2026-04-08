@@ -6,12 +6,14 @@ class MainBottomNavigationBar extends StatefulWidget {
   const MainBottomNavigationBar({
     super.key,
     required this.currentIndex,
+    required this.isVisible,
     required this.unreadCount,
     required this.onTabSelected,
     required this.onCenterTap,
   });
 
   final int currentIndex;
+  final bool isVisible;
   final int unreadCount;
   final ValueChanged<int> onTabSelected;
   final VoidCallback onCenterTap;
@@ -22,10 +24,13 @@ class MainBottomNavigationBar extends StatefulWidget {
 }
 
 class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _centerSweepController;
+  late final AnimationController _visibilityController;
   late final Animation<double> _centerSweepOffset;
   late final Animation<double> _centerIconWiggleAngle;
+  late final Animation<double> _visibilityAnimation;
+  late final Animation<Offset> _visibilityOffset;
 
   @override
   void initState() {
@@ -87,11 +92,47 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
       ),
       TweenSequenceItem(tween: ConstantTween(0), weight: 40),
     ]).animate(_centerSweepController);
+
+    _visibilityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      value: widget.isVisible ? 1 : 0,
+    );
+
+    _visibilityAnimation = CurvedAnimation(
+      parent: _visibilityController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    _visibilityOffset = Tween<Offset>(
+      begin: const Offset(0, 0.24),
+      end: Offset.zero,
+    ).animate(_visibilityAnimation);
+  }
+
+  @override
+  void didUpdateWidget(covariant MainBottomNavigationBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.isVisible == widget.isVisible) return;
+
+    if (widget.isVisible) {
+      if (!_centerSweepController.isAnimating) {
+        _centerSweepController.repeat();
+      }
+      _visibilityController.forward();
+      return;
+    }
+
+    _centerSweepController.stop(canceled: false);
+    _visibilityController.reverse();
   }
 
   @override
   void dispose() {
     _centerSweepController.dispose();
+    _visibilityController.dispose();
     super.dispose();
   }
 
@@ -101,6 +142,21 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
 
   @override
   Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: IgnorePointer(
+        ignoring: !widget.isVisible,
+        child: FadeTransition(
+          opacity: _visibilityAnimation,
+          child: SlideTransition(
+            position: _visibilityOffset,
+            child: _buildNavigationBar(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavigationBar(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -212,7 +268,7 @@ class _CenterActionButton extends StatelessWidget {
           color: scheme.surface,
           border: Border.all(
             color: borderColor.withValues(alpha: 0.72),
-            width: 0.6,
+            width: 0.4,
           ),
         ),
         child: Container(
