@@ -89,7 +89,11 @@ class PostItem extends StatelessWidget {
                     ],
                     if (post.hasMedia) ...[
                       const SizedBox(height: 12),
-                      PostMediaGallery(media: post.media),
+                      PostMediaGallery(
+                        media: post.media,
+                        multiImageLayout:
+                            PostMediaGalleryMultiImageLayout.horizontalScroll,
+                      ),
                     ],
                     const SizedBox(height: 12),
                     Wrap(
