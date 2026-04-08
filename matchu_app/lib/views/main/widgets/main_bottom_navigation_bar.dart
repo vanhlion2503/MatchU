@@ -22,71 +22,81 @@ class MainBottomNavigationBar extends StatefulWidget {
 }
 
 class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
-    with TickerProviderStateMixin {
-  late final AnimationController _centerTapController;
-  late final AnimationController _centerIdleController;
-  late final Animation<double> _tapScaleAnimation;
-  late final Animation<double> _idleScaleAnimation;
-  late final Animation<double> _boltSlideAnimation;
-  late final Animation<double> _boltRotateAnimation;
-  late final Animation<double> _glowOpacityAnimation;
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _centerSweepController;
+  late final Animation<double> _centerSweepOffset;
+  late final Animation<double> _centerIconWiggleAngle;
 
   @override
   void initState() {
     super.initState();
 
-    _centerTapController = AnimationController(
+    _centerSweepController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 180),
-    );
+      duration: const Duration(milliseconds: 3400),
+    )..repeat();
 
-    _tapScaleAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _centerTapController, curve: Curves.easeOutBack),
-    );
-
-    _centerIdleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-
-    final idleCurve = CurvedAnimation(
-      parent: _centerIdleController,
-      curve: Curves.easeInOut,
-    );
-
-    _idleScaleAnimation = Tween<double>(
-      begin: 0.98,
-      end: 1.04,
-    ).animate(idleCurve);
-    _boltSlideAnimation = Tween<double>(begin: -1.2, end: 1.6).animate(
-      CurvedAnimation(
-        parent: _centerIdleController,
-        curve: Curves.easeInOutSine,
+    _centerSweepOffset = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(-64.0), weight: 18),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: -64.0,
+          end: 64.0,
+        ).chain(CurveTween(curve: Curves.easeInOutCubic)),
+        weight: 44,
       ),
-    );
-    _boltRotateAnimation = Tween<double>(
-      begin: -0.08,
-      end: 0.08,
-    ).animate(idleCurve);
-    _glowOpacityAnimation = Tween<double>(
-      begin: 0.18,
-      end: 0.34,
-    ).animate(idleCurve);
+      TweenSequenceItem(tween: ConstantTween(64.0), weight: 38),
+    ]).animate(_centerSweepController);
+
+    _centerIconWiggleAngle = TweenSequence<double>([
+      TweenSequenceItem(tween: ConstantTween(0), weight: 16),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0,
+          end: -0.12,
+        ).chain(CurveTween(curve: Curves.easeOutSine)),
+        weight: 8,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: -0.12,
+          end: 0.10,
+        ).chain(CurveTween(curve: Curves.easeInOutSine)),
+        weight: 10,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0.10,
+          end: -0.07,
+        ).chain(CurveTween(curve: Curves.easeInOutSine)),
+        weight: 10,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: -0.07,
+          end: 0.04,
+        ).chain(CurveTween(curve: Curves.easeInOutSine)),
+        weight: 8,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0.04,
+          end: 0,
+        ).chain(CurveTween(curve: Curves.easeOutSine)),
+        weight: 8,
+      ),
+      TweenSequenceItem(tween: ConstantTween(0), weight: 40),
+    ]).animate(_centerSweepController);
   }
 
   @override
   void dispose() {
-    _centerTapController.dispose();
-    _centerIdleController.dispose();
+    _centerSweepController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleCenterTap() async {
+  void _handleCenterTap() {
     widget.onCenterTap();
-    await _centerTapController.forward(from: 0);
-    if (mounted) {
-      await _centerTapController.reverse();
-    }
   }
 
   @override
@@ -101,7 +111,7 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
       top: false,
       minimum: const EdgeInsets.fromLTRB(18, 0, 18, 16),
       child: Container(
-        height: 72,
+        height: 70,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
           color: scheme.surface.withValues(alpha: isDark ? 0.96 : 0.98),
@@ -139,73 +149,13 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
             SizedBox(
               width: 72,
               child: Center(
-                child: AnimatedBuilder(
-                  animation: _centerIdleController,
-                  builder: (context, _) {
-                    final glowOpacity =
-                        (isDark
-                                ? _glowOpacityAnimation.value + 0.10
-                                : _glowOpacityAnimation.value)
-                            .clamp(0.0, 0.8)
-                            .toDouble();
-
-                    return Transform.scale(
-                      scale: _idleScaleAnimation.value,
-                      child: ScaleTransition(
-                        scale: _tapScaleAnimation,
-                        child: GestureDetector(
-                          onTap: _handleCenterTap,
-                          behavior: HitTestBehavior.opaque,
-                          child: Container(
-                            width: 54,
-                            height: 54,
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: scheme.surface,
-                              border: Border.all(color: borderColor, width: 1),
-                            ),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [scheme.primary, scheme.secondary],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: scheme.primary.withValues(
-                                      alpha:
-                                          isCenterSelected
-                                              ? glowOpacity + 0.08
-                                              : glowOpacity * 0.72,
-                                    ),
-                                    blurRadius:
-                                        14 + (_glowOpacityAnimation.value * 14),
-                                    spreadRadius: isCenterSelected ? 0.8 : 0.2,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Transform.translate(
-                                  offset: Offset(0, _boltSlideAnimation.value),
-                                  child: Transform.rotate(
-                                    angle: _boltRotateAnimation.value,
-                                    child: Icon(
-                                      Icons.bolt,
-                                      color: scheme.onPrimary,
-                                      size: 28,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                child: _CenterActionButton(
+                  isSelected: isCenterSelected,
+                  scheme: scheme,
+                  borderColor: borderColor,
+                  sweepOffset: _centerSweepOffset,
+                  iconWiggleAngle: _centerIconWiggleAngle,
+                  onTap: _handleCenterTap,
                 ),
               ),
             ),
@@ -225,6 +175,130 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CenterActionButton extends StatelessWidget {
+  const _CenterActionButton({
+    required this.isSelected,
+    required this.scheme,
+    required this.borderColor,
+    required this.sweepOffset,
+    required this.iconWiggleAngle,
+    required this.onTap,
+  });
+
+  final bool isSelected;
+  final ColorScheme scheme;
+  final Color borderColor;
+  final Animation<double> sweepOffset;
+  final Animation<double> iconWiggleAngle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 56,
+        height: 56,
+        padding: const EdgeInsets.all(3.2),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: scheme.surface,
+          border: Border.all(
+            color: borderColor.withValues(alpha: 0.72),
+            width: 0.6,
+          ),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [scheme.primary, scheme.secondary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.primary.withValues(
+                  alpha: isSelected ? 0.32 : 0.20,
+                ),
+                blurRadius: isSelected ? 16 : 12,
+                spreadRadius: isSelected ? 0.6 : 0.1,
+              ),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ClipOval(
+                    child: AnimatedBuilder(
+                      animation: sweepOffset,
+                      builder: (context, _) {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Transform.translate(
+                              offset: Offset(sweepOffset.value, 0),
+                              child: Transform.rotate(
+                                angle: -0.42,
+                                child: Container(
+                                  width: 18,
+                                  height: 92,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                      colors: [
+                                        Colors.white.withValues(alpha: 0),
+                                        Colors.white.withValues(alpha: 0.10),
+                                        Colors.white.withValues(alpha: 0.34),
+                                        Colors.white.withValues(alpha: 0.10),
+                                        Colors.white.withValues(alpha: 0),
+                                      ],
+                                      stops: const [0, 0.22, 0.5, 0.78, 1],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              AnimatedBuilder(
+                animation: iconWiggleAngle,
+                builder: (context, child) {
+                  return Transform.rotate(
+                    angle: iconWiggleAngle.value,
+                    child: child,
+                  );
+                },
+                child: Icon(
+                  Iconsax.flash_1,
+                  size: 22,
+                  color: scheme.onPrimary,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
