@@ -13,6 +13,7 @@ class CommentThreadGuides extends StatelessWidget {
     required this.contentLeft,
     required this.avatarCenterY,
     required this.lineInsets,
+    this.horizontalLineEndX,
     this.topPadding = 0,
     this.bottomPadding = 0,
     required this.color,
@@ -26,6 +27,7 @@ class CommentThreadGuides extends StatelessWidget {
   final double contentLeft;
   final double avatarCenterY;
   final List<double> lineInsets;
+  final double? horizontalLineEndX;
   final double topPadding;
   final double bottomPadding;
   final Color color;
@@ -47,6 +49,7 @@ class CommentThreadGuides extends StatelessWidget {
                 contentLeft: contentLeft,
                 avatarCenterY: topPadding + avatarCenterY,
                 lineInsets: lineInsets,
+                horizontalLineEndX: horizontalLineEndX,
               ),
             ),
           ),
@@ -74,6 +77,7 @@ class _CommentThreadGuidePainter extends CustomPainter {
     required this.contentLeft,
     required this.avatarCenterY,
     required this.lineInsets,
+    required this.horizontalLineEndX,
   });
 
   final Color color;
@@ -84,6 +88,7 @@ class _CommentThreadGuidePainter extends CustomPainter {
   final double contentLeft;
   final double avatarCenterY;
   final List<double> lineInsets;
+  final double? horizontalLineEndX;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -106,7 +111,9 @@ class _CommentThreadGuidePainter extends CustomPainter {
       }
 
       final currentX = _lineXForLevel(depth - 1);
-      final horizontalDelta = contentLeft - currentX;
+      final currentLevelX = _lineXForLevel(depth);
+      final horizontalEndX = horizontalLineEndX ?? currentLevelX;
+      final horizontalDelta = horizontalEndX - currentX;
       final horizontalDirection = horizontalDelta >= 0 ? 1.0 : -1.0;
       final elbowRadius = math.min(
         9.0,
@@ -125,14 +132,14 @@ class _CommentThreadGuidePainter extends CustomPainter {
                 currentX + (elbowRadius * horizontalDirection),
                 avatarCenterY,
               )
-              ..lineTo(contentLeft, avatarCenterY);
+              ..lineTo(horizontalEndX, avatarCenterY);
         canvas.drawPath(elbowPath, paint);
       } else {
         final elbowPath =
             Path()
               ..moveTo(currentX, 0)
               ..lineTo(currentX, avatarCenterY)
-              ..lineTo(contentLeft, avatarCenterY);
+              ..lineTo(horizontalEndX, avatarCenterY);
         canvas.drawPath(elbowPath, paint);
       }
 
@@ -173,6 +180,7 @@ class _CommentThreadGuidePainter extends CustomPainter {
         oldDelegate.hasChildren != hasChildren ||
         oldDelegate.contentLeft != contentLeft ||
         oldDelegate.avatarCenterY != avatarCenterY ||
+        oldDelegate.horizontalLineEndX != horizontalLineEndX ||
         !listEquals(oldDelegate.lineInsets, lineInsets);
   }
 }

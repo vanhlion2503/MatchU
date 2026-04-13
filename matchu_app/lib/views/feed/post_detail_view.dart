@@ -124,6 +124,8 @@ class _CommentsSection extends StatelessWidget {
               PostDetailCommentItem(
                 entry: entry,
                 onReplyTap: () => commentsController.startReply(entry.comment),
+                onToggleRepliesTap:
+                    () => commentsController.toggleReplies(entry.comment),
               ),
             ],
           );

@@ -166,6 +166,8 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                       return CommentTreeItem(
                         entry: entry,
                         onReplyTap: () => _controller.startReply(entry.comment),
+                        onToggleRepliesTap:
+                            () => _controller.toggleReplies(entry.comment),
                       );
                     },
                   );

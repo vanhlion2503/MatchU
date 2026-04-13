@@ -23,6 +23,7 @@ class PostCommentsController extends GetxController {
   final RxBool hasInputText = false.obs;
   final RxnString errorMessage = RxnString();
   final Rxn<PostCommentModel> replyingTo = Rxn<PostCommentModel>();
+  final RxSet<String> expandedCommentIds = <String>{}.obs;
 
   List<CommentThreadEntry> get threadEntries {
     final sorted = comments.toList(growable: false)..sort((a, b) {
@@ -30,6 +31,7 @@ class PostCommentsController extends GetxController {
       final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return aTime.compareTo(bTime);
     });
+    final expandedIds = Set<String>.from(expandedCommentIds);
 
     final existingIds = sorted.map((comment) => comment.commentId).toSet();
     final groupedByParent = <String?, List<PostCommentModel>>{};
@@ -60,6 +62,8 @@ class PostCommentsController extends GetxController {
         final hasNextSibling = index < children.length - 1;
         final hasChildren =
             groupedByParent[comment.commentId]?.isNotEmpty ?? false;
+        final isExpanded =
+            hasChildren && expandedIds.contains(comment.commentId);
 
         flattened.add(
           CommentThreadEntry(
@@ -70,8 +74,11 @@ class PostCommentsController extends GetxController {
             ),
             hasNextSibling: hasNextSibling,
             hasChildren: hasChildren,
+            isExpanded: isExpanded,
           ),
         );
+
+        if (!isExpanded) continue;
 
         visit(
           comment.commentId,
@@ -99,6 +106,7 @@ class PostCommentsController extends GetxController {
     try {
       isLoading.value = true;
       errorMessage.value = null;
+      expandedCommentIds.clear();
       final loadedComments = await _service.fetchComments(postId);
       comments.assignAll(loadedComments);
     } catch (error) {
@@ -110,6 +118,7 @@ class PostCommentsController extends GetxController {
 
   void startReply(PostCommentModel comment) {
     replyingTo.value = comment;
+    _expandThreadPath(comment.commentId);
     inputFocusNode.requestFocus();
   }
 
@@ -122,6 +131,19 @@ class PostCommentsController extends GetxController {
 
   void cancelReply() {
     replyingTo.value = null;
+  }
+
+  void toggleReplies(PostCommentModel comment) {
+    if (!_hasChildren(comment.commentId)) return;
+
+    final nextExpanded = Set<String>.from(expandedCommentIds);
+    if (nextExpanded.contains(comment.commentId)) {
+      nextExpanded.remove(comment.commentId);
+      nextExpanded.removeAll(_descendantIdsOf(comment.commentId));
+    } else {
+      nextExpanded.add(comment.commentId);
+    }
+    _replaceExpandedIds(nextExpanded);
   }
 
   Future<void> submitComment() async {
@@ -164,9 +186,58 @@ class PostCommentsController extends GetxController {
         final parent = comments[index];
         comments[index] = parent.copyWith(replyCount: parent.replyCount + 1);
       }
+      _expandThreadPath(parentId);
     }
 
     comments.refresh();
+  }
+
+  void _expandThreadPath(String commentId) {
+    final nextExpanded = Set<String>.from(expandedCommentIds);
+    String? currentId = commentId;
+
+    while (currentId != null && currentId.isNotEmpty) {
+      nextExpanded.add(currentId);
+      currentId = _parentIdOf(currentId);
+    }
+
+    _replaceExpandedIds(nextExpanded);
+  }
+
+  String? _parentIdOf(String commentId) {
+    final index = comments.indexWhere((item) => item.commentId == commentId);
+    if (index == -1) return null;
+    return comments[index].parentId;
+  }
+
+  bool _hasChildren(String commentId) {
+    return comments.any((item) => item.parentId == commentId);
+  }
+
+  Set<String> _descendantIdsOf(String commentId) {
+    final descendants = <String>{};
+    final pending = <String>[commentId];
+
+    while (pending.isNotEmpty) {
+      final parentId = pending.removeLast();
+      final children = comments
+          .where((item) => item.parentId == parentId)
+          .map((item) => item.commentId)
+          .toList(growable: false);
+
+      for (final childId in children) {
+        if (!descendants.add(childId)) continue;
+        pending.add(childId);
+      }
+    }
+
+    return descendants;
+  }
+
+  void _replaceExpandedIds(Set<String> nextExpanded) {
+    expandedCommentIds
+      ..clear()
+      ..addAll(nextExpanded);
   }
 
   void _handleInputChanged() {
@@ -191,6 +262,7 @@ class CommentThreadEntry {
     required this.ancestorBranchContinues,
     required this.hasNextSibling,
     required this.hasChildren,
+    required this.isExpanded,
   });
 
   final PostCommentModel comment;
@@ -198,4 +270,5 @@ class CommentThreadEntry {
   final List<bool> ancestorBranchContinues;
   final bool hasNextSibling;
   final bool hasChildren;
+  final bool isExpanded;
 }

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/comment_thread_guides.dart';
@@ -11,10 +12,12 @@ class CommentTreeItem extends StatelessWidget {
     super.key,
     required this.entry,
     required this.onReplyTap,
+    required this.onToggleRepliesTap,
   });
 
   final CommentThreadEntry entry;
   final VoidCallback onReplyTap;
+  final VoidCallback onToggleRepliesTap;
 
   @override
   Widget build(BuildContext context) {
@@ -22,25 +25,27 @@ class CommentTreeItem extends StatelessWidget {
     final author = comment.author;
     final theme = Theme.of(context);
     final depth = math.min(entry.depth, 4);
-    final indent = depth == 0 ? 0.0 : 10.0 + (depth * 18.0);
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
     final avatarUrl = author?.avatarUrl ?? '';
     final displayName = author?.displayName ?? 'Người dùng';
     final nickname = author?.nickname ?? '';
     final lineInsets = <double>[
-      18,
-      for (var level = 1; level <= 4; level++) 18 + (level * 18),
+      18.0,
+      for (var level = 1; level <= 4; level++) 28.0 + (level * 18.0),
     ];
+    final indent = depth == 0 ? 0.0 : lineInsets[depth - 1] + 10.0;
+    final horizontalLineEndX = depth == 0 ? indent + 36.0 + 6.0 : indent - 2.0;
 
     return CommentThreadGuides(
       depth: depth,
       ancestorBranchContinues: ancestorBranchContinues,
       hasNextSibling: entry.hasNextSibling,
-      hasChildren: entry.hasChildren,
+      hasChildren: entry.hasChildren && entry.isExpanded,
       contentLeft: indent,
       avatarCenterY: 18,
       lineInsets: lineInsets,
+      horizontalLineEndX: horizontalLineEndX,
       color:
           theme.brightness == Brightness.dark
               ? AppTheme.darkBorder
@@ -66,73 +71,95 @@ class CommentTreeItem extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface.withValues(alpha: 0.82),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color:
-                      theme.brightness == Brightness.dark
-                          ? AppTheme.darkBorder
-                          : AppTheme.lightBorder,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: entry.hasChildren ? onToggleRepliesTap : null,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? AppTheme.darkBorder
+                            : AppTheme.lightBorder,
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium?.copyWith(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              nickname.isNotEmpty
+                                  ? '@$nickname • ${_formatRelativeTime(comment.createdAt)}'
+                                  : _formatRelativeTime(comment.createdAt),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      comment.content,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 14,
+                      runSpacing: 6,
+                      children: [
+                        GestureDetector(
+                          onTap: onReplyTap,
+                          child: Text(
+                            'Trả lời',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(
-                            nickname.isNotEmpty
-                                ? '@$nickname • ${_formatRelativeTime(comment.createdAt)}'
-                                : _formatRelativeTime(comment.createdAt),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    comment.content,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 14,
-                    runSpacing: 6,
-                    children: [
-                      GestureDetector(
-                        onTap: onReplyTap,
-                        child: Text(
-                          'Trả lời',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
                         ),
-                      ),
-                      if (comment.replyCount > 0)
-                        Text(
-                          '${comment.replyCount} phản hồi',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                    ],
-                  ),
-                ],
+                        if (comment.replyCount > 0)
+                          GestureDetector(
+                            onTap: onToggleRepliesTap,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  entry.isExpanded
+                                      ? Iconsax.arrow_up_1
+                                      : Iconsax.arrow_down_1,
+                                  size: 14,
+                                  color: theme.textTheme.bodySmall?.color,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  entry.isExpanded
+                                      ? 'Ẩn ${comment.replyCount} phản hồi'
+                                      : '${comment.replyCount} phản hồi',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

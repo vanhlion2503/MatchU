@@ -13,10 +13,12 @@ class PostDetailCommentItem extends StatelessWidget {
     super.key,
     required this.entry,
     required this.onReplyTap,
+    required this.onToggleRepliesTap,
   });
 
   final CommentThreadEntry entry;
   final VoidCallback onReplyTap;
+  final VoidCallback onToggleRepliesTap;
 
   @override
   Widget build(BuildContext context) {
@@ -29,12 +31,14 @@ class PostDetailCommentItem extends StatelessWidget {
     final depth = math.min(entry.depth, 4);
     final topPadding = isReply ? 10.0 : 14.0;
     const bottomPadding = 14.0;
-    final leftInset = isReply ? 28.0 + (depth * 18.0) : 16.0;
-    final avatarSize = isReply ? 34.0 : 38.0;
     final lineInsets = <double>[
-      35,
-      for (var level = 1; level <= 4; level++) 35 + (level * 18),
+      35.0,
+      for (var level = 1; level <= 4; level++) 45.0 + (level * 18.0),
     ];
+    final leftInset = isReply ? lineInsets[depth - 1] + 11.0 : 16.0;
+    final avatarSize = isReply ? 34.0 : 38.0;
+    final horizontalLineEndX =
+        isReply ? leftInset - 2.0 : leftInset + avatarSize + 6.0;
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
 
@@ -44,10 +48,11 @@ class PostDetailCommentItem extends StatelessWidget {
         depth: depth,
         ancestorBranchContinues: ancestorBranchContinues,
         hasNextSibling: entry.hasNextSibling,
-        hasChildren: entry.hasChildren,
+        hasChildren: entry.hasChildren && entry.isExpanded,
         contentLeft: leftInset,
         avatarCenterY: avatarSize / 2,
         lineInsets: lineInsets,
+        horizontalLineEndX: horizontalLineEndX,
         topPadding: topPadding,
         bottomPadding: bottomPadding,
         color: palette.threadLine,
@@ -65,101 +70,110 @@ class PostDetailCommentItem extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: VerifiedNameRow(
-                                isVerified: author?.isVerified == true,
-                                badgeSize: 14,
-                                badgePadding: const EdgeInsets.only(left: 4),
-                                child: Text(
-                                  displayName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: palette.textPrimary,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: entry.hasChildren ? onToggleRepliesTap : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: VerifiedNameRow(
+                                  isVerified: author?.isVerified == true,
+                                  badgeSize: 14,
+                                  badgePadding: const EdgeInsets.only(left: 4),
+                                  child: Text(
+                                    displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: palette.textPrimary,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                formatRelativeTime(
-                                  comment.createdAt,
-                                  compact: true,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: palette.textTertiary,
-                                  fontWeight: FontWeight.w600,
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  formatRelativeTime(
+                                    comment.createdAt,
+                                    compact: true,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: palette.textTertiary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: Icon(
-                          Iconsax.more,
-                          size: 18,
-                          color: palette.iconMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    comment.content,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 14,
-                      height: 1.55,
-                      color: palette.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _CommentMetaButton(
-                        icon: Iconsax.heart,
-                        label:
-                            comment.likeCount > 0
-                                ? formatCompactCount(comment.likeCount)
-                                : null,
-                        palette: palette,
-                      ),
-                      _CommentMetaButton(
-                        icon: Iconsax.message_text,
-                        palette: palette,
-                        onTap: onReplyTap,
-                      ),
-                      if (comment.replyCount > 0 && !isReply)
-                        Text(
-                          '${comment.replyCount} phản hồi',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: palette.textSecondary,
-                            fontWeight: FontWeight.w600,
+                            ],
                           ),
                         ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: Icon(
+                            Iconsax.more,
+                            size: 18,
+                            color: palette.iconMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      comment.content,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                        height: 1.55,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _CommentMetaButton(
+                          icon: Iconsax.heart,
+                          label:
+                              comment.likeCount > 0
+                                  ? formatCompactCount(comment.likeCount)
+                                  : null,
+                          palette: palette,
+                        ),
+                        _CommentMetaButton(
+                          icon: Iconsax.message_text,
+                          palette: palette,
+                          onTap: onReplyTap,
+                        ),
+                        if (comment.replyCount > 0)
+                          _CommentMetaButton(
+                            icon:
+                                entry.isExpanded
+                                    ? Iconsax.arrow_up_1
+                                    : Iconsax.arrow_down_1,
+                            label:
+                                entry.isExpanded
+                                    ? 'Ẩn ${comment.replyCount} phản hồi'
+                                    : '${comment.replyCount} phản hồi',
+                            palette: palette,
+                            onTap: onToggleRepliesTap,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
