@@ -85,8 +85,8 @@ class PostDetailController extends GetxController {
     }
 
     Get.snackbar(
-      'Thong bao',
-      'Tinh nang chia se se duoc cap nhat o buoc tiep theo.',
+      'Thông báo',
+      'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -152,12 +152,12 @@ class PostDetailController extends GetxController {
       return error.message.toString();
     }
 
-    return 'Khong the xu ly bai viet luc nay. Vui long thu lai.';
+    return 'Không thể xử lý bài viết lúc này. Vui lòng thử lại.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Loi',
+      'Lỗi',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

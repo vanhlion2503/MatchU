@@ -89,7 +89,7 @@ class _CommentsSection extends StatelessWidget {
               const SizedBox(height: 14),
               FilledButton(
                 onPressed: commentsController.loadComments,
-                child: const Text('Thu lai'),
+                child: const Text('Thử lại'),
               ),
             ],
           ),
@@ -100,7 +100,7 @@ class _CommentsSection extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
           child: Text(
-            'Chua co binh luan nao. Hay mo dau cuoc tro chuyen.',
+            'Chưa có bình luận nào. Hãy mở đầu cuộc trò chuyện.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
@@ -176,8 +176,8 @@ class _PostDetailComposer extends StatelessWidget {
                 !commentsController.isSubmitting.value;
             final hintText =
                 replyingTo != null
-                    ? 'Tra loi ${replyingTo.author?.displayName ?? 'nguoi dung'}...'
-                    : 'Tra loi ${postAuthorName(controller.post.value)}...';
+                    ? 'Trả lời ${replyingTo.author?.displayName ?? 'người dùng'}...'
+                    : 'Trả lời ${postAuthorName(controller.post.value)}...';
 
             return Column(
               mainAxisSize: MainAxisSize.min,
@@ -190,7 +190,7 @@ class _PostDetailComposer extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Dang tra loi ${replyingTo.author?.displayName ?? 'nguoi dung'}',
+                            'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -237,7 +237,7 @@ class _PostDetailComposer extends StatelessWidget {
                       else
                         FeedAvatar(
                           imageUrl: '',
-                          fallbackLabel: 'You',
+                          fallbackLabel: 'Bạn',
                           size: 34,
                           borderColor: palette.border,
                         ),
@@ -309,7 +309,7 @@ class _PostDetailComposer extends StatelessWidget {
                                               color: theme.colorScheme.primary,
                                             ),
                                           )
-                                          : const Text('Post'),
+                                          : const Text('Gửi'),
                                 ),
                               ),
                             ],
@@ -335,7 +335,7 @@ String _currentUserFallbackLabel(UserController controller) {
   final nickname = controller.userRx.value?.nickname.trim() ?? '';
   if (nickname.isNotEmpty) return nickname;
 
-  return 'You';
+  return 'Bạn';
 }
 
 class _PostDetailAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -370,7 +370,7 @@ class _PostDetailAppBar extends StatelessWidget implements PreferredSizeWidget {
               ),
               Expanded(
                 child: Text(
-                  'Post',
+                  'Bài viết',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,

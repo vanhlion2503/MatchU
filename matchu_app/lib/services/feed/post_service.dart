@@ -96,15 +96,15 @@ class PostService {
     bool isPublic = true,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de dang bai viet.');
+      throw StateError('Bạn cần đăng nhập để đăng bài viết.');
     }
 
     final normalizedContent = content.trim();
     if (normalizedContent.isEmpty && mediaDrafts.isEmpty) {
-      throw StateError('Bai viet can co noi dung hoac media.');
+      throw StateError('Bài viết cần có nội dung hoặc media.');
     }
     if (normalizedContent.length > maxContentLength) {
-      throw StateError('Noi dung bai viet khong duoc vuot qua 300 ky tu.');
+      throw StateError('Nội dung bài viết không được vượt quá 300 ký tự.');
     }
 
     final author = await _resolveCurrentAuthor();
@@ -213,7 +213,7 @@ class PostService {
     required bool shouldLike,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de tuong tac voi bai viet.');
+      throw StateError('Bạn cần đăng nhập để tương tác với bài viết.');
     }
 
     final postRef = _postsRef.doc(postId);
@@ -222,7 +222,7 @@ class PostService {
     await _firestore.runTransaction((transaction) async {
       final postSnap = await transaction.get(postRef);
       if (!postSnap.exists) {
-        throw StateError('Bai viet khong con ton tai.');
+        throw StateError('Bài viết không còn tồn tại.');
       }
 
       final likeSnap = await transaction.get(likeRef);
@@ -262,7 +262,7 @@ class PostService {
   Future<PostAuthorModel> _resolveCurrentAuthor() async {
     final user = await _userService.getUser(uid);
     if (user == null) {
-      throw StateError('Khong tim thay thong tin nguoi dung hien tai.');
+      throw StateError('Không tìm thấy thông tin người dùng hiện tại.');
     }
 
     return _authorFromUser(user);
@@ -351,7 +351,7 @@ class PostService {
     return PostAuthorModel(
       id: user.uid,
       nickname: nickname,
-      name: displayName.isNotEmpty ? displayName : 'Nguoi dung',
+      name: displayName.isNotEmpty ? displayName : 'Người dùng',
       avatar: user.avatarUrl,
       isVerified: user.isFaceVerified,
     );

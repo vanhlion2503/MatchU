@@ -39,6 +39,7 @@ class PostCommentsController extends GetxController {
           comment.parentId != null && existingIds.contains(comment.parentId)
               ? comment.parentId
               : null;
+
       groupedByParent
           .putIfAbsent(parentId, () => <PostCommentModel>[])
           .add(comment);
@@ -46,17 +47,43 @@ class PostCommentsController extends GetxController {
 
     final flattened = <CommentThreadEntry>[];
 
-    void visit(String? parentId, int depth) {
+    void visit(
+      String? parentId,
+      int depth,
+      List<bool> ancestorBranchContinues,
+    ) {
       final children = groupedByParent[parentId];
       if (children == null || children.isEmpty) return;
 
-      for (final comment in children) {
-        flattened.add(CommentThreadEntry(comment: comment, depth: depth));
-        visit(comment.commentId, depth + 1);
+      for (var index = 0; index < children.length; index++) {
+        final comment = children[index];
+        final hasNextSibling = index < children.length - 1;
+        final hasChildren =
+            groupedByParent[comment.commentId]?.isNotEmpty ?? false;
+
+        flattened.add(
+          CommentThreadEntry(
+            comment: comment,
+            depth: depth,
+            ancestorBranchContinues: List<bool>.unmodifiable(
+              ancestorBranchContinues,
+            ),
+            hasNextSibling: hasNextSibling,
+            hasChildren: hasChildren,
+          ),
+        );
+
+        visit(
+          comment.commentId,
+          depth + 1,
+          depth == 0
+              ? ancestorBranchContinues
+              : <bool>[...ancestorBranchContinues, hasNextSibling],
+        );
       }
     }
 
-    visit(null, 0);
+    visit(null, 0, const <bool>[]);
     return flattened;
   }
 
@@ -151,8 +178,17 @@ class PostCommentsController extends GetxController {
 }
 
 class CommentThreadEntry {
-  const CommentThreadEntry({required this.comment, required this.depth});
+  const CommentThreadEntry({
+    required this.comment,
+    required this.depth,
+    required this.ancestorBranchContinues,
+    required this.hasNextSibling,
+    required this.hasChildren,
+  });
 
   final PostCommentModel comment;
   final int depth;
+  final List<bool> ancestorBranchContinues;
+  final bool hasNextSibling;
+  final bool hasChildren;
 }

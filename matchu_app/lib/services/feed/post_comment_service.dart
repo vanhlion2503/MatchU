@@ -57,15 +57,15 @@ class PostCommentService {
     String? parentId,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de binh luan.');
+      throw StateError('Bạn cần đăng nhập để bình luận.');
     }
 
     final normalizedContent = content.trim();
     if (normalizedContent.isEmpty) {
-      throw StateError('Noi dung binh luan khong duoc de trong.');
+      throw StateError('Nội dung bình luận không được để trống.');
     }
     if (normalizedContent.length > maxCommentLength) {
-      throw StateError('Binh luan khong duoc vuot qua 300 ky tu.');
+      throw StateError('Bình luận không được vượt quá 300 ký tự.');
     }
 
     final author = PostCommentAuthorModel.fromUser(
@@ -83,13 +83,13 @@ class PostCommentService {
     await _firestore.runTransaction((transaction) async {
       final postSnap = await transaction.get(postRef);
       if (!postSnap.exists) {
-        throw StateError('Bai viet khong con ton tai.');
+        throw StateError('Bài viết không còn tồn tại.');
       }
 
       if (parentRef != null) {
         final parentSnap = await transaction.get(parentRef);
         if (!parentSnap.exists) {
-          throw StateError('Khong tim thay binh luan goc de tra loi.');
+          throw StateError('Không tìm thấy bình luận gốc để trả lời.');
         }
 
         final currentReplyCount =

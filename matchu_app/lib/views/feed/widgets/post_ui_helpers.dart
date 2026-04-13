@@ -71,7 +71,7 @@ String postAuthorName(PostModel post) {
   final handle = postAuthorHandle(post);
   if (handle.isNotEmpty) return handle;
 
-  return 'Nguoi dung';
+  return 'Người dùng';
 }
 
 String postAuthorHandle(PostModel post) {

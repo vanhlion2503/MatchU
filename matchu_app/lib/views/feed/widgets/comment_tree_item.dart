@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/feed/widgets/comment_thread_guides.dart';
 
 class CommentTreeItem extends StatelessWidget {
   const CommentTreeItem({
@@ -20,13 +21,27 @@ class CommentTreeItem extends StatelessWidget {
     final comment = entry.comment;
     final author = comment.author;
     final theme = Theme.of(context);
-    final indent = math.min(entry.depth, 4) * 18.0;
+    final depth = math.min(entry.depth, 4);
+    final indent = depth * 18.0;
+    final ancestorBranchContinues =
+        entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
     final avatarUrl = author?.avatarUrl ?? '';
     final displayName = author?.displayName ?? 'Người dùng';
     final nickname = author?.nickname ?? '';
 
-    return Padding(
-      padding: EdgeInsets.only(left: indent),
+    return CommentThreadGuides(
+      depth: depth,
+      ancestorBranchContinues: ancestorBranchContinues,
+      hasNextSibling: entry.hasNextSibling,
+      hasChildren: entry.hasChildren,
+      contentLeft: indent,
+      avatarCenterY: 18,
+      rootLineInset: 18,
+      branchSpacing: 18,
+      color:
+          theme.brightness == Brightness.dark
+              ? AppTheme.darkBorder
+              : AppTheme.lightBorder,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
