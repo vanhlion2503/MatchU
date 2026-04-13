@@ -203,49 +203,53 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                           ],
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _controller.inputController,
-                              focusNode: _controller.inputFocusNode,
-                              minLines: 1,
-                              maxLines: 4,
-                              decoration: const InputDecoration(
-                                hintText: 'Nhập bình luận...',
-                              ),
-                              onSubmitted: (_) => _controller.submitComment(),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Obx(
-                            () => FilledButton(
-                              onPressed:
-                                  _controller.isSubmitting.value
-                                      ? null
-                                      : _controller.submitComment,
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 16,
+                    TextFieldTapRegion(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _controller.inputController,
+                                focusNode: _controller.inputFocusNode,
+                                minLines: 1,
+                                maxLines: 4,
+                                onTapOutside:
+                                    (_) => _controller.dismissComposer(),
+                                decoration: const InputDecoration(
+                                  hintText: 'Nhập bình luận...',
                                 ),
+                                onSubmitted: (_) => _controller.submitComment(),
                               ),
-                              child:
-                                  _controller.isSubmitting.value
-                                      ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                      : const Icon(Iconsax.send_1),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Obx(
+                              () => FilledButton(
+                                onPressed:
+                                    _controller.isSubmitting.value
+                                        ? null
+                                        : _controller.submitComment,
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 16,
+                                  ),
+                                ),
+                                child:
+                                    _controller.isSubmitting.value
+                                        ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                        : const Icon(Iconsax.send_1),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

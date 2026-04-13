@@ -34,10 +34,10 @@ class FeedScreen extends GetView<FeedController> {
     );
   }
 
-  void _openPostDetail(PostModel post, {bool focusComposer = false}) {
+  void _openPostDetail(PostModel post) {
     Get.toNamed(
       AppRouter.postDetail,
-      arguments: PostDetailRouteArgs(post: post, focusComposer: focusComposer),
+      arguments: PostDetailRouteArgs(post: post),
     );
   }
 
@@ -147,8 +147,7 @@ class FeedScreen extends GetView<FeedController> {
                     post: post,
                     onTap: () => _openPostDetail(post),
                     onLikeTap: () => controller.toggleLike(post.postId),
-                    onCommentTap:
-                        () => _openPostDetail(post, focusComposer: true),
+                    onCommentTap: () => _openPostDetail(post),
                     onShareTap: controller.onShareTap,
                     onMoreTap: () => _openPostActionSheet(context, post),
                   ),

@@ -56,16 +56,6 @@ class PostDetailController extends GetxController {
     }
   }
 
-  @override
-  void onReady() {
-    super.onReady();
-    if (!args.focusComposer) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      commentsController.inputFocusNode.requestFocus();
-    });
-  }
-
   Future<void> toggleLike() async {
     final feedController = _feedController;
     if (feedController != null && feedController.findPostById(postId) != null) {
@@ -90,6 +80,10 @@ class PostDetailController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  void dismissCommentComposer() {
+    commentsController.dismissComposer();
   }
 
   void adjustCommentCount(int delta) {

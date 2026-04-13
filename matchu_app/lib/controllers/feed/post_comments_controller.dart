@@ -113,6 +113,13 @@ class PostCommentsController extends GetxController {
     inputFocusNode.requestFocus();
   }
 
+  void dismissComposer() {
+    inputFocusNode.unfocus();
+    if (inputController.text.trim().isEmpty) {
+      replyingTo.value = null;
+    }
+  }
+
   void cancelReply() {
     replyingTo.value = null;
   }

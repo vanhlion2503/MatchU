@@ -29,10 +29,7 @@ class PostDetailView extends GetView<PostDetailController> {
             PostDetailPostCard(
               post: post,
               onLikeTap: controller.toggleLike,
-              onCommentTap:
-                  () =>
-                      controller.commentsController.inputFocusNode
-                          .requestFocus(),
+              onCommentTap: controller.dismissCommentComposer,
               onShareTap: controller.sharePost,
               onMoreTap: () => PostActionSheet.show(context, post: post),
             ),
@@ -217,106 +214,123 @@ class _PostDetailComposer extends StatelessWidget {
                       ],
                     ),
                   ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (userController != null)
-                        Obx(
-                          () => FeedAvatar(
-                            imageUrl:
-                                userController.userRx.value?.avatarUrl ?? '',
-                            fallbackLabel: _currentUserFallbackLabel(
-                              userController,
+                TextFieldTapRegion(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (userController != null)
+                          Obx(
+                            () => FeedAvatar(
+                              imageUrl:
+                                  userController.userRx.value?.avatarUrl ?? '',
+                              fallbackLabel: _currentUserFallbackLabel(
+                                userController,
+                              ),
+                              size: 34,
+                              borderColor: palette.border,
                             ),
+                          )
+                        else
+                          FeedAvatar(
+                            imageUrl: '',
+                            fallbackLabel: 'Bạn',
                             size: 34,
                             borderColor: palette.border,
                           ),
-                        )
-                      else
-                        FeedAvatar(
-                          imageUrl: '',
-                          fallbackLabel: 'Bạn',
-                          size: 34,
-                          borderColor: palette.border,
-                        ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: palette.inputSurface,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: palette.border),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller:
-                                      commentsController.inputController,
-                                  focusNode: commentsController.inputFocusNode,
-                                  minLines: 1,
-                                  maxLines: 4,
-                                  textCapitalization:
-                                      TextCapitalization.sentences,
-                                  decoration: InputDecoration(
-                                    hintText: hintText,
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    filled: false,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      8,
-                                      12,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: palette.inputSurface,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: palette.border),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller:
+                                        commentsController.inputController,
+                                    focusNode:
+                                        commentsController.inputFocusNode,
+                                    minLines: 1,
+                                    maxLines: 4,
+                                    textCapitalization:
+                                        TextCapitalization.sentences,
+                                    decoration: InputDecoration(
+                                      hintText: hintText,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      filled: false,
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.fromLTRB(
+                                        16,
+                                        12,
+                                        8,
+                                        12,
+                                      ),
+                                      hintStyle: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: palette.textTertiary,
+                                          ),
                                     ),
-                                    hintStyle: theme.textTheme.bodySmall
-                                        ?.copyWith(color: palette.textTertiary),
+                                    onTapOutside:
+                                        (_) =>
+                                            controller.dismissCommentComposer(),
+                                    onSubmitted: (_) {
+                                      if (!canSubmit) return;
+                                      commentsController.submitComment();
+                                    },
                                   ),
-                                  onSubmitted: (_) {
-                                    if (!canSubmit) return;
-                                    commentsController.submitComment();
-                                  },
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(0, 6, 6, 6),
-                                child: TextButton(
-                                  onPressed:
-                                      canSubmit
-                                          ? commentsController.submitComment
-                                          : null,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: theme.colorScheme.primary,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    0,
+                                    6,
+                                    6,
+                                    6,
+                                  ),
+                                  child: TextButton(
+                                    onPressed:
+                                        canSubmit
+                                            ? commentsController.submitComment
+                                            : null,
+                                    style: TextButton.styleFrom(
+                                      foregroundColor:
+                                          theme.colorScheme.primary,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      textStyle: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
-                                    textStyle: theme.textTheme.bodyMedium
-                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                    child:
+                                        commentsController.isSubmitting.value
+                                            ? SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.2,
+                                                color:
+                                                    theme.colorScheme.primary,
+                                              ),
+                                            )
+                                            : const Text('Gửi'),
                                   ),
-                                  child:
-                                      commentsController.isSubmitting.value
-                                          ? SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.2,
-                                              color: theme.colorScheme.primary,
-                                            ),
-                                          )
-                                          : const Text('Gửi'),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
