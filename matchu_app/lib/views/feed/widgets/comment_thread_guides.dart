@@ -12,8 +12,7 @@ class CommentThreadGuides extends StatelessWidget {
     required this.hasChildren,
     required this.contentLeft,
     required this.avatarCenterY,
-    required this.rootLineInset,
-    required this.branchSpacing,
+    required this.lineInsets,
     this.topPadding = 0,
     this.bottomPadding = 0,
     required this.color,
@@ -26,8 +25,7 @@ class CommentThreadGuides extends StatelessWidget {
   final bool hasChildren;
   final double contentLeft;
   final double avatarCenterY;
-  final double rootLineInset;
-  final double branchSpacing;
+  final List<double> lineInsets;
   final double topPadding;
   final double bottomPadding;
   final Color color;
@@ -48,8 +46,7 @@ class CommentThreadGuides extends StatelessWidget {
                 hasChildren: hasChildren,
                 contentLeft: contentLeft,
                 avatarCenterY: topPadding + avatarCenterY,
-                rootLineInset: rootLineInset,
-                branchSpacing: branchSpacing,
+                lineInsets: lineInsets,
               ),
             ),
           ),
@@ -76,8 +73,7 @@ class _CommentThreadGuidePainter extends CustomPainter {
     required this.hasChildren,
     required this.contentLeft,
     required this.avatarCenterY,
-    required this.rootLineInset,
-    required this.branchSpacing,
+    required this.lineInsets,
   });
 
   final Color color;
@@ -87,8 +83,7 @@ class _CommentThreadGuidePainter extends CustomPainter {
   final bool hasChildren;
   final double contentLeft;
   final double avatarCenterY;
-  final double rootLineInset;
-  final double branchSpacing;
+  final List<double> lineInsets;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -160,7 +155,11 @@ class _CommentThreadGuidePainter extends CustomPainter {
     }
   }
 
-  double _lineXForLevel(int level) => rootLineInset + (level * branchSpacing);
+  double _lineXForLevel(int level) {
+    if (lineInsets.isEmpty) return 0;
+    if (level < lineInsets.length) return lineInsets[level];
+    return lineInsets.last;
+  }
 
   @override
   bool shouldRepaint(covariant _CommentThreadGuidePainter oldDelegate) {
@@ -174,7 +173,6 @@ class _CommentThreadGuidePainter extends CustomPainter {
         oldDelegate.hasChildren != hasChildren ||
         oldDelegate.contentLeft != contentLeft ||
         oldDelegate.avatarCenterY != avatarCenterY ||
-        oldDelegate.rootLineInset != rootLineInset ||
-        oldDelegate.branchSpacing != branchSpacing;
+        !listEquals(oldDelegate.lineInsets, lineInsets);
   }
 }

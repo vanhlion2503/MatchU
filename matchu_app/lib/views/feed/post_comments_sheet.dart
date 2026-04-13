@@ -183,23 +183,39 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                         width: double.infinity,
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                         color: theme.colorScheme.surface.withValues(alpha: 0.8),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
-                                maxLines: 1,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: _controller.cancelReply,
+                                  icon: const Icon(Iconsax.close_circle),
+                                ),
+                              ],
+                            ),
+                            if (replyingTo.content.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                replyingTo.content.trim(),
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
+                                  height: 1.4,
                                 ),
                               ),
-                            ),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              onPressed: _controller.cancelReply,
-                              icon: const Icon(Iconsax.close_circle),
-                            ),
+                            ],
                           ],
                         ),
                       ),

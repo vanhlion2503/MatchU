@@ -31,6 +31,10 @@ class PostDetailCommentItem extends StatelessWidget {
     const bottomPadding = 14.0;
     final leftInset = isReply ? 28.0 + (depth * 18.0) : 16.0;
     final avatarSize = isReply ? 34.0 : 38.0;
+    final lineInsets = <double>[
+      35,
+      for (var level = 1; level <= 4; level++) 35 + (level * 18),
+    ];
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
 
@@ -43,8 +47,7 @@ class PostDetailCommentItem extends StatelessWidget {
         hasChildren: entry.hasChildren,
         contentLeft: leftInset,
         avatarCenterY: avatarSize / 2,
-        rootLineInset: 35,
-        branchSpacing: 18,
+        lineInsets: lineInsets,
         topPadding: topPadding,
         bottomPadding: bottomPadding,
         color: palette.threadLine,

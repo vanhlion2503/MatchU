@@ -175,35 +175,52 @@ class _PostDetailComposer extends StatelessWidget {
                 if (replyingTo != null)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Row(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
-                            maxLines: 1,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: palette.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: commentsController.cancelReply,
+                              visualDensity: VisualDensity.compact,
+                              style: const ButtonStyle(
+                                overlayColor: WidgetStatePropertyAll(
+                                  Colors.transparent,
+                                ),
+                                splashFactory: NoSplash.splashFactory,
+                              ),
+                              icon: Icon(
+                                Iconsax.close_circle,
+                                size: 18,
+                                color: palette.iconMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (replyingTo.content.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            replyingTo.content.trim(),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: palette.textSecondary,
-                              fontWeight: FontWeight.w700,
+                              color: palette.textPrimary,
+                              height: 1.4,
                             ),
                           ),
-                        ),
-                        IconButton(
-                          onPressed: commentsController.cancelReply,
-                          visualDensity: VisualDensity.compact,
-                          style: const ButtonStyle(
-                            overlayColor: WidgetStatePropertyAll(
-                              Colors.transparent,
-                            ),
-                            splashFactory: NoSplash.splashFactory,
-                          ),
-                          icon: Icon(
-                            Iconsax.close_circle,
-                            size: 18,
-                            color: palette.iconMuted,
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),

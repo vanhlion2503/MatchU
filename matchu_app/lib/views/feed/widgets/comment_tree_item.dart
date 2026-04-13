@@ -22,12 +22,16 @@ class CommentTreeItem extends StatelessWidget {
     final author = comment.author;
     final theme = Theme.of(context);
     final depth = math.min(entry.depth, 4);
-    final indent = depth * 18.0;
+    final indent = depth == 0 ? 0.0 : 10.0 + (depth * 18.0);
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
     final avatarUrl = author?.avatarUrl ?? '';
     final displayName = author?.displayName ?? 'Người dùng';
     final nickname = author?.nickname ?? '';
+    final lineInsets = <double>[
+      18,
+      for (var level = 1; level <= 4; level++) 18 + (level * 18),
+    ];
 
     return CommentThreadGuides(
       depth: depth,
@@ -36,8 +40,7 @@ class CommentTreeItem extends StatelessWidget {
       hasChildren: entry.hasChildren,
       contentLeft: indent,
       avatarCenterY: 18,
-      rootLineInset: 18,
-      branchSpacing: 18,
+      lineInsets: lineInsets,
       color:
           theme.brightness == Brightness.dark
               ? AppTheme.darkBorder
