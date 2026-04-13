@@ -120,14 +120,7 @@ class _CommentsSection extends StatelessWidget {
           return Column(
             children: [
               if (shouldShowDivider)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                  child: Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: palette.border,
-                  ),
-                ),
+                Divider(height: 1, thickness: 1, color: palette.border),
               PostDetailCommentItem(
                 entry: entry,
                 onReplyTap: () => commentsController.startReply(entry.comment),

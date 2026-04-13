@@ -143,11 +143,8 @@ class PostDetailCommentItem extends StatelessWidget {
                       ),
                       _CommentMetaButton(
                         icon: Iconsax.message_text,
-                        label: isReply ? null : 'Trả lời',
                         palette: palette,
                         onTap: onReplyTap,
-                        iconColor: theme.colorScheme.primary,
-                        labelColor: theme.colorScheme.primary,
                       ),
                       if (comment.replyCount > 0 && !isReply)
                         Text(
@@ -175,16 +172,12 @@ class _CommentMetaButton extends StatelessWidget {
     required this.palette,
     this.label,
     this.onTap,
-    this.iconColor,
-    this.labelColor,
   });
 
   final IconData icon;
   final FeedPalette palette;
   final String? label;
   final VoidCallback? onTap;
-  final Color? iconColor;
-  final Color? labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -192,13 +185,13 @@ class _CommentMetaButton extends StatelessWidget {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: iconColor ?? palette.iconMuted),
+        Icon(icon, size: 18, color: palette.iconMuted),
         if (label != null) ...[
           const SizedBox(width: 5),
           Text(
             label!,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: labelColor ?? palette.textSecondary,
+              color: palette.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
