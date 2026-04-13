@@ -1,4 +1,9 @@
+import 'dart:ui';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
@@ -135,18 +140,122 @@ class _CommentsSection extends StatelessWidget {
   }
 }
 
-class _PostDetailComposer extends StatelessWidget {
+class _PostDetailComposer extends StatefulWidget {
   const _PostDetailComposer({required this.controller});
 
   final PostDetailController controller;
 
   @override
+  State<_PostDetailComposer> createState() => _PostDetailComposerState();
+}
+
+class _PostDetailComposerState extends State<_PostDetailComposer> {
+  static const double _kPillHeight = 52;
+  static const double _kEmojiPickerHeight = 320;
+
+  int _clampInt(int value, int min, int max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+  }
+
+  void _insertEmoji(String emoji) {
+    final inputController =
+        widget.controller.commentsController.inputController;
+    final text = inputController.text;
+    final selection = inputController.selection;
+    final textLength = text.length;
+    final hasValidSelection = selection.start >= 0 && selection.end >= 0;
+
+    final start =
+        hasValidSelection
+            ? _clampInt(selection.start, 0, textLength)
+            : textLength;
+    final end =
+        hasValidSelection ? _clampInt(selection.end, start, textLength) : start;
+
+    inputController.value = inputController.value.copyWith(
+      text: text.replaceRange(start, end, emoji),
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  Future<void> _openEmojiPicker(BuildContext context) async {
+    final scheme = Theme.of(context).colorScheme;
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: scheme.surface,
+      builder:
+          (_) => SafeArea(
+            top: false,
+            child: SizedBox(
+              height: _kEmojiPickerHeight,
+              child: EmojiPicker(
+                onEmojiSelected: (_, emoji) => _insertEmoji(emoji.emoji),
+                config: Config(
+                  height: _kEmojiPickerHeight,
+                  emojiViewConfig: EmojiViewConfig(
+                    columns: 8,
+                    emojiSizeMax: 28,
+                    backgroundColor: scheme.surface,
+                  ),
+                  categoryViewConfig: CategoryViewConfig(
+                    backgroundColor: scheme.surface,
+                    indicatorColor: scheme.primary,
+                    iconColor: scheme.onSurface.withValues(alpha: 0.6),
+                    iconColorSelected: scheme.primary,
+                  ),
+                  bottomActionBarConfig: BottomActionBarConfig(
+                    backgroundColor: scheme.surface,
+                    buttonColor: scheme.primary,
+                  ),
+                  searchViewConfig: SearchViewConfig(
+                    backgroundColor: scheme.surface,
+                  ),
+                  skinToneConfig: const SkinToneConfig(enabled: true),
+                ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  void _showImageCommentNotice() {
+    HapticFeedback.selectionClick();
+    Get.snackbar(
+      'Sắp hỗ trợ',
+      'Bình luận kèm ảnh đang được hoàn thiện.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
-    final commentsController = controller.commentsController;
+    final commentsController = widget.controller.commentsController;
     final userController =
         Get.isRegistered<UserController>() ? Get.find<UserController>() : null;
+    final isDark = theme.brightness == Brightness.dark;
+    final shellColor =
+        Color.lerp(theme.scaffoldBackgroundColor, palette.surface, 0.55) ??
+        palette.surface;
+    final pillColor =
+        Color.lerp(
+          theme.scaffoldBackgroundColor,
+          palette.inputSurface,
+          isDark ? 0.78 : 0.92,
+        ) ??
+        palette.inputSurface;
+    final replySurface =
+        Color.lerp(palette.surfaceMuted, theme.scaffoldBackgroundColor, 0.28) ??
+        palette.surfaceMuted;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
@@ -154,201 +263,337 @@ class _PostDetailComposer extends StatelessWidget {
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: palette.surface.withValues(alpha: 0.98),
-          border: Border(top: BorderSide(color: palette.border)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Obx(() {
-            final replyingTo = commentsController.replyingTo.value;
-            final canSubmit =
-                commentsController.hasInputText.value &&
-                !commentsController.isSubmitting.value;
-            final hintText =
-                replyingTo != null
-                    ? 'Trả lời ${replyingTo.author?.displayName ?? 'người dùng'}...'
-                    : 'Trả lời ${postAuthorName(controller.post.value)}...';
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (replyingTo != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: palette.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: commentsController.cancelReply,
-                              visualDensity: VisualDensity.compact,
-                              style: const ButtonStyle(
-                                overlayColor: WidgetStatePropertyAll(
-                                  Colors.transparent,
-                                ),
-                                splashFactory: NoSplash.splashFactory,
-                              ),
-                              icon: Icon(
-                                Iconsax.close_circle,
-                                size: 18,
-                                color: palette.iconMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (replyingTo.content.trim().isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            replyingTo.content.trim(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: palette.textPrimary,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: shellColor.withValues(alpha: isDark ? 0.96 : 0.94),
+              border: Border(
+                top: BorderSide(color: palette.border.withValues(alpha: 0.88)),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadowColor.withValues(
+                    alpha: isDark ? 0.18 : 0.08,
                   ),
-                TextFieldTapRegion(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (userController != null)
-                          Obx(
-                            () => FeedAvatar(
-                              imageUrl:
-                                  userController.userRx.value?.avatarUrl ?? '',
-                              fallbackLabel: _currentUserFallbackLabel(
-                                userController,
-                              ),
-                              size: 34,
-                              borderColor: palette.border,
+                  blurRadius: 18,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Obx(() {
+                final replyingTo = commentsController.replyingTo.value;
+                final isSubmitting = commentsController.isSubmitting.value;
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (replyingTo != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                          decoration: BoxDecoration(
+                            color: replySurface,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: palette.border.withValues(alpha: 0.82),
                             ),
-                          )
-                        else
-                          FeedAvatar(
-                            imageUrl: '',
-                            fallbackLabel: 'Bạn',
-                            size: 34,
-                            borderColor: palette.border,
                           ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: palette.inputSurface,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: palette.border),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller:
-                                        commentsController.inputController,
-                                    focusNode:
-                                        commentsController.inputFocusNode,
-                                    minLines: 1,
-                                    maxLines: 4,
-                                    textCapitalization:
-                                        TextCapitalization.sentences,
-                                    decoration: InputDecoration(
-                                      hintText: hintText,
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                      filled: false,
-                                      isDense: true,
-                                      contentPadding: const EdgeInsets.fromLTRB(
-                                        16,
-                                        12,
-                                        8,
-                                        12,
-                                      ),
-                                      hintStyle: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: palette.textTertiary,
-                                          ),
-                                    ),
-                                    onTapOutside:
-                                        (_) =>
-                                            controller.dismissCommentComposer(),
-                                    onSubmitted: (_) {
-                                      if (!canSubmit) return;
-                                      commentsController.submitComment();
-                                    },
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 3,
+                                height:
+                                    replyingTo.content.trim().isEmpty ? 18 : 34,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.7,
                                   ),
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    6,
-                                    6,
-                                    6,
-                                  ),
-                                  child: TextButton(
-                                    onPressed:
-                                        canSubmit
-                                            ? commentsController.submitComment
-                                            : null,
-                                    style: TextButton.styleFrom(
-                                      foregroundColor:
-                                          theme.colorScheme.primary,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 10,
-                                      ),
-                                      textStyle: theme.textTheme.bodyMedium
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall
                                           ?.copyWith(
+                                            color: palette.textSecondary,
                                             fontWeight: FontWeight.w700,
                                           ),
                                     ),
-                                    child:
-                                        commentsController.isSubmitting.value
-                                            ? SizedBox(
+                                    if (replyingTo.content
+                                        .trim()
+                                        .isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        replyingTo.content.trim(),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: palette.textPrimary,
+                                              height: 1.35,
+                                            ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: commentsController.cancelReply,
+                                visualDensity: VisualDensity.compact,
+                                style: const ButtonStyle(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  overlayColor: WidgetStatePropertyAll(
+                                    Colors.transparent,
+                                  ),
+                                  splashFactory: NoSplash.splashFactory,
+                                ),
+                                icon: Icon(
+                                  Iconsax.close_circle,
+                                  size: 18,
+                                  color: palette.iconMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    TextFieldTapRegion(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            minHeight: _kPillHeight,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: pillColor,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: palette.border.withValues(
+                                alpha: isDark ? 0.92 : 0.72,
+                              ),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: palette.shadowColor.withValues(
+                                  alpha: isDark ? 0.14 : 0.05,
+                                ),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              if (userController != null)
+                                Obx(
+                                  () => _ComposerAvatar(
+                                    imageUrl:
+                                        userController
+                                            .userRx
+                                            .value
+                                            ?.avatarUrl ??
+                                        '',
+                                    fallbackLabel: _currentUserFallbackLabel(
+                                      userController,
+                                    ),
+                                    size: 32,
+                                    borderColor: palette.border,
+                                    backgroundColor: palette.surfaceMuted,
+                                    textColor: palette.textPrimary,
+                                  ),
+                                )
+                              else
+                                _ComposerAvatar(
+                                  imageUrl: '',
+                                  fallbackLabel: 'Bạn',
+                                  size: 32,
+                                  borderColor: palette.border,
+                                  backgroundColor: palette.surfaceMuted,
+                                  textColor: palette.textPrimary,
+                                ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller:
+                                      commentsController.inputController,
+                                  focusNode: commentsController.inputFocusNode,
+                                  minLines: 1,
+                                  maxLines: 1,
+                                  textInputAction: TextInputAction.send,
+                                  textCapitalization:
+                                      TextCapitalization.sentences,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: palette.textPrimary,
+                                    height: 1.2,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: 'Thêm câu trả lời...',
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    isCollapsed: true,
+                                    hintStyle: theme.textTheme.bodyMedium
+                                        ?.copyWith(color: palette.textTertiary),
+                                  ),
+                                  onTapOutside:
+                                      (_) =>
+                                          widget.controller
+                                              .dismissCommentComposer(),
+                                  onSubmitted:
+                                      (_) => commentsController.submitComment(),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              _ComposerActionButton(
+                                icon: Iconsax.gallery,
+                                color: palette.iconMuted,
+                                onPressed:
+                                    isSubmitting
+                                        ? null
+                                        : _showImageCommentNotice,
+                              ),
+                              const SizedBox(width: 4),
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 180),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeIn,
+                                child:
+                                    isSubmitting
+                                        ? SizedBox(
+                                          key: const ValueKey(
+                                            'composer_loading',
+                                          ),
+                                          width: 36,
+                                          height: 36,
+                                          child: Center(
+                                            child: SizedBox(
                                               width: 18,
                                               height: 18,
                                               child: CircularProgressIndicator(
-                                                strokeWidth: 2.2,
+                                                strokeWidth: 2.1,
                                                 color:
                                                     theme.colorScheme.primary,
                                               ),
-                                            )
-                                            : const Text('Gửi'),
-                                  ),
-                                ),
-                              ],
-                            ),
+                                            ),
+                                          ),
+                                        )
+                                        : _ComposerActionButton(
+                                          key: const ValueKey('emoji_button'),
+                                          icon: Iconsax.emoji_happy,
+                                          color: palette.iconMuted,
+                                          onPressed:
+                                              () => _openEmojiPicker(context),
+                                        ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          }),
+                  ],
+                );
+              }),
+            ),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _ComposerAvatar extends StatelessWidget {
+  const _ComposerAvatar({
+    required this.imageUrl,
+    required this.fallbackLabel,
+    required this.size,
+    required this.borderColor,
+    required this.backgroundColor,
+    required this.textColor,
+  });
+
+  final String imageUrl;
+  final String fallbackLabel;
+  final double size;
+  final Color borderColor;
+  final Color backgroundColor;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedUrl = imageUrl.trim();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: borderColor),
+      ),
+      child: CircleAvatar(
+        radius: size / 2,
+        backgroundColor: backgroundColor,
+        backgroundImage:
+            trimmedUrl.isNotEmpty
+                ? CachedNetworkImageProvider(trimmedUrl)
+                : null,
+        child:
+            trimmedUrl.isEmpty
+                ? Text(
+                  initialOf(fallbackLabel),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+                : null,
+      ),
+    );
+  }
+}
+
+class _ComposerActionButton extends StatelessWidget {
+  const _ComposerActionButton({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      splashRadius: 18,
+      icon: Icon(
+        icon,
+        size: 19,
+        color: onPressed == null ? color.withValues(alpha: 0.38) : color,
       ),
     );
   }
