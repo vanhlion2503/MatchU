@@ -139,25 +139,31 @@ class PostDetailCommentItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _CommentMetaButton(
-                          icon: Iconsax.heart,
-                          label:
-                              comment.likeCount > 0
-                                  ? formatCompactCount(comment.likeCount)
-                                  : null,
-                          palette: palette,
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _CommentMetaButton(
+                              icon: Iconsax.heart,
+                              label:
+                                  comment.likeCount > 0
+                                      ? formatCompactCount(comment.likeCount)
+                                      : null,
+                              palette: palette,
+                            ),
+                            _CommentMetaButton(
+                              icon: Iconsax.message_text,
+                              palette: palette,
+                              onTap: onReplyTap,
+                            ),
+                          ],
                         ),
-                        _CommentMetaButton(
-                          icon: Iconsax.message_text,
-                          palette: palette,
-                          onTap: onReplyTap,
-                        ),
-                        if (comment.replyCount > 0)
+                        if (comment.replyCount > 0) ...[
+                          const SizedBox(height: 8),
                           _CommentMetaButton(
                             icon:
                                 entry.isExpanded
@@ -170,6 +176,7 @@ class PostDetailCommentItem extends StatelessWidget {
                             palette: palette,
                             onTap: onToggleRepliesTap,
                           ),
+                        ],
                       ],
                     ),
                   ],

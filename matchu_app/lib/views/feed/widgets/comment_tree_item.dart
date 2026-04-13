@@ -119,21 +119,27 @@ class CommentTreeItem extends StatelessWidget {
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                     ),
                     const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 14,
-                      runSpacing: 6,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GestureDetector(
-                          onTap: onReplyTap,
-                          child: Text(
-                            'Trả lời',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.primary,
-                              fontWeight: FontWeight.w700,
+                        Wrap(
+                          spacing: 14,
+                          runSpacing: 6,
+                          children: [
+                            GestureDetector(
+                              onTap: onReplyTap,
+                              child: Text(
+                                'Trả lời',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        if (comment.replyCount > 0)
+                        if (comment.replyCount > 0) ...[
+                          const SizedBox(height: 8),
                           GestureDetector(
                             onTap: onToggleRepliesTap,
                             child: Row(
@@ -156,6 +162,7 @@ class CommentTreeItem extends StatelessWidget {
                               ],
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ],
