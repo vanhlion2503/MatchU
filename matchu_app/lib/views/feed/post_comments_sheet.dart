@@ -162,23 +162,15 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                        child: Row(
-                          children: [
-                            Text(
-                              '${_controller.comments.length} bình luận',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const Spacer(),
-                            CommentSortDropdown(
-                              value: _controller.sortMode.value,
-                              onChanged: (value) {
-                                if (value == null) return;
-                                _controller.updateSortMode(value);
-                              },
-                            ),
-                          ],
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: CommentSortDropdown(
+                            value: _controller.sortMode.value,
+                            onChanged: (value) {
+                              if (value == null) return;
+                              _controller.updateSortMode(value);
+                            },
+                          ),
                         ),
                       ),
                       const SizedBox(height: 10),

@@ -18,33 +18,70 @@ class CommentSortDropdown extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: palette.surfaceMuted.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: palette.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<CommentSortMode>(
-          value: value,
-          onChanged: onChanged,
-          isDense: true,
-          icon: Icon(Iconsax.arrow_down_1, size: 16, color: palette.iconMuted),
-          borderRadius: BorderRadius.circular(16),
-          dropdownColor: palette.surface,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: palette.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-          items: CommentSortMode.values
+    return PopupMenuButton<CommentSortMode>(
+      tooltip: 'Sắp xếp bình luận',
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 3),
+      splashRadius: 20,
+      color: palette.surface,
+      elevation: 10,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      constraints: const BoxConstraints(minWidth: 80),
+      onSelected: (mode) => onChanged(mode),
+      itemBuilder:
+          (context) => CommentSortMode.values
               .map(
-                (mode) => DropdownMenuItem<CommentSortMode>(
+                (mode) => PopupMenuItem<CommentSortMode>(
                   value: mode,
-                  child: Text(mode.label),
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        child:
+                            mode == value
+                                ? Icon(
+                                  Iconsax.tick_circle5,
+                                  size: 16,
+                                  color: theme.colorScheme.primary,
+                                )
+                                : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        mode.label,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: palette.textPrimary,
+                          fontWeight:
+                              mode == value ? FontWeight.w700 : FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
               .toList(growable: false),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                value.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Iconsax.arrow_down_1, size: 16, color: palette.iconMuted),
+          ],
         ),
       ),
     );

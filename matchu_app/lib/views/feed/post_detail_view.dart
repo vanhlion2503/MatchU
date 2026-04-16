@@ -141,24 +141,15 @@ class _CommentsSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Row(
-              children: [
-                Text(
-                  '${commentsController.comments.length} bình luận',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: palette.textSecondary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const Spacer(),
-                CommentSortDropdown(
-                  value: commentsController.sortMode.value,
-                  onChanged: (value) {
-                    if (value == null) return;
-                    commentsController.updateSortMode(value);
-                  },
-                ),
-              ],
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: CommentSortDropdown(
+                value: commentsController.sortMode.value,
+                onChanged: (value) {
+                  if (value == null) return;
+                  commentsController.updateSortMode(value);
+                },
+              ),
             ),
           ),
           ListView.builder(
