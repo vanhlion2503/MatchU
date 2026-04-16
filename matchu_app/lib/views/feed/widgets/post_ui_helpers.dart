@@ -153,6 +153,14 @@ String buildPostMetaLabel(PostModel post) {
   return '@$handle';
 }
 
+String buildFeedPostMetaLabel(PostModel post) {
+  final handleLabel = buildPostMetaLabel(post);
+  final relativeTime = formatRelativeTime(post.createdAt).toLowerCase();
+
+  if (handleLabel.isEmpty) return relativeTime;
+  return '$handleLabel • $relativeTime';
+}
+
 String formatCompactCount(int value) {
   if (value < 1000) return '$value';
   if (value < 1000000) {

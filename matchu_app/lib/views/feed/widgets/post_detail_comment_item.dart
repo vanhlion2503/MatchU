@@ -12,11 +12,13 @@ class PostDetailCommentItem extends StatelessWidget {
   const PostDetailCommentItem({
     super.key,
     required this.entry,
+    required this.onLikeTap,
     required this.onReplyTap,
     required this.onToggleRepliesTap,
   });
 
   final CommentThreadEntry entry;
+  final VoidCallback onLikeTap;
   final VoidCallback onReplyTap;
   final VoidCallback onToggleRepliesTap;
 
@@ -148,15 +150,37 @@ class PostDetailCommentItem extends StatelessWidget {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             _CommentMetaButton(
-                              icon: Iconsax.heart,
+                              icon:
+                                  comment.isLiked
+                                      ? Iconsax.heart5
+                                      : Iconsax.heart,
                               label:
                                   comment.likeCount > 0
                                       ? formatCompactCount(comment.likeCount)
                                       : null,
                               palette: palette,
+                              iconColor:
+                                  comment.isLiked
+                                      ? palette.likeColor.withValues(
+                                        alpha: comment.isLikePending ? 0.58 : 1,
+                                      )
+                                      : palette.iconMuted.withValues(
+                                        alpha: comment.isLikePending ? 0.58 : 1,
+                                      ),
+                              labelColor:
+                                  comment.isLiked
+                                      ? palette.likeColor.withValues(
+                                        alpha: comment.isLikePending ? 0.58 : 1,
+                                      )
+                                      : null,
+                              onTap: onLikeTap,
                             ),
                             _CommentMetaButton(
                               icon: Iconsax.message_text,
+                              label:
+                                  comment.replyCount > 0
+                                      ? formatCompactCount(comment.replyCount)
+                                      : null,
                               palette: palette,
                               onTap: onReplyTap,
                             ),
@@ -194,12 +218,16 @@ class _CommentMetaButton extends StatelessWidget {
   const _CommentMetaButton({
     required this.icon,
     required this.palette,
+    this.iconColor,
+    this.labelColor,
     this.label,
     this.onTap,
   });
 
   final IconData icon;
   final FeedPalette palette;
+  final Color? iconColor;
+  final Color? labelColor;
   final String? label;
   final VoidCallback? onTap;
 
@@ -209,13 +237,13 @@ class _CommentMetaButton extends StatelessWidget {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: palette.iconMuted),
+        Icon(icon, size: 18, color: iconColor ?? palette.iconMuted),
         if (label != null) ...[
           const SizedBox(width: 5),
           Text(
             label!,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: palette.textSecondary,
+              color: labelColor ?? palette.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),

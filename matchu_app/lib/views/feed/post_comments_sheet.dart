@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
+import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 
 class PostCommentsSheet extends StatefulWidget {
   const PostCommentsSheet({
@@ -157,19 +158,52 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     );
                   }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                    itemCount: _controller.threadEntries.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final entry = _controller.threadEntries[index];
-                      return CommentTreeItem(
-                        entry: entry,
-                        onReplyTap: () => _controller.startReply(entry.comment),
-                        onToggleRepliesTap:
-                            () => _controller.toggleReplies(entry.comment),
-                      );
-                    },
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Row(
+                          children: [
+                            Text(
+                              '${_controller.comments.length} bình luận',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const Spacer(),
+                            CommentSortDropdown(
+                              value: _controller.sortMode.value,
+                              onChanged: (value) {
+                                if (value == null) return;
+                                _controller.updateSortMode(value);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          itemCount: _controller.threadEntries.length,
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final entry = _controller.threadEntries[index];
+                            return CommentTreeItem(
+                              entry: entry,
+                              onLikeTap:
+                                  () => _controller.toggleLike(entry.comment),
+                              onReplyTap:
+                                  () => _controller.startReply(entry.comment),
+                              onToggleRepliesTap:
+                                  () =>
+                                      _controller.toggleReplies(entry.comment),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   );
                 }),
               ),

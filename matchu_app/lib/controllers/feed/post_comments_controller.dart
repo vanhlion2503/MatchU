@@ -1,7 +1,27 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
+import 'package:matchu_app/translates/firebase_error_translator.dart';
+
+enum CommentSortMode { relevant, newest, featured }
+
+extension CommentSortModeLabel on CommentSortMode {
+  String get label {
+    switch (this) {
+      case CommentSortMode.relevant:
+        return 'Phù hợp';
+      case CommentSortMode.newest:
+        return 'Mới nhất';
+      case CommentSortMode.featured:
+        return 'Nổi bật';
+    }
+  }
+}
 
 class PostCommentsController extends GetxController {
   PostCommentsController({
@@ -24,19 +44,24 @@ class PostCommentsController extends GetxController {
   final RxnString errorMessage = RxnString();
   final Rxn<PostCommentModel> replyingTo = Rxn<PostCommentModel>();
   final RxSet<String> expandedCommentIds = <String>{}.obs;
+  final Rx<CommentSortMode> sortMode = CommentSortMode.relevant.obs;
+
+  final Map<String, bool> _likeCache = <String, bool>{};
+  final Map<String, bool> _confirmedLikeStates = <String, bool>{};
+  final Map<String, bool> _queuedLikeStates = <String, bool>{};
+  final Set<String> _likeSyncingCommentIds = <String>{};
+  final Map<String, int> _relevantOrderRanks = <String, int>{};
+  final Random _random = Random();
 
   List<CommentThreadEntry> get threadEntries {
-    final sorted = comments.toList(growable: false)..sort((a, b) {
-      final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return aTime.compareTo(bTime);
-    });
     final expandedIds = Set<String>.from(expandedCommentIds);
-
-    final existingIds = sorted.map((comment) => comment.commentId).toSet();
+    final currentSortMode = sortMode.value;
+    final currentComments = comments.toList(growable: false);
+    final existingIds =
+        currentComments.map((comment) => comment.commentId).toSet();
     final groupedByParent = <String?, List<PostCommentModel>>{};
 
-    for (final comment in sorted) {
+    for (final comment in currentComments) {
       final parentId =
           comment.parentId != null && existingIds.contains(comment.parentId)
               ? comment.parentId
@@ -45,6 +70,17 @@ class PostCommentsController extends GetxController {
       groupedByParent
           .putIfAbsent(parentId, () => <PostCommentModel>[])
           .add(comment);
+    }
+
+    for (final entry in groupedByParent.entries) {
+      entry.value.sort(
+        (a, b) => _compareThreadComments(
+          parentId: entry.key,
+          currentSortMode: currentSortMode,
+          a: a,
+          b: b,
+        ),
+      );
     }
 
     final flattened = <CommentThreadEntry>[];
@@ -107,13 +143,27 @@ class PostCommentsController extends GetxController {
       isLoading.value = true;
       errorMessage.value = null;
       expandedCommentIds.clear();
+
       final loadedComments = await _service.fetchComments(postId);
+      _hydrateLikeCaches(loadedComments);
+      _refreshRelevantOrder(loadedComments);
       comments.assignAll(loadedComments);
     } catch (error) {
-      errorMessage.value = error.toString();
+      errorMessage.value = _mapError(error);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void updateSortMode(CommentSortMode nextMode) {
+    if (sortMode.value == nextMode) return;
+
+    if (nextMode == CommentSortMode.relevant) {
+      _refreshRelevantOrder(comments);
+    }
+
+    sortMode.value = nextMode;
+    comments.refresh();
   }
 
   void startReply(PostCommentModel comment) {
@@ -146,6 +196,24 @@ class PostCommentsController extends GetxController {
     _replaceExpandedIds(nextExpanded);
   }
 
+  Future<void> toggleLike(PostCommentModel comment) async {
+    final currentComment = _findComment(comment.commentId);
+    if (currentComment == null) return;
+
+    final shouldLike = !currentComment.isLiked;
+    _replaceComment(
+      currentComment.copyWith(
+        isLiked: shouldLike,
+        isLikePending: true,
+        likeCount: _nextLikeCount(currentComment.likeCount, shouldLike),
+      ),
+    );
+
+    _likeCache[comment.commentId] = shouldLike;
+    _queuedLikeStates[comment.commentId] = shouldLike;
+    unawaited(_syncLikeState(comment.commentId));
+  }
+
   Future<void> submitComment() async {
     if (isSubmitting.value) return;
 
@@ -165,12 +233,7 @@ class PostCommentsController extends GetxController {
       replyingTo.value = null;
       onCommentCountChanged?.call(1);
     } catch (error) {
-      Get.snackbar(
-        'Lỗi',
-        error.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(12),
-      );
+      _showError(_mapError(error));
     } finally {
       isSubmitting.value = false;
     }
@@ -178,15 +241,20 @@ class PostCommentsController extends GetxController {
 
   void _insertLocalComment(PostCommentModel comment) {
     comments.add(comment);
+    _likeCache[comment.commentId] = comment.isLiked;
+    _confirmedLikeStates[comment.commentId] = comment.isLiked;
+    _queuedLikeStates.remove(comment.commentId);
+    _likeSyncingCommentIds.remove(comment.commentId);
 
     final parentId = comment.parentId;
     if (parentId != null) {
-      final index = comments.indexWhere((item) => item.commentId == parentId);
-      if (index != -1) {
-        final parent = comments[index];
-        comments[index] = parent.copyWith(replyCount: parent.replyCount + 1);
+      final parent = _findComment(parentId);
+      if (parent != null) {
+        _replaceComment(parent.copyWith(replyCount: parent.replyCount + 1));
       }
       _expandThreadPath(parentId);
+    } else if (sortMode.value == CommentSortMode.relevant) {
+      _prioritizeRelevantComment(comment.commentId);
     }
 
     comments.refresh();
@@ -205,13 +273,125 @@ class PostCommentsController extends GetxController {
   }
 
   String? _parentIdOf(String commentId) {
-    final index = comments.indexWhere((item) => item.commentId == commentId);
-    if (index == -1) return null;
-    return comments[index].parentId;
+    final comment = _findComment(commentId);
+    return comment?.parentId;
   }
 
   bool _hasChildren(String commentId) {
     return comments.any((item) => item.parentId == commentId);
+  }
+
+  PostCommentModel? _findComment(String commentId) {
+    for (final comment in comments) {
+      if (comment.commentId == commentId) return comment;
+    }
+    return null;
+  }
+
+  void _replaceComment(PostCommentModel updatedComment) {
+    final index = comments.indexWhere(
+      (comment) => comment.commentId == updatedComment.commentId,
+    );
+    if (index == -1) return;
+
+    comments[index] = updatedComment;
+    comments.refresh();
+  }
+
+  void _hydrateLikeCaches(List<PostCommentModel> loadedComments) {
+    _likeCache
+      ..clear()
+      ..addEntries(
+        loadedComments.map(
+          (comment) => MapEntry(comment.commentId, comment.isLiked),
+        ),
+      );
+    _confirmedLikeStates
+      ..clear()
+      ..addAll(_likeCache);
+    _queuedLikeStates.clear();
+    _likeSyncingCommentIds.clear();
+  }
+
+  bool _isLikeSyncPending(String commentId) {
+    return _queuedLikeStates.containsKey(commentId) ||
+        _likeSyncingCommentIds.contains(commentId);
+  }
+
+  Future<void> _syncLikeState(String commentId) async {
+    if (_likeSyncingCommentIds.contains(commentId)) return;
+
+    _likeSyncingCommentIds.add(commentId);
+    _updateLikePendingState(commentId);
+
+    try {
+      while (true) {
+        final targetState = _queuedLikeStates[commentId];
+        if (targetState == null) break;
+
+        final confirmedState = _confirmedLikeStates[commentId] ?? false;
+        if (targetState == confirmedState) {
+          _queuedLikeStates.remove(commentId);
+          _updateLikePendingState(commentId);
+          continue;
+        }
+
+        try {
+          if (targetState) {
+            await _service.likeComment(postId, commentId);
+          } else {
+            await _service.unlikeComment(postId, commentId);
+          }
+
+          _confirmedLikeStates[commentId] = targetState;
+          if (_queuedLikeStates[commentId] == targetState) {
+            _queuedLikeStates.remove(commentId);
+          }
+        } catch (error) {
+          _queuedLikeStates.remove(commentId);
+          _revertLikeState(commentId);
+          _showError(_mapError(error));
+          break;
+        }
+      }
+    } finally {
+      _likeSyncingCommentIds.remove(commentId);
+      _updateLikePendingState(commentId);
+      if (_queuedLikeStates.containsKey(commentId)) {
+        unawaited(_syncLikeState(commentId));
+      }
+    }
+  }
+
+  void _updateLikePendingState(String commentId) {
+    final currentComment = _findComment(commentId);
+    if (currentComment == null) return;
+
+    final shouldBePending = _isLikeSyncPending(commentId);
+    if (currentComment.isLikePending == shouldBePending) return;
+
+    _replaceComment(currentComment.copyWith(isLikePending: shouldBePending));
+  }
+
+  void _revertLikeState(String commentId) {
+    final currentComment = _findComment(commentId);
+    if (currentComment == null) return;
+
+    final confirmedState = _confirmedLikeStates[commentId] ?? false;
+    _likeCache[commentId] = confirmedState;
+
+    final resolvedLikeCount =
+        currentComment.isLiked == confirmedState
+            ? currentComment.likeCount
+            : _nextLikeCount(currentComment.likeCount, confirmedState);
+
+    _replaceComment(
+      currentComment.copyWith(
+        isLiked: confirmedState,
+        isLikePending: false,
+        likeCount: resolvedLikeCount,
+      ),
+    );
   }
 
   Set<String> _descendantIdsOf(String commentId) {
@@ -238,6 +418,109 @@ class PostCommentsController extends GetxController {
     expandedCommentIds
       ..clear()
       ..addAll(nextExpanded);
+  }
+
+  int _compareThreadComments({
+    required String? parentId,
+    required CommentSortMode currentSortMode,
+    required PostCommentModel a,
+    required PostCommentModel b,
+  }) {
+    if (parentId != null) {
+      return _compareByCreatedAt(a, b, descending: false);
+    }
+
+    switch (currentSortMode) {
+      case CommentSortMode.relevant:
+        return _compareByRelevantRank(a, b);
+      case CommentSortMode.newest:
+        return _compareByCreatedAt(a, b, descending: true);
+      case CommentSortMode.featured:
+        return _compareByFeaturedScore(a, b);
+    }
+  }
+
+  int _compareByRelevantRank(PostCommentModel a, PostCommentModel b) {
+    final aRank = _relevantOrderRanks[a.commentId] ?? 1 << 20;
+    final bRank = _relevantOrderRanks[b.commentId] ?? 1 << 20;
+    final rankComparison = aRank.compareTo(bRank);
+    if (rankComparison != 0) return rankComparison;
+
+    return _compareByCreatedAt(a, b, descending: true);
+  }
+
+  int _compareByFeaturedScore(PostCommentModel a, PostCommentModel b) {
+    final likeComparison = b.likeCount.compareTo(a.likeCount);
+    if (likeComparison != 0) return likeComparison;
+
+    final replyComparison = b.replyCount.compareTo(a.replyCount);
+    if (replyComparison != 0) return replyComparison;
+
+    return _compareByCreatedAt(a, b, descending: true);
+  }
+
+  int _compareByCreatedAt(
+    PostCommentModel a,
+    PostCommentModel b, {
+    required bool descending,
+  }) {
+    final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final timeComparison =
+        descending ? bTime.compareTo(aTime) : aTime.compareTo(bTime);
+    if (timeComparison != 0) return timeComparison;
+
+    return a.commentId.compareTo(b.commentId);
+  }
+
+  void _refreshRelevantOrder(Iterable<PostCommentModel> source) {
+    final topLevelIds = source
+      .where((comment) => !comment.isReply)
+      .map((comment) => comment.commentId)
+      .toList(growable: true)..shuffle(_random);
+
+    _relevantOrderRanks
+      ..clear()
+      ..addEntries(
+        topLevelIds.indexed.map((entry) => MapEntry(entry.$2, entry.$1)),
+      );
+  }
+
+  void _prioritizeRelevantComment(String commentId) {
+    if (_relevantOrderRanks.isEmpty) {
+      _relevantOrderRanks[commentId] = 0;
+      return;
+    }
+
+    final currentMinRank = _relevantOrderRanks.values.reduce(min);
+    _relevantOrderRanks[commentId] = currentMinRank - 1;
+  }
+
+  int _nextLikeCount(int currentCount, bool shouldLike) {
+    if (shouldLike) return currentCount + 1;
+    if (currentCount <= 0) return 0;
+    return currentCount - 1;
+  }
+
+  String _mapError(Object error) {
+    if (error is FirebaseException) {
+      return firebaseErrorToVietnamese(error.code);
+    }
+
+    if (error is StateError) {
+      return error.message.toString();
+    }
+
+    return 'Không thể xử lý bình luận lúc này. Vui lòng thử lại.';
+  }
+
+  void _showError(String message) {
+    Get.snackbar(
+      'Lỗi',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
   }
 
   void _handleInputChanged() {

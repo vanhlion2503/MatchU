@@ -59,6 +59,8 @@ class PostCommentModel {
     required this.replyCount,
     this.createdAt,
     this.author,
+    this.isLiked = false,
+    this.isLikePending = false,
   });
 
   final String commentId;
@@ -69,6 +71,10 @@ class PostCommentModel {
   final int replyCount;
   final DateTime? createdAt;
   final PostCommentAuthorModel? author;
+
+  // Local UI state, not stored in Firestore.
+  final bool isLiked;
+  final bool isLikePending;
 
   bool get isReply => parentId != null && parentId!.trim().isNotEmpty;
 
@@ -112,6 +118,8 @@ class PostCommentModel {
     int? replyCount,
     DateTime? createdAt,
     PostCommentAuthorModel? author,
+    bool? isLiked,
+    bool? isLikePending,
   }) {
     return PostCommentModel(
       commentId: commentId ?? this.commentId,
@@ -122,6 +130,8 @@ class PostCommentModel {
       replyCount: replyCount ?? this.replyCount,
       createdAt: createdAt ?? this.createdAt,
       author: author ?? this.author,
+      isLiked: isLiked ?? this.isLiked,
+      isLikePending: isLikePending ?? this.isLikePending,
     );
   }
 

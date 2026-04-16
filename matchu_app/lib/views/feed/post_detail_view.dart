@@ -9,10 +9,15 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
+import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_comment_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+
+const double _kComposerFloatingGap = 10;
+const double _kComposerListBottomPadding = 104;
+const double _kComposerListBottomPaddingWithReply = 176;
 
 class PostDetailView extends GetView<PostDetailController> {
   const PostDetailView({super.key});
@@ -22,27 +27,45 @@ class PostDetailView extends GetView<PostDetailController> {
     final palette = FeedPalette.of(context);
 
     return Scaffold(
-      backgroundColor: palette.surface,
+      backgroundColor: palette.pageBackground,
       appBar: const _PostDetailAppBar(),
       body: Obx(() {
         final post = controller.post.value;
+        final hasReplyTarget =
+            controller.commentsController.replyingTo.value != null;
+        final listBottomPadding =
+            MediaQuery.paddingOf(context).bottom +
+            (hasReplyTarget
+                ? _kComposerListBottomPaddingWithReply
+                : _kComposerListBottomPadding);
 
-        return ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 24),
+        return Stack(
           children: [
-            PostDetailPostCard(
-              post: post,
-              onLikeTap: controller.toggleLike,
-              onCommentTap: controller.dismissCommentComposer,
-              onShareTap: controller.sharePost,
-              onMoreTap: () => PostActionSheet.show(context, post: post),
+            Positioned.fill(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.only(bottom: listBottomPadding),
+                children: [
+                  PostDetailPostCard(
+                    post: post,
+                    onLikeTap: controller.toggleLike,
+                    onCommentTap: controller.dismissCommentComposer,
+                    onShareTap: controller.sharePost,
+                    onMoreTap: () => PostActionSheet.show(context, post: post),
+                  ),
+                  _CommentsSection(controller: controller),
+                ],
+              ),
             ),
-            _CommentsSection(controller: controller),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _PostDetailComposer(controller: controller),
+            ),
           ],
         );
       }),
-      bottomNavigationBar: _PostDetailComposer(controller: controller),
     );
   }
 }
@@ -114,27 +137,56 @@ class _CommentsSection extends StatelessWidget {
 
       final entries = commentsController.threadEntries;
 
-      return ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: entries.length,
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          final shouldShowDivider = index > 0 && entry.depth == 0;
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(
+              children: [
+                Text(
+                  '${commentsController.comments.length} bình luận',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                CommentSortDropdown(
+                  value: commentsController.sortMode.value,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    commentsController.updateSortMode(value);
+                  },
+                ),
+              ],
+            ),
+          ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: entries.length,
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              final shouldShowDivider = index > 0 && entry.depth == 0;
 
-          return Column(
-            children: [
-              if (shouldShowDivider)
-                Divider(height: 1, thickness: 1, color: palette.border),
-              PostDetailCommentItem(
-                entry: entry,
-                onReplyTap: () => commentsController.startReply(entry.comment),
-                onToggleRepliesTap:
-                    () => commentsController.toggleReplies(entry.comment),
-              ),
-            ],
-          );
-        },
+              return Column(
+                children: [
+                  if (shouldShowDivider)
+                    Divider(height: 1, thickness: 1, color: palette.border),
+                  PostDetailCommentItem(
+                    entry: entry,
+                    onLikeTap:
+                        () => commentsController.toggleLike(entry.comment),
+                    onReplyTap:
+                        () => commentsController.startReply(entry.comment),
+                    onToggleRepliesTap:
+                        () => commentsController.toggleReplies(entry.comment),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       );
     });
   }
@@ -150,7 +202,7 @@ class _PostDetailComposer extends StatefulWidget {
 }
 
 class _PostDetailComposerState extends State<_PostDetailComposer> {
-  static const double _kPillHeight = 52;
+  static const double _kPillHeight = 50;
   static const double _kEmojiPickerHeight = 320;
 
   int _clampInt(int value, int min, int max) {
@@ -243,279 +295,222 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
     final userController =
         Get.isRegistered<UserController>() ? Get.find<UserController>() : null;
     final isDark = theme.brightness == Brightness.dark;
-    final shellColor =
-        Color.lerp(theme.scaffoldBackgroundColor, palette.surface, 0.55) ??
-        palette.surface;
-    final pillColor =
-        Color.lerp(
-          theme.scaffoldBackgroundColor,
-          palette.inputSurface,
-          isDark ? 0.78 : 0.92,
-        ) ??
-        palette.inputSurface;
+    final composerSurfaceColor = palette.pageBackground;
     final replySurface =
-        Color.lerp(palette.surfaceMuted, theme.scaffoldBackgroundColor, 0.28) ??
+        Color.lerp(palette.surfaceMuted, palette.pageBackground, 0.28) ??
         palette.surfaceMuted;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomSafeInset = MediaQuery.paddingOf(context).bottom;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 12,
+        right: 12,
+        bottom: keyboardInset + bottomSafeInset + _kComposerFloatingGap,
       ),
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: shellColor.withValues(alpha: isDark ? 0.96 : 0.94),
-              border: Border(
-                top: BorderSide(color: palette.border.withValues(alpha: 0.88)),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: palette.shadowColor.withValues(
-                    alpha: isDark ? 0.18 : 0.08,
-                  ),
-                  blurRadius: 18,
-                  offset: const Offset(0, -4),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: Obx(() {
-                final replyingTo = commentsController.replyingTo.value;
-                final isSubmitting = commentsController.isSubmitting.value;
+      child: Obx(() {
+        final replyingTo = commentsController.replyingTo.value;
+        final isSubmitting = commentsController.isSubmitting.value;
 
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (replyingTo != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-                          decoration: BoxDecoration(
-                            color: replySurface,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: palette.border.withValues(alpha: 0.82),
-                            ),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (replyingTo != null)
+              _ComposerSurface(
+                borderRadius: BorderRadius.circular(18),
+                backgroundColor: replySurface.withValues(
+                  alpha: isDark ? 0.92 : 0.96,
+                ),
+                borderColor: palette.border.withValues(alpha: 0.8),
+                shadowColor: palette.shadowColor.withValues(
+                  alpha: isDark ? 0.18 : 0.08,
+                ),
+                blurSigma: 14,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 3,
+                        height: replyingTo.content.trim().isEmpty ? 18 : 34,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.7,
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 3,
-                                height:
-                                    replyingTo.content.trim().isEmpty ? 18 : 34,
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: palette.textSecondary,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                    if (replyingTo.content
-                                        .trim()
-                                        .isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        replyingTo.content.trim(),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: palette.textPrimary,
-                                              height: 1.35,
-                                            ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: commentsController.cancelReply,
-                                visualDensity: VisualDensity.compact,
-                                style: const ButtonStyle(
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  overlayColor: WidgetStatePropertyAll(
-                                    Colors.transparent,
-                                  ),
-                                  splashFactory: NoSplash.splashFactory,
-                                ),
-                                icon: Icon(
-                                  Iconsax.close_circle,
-                                  size: 18,
-                                  color: palette.iconMuted,
-                                ),
-                              ),
-                            ],
-                          ),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                       ),
-                    TextFieldTapRegion(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                        child: Container(
-                          constraints: const BoxConstraints(
-                            minHeight: _kPillHeight,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: pillColor,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: palette.border.withValues(
-                                alpha: isDark ? 0.92 : 0.72,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Đang trả lời ${replyingTo.author?.displayName ?? 'người dùng'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: palette.textSecondary,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: palette.shadowColor.withValues(
-                                  alpha: isDark ? 0.14 : 0.05,
+                            if (replyingTo.content.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                replyingTo.content.trim(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: palette.textPrimary,
+                                  height: 1.35,
                                 ),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
                               ),
                             ],
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: commentsController.cancelReply,
+                        visualDensity: VisualDensity.compact,
+                        style: const ButtonStyle(
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          overlayColor: WidgetStatePropertyAll(
+                            Colors.transparent,
                           ),
-                          child: Row(
-                            children: [
-                              if (userController != null)
-                                Obx(
-                                  () => _ComposerAvatar(
-                                    imageUrl:
-                                        userController
-                                            .userRx
-                                            .value
-                                            ?.avatarUrl ??
-                                        '',
-                                    fallbackLabel: _currentUserFallbackLabel(
-                                      userController,
-                                    ),
-                                    size: 32,
-                                    borderColor: palette.border,
-                                    backgroundColor: palette.surfaceMuted,
-                                    textColor: palette.textPrimary,
-                                  ),
-                                )
-                              else
-                                _ComposerAvatar(
-                                  imageUrl: '',
-                                  fallbackLabel: 'Bạn',
-                                  size: 32,
-                                  borderColor: palette.border,
-                                  backgroundColor: palette.surfaceMuted,
-                                  textColor: palette.textPrimary,
-                                ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller:
-                                      commentsController.inputController,
-                                  focusNode: commentsController.inputFocusNode,
-                                  minLines: 1,
-                                  maxLines: 1,
-                                  textInputAction: TextInputAction.send,
-                                  textCapitalization:
-                                      TextCapitalization.sentences,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: palette.textPrimary,
-                                    height: 1.2,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Thêm câu trả lời...',
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    isCollapsed: true,
-                                    hintStyle: theme.textTheme.bodyMedium
-                                        ?.copyWith(color: palette.textTertiary),
-                                  ),
-                                  onTapOutside:
-                                      (_) =>
-                                          widget.controller
-                                              .dismissCommentComposer(),
-                                  onSubmitted:
-                                      (_) => commentsController.submitComment(),
-                                ),
+                          splashFactory: NoSplash.splashFactory,
+                        ),
+                        icon: Icon(
+                          Iconsax.close_circle,
+                          size: 18,
+                          color: palette.iconMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (replyingTo != null) const SizedBox(height: 8),
+            TextFieldTapRegion(
+              child: _ComposerSurface(
+                borderRadius: BorderRadius.circular(999),
+                backgroundColor: composerSurfaceColor,
+                borderColor: palette.border.withValues(
+                  alpha: isDark ? 0.84 : 0.68,
+                ),
+                shadowColor: palette.shadowColor.withValues(
+                  alpha: isDark ? 0.2 : 0.08,
+                ),
+                blurSigma: 16,
+                child: SizedBox(
+                  height: _kPillHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 13),
+                    child: Row(
+                      children: [
+                        if (userController != null)
+                          Obx(
+                            () => _ComposerAvatar(
+                              imageUrl:
+                                  userController.userRx.value?.avatarUrl ?? '',
+                              fallbackLabel: _currentUserFallbackLabel(
+                                userController,
                               ),
-                              const SizedBox(width: 10),
-                              _ComposerActionButton(
-                                icon: Iconsax.gallery,
-                                color: palette.iconMuted,
-                                onPressed:
-                                    isSubmitting
-                                        ? null
-                                        : _showImageCommentNotice,
+                              size: 30,
+                              borderColor: palette.border,
+                              backgroundColor: palette.surfaceMuted,
+                              textColor: palette.textPrimary,
+                            ),
+                          )
+                        else
+                          _ComposerAvatar(
+                            imageUrl: '',
+                            fallbackLabel: 'Bạn',
+                            size: 30,
+                            borderColor: palette.border,
+                            backgroundColor: palette.surfaceMuted,
+                            textColor: palette.textPrimary,
+                          ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: commentsController.inputController,
+                            focusNode: commentsController.inputFocusNode,
+                            minLines: 1,
+                            maxLines: 1,
+                            textInputAction: TextInputAction.send,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: palette.textPrimary,
+                              height: 1.15,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Bình luận...',
+                              filled: false,
+                              fillColor: Colors.transparent,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              isCollapsed: true,
+                              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                color: palette.textTertiary,
                               ),
-                              const SizedBox(width: 4),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 180),
-                                switchInCurve: Curves.easeOut,
-                                switchOutCurve: Curves.easeIn,
-                                child:
-                                    isSubmitting
-                                        ? SizedBox(
-                                          key: const ValueKey(
-                                            'composer_loading',
-                                          ),
-                                          width: 36,
-                                          height: 36,
-                                          child: Center(
-                                            child: SizedBox(
-                                              width: 18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2.1,
-                                                color:
-                                                    theme.colorScheme.primary,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        : _ComposerActionButton(
-                                          key: const ValueKey('emoji_button'),
-                                          icon: Iconsax.emoji_happy,
-                                          color: palette.iconMuted,
-                                          onPressed:
-                                              () => _openEmojiPicker(context),
+                            ),
+                            onTapOutside:
+                                (_) =>
+                                    widget.controller.dismissCommentComposer(),
+                            onSubmitted:
+                                (_) => commentsController.submitComment(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _ComposerActionButton(
+                          icon: Iconsax.gallery,
+                          color: palette.iconMuted,
+                          onPressed:
+                              isSubmitting ? null : _showImageCommentNotice,
+                        ),
+                        const SizedBox(width: 2),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          child:
+                              isSubmitting
+                                  ? SizedBox(
+                                    key: const ValueKey('composer_loading'),
+                                    width: 34,
+                                    height: 34,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 17,
+                                        height: 17,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.1,
+                                          color: theme.colorScheme.primary,
                                         ),
-                              ),
-                            ],
-                          ),
+                                      ),
+                                    ),
+                                  )
+                                  : _ComposerActionButton(
+                                    key: const ValueKey('emoji_button'),
+                                    icon: Iconsax.emoji_happy,
+                                    color: palette.iconMuted,
+                                    onPressed: () => _openEmojiPicker(context),
+                                  ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                );
-              }),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
+          ],
+        );
+      }),
     );
   }
 }
@@ -588,12 +583,60 @@ class _ComposerActionButton extends StatelessWidget {
       onPressed: onPressed,
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-      splashRadius: 18,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      splashRadius: 17,
       icon: Icon(
         icon,
-        size: 19,
+        size: 18,
         color: onPressed == null ? color.withValues(alpha: 0.38) : color,
+      ),
+    );
+  }
+}
+
+class _ComposerSurface extends StatelessWidget {
+  const _ComposerSurface({
+    required this.borderRadius,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.shadowColor,
+    required this.child,
+    this.blurSigma = 14,
+  });
+
+  final BorderRadius borderRadius;
+  final Color backgroundColor;
+  final Color borderColor;
+  final Color shadowColor;
+  final Widget child;
+  final double blurSigma;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: borderRadius,
+              border: Border.all(color: borderColor),
+            ),
+            child: child,
+          ),
+        ),
       ),
     );
   }
@@ -622,7 +665,7 @@ class _PostDetailAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: palette.surface,
+        color: palette.pageBackground,
         border: Border(bottom: BorderSide(color: palette.border)),
       ),
       child: SafeArea(

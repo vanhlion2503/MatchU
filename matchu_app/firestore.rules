@@ -366,17 +366,58 @@ service cloud.firestore {
             : 0;
         }
 
+        function oldLikeCount() {
+          return resource.data.likeCount is number
+            ? resource.data.likeCount
+            : 0;
+        }
+
+        function newLikeCount() {
+          return request.resource.data.likeCount is number
+            ? request.resource.data.likeCount
+            : 0;
+        }
+
         allow update: if request.auth != null
           && canAccessParentPost()
-          && request.resource.data.diff(resource.data).changedKeys()
-            .hasOnly(["replyCount"])
-          && newReplyCount() >= 0
           && (
-            newReplyCount() == oldReplyCount() + 1
-            || newReplyCount() == oldReplyCount() - 1
+            request.resource.data.diff(resource.data).changedKeys()
+              .hasOnly(["replyCount"])
+            && newReplyCount() >= 0
+            && (
+              newReplyCount() == oldReplyCount() + 1
+              || newReplyCount() == oldReplyCount() - 1
+            )
+            || (
+              request.resource.data.diff(resource.data).changedKeys()
+                .hasOnly(["likeCount"])
+              && newLikeCount() >= 0
+              && (
+                newLikeCount() == oldLikeCount() + 1
+                || newLikeCount() == oldLikeCount() - 1
+              )
+            )
           );
 
         allow delete: if false;
+
+        match /likes/{userId} {
+
+          allow read: if request.auth != null
+            && request.auth.uid == userId
+            && canAccessParentPost();
+
+          allow create: if request.auth != null
+            && request.auth.uid == userId
+            && canAccessParentPost()
+            && request.resource.data.userId == request.auth.uid;
+
+          allow delete: if request.auth != null
+            && request.auth.uid == userId
+            && canAccessParentPost();
+
+          allow update: if false;
+        }
       }
     }
 

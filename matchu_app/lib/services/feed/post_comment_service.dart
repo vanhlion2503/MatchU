@@ -36,10 +36,21 @@ class PostCommentService {
         .where((comment) => comment.content.trim().isNotEmpty)
         .toList(growable: false);
 
-    final authors = await _resolveAuthors(comments);
+    final authorsFuture = _resolveAuthors(comments);
+    final likeStatesFuture = getLikeStates(
+      postId,
+      comments.map((comment) => comment.commentId).toList(growable: false),
+    );
+    final authors = await authorsFuture;
+    final likeStates = await likeStatesFuture;
 
     final hydrated = comments
-        .map((comment) => comment.copyWith(author: authors[comment.userId]))
+        .map(
+          (comment) => comment.copyWith(
+            author: authors[comment.userId],
+            isLiked: likeStates[comment.commentId] ?? false,
+          ),
+        )
         .toList(growable: false);
 
     hydrated.sort((a, b) {
@@ -131,6 +142,98 @@ class PostCommentService {
       createdAt: DateTime.now(),
       author: author,
     );
+  }
+
+  Future<Map<String, bool>> getLikeStates(
+    String postId,
+    List<String> commentIds,
+  ) async {
+    if (commentIds.isEmpty) {
+      return const {};
+    }
+
+    if (uid.isEmpty) {
+      return {for (final commentId in commentIds) commentId: false};
+    }
+
+    final entries = await Future.wait(
+      commentIds.map((commentId) async {
+        final likeDoc =
+            await _postsRef
+                .doc(postId)
+                .collection('comments')
+                .doc(commentId)
+                .collection('likes')
+                .doc(uid)
+                .get();
+        return MapEntry(commentId, likeDoc.exists);
+      }),
+    );
+
+    return Map<String, bool>.fromEntries(entries);
+  }
+
+  Future<void> likeComment(String postId, String commentId) {
+    return _setCommentLike(
+      postId: postId,
+      commentId: commentId,
+      shouldLike: true,
+    );
+  }
+
+  Future<void> unlikeComment(String postId, String commentId) {
+    return _setCommentLike(
+      postId: postId,
+      commentId: commentId,
+      shouldLike: false,
+    );
+  }
+
+  Future<void> _setCommentLike({
+    required String postId,
+    required String commentId,
+    required bool shouldLike,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError(
+        'Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ tÆ°Æ¡ng tÃ¡c vá»›i bÃ¬nh luáº­n.',
+      );
+    }
+
+    final commentRef = _postsRef
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId);
+    final likeRef = commentRef.collection('likes').doc(uid);
+
+    await _firestore.runTransaction((transaction) async {
+      final commentSnap = await transaction.get(commentRef);
+      if (!commentSnap.exists) {
+        throw StateError('BÃ¬nh luáº­n khÃ´ng cÃ²n tá»“n táº¡i.');
+      }
+
+      final likeSnap = await transaction.get(likeRef);
+      final currentLikeCount =
+          (commentSnap.data()?['likeCount'] as num?)?.toInt() ?? 0;
+
+      if (shouldLike) {
+        if (likeSnap.exists) return;
+
+        transaction.set(likeRef, {
+          'userId': uid,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        transaction.update(commentRef, {'likeCount': currentLikeCount + 1});
+        return;
+      }
+
+      if (!likeSnap.exists) return;
+
+      transaction.delete(likeRef);
+      transaction.update(commentRef, {
+        'likeCount': currentLikeCount > 0 ? currentLikeCount - 1 : 0,
+      });
+    });
   }
 
   Future<Map<String, PostCommentAuthorModel>> _resolveAuthors(

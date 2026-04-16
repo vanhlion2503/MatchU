@@ -28,7 +28,7 @@ class PostItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
-    final metaLabel = buildPostMetaLabel(post);
+    final metaLabel = buildFeedPostMetaLabel(post);
 
     return Material(
       color: Colors.transparent,

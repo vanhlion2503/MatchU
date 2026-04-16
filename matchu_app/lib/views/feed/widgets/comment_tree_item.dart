@@ -6,16 +6,19 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/comment_thread_guides.dart';
+import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 
 class CommentTreeItem extends StatelessWidget {
   const CommentTreeItem({
     super.key,
     required this.entry,
+    required this.onLikeTap,
     required this.onReplyTap,
     required this.onToggleRepliesTap,
   });
 
   final CommentThreadEntry entry;
+  final VoidCallback onLikeTap;
   final VoidCallback onReplyTap;
   final VoidCallback onToggleRepliesTap;
 
@@ -36,6 +39,12 @@ class CommentTreeItem extends StatelessWidget {
     ];
     final indent = depth == 0 ? 0.0 : lineInsets[depth - 1] + 10.0;
     final horizontalLineEndX = depth == 0 ? indent + 36.0 + 6.0 : indent - 2.0;
+    final likeColor =
+        comment.isLiked
+            ? theme.colorScheme.primary.withValues(
+              alpha: comment.isLikePending ? 0.58 : 1,
+            )
+            : null;
 
     return CommentThreadGuides(
       depth: depth,
@@ -62,7 +71,7 @@ class CommentTreeItem extends StatelessWidget {
             child:
                 avatarUrl.isEmpty
                     ? Text(
-                      _initialOf(displayName),
+                      initialOf(displayName),
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -105,8 +114,11 @@ class CommentTreeItem extends StatelessWidget {
                             ),
                             Text(
                               nickname.isNotEmpty
-                                  ? '@$nickname • ${_formatRelativeTime(comment.createdAt)}'
-                                  : _formatRelativeTime(comment.createdAt),
+                                  ? '@$nickname • ${formatRelativeTime(comment.createdAt, withSuffix: true)}'
+                                  : formatRelativeTime(
+                                    comment.createdAt,
+                                    withSuffix: true,
+                                  ),
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -126,15 +138,26 @@ class CommentTreeItem extends StatelessWidget {
                           spacing: 14,
                           runSpacing: 6,
                           children: [
-                            GestureDetector(
+                            _CommentActionChip(
+                              icon:
+                                  comment.isLiked
+                                      ? Iconsax.heart5
+                                      : Iconsax.heart,
+                              label:
+                                  comment.likeCount > 0
+                                      ? formatCompactCount(comment.likeCount)
+                                      : null,
+                              color: likeColor,
+                              onTap: onLikeTap,
+                            ),
+                            _CommentActionChip(
+                              icon: Iconsax.message_text,
+                              label:
+                                  comment.replyCount > 0
+                                      ? formatCompactCount(comment.replyCount)
+                                      : 'Trả lời',
+                              color: theme.colorScheme.primary,
                               onTap: onReplyTap,
-                              child: Text(
-                                'Trả lời',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
                             ),
                           ],
                         ),
@@ -176,24 +199,42 @@ class CommentTreeItem extends StatelessWidget {
   }
 }
 
-String _formatRelativeTime(DateTime? dateTime) {
-  if (dateTime == null) return 'Vừa xong';
+class _CommentActionChip extends StatelessWidget {
+  const _CommentActionChip({
+    required this.icon,
+    this.label,
+    this.color,
+    this.onTap,
+  });
 
-  final now = DateTime.now();
-  final diff = now.difference(dateTime);
+  final IconData icon;
+  final String? label;
+  final Color? color;
+  final VoidCallback? onTap;
 
-  if (diff.inSeconds < 60) return 'Vừa xong';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
-  if (diff.inHours < 24) return '${diff.inHours} giờ trước';
-  if (diff.inDays < 7) return '${diff.inDays} ngày trước';
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foregroundColor = color ?? theme.textTheme.bodySmall?.color;
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: foregroundColor),
+        if (label != null) ...[
+          const SizedBox(width: 5),
+          Text(
+            label!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: foregroundColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ],
+    );
 
-  final day = dateTime.day.toString().padLeft(2, '0');
-  final month = dateTime.month.toString().padLeft(2, '0');
-  return '$day/$month/${dateTime.year}';
-}
+    if (onTap == null) return content;
 
-String _initialOf(String value) {
-  final trimmed = value.trim();
-  if (trimmed.isEmpty) return '?';
-  return String.fromCharCode(trimmed.runes.first).toUpperCase();
+    return GestureDetector(onTap: onTap, child: content);
+  }
 }
