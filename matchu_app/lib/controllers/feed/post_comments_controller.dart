@@ -8,17 +8,15 @@ import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
-enum CommentSortMode { relevant, newest, featured }
+enum CommentSortMode { featured, newest }
 
 extension CommentSortModeLabel on CommentSortMode {
   String get label {
     switch (this) {
-      case CommentSortMode.relevant:
-        return 'Phù hợp';
-      case CommentSortMode.newest:
-        return 'Mới nhất';
       case CommentSortMode.featured:
         return 'Nổi bật';
+      case CommentSortMode.newest:
+        return 'Mới nhất';
     }
   }
 }
@@ -44,14 +42,12 @@ class PostCommentsController extends GetxController {
   final RxnString errorMessage = RxnString();
   final Rxn<PostCommentModel> replyingTo = Rxn<PostCommentModel>();
   final RxSet<String> expandedCommentIds = <String>{}.obs;
-  final Rx<CommentSortMode> sortMode = CommentSortMode.relevant.obs;
+  final Rx<CommentSortMode> sortMode = CommentSortMode.featured.obs;
 
   final Map<String, bool> _likeCache = <String, bool>{};
   final Map<String, bool> _confirmedLikeStates = <String, bool>{};
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingCommentIds = <String>{};
-  final Map<String, int> _relevantOrderRanks = <String, int>{};
-  final Random _random = Random();
 
   List<CommentThreadEntry> get threadEntries {
     final expandedIds = Set<String>.from(expandedCommentIds);
@@ -146,7 +142,6 @@ class PostCommentsController extends GetxController {
 
       final loadedComments = await _service.fetchComments(postId);
       _hydrateLikeCaches(loadedComments);
-      _refreshRelevantOrder(loadedComments);
       comments.assignAll(loadedComments);
     } catch (error) {
       errorMessage.value = _mapError(error);
@@ -157,10 +152,6 @@ class PostCommentsController extends GetxController {
 
   void updateSortMode(CommentSortMode nextMode) {
     if (sortMode.value == nextMode) return;
-
-    if (nextMode == CommentSortMode.relevant) {
-      _refreshRelevantOrder(comments);
-    }
 
     sortMode.value = nextMode;
     comments.refresh();
@@ -253,8 +244,6 @@ class PostCommentsController extends GetxController {
         _replaceComment(parent.copyWith(replyCount: parent.replyCount + 1));
       }
       _expandThreadPath(parentId);
-    } else if (sortMode.value == CommentSortMode.relevant) {
-      _prioritizeRelevantComment(comment.commentId);
     }
 
     comments.refresh();
@@ -431,32 +420,40 @@ class PostCommentsController extends GetxController {
     }
 
     switch (currentSortMode) {
-      case CommentSortMode.relevant:
-        return _compareByRelevantRank(a, b);
-      case CommentSortMode.newest:
-        return _compareByCreatedAt(a, b, descending: true);
       case CommentSortMode.featured:
         return _compareByFeaturedScore(a, b);
+      case CommentSortMode.newest:
+        return _compareByCreatedAt(a, b, descending: true);
     }
   }
 
-  int _compareByRelevantRank(PostCommentModel a, PostCommentModel b) {
-    final aRank = _relevantOrderRanks[a.commentId] ?? 1 << 20;
-    final bRank = _relevantOrderRanks[b.commentId] ?? 1 << 20;
-    final rankComparison = aRank.compareTo(bRank);
-    if (rankComparison != 0) return rankComparison;
-
-    return _compareByCreatedAt(a, b, descending: true);
-  }
-
   int _compareByFeaturedScore(PostCommentModel a, PostCommentModel b) {
-    final likeComparison = b.likeCount.compareTo(a.likeCount);
-    if (likeComparison != 0) return likeComparison;
+    final now = DateTime.now();
+    final aScore = _featuredScore(a, now);
+    final bScore = _featuredScore(b, now);
+    final scoreComparison = bScore.compareTo(aScore);
+    if (scoreComparison != 0) return scoreComparison;
 
     final replyComparison = b.replyCount.compareTo(a.replyCount);
     if (replyComparison != 0) return replyComparison;
 
+    final likeComparison = b.likeCount.compareTo(a.likeCount);
+    if (likeComparison != 0) return likeComparison;
+
     return _compareByCreatedAt(a, b, descending: true);
+  }
+
+  double _featuredScore(PostCommentModel comment, DateTime now) {
+    final createdAt = comment.createdAt;
+    if (createdAt == null) return 0;
+
+    final ageInHours = max(
+      0.0,
+      now.difference(createdAt).inMinutes / Duration.minutesPerHour,
+    );
+    final engagement = comment.likeCount + (2 * comment.replyCount);
+    final decay = pow(ageInHours + 2, 1.2).toDouble();
+    return engagement / decay;
   }
 
   int _compareByCreatedAt(
@@ -471,29 +468,6 @@ class PostCommentsController extends GetxController {
     if (timeComparison != 0) return timeComparison;
 
     return a.commentId.compareTo(b.commentId);
-  }
-
-  void _refreshRelevantOrder(Iterable<PostCommentModel> source) {
-    final topLevelIds = source
-      .where((comment) => !comment.isReply)
-      .map((comment) => comment.commentId)
-      .toList(growable: true)..shuffle(_random);
-
-    _relevantOrderRanks
-      ..clear()
-      ..addEntries(
-        topLevelIds.indexed.map((entry) => MapEntry(entry.$2, entry.$1)),
-      );
-  }
-
-  void _prioritizeRelevantComment(String commentId) {
-    if (_relevantOrderRanks.isEmpty) {
-      _relevantOrderRanks[commentId] = 0;
-      return;
-    }
-
-    final currentMinRank = _relevantOrderRanks.values.reduce(min);
-    _relevantOrderRanks[commentId] = currentMinRank - 1;
   }
 
   int _nextLikeCount(int currentCount, bool shouldLike) {
