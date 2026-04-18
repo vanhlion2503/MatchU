@@ -25,11 +25,15 @@ class PostCommentsController extends GetxController {
   PostCommentsController({
     required this.postId,
     this.onCommentCountChanged,
+    this.initialCommentCount = 0,
+    this.pageSize = PostCommentService.defaultTopLevelPageSize,
     PostCommentService? service,
   }) : _service = service ?? PostCommentService();
 
   final String postId;
   final ValueChanged<int>? onCommentCountChanged;
+  final int initialCommentCount;
+  final int pageSize;
   final PostCommentService _service;
 
   final TextEditingController inputController = TextEditingController();
@@ -39,15 +43,23 @@ class PostCommentsController extends GetxController {
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
   final RxBool hasInputText = false.obs;
+  final RxBool isLoadingMoreComments = false.obs;
+  final RxBool hasMoreComments = true.obs;
   final RxnString errorMessage = RxnString();
   final Rxn<PostCommentModel> replyingTo = Rxn<PostCommentModel>();
   final RxSet<String> expandedCommentIds = <String>{}.obs;
+  final RxSet<String> loadingReplyParentIds = <String>{}.obs;
+  final RxInt totalCommentCount = 0.obs;
   final Rx<CommentSortMode> sortMode = CommentSortMode.featured.obs;
 
   final Map<String, bool> _likeCache = <String, bool>{};
   final Map<String, bool> _confirmedLikeStates = <String, bool>{};
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingCommentIds = <String>{};
+  final Set<String> _loadedReplyParentIds = <String>{};
+  final Map<String, int> _topLevelOrderRanks = <String, int>{};
+
+  DocumentSnapshot<Map<String, dynamic>>? _topLevelCursor;
 
   List<CommentThreadEntry> get threadEntries {
     final expandedIds = Set<String>.from(expandedCommentIds);
@@ -91,9 +103,10 @@ class PostCommentsController extends GetxController {
 
       for (var index = 0; index < children.length; index++) {
         final comment = children[index];
+        final loadedChildren = groupedByParent[comment.commentId];
         final hasNextSibling = index < children.length - 1;
         final hasChildren =
-            groupedByParent[comment.commentId]?.isNotEmpty ?? false;
+            (loadedChildren?.isNotEmpty ?? false) || comment.replyCount > 0;
         final isExpanded =
             hasChildren && expandedIds.contains(comment.commentId);
 
@@ -129,20 +142,23 @@ class PostCommentsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    totalCommentCount.value = initialCommentCount;
     inputController.addListener(_handleInputChanged);
     _handleInputChanged();
     loadComments();
+  }
+
+  bool isReplyLoading(String commentId) {
+    return loadingReplyParentIds.contains(commentId);
   }
 
   Future<void> loadComments() async {
     try {
       isLoading.value = true;
       errorMessage.value = null;
-      expandedCommentIds.clear();
+      _resetLoadedState();
 
-      final loadedComments = await _service.fetchComments(postId);
-      _hydrateLikeCaches(loadedComments);
-      comments.assignAll(loadedComments);
+      await _loadMoreTopLevelComments(resetCursor: true);
     } catch (error) {
       errorMessage.value = _mapError(error);
     } finally {
@@ -150,10 +166,28 @@ class PostCommentsController extends GetxController {
     }
   }
 
+  Future<void> loadMoreComments() async {
+    if (isLoading.value ||
+        isLoadingMoreComments.value ||
+        !hasMoreComments.value) {
+      return;
+    }
+
+    try {
+      isLoadingMoreComments.value = true;
+      await _loadMoreTopLevelComments();
+    } catch (error) {
+      _showError(_mapError(error));
+    } finally {
+      isLoadingMoreComments.value = false;
+    }
+  }
+
   void updateSortMode(CommentSortMode nextMode) {
     if (sortMode.value == nextMode) return;
 
     sortMode.value = nextMode;
+    _rebuildTopLevelOrder(comments);
     comments.refresh();
   }
 
@@ -175,16 +209,26 @@ class PostCommentsController extends GetxController {
   }
 
   void toggleReplies(PostCommentModel comment) {
-    if (!_hasChildren(comment.commentId)) return;
+    if (comment.replyCount <= 0) return;
 
+    final commentId = comment.commentId;
     final nextExpanded = Set<String>.from(expandedCommentIds);
-    if (nextExpanded.contains(comment.commentId)) {
-      nextExpanded.remove(comment.commentId);
-      nextExpanded.removeAll(_descendantIdsOf(comment.commentId));
-    } else {
-      nextExpanded.add(comment.commentId);
+
+    if (nextExpanded.contains(commentId)) {
+      nextExpanded.remove(commentId);
+      nextExpanded.removeAll(_descendantIdsOf(commentId));
+      _replaceExpandedIds(nextExpanded);
+      return;
     }
-    _replaceExpandedIds(nextExpanded);
+
+    if (_loadedReplyParentIds.contains(commentId) ||
+        _hasLoadedChildren(commentId)) {
+      _expandThreadPath(commentId);
+      return;
+    }
+
+    if (loadingReplyParentIds.contains(commentId)) return;
+    unawaited(_loadRepliesForParent(comment));
   }
 
   Future<void> toggleLike(PostCommentModel comment) async {
@@ -220,6 +264,7 @@ class PostCommentsController extends GetxController {
       );
 
       _insertLocalComment(created);
+      totalCommentCount.value += 1;
       inputController.clear();
       replyingTo.value = null;
       onCommentCountChanged?.call(1);
@@ -230,12 +275,45 @@ class PostCommentsController extends GetxController {
     }
   }
 
+  Future<void> _loadMoreTopLevelComments({bool resetCursor = false}) async {
+    final page = await _service.fetchTopLevelCommentsPage(
+      postId,
+      startAfter: resetCursor ? null : _topLevelCursor,
+      limit: pageSize,
+    );
+
+    if (resetCursor) {
+      comments.clear();
+    }
+
+    _topLevelCursor = page.nextCursor;
+    hasMoreComments.value = page.hasMore;
+    _upsertComments(page.comments);
+    if (resetCursor) {
+      _rebuildTopLevelOrder(comments);
+    } else {
+      _appendTopLevelOrder(page.comments);
+    }
+  }
+
+  Future<void> _loadRepliesForParent(PostCommentModel parentComment) async {
+    final parentId = parentComment.commentId;
+    _setReplyLoading(parentId, true);
+
+    try {
+      final replies = await _service.fetchReplies(postId, parentId);
+      _loadedReplyParentIds.add(parentId);
+      _upsertComments(replies);
+      _expandThreadPath(parentId);
+    } catch (error) {
+      _showError(_mapError(error));
+    } finally {
+      _setReplyLoading(parentId, false);
+    }
+  }
+
   void _insertLocalComment(PostCommentModel comment) {
-    comments.add(comment);
-    _likeCache[comment.commentId] = comment.isLiked;
-    _confirmedLikeStates[comment.commentId] = comment.isLiked;
-    _queuedLikeStates.remove(comment.commentId);
-    _likeSyncingCommentIds.remove(comment.commentId);
+    _upsertComments(<PostCommentModel>[comment]);
 
     final parentId = comment.parentId;
     if (parentId != null) {
@@ -244,9 +322,87 @@ class PostCommentsController extends GetxController {
         _replaceComment(parent.copyWith(replyCount: parent.replyCount + 1));
       }
       _expandThreadPath(parentId);
+    } else {
+      _pinTopLevelCommentToFront(comment.commentId);
+    }
+  }
+
+  void _upsertComments(Iterable<PostCommentModel> incomingComments) {
+    var hasChanges = false;
+
+    for (final incoming in incomingComments) {
+      _mergeLikeCaches(incoming);
+
+      final index = comments.indexWhere(
+        (comment) => comment.commentId == incoming.commentId,
+      );
+      if (index == -1) {
+        comments.add(incoming);
+        hasChanges = true;
+        continue;
+      }
+
+      final merged = _mergeCommentWithLocalState(
+        existing: comments[index],
+        incoming: incoming,
+      );
+      comments[index] = merged;
+      hasChanges = true;
     }
 
-    comments.refresh();
+    if (hasChanges) {
+      comments.refresh();
+    }
+  }
+
+  PostCommentModel _mergeCommentWithLocalState({
+    required PostCommentModel existing,
+    required PostCommentModel incoming,
+  }) {
+    final commentId = incoming.commentId;
+    final hasPendingLike =
+        _queuedLikeStates.containsKey(commentId) ||
+        _likeSyncingCommentIds.contains(commentId) ||
+        existing.isLikePending;
+
+    if (!hasPendingLike) {
+      return incoming.copyWith(
+        isLiked: _confirmedLikeStates[commentId] ?? incoming.isLiked,
+      );
+    }
+
+    return incoming.copyWith(
+      isLiked: existing.isLiked,
+      isLikePending: existing.isLikePending,
+      likeCount: existing.likeCount,
+    );
+  }
+
+  void _mergeLikeCaches(PostCommentModel comment) {
+    final commentId = comment.commentId;
+    if (_queuedLikeStates.containsKey(commentId) ||
+        _likeSyncingCommentIds.contains(commentId)) {
+      return;
+    }
+
+    _likeCache[commentId] = comment.isLiked;
+    _confirmedLikeStates[commentId] = comment.isLiked;
+  }
+
+  void _resetLoadedState() {
+    comments.clear();
+    expandedCommentIds.clear();
+    loadingReplyParentIds.clear();
+    _loadedReplyParentIds.clear();
+    _topLevelOrderRanks.clear();
+    _topLevelCursor = null;
+    hasMoreComments.value = true;
+    isLoadingMoreComments.value = false;
+
+    _likeCache.clear();
+    _confirmedLikeStates.clear();
+    _queuedLikeStates.clear();
+    _likeSyncingCommentIds.clear();
   }
 
   void _expandThreadPath(String commentId) {
@@ -266,7 +422,7 @@ class PostCommentsController extends GetxController {
     return comment?.parentId;
   }
 
-  bool _hasChildren(String commentId) {
+  bool _hasLoadedChildren(String commentId) {
     return comments.any((item) => item.parentId == commentId);
   }
 
@@ -285,21 +441,6 @@ class PostCommentsController extends GetxController {
 
     comments[index] = updatedComment;
     comments.refresh();
-  }
-
-  void _hydrateLikeCaches(List<PostCommentModel> loadedComments) {
-    _likeCache
-      ..clear()
-      ..addEntries(
-        loadedComments.map(
-          (comment) => MapEntry(comment.commentId, comment.isLiked),
-        ),
-      );
-    _confirmedLikeStates
-      ..clear()
-      ..addAll(_likeCache);
-    _queuedLikeStates.clear();
-    _likeSyncingCommentIds.clear();
   }
 
   bool _isLikeSyncPending(String commentId) {
@@ -409,6 +550,15 @@ class PostCommentsController extends GetxController {
       ..addAll(nextExpanded);
   }
 
+  void _setReplyLoading(String commentId, bool isLoadingReply) {
+    if (isLoadingReply) {
+      loadingReplyParentIds.add(commentId);
+    } else {
+      loadingReplyParentIds.remove(commentId);
+    }
+    loadingReplyParentIds.refresh();
+  }
+
   int _compareThreadComments({
     required String? parentId,
     required CommentSortMode currentSortMode,
@@ -418,6 +568,9 @@ class PostCommentsController extends GetxController {
     if (parentId != null) {
       return _compareByCreatedAt(a, b, descending: false);
     }
+
+    final rankedComparison = _compareByTopLevelOrderRank(a, b);
+    if (rankedComparison != null) return rankedComparison;
 
     switch (currentSortMode) {
       case CommentSortMode.featured:
@@ -441,6 +594,74 @@ class PostCommentsController extends GetxController {
     if (likeComparison != 0) return likeComparison;
 
     return _compareByCreatedAt(a, b, descending: true);
+  }
+
+  int? _compareByTopLevelOrderRank(PostCommentModel a, PostCommentModel b) {
+    final aRank = _topLevelOrderRanks[a.commentId];
+    final bRank = _topLevelOrderRanks[b.commentId];
+    if (aRank == null && bRank == null) return null;
+    if (aRank == null) return 1;
+    if (bRank == null) return -1;
+
+    final rankComparison = aRank.compareTo(bRank);
+    if (rankComparison != 0) return rankComparison;
+    return null;
+  }
+
+  void _rebuildTopLevelOrder(Iterable<PostCommentModel> source) {
+    final topLevelComments = source
+        .where((comment) => !comment.isReply)
+        .toList(growable: true);
+
+    topLevelComments.sort(_compareTopLevelByCurrentMode);
+
+    _topLevelOrderRanks
+      ..clear()
+      ..addEntries(
+        topLevelComments.indexed.map(
+          (entry) => MapEntry(entry.$2.commentId, entry.$1),
+        ),
+      );
+  }
+
+  void _appendTopLevelOrder(Iterable<PostCommentModel> source) {
+    final newTopLevelComments = source
+        .where((comment) => !comment.isReply)
+        .where((comment) => !_topLevelOrderRanks.containsKey(comment.commentId))
+        .toList(growable: true);
+
+    if (newTopLevelComments.isEmpty) return;
+
+    newTopLevelComments.sort(_compareTopLevelByCurrentMode);
+
+    var nextRank =
+        _topLevelOrderRanks.isEmpty
+            ? 0
+            : _topLevelOrderRanks.values.reduce(max) + 1;
+
+    for (final comment in newTopLevelComments) {
+      _topLevelOrderRanks[comment.commentId] = nextRank;
+      nextRank += 1;
+    }
+  }
+
+  void _pinTopLevelCommentToFront(String commentId) {
+    if (_topLevelOrderRanks.isEmpty) {
+      _topLevelOrderRanks[commentId] = 0;
+      return;
+    }
+
+    final currentMinRank = _topLevelOrderRanks.values.reduce(min);
+    _topLevelOrderRanks[commentId] = currentMinRank - 1;
+  }
+
+  int _compareTopLevelByCurrentMode(PostCommentModel a, PostCommentModel b) {
+    switch (sortMode.value) {
+      case CommentSortMode.featured:
+        return _compareByFeaturedScore(a, b);
+      case CommentSortMode.newest:
+        return _compareByCreatedAt(a, b, descending: true);
+    }
   }
 
   double _featuredScore(PostCommentModel comment, DateTime now) {

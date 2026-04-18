@@ -15,12 +15,14 @@ class PostDetailCommentItem extends StatelessWidget {
     required this.onLikeTap,
     required this.onReplyTap,
     required this.onToggleRepliesTap,
+    this.isReplyLoading = false,
   });
 
   final CommentThreadEntry entry;
   final VoidCallback onLikeTap;
   final VoidCallback onReplyTap;
   final VoidCallback onToggleRepliesTap;
+  final bool isReplyLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +45,7 @@ class PostDetailCommentItem extends StatelessWidget {
         isReply ? leftInset - 2.0 : leftInset + avatarSize + 6.0;
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
+    final canToggleReplies = comment.replyCount > 0 && !isReplyLoading;
 
     return Padding(
       padding: const EdgeInsets.only(right: 16),
@@ -74,7 +77,7 @@ class PostDetailCommentItem extends StatelessWidget {
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: entry.hasChildren ? onToggleRepliesTap : null,
+                onTap: canToggleReplies ? onToggleRepliesTap : null,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -190,15 +193,20 @@ class PostDetailCommentItem extends StatelessWidget {
                           const SizedBox(height: 8),
                           _CommentMetaButton(
                             icon:
-                                entry.isExpanded
+                                isReplyLoading
+                                    ? null
+                                    : entry.isExpanded
                                     ? Iconsax.arrow_up_1
                                     : Iconsax.arrow_down_1,
                             label:
-                                entry.isExpanded
+                                isReplyLoading
+                                    ? 'Đang tải phản hồi...'
+                                    : entry.isExpanded
                                     ? 'Ẩn ${comment.replyCount} phản hồi'
                                     : '${comment.replyCount} phản hồi',
                             palette: palette,
-                            onTap: onToggleRepliesTap,
+                            isLoading: isReplyLoading,
+                            onTap: canToggleReplies ? onToggleRepliesTap : null,
                           ),
                         ],
                       ],
@@ -216,20 +224,22 @@ class PostDetailCommentItem extends StatelessWidget {
 
 class _CommentMetaButton extends StatelessWidget {
   const _CommentMetaButton({
-    required this.icon,
     required this.palette,
+    this.icon,
     this.iconColor,
     this.labelColor,
     this.label,
     this.onTap,
+    this.isLoading = false,
   });
 
-  final IconData icon;
+  final IconData? icon;
   final FeedPalette palette;
   final Color? iconColor;
   final Color? labelColor;
   final String? label;
   final VoidCallback? onTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -237,9 +247,19 @@ class _CommentMetaButton extends StatelessWidget {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 18, color: iconColor ?? palette.iconMuted),
+        if (isLoading)
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.8,
+              color: palette.iconPrimary,
+            ),
+          )
+        else if (icon != null)
+          Icon(icon, size: 18, color: iconColor ?? palette.iconMuted),
         if (label != null) ...[
-          const SizedBox(width: 5),
+          if (icon != null || isLoading) const SizedBox(width: 5),
           Text(
             label!,
             style: theme.textTheme.bodySmall?.copyWith(

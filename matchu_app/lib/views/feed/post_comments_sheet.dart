@@ -4,8 +4,8 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
+import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
 
 class PostCommentsSheet extends StatefulWidget {
   const PostCommentsSheet({
@@ -50,6 +50,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
       PostCommentsController(
         postId: widget.post.postId,
         onCommentCountChanged: widget.onCommentCountChanged,
+        initialCommentCount: widget.post.stats.commentCount,
       ),
       tag: _tag,
     );
@@ -99,7 +100,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     Expanded(
                       child: Obx(
                         () => Text(
-                          'Bình luận (${_controller.comments.length})',
+                          'Bình luận (${_controller.totalCommentCount.value})',
                           style: theme.textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
@@ -158,6 +159,8 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     );
                   }
 
+                  final entries = _controller.threadEntries;
+
                   return Column(
                     children: [
                       Padding(
@@ -176,14 +179,17 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                       const SizedBox(height: 10),
                       Expanded(
                         child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: _controller.threadEntries.length,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          itemCount: entries.length,
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            final entry = _controller.threadEntries[index];
+                            final entry = entries[index];
                             return CommentTreeItem(
                               entry: entry,
+                              isReplyLoading: _controller.isReplyLoading(
+                                entry.comment.commentId,
+                              ),
                               onLikeTap:
                                   () => _controller.toggleLike(entry.comment),
                               onReplyTap:
@@ -195,6 +201,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                           },
                         ),
                       ),
+                      _CommentsLoadMoreButton(controller: _controller),
                     ],
                   );
                 }),
@@ -304,5 +311,41 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
         ),
       ),
     );
+  }
+}
+
+class _CommentsLoadMoreButton extends StatelessWidget {
+  const _CommentsLoadMoreButton({required this.controller});
+
+  final PostCommentsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (!controller.hasMoreComments.value &&
+          !controller.isLoadingMoreComments.value) {
+        return const SizedBox.shrink();
+      }
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Center(
+          child: OutlinedButton(
+            onPressed:
+                controller.isLoadingMoreComments.value
+                    ? null
+                    : controller.loadMoreComments,
+            child:
+                controller.isLoadingMoreComments.value
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('Xem thêm bình luận'),
+          ),
+        ),
+      );
+    });
   }
 }

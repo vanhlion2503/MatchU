@@ -3,6 +3,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 
+class PostCommentPageResult {
+  const PostCommentPageResult({
+    required this.comments,
+    required this.hasMore,
+    this.nextCursor,
+  });
+
+  final List<PostCommentModel> comments;
+  final bool hasMore;
+  final DocumentSnapshot<Map<String, dynamic>>? nextCursor;
+}
+
 class PostCommentService {
   PostCommentService({
     FirebaseFirestore? firestore,
@@ -13,6 +25,8 @@ class PostCommentService {
        _userService = userService ?? UserService();
 
   static const int maxCommentLength = 300;
+  static const int defaultTopLevelPageSize = 5;
+  static const int _topLevelScanBatchSize = 24;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -23,42 +37,76 @@ class PostCommentService {
 
   String get uid => _auth.currentUser?.uid ?? '';
 
-  Future<List<PostCommentModel>> fetchComments(String postId) async {
-    final snapshot =
-        await _postsRef
-            .doc(postId)
-            .collection('comments')
-            .orderBy('createdAt')
-            .get();
+  CollectionReference<Map<String, dynamic>> _commentsRef(String postId) =>
+      _postsRef.doc(postId).collection('comments');
 
-    final comments = snapshot.docs
-        .map(PostCommentModel.fromDoc)
-        .where((comment) => comment.content.trim().isNotEmpty)
-        .toList(growable: false);
+  Future<PostCommentPageResult> fetchTopLevelCommentsPage(
+    String postId, {
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int limit = defaultTopLevelPageSize,
+  }) async {
+    if (limit <= 0) {
+      return const PostCommentPageResult(comments: [], hasMore: false);
+    }
 
-    final authorsFuture = _resolveAuthors(comments);
-    final likeStatesFuture = getLikeStates(
-      postId,
-      comments.map((comment) => comment.commentId).toList(growable: false),
+    final topLevelDocs = <QueryDocumentSnapshot<Map<String, dynamic>>>[];
+    QueryDocumentSnapshot<Map<String, dynamic>>? scanCursor;
+    var exhausted = false;
+
+    while (topLevelDocs.length < limit + 1 && !exhausted) {
+      Query<Map<String, dynamic>> query = _commentsRef(
+        postId,
+      ).orderBy('createdAt', descending: true).limit(_topLevelScanBatchSize);
+
+      final effectiveCursor = scanCursor ?? startAfter;
+      if (effectiveCursor != null) {
+        query = query.startAfterDocument(effectiveCursor);
+      }
+
+      final snapshot = await query.get();
+      if (snapshot.docs.isEmpty) {
+        exhausted = true;
+        break;
+      }
+
+      for (final doc in snapshot.docs) {
+        scanCursor = doc;
+        if (!_isTopLevelComment(doc.data()['parentId'])) continue;
+
+        topLevelDocs.add(doc);
+        if (topLevelDocs.length >= limit + 1) {
+          break;
+        }
+      }
+
+      if (snapshot.docs.length < _topLevelScanBatchSize) {
+        exhausted = true;
+      }
+    }
+
+    final selectedDocs = topLevelDocs.take(limit).toList(growable: false);
+    final hydrated = await _hydrateDocs(postId, selectedDocs);
+
+    return PostCommentPageResult(
+      comments: hydrated,
+      hasMore: topLevelDocs.length > limit,
+      nextCursor: selectedDocs.isNotEmpty ? selectedDocs.last : startAfter,
     );
-    final authors = await authorsFuture;
-    final likeStates = await likeStatesFuture;
+  }
 
-    final hydrated = comments
-        .map(
-          (comment) => comment.copyWith(
-            author: authors[comment.userId],
-            isLiked: likeStates[comment.commentId] ?? false,
-          ),
-        )
-        .toList(growable: false);
+  Future<List<PostCommentModel>> fetchReplies(
+    String postId,
+    String parentId,
+  ) async {
+    final snapshot =
+        await _commentsRef(postId).where('parentId', isEqualTo: parentId).get();
 
+    final hydrated = await _hydrateDocs(postId, snapshot.docs);
     hydrated.sort((a, b) {
       final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return aTime.compareTo(bTime);
     });
-
     return hydrated;
   }
 
@@ -159,13 +207,9 @@ class PostCommentService {
     final entries = await Future.wait(
       commentIds.map((commentId) async {
         final likeDoc =
-            await _postsRef
-                .doc(postId)
-                .collection('comments')
-                .doc(commentId)
-                .collection('likes')
-                .doc(uid)
-                .get();
+            await _commentsRef(
+              postId,
+            ).doc(commentId).collection('likes').doc(uid).get();
         return MapEntry(commentId, likeDoc.exists);
       }),
     );
@@ -195,21 +239,16 @@ class PostCommentService {
     required bool shouldLike,
   }) async {
     if (uid.isEmpty) {
-      throw StateError(
-        'Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ tÆ°Æ¡ng tÃ¡c vá»›i bÃ¬nh luáº­n.',
-      );
+      throw StateError('Bạn cần đăng nhập để tương tác với bình luận.');
     }
 
-    final commentRef = _postsRef
-        .doc(postId)
-        .collection('comments')
-        .doc(commentId);
+    final commentRef = _commentsRef(postId).doc(commentId);
     final likeRef = commentRef.collection('likes').doc(uid);
 
     await _firestore.runTransaction((transaction) async {
       final commentSnap = await transaction.get(commentRef);
       if (!commentSnap.exists) {
-        throw StateError('BÃ¬nh luáº­n khÃ´ng cÃ²n tá»“n táº¡i.');
+        throw StateError('Bình luận không còn tồn tại.');
       }
 
       final likeSnap = await transaction.get(likeRef);
@@ -236,6 +275,37 @@ class PostCommentService {
     });
   }
 
+  Future<List<PostCommentModel>> _hydrateDocs(
+    String postId,
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) async {
+    final comments = docs
+        .map(PostCommentModel.fromDoc)
+        .where((comment) => comment.content.trim().isNotEmpty)
+        .toList(growable: false);
+
+    if (comments.isEmpty) {
+      return const <PostCommentModel>[];
+    }
+
+    final authorsFuture = _resolveAuthors(comments);
+    final likeStatesFuture = getLikeStates(
+      postId,
+      comments.map((comment) => comment.commentId).toList(growable: false),
+    );
+    final authors = await authorsFuture;
+    final likeStates = await likeStatesFuture;
+
+    return comments
+        .map(
+          (comment) => comment.copyWith(
+            author: authors[comment.userId],
+            isLiked: likeStates[comment.commentId] ?? false,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<Map<String, PostCommentAuthorModel>> _resolveAuthors(
     List<PostCommentModel> comments,
   ) async {
@@ -251,5 +321,11 @@ class PostCommentService {
     }
 
     return authors;
+  }
+
+  bool _isTopLevelComment(dynamic parentId) {
+    if (parentId == null) return true;
+    if (parentId is String) return parentId.trim().isEmpty;
+    return parentId.toString().trim().isEmpty;
   }
 }

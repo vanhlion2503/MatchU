@@ -42,6 +42,7 @@ class PostDetailController extends GetxController {
       PostCommentsController(
         postId: args.post.postId,
         onCommentCountChanged: adjustCommentCount,
+        initialCommentCount: args.post.stats.commentCount,
       ),
       tag: commentsTag,
     );

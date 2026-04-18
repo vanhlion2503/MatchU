@@ -15,12 +15,14 @@ class CommentTreeItem extends StatelessWidget {
     required this.onLikeTap,
     required this.onReplyTap,
     required this.onToggleRepliesTap,
+    this.isReplyLoading = false,
   });
 
   final CommentThreadEntry entry;
   final VoidCallback onLikeTap;
   final VoidCallback onReplyTap;
   final VoidCallback onToggleRepliesTap;
+  final bool isReplyLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -38,13 +40,14 @@ class CommentTreeItem extends StatelessWidget {
       for (var level = 1; level <= 4; level++) 28.0 + (level * 18.0),
     ];
     final indent = depth == 0 ? 0.0 : lineInsets[depth - 1] + 10.0;
-    final horizontalLineEndX = depth == 0 ? indent + 36.0 + 6.0 : indent - 2.0;
+    final horizontalLineEndX = depth == 0 ? indent + 42.0 : indent - 2.0;
     final likeColor =
         comment.isLiked
             ? theme.colorScheme.primary.withValues(
               alpha: comment.isLikePending ? 0.58 : 1,
             )
             : null;
+    final canToggleReplies = comment.replyCount > 0 && !isReplyLoading;
 
     return CommentThreadGuides(
       depth: depth,
@@ -82,7 +85,7 @@ class CommentTreeItem extends StatelessWidget {
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: entry.hasChildren ? onToggleRepliesTap : null,
+              onTap: canToggleReplies ? onToggleRepliesTap : null,
               child: Container(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 decoration: BoxDecoration(
@@ -98,32 +101,22 @@ class CommentTreeItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              nickname.isNotEmpty
-                                  ? '@$nickname • ${formatRelativeTime(comment.createdAt, withSuffix: true)}'
-                                  : formatRelativeTime(
-                                    comment.createdAt,
-                                    withSuffix: true,
-                                  ),
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ],
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      nickname.isNotEmpty
+                          ? '@$nickname • ${formatRelativeTime(comment.createdAt, withSuffix: true)}'
+                          : formatRelativeTime(
+                            comment.createdAt,
+                            withSuffix: true,
+                          ),
+                      style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -164,20 +157,32 @@ class CommentTreeItem extends StatelessWidget {
                         if (comment.replyCount > 0) ...[
                           const SizedBox(height: 8),
                           GestureDetector(
-                            onTap: onToggleRepliesTap,
+                            onTap: canToggleReplies ? onToggleRepliesTap : null,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  entry.isExpanded
-                                      ? Iconsax.arrow_up_1
-                                      : Iconsax.arrow_down_1,
-                                  size: 14,
-                                  color: theme.textTheme.bodySmall?.color,
-                                ),
+                                if (isReplyLoading)
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.8,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  )
+                                else
+                                  Icon(
+                                    entry.isExpanded
+                                        ? Iconsax.arrow_up_1
+                                        : Iconsax.arrow_down_1,
+                                    size: 14,
+                                    color: theme.textTheme.bodySmall?.color,
+                                  ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  entry.isExpanded
+                                  isReplyLoading
+                                      ? 'Đang tải phản hồi...'
+                                      : entry.isExpanded
                                       ? 'Ẩn ${comment.replyCount} phản hồi'
                                       : '${comment.replyCount} phản hồi',
                                   style: theme.textTheme.bodySmall,

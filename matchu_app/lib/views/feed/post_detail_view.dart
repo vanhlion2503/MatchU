@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
@@ -166,6 +167,9 @@ class _CommentsSection extends StatelessWidget {
                     Divider(height: 1, thickness: 1, color: palette.border),
                   PostDetailCommentItem(
                     entry: entry,
+                    isReplyLoading: commentsController.isReplyLoading(
+                      entry.comment.commentId,
+                    ),
                     onLikeTap:
                         () => commentsController.toggleLike(entry.comment),
                     onReplyTap:
@@ -177,7 +181,44 @@ class _CommentsSection extends StatelessWidget {
               );
             },
           ),
+          _PostDetailLoadMoreButton(controller: commentsController),
         ],
+      );
+    });
+  }
+}
+
+class _PostDetailLoadMoreButton extends StatelessWidget {
+  const _PostDetailLoadMoreButton({required this.controller});
+
+  final PostCommentsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (!controller.hasMoreComments.value &&
+          !controller.isLoadingMoreComments.value) {
+        return const SizedBox.shrink();
+      }
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        child: Center(
+          child: OutlinedButton(
+            onPressed:
+                controller.isLoadingMoreComments.value
+                    ? null
+                    : controller.loadMoreComments,
+            child:
+                controller.isLoadingMoreComments.value
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('Xem thêm bình luận'),
+          ),
+        ),
       );
     });
   }
