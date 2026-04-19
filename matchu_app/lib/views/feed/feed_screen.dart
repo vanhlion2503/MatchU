@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -21,10 +22,8 @@ class FeedScreen extends GetView<FeedController> {
     final createdPost = await CreatePostSheet.show(context);
     if (createdPost == null) return;
 
-    if (createdPost.isPublic) {
-      controller.prependPost(createdPost);
-      return;
-    }
+    PostCreationSync.sync(createdPost);
+    if (createdPost.isPublic) return;
 
     Get.snackbar(
       'Thông báo',

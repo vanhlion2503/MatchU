@@ -1,33 +1,69 @@
-import 'package:flutter/material.dart';
-import 'package:matchu_app/theme/app_theme.dart';
-import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
-import 'package:matchu_app/views/profile/follow_tab_view.dart';
-import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
-import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
-import 'package:matchu_app/controllers/profile/profile_controller.dart';
-import 'package:get/get.dart';
-import 'package:matchu_app/views/profile/profile_widget/popup_profile_widget.dart';
-import 'package:iconsax/iconsax.dart';
-import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
+import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
+import 'package:matchu_app/controllers/profile/profile_controller.dart';
+import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/feed/create_post_sheet.dart';
+import 'package:matchu_app/views/profile/follow_tab_view.dart';
+import 'package:matchu_app/views/profile/profile_widget/popup_profile_widget.dart';
+import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
+import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
+import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
+
+  Future<void> _openCreatePostSheet(BuildContext context) async {
+    final createdPost = await CreatePostSheet.show(context);
+    if (createdPost == null) return;
+
+    PostCreationSync.sync(createdPost);
+    if (createdPost.isPublic) return;
+
+    Get.snackbar(
+      'Thông báo',
+      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).padding.bottom;
     final ProfileController c = Get.put(ProfileController());
     final AvatarController avatarC = Get.find<AvatarController>();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: Obx(() {
+        if (c.isLoading.value || c.user.value == null) {
+          return const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomInset + 80),
+          child: FloatingActionButton(
+            heroTag: 'profile_create_post_fab',
+            tooltip: 'Tạo bài viết',
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: theme.colorScheme.onPrimary,
+            onPressed: () => _openCreatePostSheet(context),
+            child: const Icon(Iconsax.edit_2),
+          ),
+        );
+      }),
       body: Obx(() {
         // ====== LOADING ======
         if (c.isLoading.value) {
@@ -39,7 +75,7 @@ class ProfileView extends StatelessWidget {
           return const Center(child: Text("Không tìm thấy hồ sơ người dùng."));
         }
         final user = c.user.value!;
-        final postsTag = 'profile_posts_self_${user.uid}';
+        final postsTag = ProfilePostsController.ownerProfileTag(user.uid);
         if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
           Get.put(
             ProfilePostsController(userId: user.uid, includePrivate: true),
@@ -378,7 +414,7 @@ class ProfileView extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 "Giữ cách trò chuyện lịch sự để tăng độ uy tín và mở khóa nhiều tính năng hơn.",
-                                style: textTheme.bodySmall
+                                style: textTheme.bodySmall,
                               ),
                             ),
                           ],
@@ -388,11 +424,9 @@ class ProfileView extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
-              ProfilePostsSection(
-                controllerTag: postsTag,
-                isOwnerView: true,
-              ),
+              const SizedBox(height: 16),
+              ProfilePostsSection(controllerTag: postsTag, isOwnerView: true),
+              const SizedBox(height: 96),
             ],
           ),
         );

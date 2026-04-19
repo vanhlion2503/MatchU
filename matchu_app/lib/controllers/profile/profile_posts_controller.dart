@@ -18,6 +18,18 @@ class ProfilePostsController extends GetxController {
 
   static const int _pageSize = 10;
 
+  static String ownerProfileTag(String userId) => 'profile_posts_self_$userId';
+
+  static String otherProfileTag(
+    String userId, {
+    required bool includePrivate,
+  }) => 'other_profile_posts_${userId}_${includePrivate ? 'self' : 'public'}';
+
+  static List<String> selfProfileTags(String userId) => <String>[
+    ownerProfileTag(userId),
+    otherProfileTag(userId, includePrivate: true),
+  ];
+
   final String userId;
   final bool includePrivate;
   final PostService _service;
@@ -33,6 +45,7 @@ class ProfilePostsController extends GetxController {
   final Map<String, bool> _confirmedLikeStates = <String, bool>{};
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingPosts = <String>{};
+  final Map<String, PostModel> _locallyPrependedPosts = <String, PostModel>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   @override
@@ -57,6 +70,18 @@ class ProfilePostsController extends GetxController {
     }
 
     await _loadPosts(reset: false);
+  }
+
+  void prependPost(PostModel post) {
+    if (post.authorId != userId) return;
+    if (!includePrivate && !post.isPublic) return;
+
+    _locallyPrependedPosts[post.postId] = post;
+    _likeCache[post.postId] = post.isLiked;
+    _confirmedLikeStates[post.postId] = post.isLiked;
+    posts.assignAll(_mergePosts(posts, [post]));
+    errorMessage.value = null;
+    status.value = ProfilePostsStatus.success;
   }
 
   PostModel? findPostById(String postId) {
@@ -137,7 +162,7 @@ class ProfilePostsController extends GetxController {
       final hydratedPosts = await _attachLikeStates(page.posts, reset: reset);
 
       if (reset) {
-        posts.assignAll(hydratedPosts);
+        posts.assignAll(_mergeWithLocallyPrependedPosts(hydratedPosts));
       } else {
         posts.assignAll(_mergePosts(posts, hydratedPosts));
       }
@@ -235,6 +260,18 @@ class ProfilePostsController extends GetxController {
     return items;
   }
 
+  List<PostModel> _mergeWithLocallyPrependedPosts(List<PostModel> incoming) {
+    if (_locallyPrependedPosts.isEmpty) return incoming;
+
+    final localPosts = _locallyPrependedPosts.values
+        .where((post) => post.authorId == userId)
+        .where((post) => includePrivate || post.isPublic)
+        .toList(growable: false);
+
+    if (localPosts.isEmpty) return incoming;
+    return _mergePosts(incoming, localPosts);
+  }
+
   bool _isLikeSyncPending(String postId) {
     return _queuedLikeStates.containsKey(postId) ||
         _likeSyncingPosts.contains(postId);
@@ -319,6 +356,9 @@ class ProfilePostsController extends GetxController {
   void _replacePost(PostModel updatedPost) {
     final index = posts.indexWhere((post) => post.postId == updatedPost.postId);
     if (index == -1) return;
+    if (_locallyPrependedPosts.containsKey(updatedPost.postId)) {
+      _locallyPrependedPosts[updatedPost.postId] = updatedPost;
+    }
     posts[index] = updatedPost;
     posts.refresh();
   }

@@ -371,6 +371,7 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
       child: Obx(() {
         final replyingTo = commentsController.replyingTo.value;
         final isSubmitting = commentsController.isSubmitting.value;
+        final hasInputText = commentsController.hasInputText.value;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -525,40 +526,65 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _ComposerActionButton(
-                          icon: Iconsax.gallery,
-                          color: palette.iconMuted,
-                          onPressed:
-                              isSubmitting ? null : _showImageCommentNotice,
-                        ),
-                        const SizedBox(width: 2),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          child:
-                              isSubmitting
-                                  ? SizedBox(
-                                    key: const ValueKey('composer_loading'),
-                                    width: 34,
-                                    height: 34,
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 17,
-                                        height: 17,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.1,
-                                          color: theme.colorScheme.primary,
-                                        ),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.centerRight,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              final slideAnimation = Tween<Offset>(
+                                begin: const Offset(0.18, 0),
+                                end: Offset.zero,
+                              ).animate(animation);
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: slideAnimation,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child:
+                                hasInputText
+                                    ? _ComposerSubmitButton(
+                                      key: const ValueKey(
+                                        'composer_submit_button',
                                       ),
+                                      isSubmitting: isSubmitting,
+                                      onPressed:
+                                          commentsController.submitComment,
+                                      backgroundColor:
+                                          theme.colorScheme.primary,
+                                      foregroundColor:
+                                          theme.colorScheme.onPrimary,
+                                    )
+                                    : Row(
+                                      key: const ValueKey(
+                                        'composer_media_actions',
+                                      ),
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _ComposerActionButton(
+                                          icon: Iconsax.gallery,
+                                          color: palette.iconMuted,
+                                          onPressed:
+                                              isSubmitting
+                                                  ? null
+                                                  : _showImageCommentNotice,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        _ComposerActionButton(
+                                          icon: Iconsax.emoji_happy,
+                                          color: palette.iconMuted,
+                                          onPressed:
+                                              () => _openEmojiPicker(context),
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                  : _ComposerActionButton(
-                                    key: const ValueKey('emoji_button'),
-                                    icon: Iconsax.emoji_happy,
-                                    color: palette.iconMuted,
-                                    onPressed: () => _openEmojiPicker(context),
-                                  ),
+                          ),
                         ),
                       ],
                     ),
@@ -625,7 +651,6 @@ class _ComposerAvatar extends StatelessWidget {
 
 class _ComposerActionButton extends StatelessWidget {
   const _ComposerActionButton({
-    super.key,
     required this.icon,
     required this.color,
     required this.onPressed,
@@ -647,6 +672,68 @@ class _ComposerActionButton extends StatelessWidget {
         icon,
         size: 18,
         color: onPressed == null ? color.withValues(alpha: 0.38) : color,
+      ),
+    );
+  }
+}
+
+class _ComposerSubmitButton extends StatelessWidget {
+  const _ComposerSubmitButton({
+    super.key,
+    required this.isSubmitting,
+    required this.onPressed,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final bool isSubmitting;
+  final VoidCallback onPressed;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 34,
+      child: FilledButton(
+        onPressed: isSubmitting ? null : onPressed,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(82, 34),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+          elevation: 0,
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
+          disabledBackgroundColor: backgroundColor.withValues(alpha: 0.62),
+          disabledForegroundColor: foregroundColor.withValues(alpha: 0.92),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 150),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child:
+              isSubmitting
+                  ? SizedBox(
+                    key: const ValueKey('composer_submit_loading'),
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: foregroundColor,
+                    ),
+                  )
+                  : const Row(
+                    key: ValueKey('composer_submit_label'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Iconsax.send_1, size: 22),
+                    ],
+                  ),
+        ),
       ),
     );
   }

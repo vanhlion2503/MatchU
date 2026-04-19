@@ -40,7 +40,10 @@ class OtherProfileView extends StatelessWidget {
         final UserModel u = c.user.value!;
         final String currentUid = c.currentUid;
         final bool isMe = currentUid == u.uid;
-        final postsTag = 'other_profile_posts_${u.uid}_${isMe ? 'self' : 'public'}';
+        final postsTag = ProfilePostsController.otherProfileTag(
+          u.uid,
+          includePrivate: isMe,
+        );
         if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
           Get.put(
             ProfilePostsController(userId: u.uid, includePrivate: isMe),
@@ -358,10 +361,7 @@ class OtherProfileView extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              ProfilePostsSection(
-                controllerTag: postsTag,
-                isOwnerView: isMe,
-              ),
+              ProfilePostsSection(controllerTag: postsTag, isOwnerView: isMe),
             ],
           ),
         );

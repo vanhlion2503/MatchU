@@ -28,6 +28,7 @@ class FeedController extends GetxController {
   final Map<String, bool> _confirmedLikeStates = <String, bool>{};
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingPosts = <String>{};
+  final Map<String, PostModel> _locallyPrependedPosts = <String, PostModel>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   @override
@@ -57,9 +58,11 @@ class FeedController extends GetxController {
   void prependPost(PostModel post) {
     if (!post.isPublic) return;
 
+    _locallyPrependedPosts[post.postId] = post;
     _likeCache[post.postId] = post.isLiked;
     _confirmedLikeStates[post.postId] = post.isLiked;
-    posts.assignAll(_mergePosts([post, ...posts], const []));
+    posts.assignAll(_mergePosts(posts, [post]));
+    errorMessage.value = null;
     status.value = FeedStatus.success;
   }
 
@@ -108,7 +111,7 @@ class FeedController extends GetxController {
       final hydratedPosts = await _attachLikeStates(page.posts, reset: reset);
 
       if (reset) {
-        posts.assignAll(hydratedPosts);
+        posts.assignAll(_mergeWithLocallyPrependedPosts(hydratedPosts));
       } else {
         posts.assignAll(_mergePosts(posts, hydratedPosts));
       }
@@ -234,6 +237,12 @@ class FeedController extends GetxController {
     return items;
   }
 
+  List<PostModel> _mergeWithLocallyPrependedPosts(List<PostModel> incoming) {
+    if (_locallyPrependedPosts.isEmpty) return incoming;
+
+    return _mergePosts(incoming, _locallyPrependedPosts.values.toList());
+  }
+
   PostModel? _findPost(String postId) {
     for (final post in posts) {
       if (post.postId == postId) return post;
@@ -244,6 +253,9 @@ class FeedController extends GetxController {
   void _replacePost(PostModel updatedPost) {
     final index = posts.indexWhere((post) => post.postId == updatedPost.postId);
     if (index == -1) return;
+    if (_locallyPrependedPosts.containsKey(updatedPost.postId)) {
+      _locallyPrependedPosts[updatedPost.postId] = updatedPost;
+    }
     posts[index] = updatedPost;
     posts.refresh();
   }
