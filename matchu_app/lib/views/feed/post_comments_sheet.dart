@@ -4,8 +4,11 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
+
+const double _kCommentsAutoLoadTriggerExtent = 320;
 
 class PostCommentsSheet extends StatefulWidget {
   const PostCommentsSheet({
@@ -41,6 +44,7 @@ class PostCommentsSheet extends StatefulWidget {
 class _PostCommentsSheetState extends State<PostCommentsSheet> {
   late final String _tag;
   late final PostCommentsController _controller;
+  late final ScrollController _commentsScrollController;
 
   @override
   void initState() {
@@ -54,14 +58,33 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
       ),
       tag: _tag,
     );
+    _commentsScrollController =
+        ScrollController()..addListener(_handleCommentsScroll);
   }
 
   @override
   void dispose() {
+    _commentsScrollController
+      ..removeListener(_handleCommentsScroll)
+      ..dispose();
     if (Get.isRegistered<PostCommentsController>(tag: _tag)) {
       Get.delete<PostCommentsController>(tag: _tag, force: true);
     }
     super.dispose();
+  }
+
+  void _handleCommentsScroll() {
+    if (!_commentsScrollController.hasClients) return;
+    if (_controller.isLoadingMoreComments.value ||
+        !_controller.hasMoreComments.value) {
+      return;
+    }
+    if (_commentsScrollController.position.extentAfter >
+        _kCommentsAutoLoadTriggerExtent) {
+      return;
+    }
+
+    _controller.loadMoreComments();
   }
 
   @override
@@ -118,7 +141,10 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
               Expanded(
                 child: Obx(() {
                   if (_controller.isLoading.value) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const CommentSectionShimmer(
+                      variant: CommentShimmerVariant.sheet,
+                      itemCount: 5,
+                    );
                   }
 
                   if (_controller.errorMessage.value != null &&
@@ -160,6 +186,8 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                   }
 
                   final entries = _controller.threadEntries;
+                  final showLoadMoreShimmer =
+                      _controller.isLoadingMoreComments.value;
 
                   return Column(
                     children: [
@@ -178,30 +206,51 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                       ),
                       const SizedBox(height: 10),
                       Expanded(
-                        child: ListView.separated(
+                        child: ListView.builder(
+                          controller: _commentsScrollController,
+                          cacheExtent: 720,
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          itemCount: entries.length,
-                          separatorBuilder:
-                              (_, __) => const SizedBox(height: 12),
+                          itemCount:
+                              entries.length + (showLoadMoreShimmer ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index == entries.length) {
+                              return const Padding(
+                                padding: EdgeInsets.only(top: 12),
+                                child: CommentLoadMoreShimmer(
+                                  variant: CommentShimmerVariant.sheet,
+                                  includeOuterPadding: false,
+                                ),
+                              );
+                            }
+
                             final entry = entries[index];
-                            return CommentTreeItem(
-                              entry: entry,
-                              isReplyLoading: _controller.isReplyLoading(
-                                entry.comment.commentId,
+                            final isLastComment =
+                                index == entries.length - 1 &&
+                                !showLoadMoreShimmer;
+
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: isLastComment ? 0 : 12,
                               ),
-                              onLikeTap:
-                                  () => _controller.toggleLike(entry.comment),
-                              onReplyTap:
-                                  () => _controller.startReply(entry.comment),
-                              onToggleRepliesTap:
-                                  () =>
-                                      _controller.toggleReplies(entry.comment),
+                              child: CommentTreeItem(
+                                key: ValueKey(entry.comment.commentId),
+                                entry: entry,
+                                isReplyLoading: _controller.isReplyLoading(
+                                  entry.comment.commentId,
+                                ),
+                                onLikeTap:
+                                    () => _controller.toggleLike(entry.comment),
+                                onReplyTap:
+                                    () => _controller.startReply(entry.comment),
+                                onToggleRepliesTap:
+                                    () => _controller.toggleReplies(
+                                      entry.comment,
+                                    ),
+                              ),
                             );
                           },
                         ),
                       ),
-                      _CommentsLoadMoreButton(controller: _controller),
                     ],
                   );
                 }),
@@ -311,41 +360,5 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
         ),
       ),
     );
-  }
-}
-
-class _CommentsLoadMoreButton extends StatelessWidget {
-  const _CommentsLoadMoreButton({required this.controller});
-
-  final PostCommentsController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      if (!controller.hasMoreComments.value &&
-          !controller.isLoadingMoreComments.value) {
-        return const SizedBox.shrink();
-      }
-
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Center(
-          child: OutlinedButton(
-            onPressed:
-                controller.isLoadingMoreComments.value
-                    ? null
-                    : controller.loadMoreComments,
-            child:
-                controller.isLoadingMoreComments.value
-                    ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : const Text('Xem thêm bình luận'),
-          ),
-        ),
-      );
-    });
   }
 }

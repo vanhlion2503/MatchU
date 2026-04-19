@@ -40,6 +40,7 @@ class PostCommentsController extends GetxController {
   final FocusNode inputFocusNode = FocusNode();
 
   final RxList<PostCommentModel> comments = <PostCommentModel>[].obs;
+  final RxList<CommentThreadEntry> threadEntries = <CommentThreadEntry>[].obs;
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
   final RxBool hasInputText = false.obs;
@@ -61,7 +62,7 @@ class PostCommentsController extends GetxController {
 
   DocumentSnapshot<Map<String, dynamic>>? _topLevelCursor;
 
-  List<CommentThreadEntry> get threadEntries {
+  void _rebuildThreadEntries() {
     final expandedIds = Set<String>.from(expandedCommentIds);
     final currentSortMode = sortMode.value;
     final currentComments = comments.toList(growable: false);
@@ -136,7 +137,7 @@ class PostCommentsController extends GetxController {
     }
 
     visit(null, 0, const <bool>[]);
-    return flattened;
+    threadEntries.assignAll(flattened);
   }
 
   @override
@@ -188,7 +189,7 @@ class PostCommentsController extends GetxController {
 
     sortMode.value = nextMode;
     _rebuildTopLevelOrder(comments);
-    comments.refresh();
+    _rebuildThreadEntries();
   }
 
   void startReply(PostCommentModel comment) {
@@ -288,12 +289,13 @@ class PostCommentsController extends GetxController {
 
     _topLevelCursor = page.nextCursor;
     hasMoreComments.value = page.hasMore;
-    _upsertComments(page.comments);
+    _upsertComments(page.comments, rebuildThreadEntries: false);
     if (resetCursor) {
       _rebuildTopLevelOrder(comments);
     } else {
       _appendTopLevelOrder(page.comments);
     }
+    _rebuildThreadEntries();
   }
 
   Future<void> _loadRepliesForParent(PostCommentModel parentComment) async {
@@ -327,31 +329,38 @@ class PostCommentsController extends GetxController {
     }
   }
 
-  void _upsertComments(Iterable<PostCommentModel> incomingComments) {
+  void _upsertComments(
+    Iterable<PostCommentModel> incomingComments, {
+    bool rebuildThreadEntries = true,
+  }) {
+    final nextComments = comments.toList(growable: true);
     var hasChanges = false;
 
     for (final incoming in incomingComments) {
       _mergeLikeCaches(incoming);
 
-      final index = comments.indexWhere(
+      final index = nextComments.indexWhere(
         (comment) => comment.commentId == incoming.commentId,
       );
       if (index == -1) {
-        comments.add(incoming);
+        nextComments.add(incoming);
         hasChanges = true;
         continue;
       }
 
       final merged = _mergeCommentWithLocalState(
-        existing: comments[index],
+        existing: nextComments[index],
         incoming: incoming,
       );
-      comments[index] = merged;
+      nextComments[index] = merged;
       hasChanges = true;
     }
 
     if (hasChanges) {
-      comments.refresh();
+      comments.assignAll(nextComments);
+      if (rebuildThreadEntries) {
+        _rebuildThreadEntries();
+      }
     }
   }
 
@@ -398,6 +407,7 @@ class PostCommentsController extends GetxController {
     _topLevelCursor = null;
     hasMoreComments.value = true;
     isLoadingMoreComments.value = false;
+    threadEntries.clear();
 
     _likeCache.clear();
     _confirmedLikeStates.clear();
@@ -434,13 +444,15 @@ class PostCommentsController extends GetxController {
   }
 
   void _replaceComment(PostCommentModel updatedComment) {
-    final index = comments.indexWhere(
+    final nextComments = comments.toList(growable: true);
+    final index = nextComments.indexWhere(
       (comment) => comment.commentId == updatedComment.commentId,
     );
     if (index == -1) return;
 
-    comments[index] = updatedComment;
-    comments.refresh();
+    nextComments[index] = updatedComment;
+    comments.assignAll(nextComments);
+    _rebuildThreadEntries();
   }
 
   bool _isLikeSyncPending(String commentId) {
@@ -548,6 +560,7 @@ class PostCommentsController extends GetxController {
     expandedCommentIds
       ..clear()
       ..addAll(nextExpanded);
+    _rebuildThreadEntries();
   }
 
   void _setReplyLoading(String commentId, bool isLoadingReply) {

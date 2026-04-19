@@ -6,11 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
-import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
+import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
+import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_comment_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
@@ -19,9 +19,50 @@ import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 const double _kComposerFloatingGap = 10;
 const double _kComposerListBottomPadding = 104;
 const double _kComposerListBottomPaddingWithReply = 176;
+const double _kPostDetailCommentsAutoLoadTriggerExtent = 360;
 
-class PostDetailView extends GetView<PostDetailController> {
+class PostDetailView extends StatefulWidget {
   const PostDetailView({super.key});
+
+  @override
+  State<PostDetailView> createState() => _PostDetailViewState();
+}
+
+class _PostDetailViewState extends State<PostDetailView> {
+  late final PostDetailController controller;
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<PostDetailController>();
+    _scrollController = ScrollController()..addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_handleScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) return;
+
+    final commentsController = controller.commentsController;
+    if (commentsController.isLoading.value ||
+        commentsController.isLoadingMoreComments.value ||
+        !commentsController.hasMoreComments.value) {
+      return;
+    }
+    if (_scrollController.position.extentAfter >
+        _kPostDetailCommentsAutoLoadTriggerExtent) {
+      return;
+    }
+
+    commentsController.loadMoreComments();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,18 +84,25 @@ class PostDetailView extends GetView<PostDetailController> {
         return Stack(
           children: [
             Positioned.fill(
-              child: ListView(
+              child: CustomScrollView(
+                controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.only(bottom: listBottomPadding),
-                children: [
-                  PostDetailPostCard(
-                    post: post,
-                    onLikeTap: controller.toggleLike,
-                    onCommentTap: controller.dismissCommentComposer,
-                    onShareTap: controller.sharePost,
-                    onMoreTap: () => PostActionSheet.show(context, post: post),
+                cacheExtent: 960,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: PostDetailPostCard(
+                      post: post,
+                      onLikeTap: controller.toggleLike,
+                      onCommentTap: controller.dismissCommentComposer,
+                      onShareTap: controller.sharePost,
+                      onMoreTap:
+                          () => PostActionSheet.show(context, post: post),
+                    ),
                   ),
-                  _CommentsSection(controller: controller),
+                  _CommentsSliverSection(controller: controller),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: listBottomPadding),
+                  ),
                 ],
               ),
             ),
@@ -71,8 +119,8 @@ class PostDetailView extends GetView<PostDetailController> {
   }
 }
 
-class _CommentsSection extends StatelessWidget {
-  const _CommentsSection({required this.controller});
+class _CommentsSliverSection extends StatelessWidget {
+  const _CommentsSliverSection({required this.controller});
 
   final PostDetailController controller;
 
@@ -84,13 +132,12 @@ class _CommentsSection extends StatelessWidget {
 
     return Obx(() {
       if (commentsController.isLoading.value) {
-        return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 32),
-          child: Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 2.4),
+        return const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: CommentSectionShimmer(
+              variant: CommentShimmerVariant.detail,
+              itemCount: 4,
             ),
           ),
         );
@@ -98,66 +145,75 @@ class _CommentsSection extends StatelessWidget {
 
       if (commentsController.errorMessage.value != null &&
           commentsController.comments.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-          child: Column(
-            children: [
-              Icon(Iconsax.warning_2, size: 30, color: theme.colorScheme.error),
-              const SizedBox(height: 10),
-              Text(
-                commentsController.errorMessage.value!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textSecondary,
-                  height: 1.5,
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              children: [
+                Icon(
+                  Iconsax.warning_2,
+                  size: 30,
+                  color: theme.colorScheme.error,
                 ),
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: commentsController.loadComments,
-                child: const Text('Thử lại'),
-              ),
-            ],
+                const SizedBox(height: 10),
+                Text(
+                  commentsController.errorMessage.value!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: commentsController.loadComments,
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
           ),
         );
       }
 
       if (commentsController.threadEntries.isEmpty) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-          child: Text(
-            'Chưa có bình luận nào. Hãy mở đầu cuộc trò chuyện.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: palette.textSecondary,
-              height: 1.5,
+        return SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+            child: Text(
+              'Chưa có bình luận nào. Hãy mở đầu cuộc trò chuyện.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+                height: 1.5,
+              ),
             ),
           ),
         );
       }
 
-      final entries = commentsController.threadEntries;
+      final entries = commentsController.threadEntries.toList(growable: false);
+      final showLoadMoreShimmer =
+          commentsController.isLoadingMoreComments.value;
 
-      return Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: CommentSortDropdown(
-                value: commentsController.sortMode.value,
-                onChanged: (value) {
-                  if (value == null) return;
-                  commentsController.updateSortMode(value);
-                },
+      return SliverMainAxisGroup(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: CommentSortDropdown(
+                  value: commentsController.sortMode.value,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    commentsController.updateSortMode(value);
+                  },
+                ),
               ),
             ),
           ),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: entries.length,
-            itemBuilder: (context, index) {
+          SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
               final entry = entries[index];
               final shouldShowDivider = index > 0 && entry.depth == 0;
 
@@ -166,6 +222,7 @@ class _CommentsSection extends StatelessWidget {
                   if (shouldShowDivider)
                     Divider(height: 1, thickness: 1, color: palette.border),
                   PostDetailCommentItem(
+                    key: ValueKey(entry.comment.commentId),
                     entry: entry,
                     isReplyLoading: commentsController.isReplyLoading(
                       entry.comment.commentId,
@@ -179,46 +236,15 @@ class _CommentsSection extends StatelessWidget {
                   ),
                 ],
               );
-            },
+            }, childCount: entries.length),
           ),
-          _PostDetailLoadMoreButton(controller: commentsController),
+          if (showLoadMoreShimmer)
+            const SliverToBoxAdapter(
+              child: CommentLoadMoreShimmer(
+                variant: CommentShimmerVariant.detail,
+              ),
+            ),
         ],
-      );
-    });
-  }
-}
-
-class _PostDetailLoadMoreButton extends StatelessWidget {
-  const _PostDetailLoadMoreButton({required this.controller});
-
-  final PostCommentsController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      if (!controller.hasMoreComments.value &&
-          !controller.isLoadingMoreComments.value) {
-        return const SizedBox.shrink();
-      }
-
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-        child: Center(
-          child: OutlinedButton(
-            onPressed:
-                controller.isLoadingMoreComments.value
-                    ? null
-                    : controller.loadMoreComments,
-            child:
-                controller.isLoadingMoreComments.value
-                    ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : const Text('Xem thêm bình luận'),
-          ),
-        ),
       );
     });
   }
@@ -360,7 +386,7 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                 shadowColor: palette.shadowColor.withValues(
                   alpha: isDark ? 0.18 : 0.08,
                 ),
-                blurSigma: 14,
+                blurSigma: 0,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
                   child: Row(
@@ -436,7 +462,7 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                 shadowColor: palette.shadowColor.withValues(
                   alpha: isDark ? 0.2 : 0.08,
                 ),
-                blurSigma: 16,
+                blurSigma: 0,
                 child: SizedBox(
                   height: _kPillHeight,
                   child: Padding(
@@ -645,30 +671,39 @@ class _ComposerSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    final decoration = BoxDecoration(
+      borderRadius: borderRadius,
+      boxShadow: [
+        BoxShadow(
+          color: shadowColor,
+          blurRadius: 18,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    );
+    final content = DecoratedBox(
       decoration: BoxDecoration(
+        color: backgroundColor,
         borderRadius: borderRadius,
-        boxShadow: [
-          BoxShadow(
-            color: shadowColor,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        border: Border.all(color: borderColor),
       ),
+      child: child,
+    );
+
+    return DecoratedBox(
+      decoration: decoration,
       child: ClipRRect(
         borderRadius: borderRadius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: borderRadius,
-              border: Border.all(color: borderColor),
-            ),
-            child: child,
-          ),
-        ),
+        child:
+            blurSigma <= 0
+                ? content
+                : BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: blurSigma,
+                    sigmaY: blurSigma,
+                  ),
+                  child: content,
+                ),
       ),
     );
   }
