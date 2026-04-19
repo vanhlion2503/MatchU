@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
+import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -10,6 +11,7 @@ import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/profile/avatar_fullscreen_view.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
+import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class OtherProfileView extends StatelessWidget {
@@ -38,6 +40,13 @@ class OtherProfileView extends StatelessWidget {
         final UserModel u = c.user.value!;
         final String currentUid = c.currentUid;
         final bool isMe = currentUid == u.uid;
+        final postsTag = 'other_profile_posts_${u.uid}_${isMe ? 'self' : 'public'}';
+        if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
+          Get.put(
+            ProfilePostsController(userId: u.uid, includePrivate: isMe),
+            tag: postsTag,
+          );
+        }
 
         return SingleChildScrollView(
           child: Column(
@@ -349,7 +358,10 @@ class OtherProfileView extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-            
+              ProfilePostsSection(
+                controllerTag: postsTag,
+                isOwnerView: isMe,
+              ),
             ],
           ),
         );

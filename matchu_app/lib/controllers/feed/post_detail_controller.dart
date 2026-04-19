@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
+import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
@@ -19,11 +20,21 @@ class PostDetailController extends GetxController {
            (Get.isRegistered<FeedController>()
                ? Get.find<FeedController>()
                : null),
+       _profilePostsController =
+           args.profilePostsControllerTag != null &&
+                   Get.isRegistered<ProfilePostsController>(
+                     tag: args.profilePostsControllerTag,
+                   )
+               ? Get.find<ProfilePostsController>(
+                 tag: args.profilePostsControllerTag,
+               )
+               : null,
        post = args.post.obs;
 
   final PostDetailRouteArgs args;
   final PostService _postService;
   final FeedController? _feedController;
+  final ProfilePostsController? _profilePostsController;
   final Rx<PostModel> post;
 
   late final String commentsTag =
@@ -31,6 +42,7 @@ class PostDetailController extends GetxController {
   late final PostCommentsController commentsController;
 
   Worker? _feedWorker;
+  Worker? _profileWorker;
 
   String get postId => post.value.postId;
 
@@ -47,21 +59,37 @@ class PostDetailController extends GetxController {
       tag: commentsTag,
     );
 
-    _syncPostFromFeed();
+    _syncPostFromSources();
     final feedController = _feedController;
     if (feedController != null) {
       _feedWorker = ever<List<PostModel>>(
         feedController.posts,
-        (_) => _syncPostFromFeed(),
+        (_) => _syncPostFromSources(),
+      );
+    }
+
+    final profilePostsController = _profilePostsController;
+    if (profilePostsController != null) {
+      _profileWorker = ever<List<PostModel>>(
+        profilePostsController.posts,
+        (_) => _syncPostFromSources(),
       );
     }
   }
 
   Future<void> toggleLike() async {
+    final profilePostsController = _profilePostsController;
+    if (profilePostsController != null &&
+        profilePostsController.findPostById(postId) != null) {
+      await profilePostsController.toggleLike(postId);
+      _syncPostFromSources();
+      return;
+    }
+
     final feedController = _feedController;
     if (feedController != null && feedController.findPostById(postId) != null) {
       await feedController.toggleLike(postId);
-      _syncPostFromFeed();
+      _syncPostFromSources();
       return;
     }
 
@@ -97,10 +125,17 @@ class PostDetailController extends GetxController {
       ),
     );
 
+    _profilePostsController?.adjustCommentCount(postId, delta: delta);
     _feedController?.adjustCommentCount(postId, delta: delta);
   }
 
-  void _syncPostFromFeed() {
+  void _syncPostFromSources() {
+    final latestProfilePost = _profilePostsController?.findPostById(postId);
+    if (latestProfilePost != null) {
+      post.value = latestProfilePost;
+      return;
+    }
+
     final latestPost = _feedController?.findPostById(postId);
     if (latestPost == null) return;
     post.value = latestPost;
@@ -162,6 +197,7 @@ class PostDetailController extends GetxController {
   @override
   void onClose() {
     _feedWorker?.dispose();
+    _profileWorker?.dispose();
     if (Get.isRegistered<PostCommentsController>(tag: commentsTag)) {
       Get.delete<PostCommentsController>(tag: commentsTag, force: true);
     }

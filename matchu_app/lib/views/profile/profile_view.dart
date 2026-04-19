@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
 import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
@@ -11,6 +12,7 @@ import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class ProfileView extends StatelessWidget {
@@ -37,6 +39,14 @@ class ProfileView extends StatelessWidget {
           return const Center(child: Text("Không tìm thấy hồ sơ người dùng."));
         }
         final user = c.user.value!;
+        final postsTag = 'profile_posts_self_${user.uid}';
+        if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
+          Get.put(
+            ProfilePostsController(userId: user.uid, includePrivate: true),
+            tag: postsTag,
+          );
+        }
+
         return SingleChildScrollView(
           child: Column(
             children: [
@@ -378,7 +388,11 @@ class ProfileView extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 6),
+              ProfilePostsSection(
+                controllerTag: postsTag,
+                isOwnerView: true,
+              ),
             ],
           ),
         );

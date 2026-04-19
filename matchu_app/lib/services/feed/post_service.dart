@@ -89,6 +89,73 @@ class PostService {
     );
   }
 
+  Future<PostPageResult> fetchPostsByAuthor({
+    required String authorId,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int limit = defaultPageSize,
+    bool publicOnly = false,
+  }) async {
+    if (authorId.trim().isEmpty) {
+      return const PostPageResult(
+        posts: <PostModel>[],
+        lastDocument: null,
+        hasMore: false,
+      );
+    }
+
+    final collectedPosts = <PostModel>[];
+    DocumentSnapshot<Map<String, dynamic>>? cursor = startAfter;
+    var canLoadMore = true;
+
+    while (collectedPosts.length < limit && canLoadMore) {
+      Query<Map<String, dynamic>> query = _postsRef.where(
+        'authorId',
+        isEqualTo: authorId,
+      );
+
+      if (publicOnly) {
+        query = query.where('isPublic', isEqualTo: true);
+      }
+
+      query = query.orderBy('createdAt', descending: true).limit(limit);
+
+      if (cursor != null) {
+        query = query.startAfterDocument(cursor);
+      }
+
+      final snapshot = await query.get();
+      final docs = snapshot.docs;
+
+      if (docs.isEmpty) {
+        canLoadMore = false;
+        break;
+      }
+
+      cursor = docs.last;
+
+      for (final doc in docs) {
+        final post = PostModel.fromDoc(doc);
+        if (post.deletedAt != null) {
+          continue;
+        }
+        collectedPosts.add(post);
+        if (collectedPosts.length == limit) {
+          break;
+        }
+      }
+
+      if (docs.length < limit) {
+        canLoadMore = false;
+      }
+    }
+
+    return PostPageResult(
+      posts: collectedPosts,
+      lastDocument: cursor,
+      hasMore: canLoadMore,
+    );
+  }
+
   Future<PostModel> createPost({
     required String content,
     required List<PostMediaDraft> mediaDrafts,
