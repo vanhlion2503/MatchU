@@ -90,7 +90,7 @@ class PostActionSheet extends StatelessWidget {
                     _PostActionTile(
                       icon: Iconsax.eye_slash,
                       title: 'Ẩn bài viết',
-                      subtitle: 'Ẩn bài viết này khỏi bảng tin của bạn.',
+                      subtitle: 'Ẩn bài viết này khỏi trang tin.',
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),
@@ -106,8 +106,7 @@ class PostActionSheet extends StatelessWidget {
                     _PostActionTile(
                       icon: Iconsax.link_2,
                       title: 'Sao chép liên kết',
-                      subtitle:
-                          'Chuẩn bị giao diện cho thao tác chia sẻ liên kết.',
+                      subtitle:'Chia sẻ liên kết.',
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),
@@ -118,8 +117,7 @@ class PostActionSheet extends StatelessWidget {
                           authorHandle.isNotEmpty
                               ? 'Ẩn bài viết từ @$authorHandle'
                               : 'Ẩn bài viết từ tác giả này',
-                      subtitle:
-                          'Giảm bớt nội dung tương tự xuất hiện trong bảng tin.',
+                      subtitle:'Ẩn bớt các bài viết tương tự',
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),
@@ -217,8 +215,6 @@ class _PostActionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Icon(Iconsax.arrow_right_3, color: palette.iconMuted),
             ],
           ),
         ),

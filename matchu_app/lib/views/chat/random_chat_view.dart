@@ -355,6 +355,7 @@ class _RandomChatViewState extends State<RandomChatView>
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -394,10 +395,11 @@ class _RandomChatViewState extends State<RandomChatView>
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            const bottomNavigationClearance = 96.0;
             const contentMaxWidth = 560.0;
 
             final viewPadding = MediaQuery.viewPaddingOf(context);
+            final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+            final bottomNavigationClearance = keyboardInset > 0 ? 16.0 : 96.0;
             final isCompactHeight = constraints.maxHeight < 700;
             final isNarrowWidth = constraints.maxWidth < 360;
             final horizontalPadding = isNarrowWidth ? 16.0 : 24.0;
@@ -432,6 +434,21 @@ class _RandomChatViewState extends State<RandomChatView>
                         child: LayoutBuilder(
                           builder: (context, middleConstraints) {
                             final middleHeight = middleConstraints.maxHeight;
+                            if (middleHeight < 240) {
+                              return SingleChildScrollView(
+                                physics: const ClampingScrollPhysics(),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: middleHeight,
+                                  ),
+                                  child: _buildTargetSection(
+                                    theme,
+                                    compact: true,
+                                  ),
+                                ),
+                              );
+                            }
+
                             final middleGap =
                                 middleHeight < 340 ? 10.0 : sectionGap;
                             final targetHeight =
