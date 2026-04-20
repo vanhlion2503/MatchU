@@ -375,7 +375,7 @@ class _ComposerLayout extends StatelessWidget {
               TextField(
                 controller: controller.contentController,
                 focusNode: contentFocusNode,
-                minLines: 5,
+                minLines: 2,
                 maxLines: null,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   fontSize: 16,
@@ -517,6 +517,7 @@ class _QuotedPostPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const double quotedPreviewMediaHeight = 168;
     final theme = Theme.of(context);
     final reference = post.isRepostOnly ? post.referencePost : null;
     final authorName =
@@ -626,12 +627,12 @@ class _QuotedPostPreview extends StatelessWidget {
                   previewMedia.isImage
                       ? Image.network(
                         previewMedia.url,
-                        height: 120,
+                        height: quotedPreviewMediaHeight,
                         width: double.infinity,
                         fit: BoxFit.cover,
                       )
                       : Container(
-                        height: 120,
+                        height: quotedPreviewMediaHeight,
                         width: double.infinity,
                         color: const Color(0xFF0F172A),
                         alignment: Alignment.center,
@@ -1093,9 +1094,9 @@ class _CreatePostPalette {
 
     return _CreatePostPalette(
       sheetBackground:
-          isDark ? const Color(0xFF10151F) : theme.scaffoldBackgroundColor,
+          isDark ? AppTheme.darkBackground : theme.scaffoldBackgroundColor,
       headerBackground:
-          isDark ? const Color(0xF2111721) : const Color(0xF8FFFFFF),
+          isDark ? AppTheme.darkBackground : const Color(0xF8FFFFFF),
       surfaceMuted: isDark ? const Color(0xFF171D28) : const Color(0xFFF7F7F8),
       border: isDark ? AppTheme.darkBorder : const Color(0xFFE9ECEF),
       textPrimary: theme.colorScheme.onSurface,
