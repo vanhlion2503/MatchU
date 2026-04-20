@@ -6,14 +6,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
+import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_comment_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
+import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 
 const double _kComposerFloatingGap = 10;
@@ -64,6 +68,46 @@ class _PostDetailViewState extends State<PostDetailView> {
     commentsController.loadMoreComments();
   }
 
+  Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
+    return PostActionSheet.show(context, post: post);
+  }
+
+  Future<void> _openRepostSheet(BuildContext context, PostModel post) {
+    return PostRepostSheet.show(
+      context,
+      post: post,
+      onRepostTap: _repostPost,
+      onQuoteTap: () => _quotePost(context, post),
+    );
+  }
+
+  Future<void> _quotePost(BuildContext context, PostModel sourcePost) async {
+    final createdPost = await CreatePostSheet.show(
+      context,
+      quotedPost: sourcePost,
+    );
+    _handlePostCreated(createdPost);
+  }
+
+  Future<void> _repostPost() async {
+    final createdPost = await controller.repostCurrentPost();
+    _handlePostCreated(createdPost);
+  }
+
+  void _handlePostCreated(PostModel? createdPost) {
+    if (createdPost == null) return;
+
+    PostCreationSync.sync(createdPost);
+    if (createdPost.isPublic) return;
+
+    Get.snackbar(
+      'Thông báo',
+      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = FeedPalette.of(context);
@@ -94,9 +138,9 @@ class _PostDetailViewState extends State<PostDetailView> {
                       post: post,
                       onLikeTap: controller.toggleLike,
                       onCommentTap: controller.dismissCommentComposer,
+                      onRepostTap: () => _openRepostSheet(context, post),
                       onShareTap: controller.sharePost,
-                      onMoreTap:
-                          () => PostActionSheet.show(context, post: post),
+                      onMoreTap: () => _openPostActionSheet(context, post),
                     ),
                   ),
                   _CommentsSliverSection(controller: controller),

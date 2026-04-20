@@ -115,6 +115,22 @@ class PostDetailController extends GetxController {
     commentsController.dismissComposer();
   }
 
+  Future<PostModel?> repostCurrentPost() async {
+    try {
+      final created = await _postService.createRepost(sourcePost: post.value);
+      Get.snackbar(
+        'Thông báo',
+        'Đã đăng lại bài viết thành công.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return created;
+    } catch (error) {
+      _showError(_mapError(error));
+      return null;
+    }
+  }
+
   void adjustCommentCount(int delta) {
     final currentPost = post.value;
     final nextCount = currentPost.stats.commentCount + delta;
@@ -127,6 +143,21 @@ class PostDetailController extends GetxController {
 
     _profilePostsController?.adjustCommentCount(postId, delta: delta);
     _feedController?.adjustCommentCount(postId, delta: delta);
+  }
+
+  void adjustShareCount(String targetPostId, {int delta = 1}) {
+    if (post.value.postId != targetPostId) return;
+
+    final currentPost = post.value;
+    final nextCount = currentPost.stats.shareCount + delta;
+    post.value = currentPost.copyWith(
+      stats: currentPost.stats.copyWith(
+        shareCount: nextCount < 0 ? 0 : nextCount,
+      ),
+    );
+
+    _profilePostsController?.adjustShareCount(targetPostId, delta: delta);
+    _feedController?.adjustShareCount(targetPostId, delta: delta);
   }
 
   void _syncPostFromSources() {

@@ -9,13 +9,14 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 
 class PostComposerController extends GetxController {
-  PostComposerController({PostService? service})
+  PostComposerController({this.quotedPost, PostService? service})
     : _service = service ?? PostService();
 
   static const int maxMediaItems = 6;
 
   final PostService _service;
   final ImagePicker _picker = ImagePicker();
+  final PostModel? quotedPost;
 
   final TextEditingController contentController = TextEditingController();
   final TextEditingController tagInputController = TextEditingController();
@@ -28,12 +29,14 @@ class PostComposerController extends GetxController {
   final RxBool isPublic = true.obs;
   final RxBool isTagEditorVisible = false.obs;
 
+  bool get isQuoteComposer => quotedPost != null;
+
   int get remainingCharacters =>
       PostService.maxContentLength - contentLength.value;
 
   bool get canSubmit =>
       !isSubmitting.value &&
-      (contentLength.value > 0 || mediaDrafts.isNotEmpty) &&
+      (isQuoteComposer || contentLength.value > 0 || mediaDrafts.isNotEmpty) &&
       contentLength.value <= PostService.maxContentLength;
 
   @override
@@ -113,7 +116,7 @@ class PostComposerController extends GetxController {
 
     commitPendingTag();
     final content = contentController.text.trim();
-    if (content.isEmpty && mediaDrafts.isEmpty) {
+    if (!isQuoteComposer && content.isEmpty && mediaDrafts.isEmpty) {
       _showError('Bài viết cần có nội dung hoặc tệp đính kèm.');
       return null;
     }
@@ -125,15 +128,25 @@ class PostComposerController extends GetxController {
 
     isSubmitting.value = true;
     try {
-      final post = await _service.createPost(
-        content: content,
-        mediaDrafts: mediaDrafts.toList(growable: false),
-        tags: tags.toList(growable: false),
-        isPublic: isPublic.value,
-      );
+      final post =
+          isQuoteComposer
+              ? await _service.createQuotePost(
+                content: content,
+                mediaDrafts: mediaDrafts.toList(growable: false),
+                tags: tags.toList(growable: false),
+                sourcePost: quotedPost!,
+                isPublic: isPublic.value,
+              )
+              : await _service.createPost(
+                content: content,
+                mediaDrafts: mediaDrafts.toList(growable: false),
+                tags: tags.toList(growable: false),
+                isPublic: isPublic.value,
+              );
+
       return post;
     } catch (error) {
-      _showError(error.toString());
+      _showError(_humanizeError(error));
       return null;
     } finally {
       isSubmitting.value = false;
@@ -192,6 +205,13 @@ class PostComposerController extends GetxController {
     final currentValue = tagInputController.text;
     if (!RegExp(r'[\s,]+').hasMatch(currentValue)) return;
     _appendTagsFromRaw(currentValue, clearInput: true);
+  }
+
+  String _humanizeError(Object error) {
+    if (error is StateError) {
+      return error.message.toString();
+    }
+    return error.toString();
   }
 
   void _showError(String message) {

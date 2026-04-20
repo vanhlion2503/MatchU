@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
+import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 
 class ProfilePostsSection extends StatefulWidget {
   const ProfilePostsSection({
@@ -29,13 +32,21 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(_handleTabChanged);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController
+      ..removeListener(_handleTabChanged)
+      ..dispose();
     super.dispose();
+  }
+
+  void _handleTabChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   @override
@@ -48,6 +59,15 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
 
     return Obx(() {
       final status = controller.status.value;
+      final allPosts = controller.posts.toList(growable: false);
+      final normalPosts = allPosts
+          .where((post) => !post.isRepostOnly)
+          .toList(growable: false);
+      final repostPosts = allPosts
+          .where((post) => post.isRepostOnly)
+          .toList(growable: false);
+      final isRepostTab = _tabController.index == 1;
+      final visiblePosts = isRepostTab ? repostPosts : normalPosts;
 
       return Padding(
         padding: const EdgeInsets.fromLTRB(0, 0, 0, 30),
@@ -56,7 +76,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           children: [
             _ProfilePostsTabBar(controller: _tabController),
             SizedBox(
-              height: _buildTabHeight(controller: controller, status: status),
+              height: _buildTabHeight(
+                controller: controller,
+                status: status,
+                visiblePosts: visiblePosts,
+              ),
               child: TabBarView(
                 controller: _tabController,
                 children: [
@@ -68,23 +92,26 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                       palette: palette,
                       theme: theme,
                       status: status,
+                      posts: normalPosts,
+                      emptyMessage:
+                          widget.isOwnerView
+                              ? 'Bạn chưa có bài viết nào.'
+                              : 'Người dùng này chưa có bài viết công khai nào.',
                     ),
                   ),
                   SingleChildScrollView(
                     physics: const NeverScrollableScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _SectionStateCard(
-                        palette: palette,
-                        child: Text(
-                          'Tab bài đăng lại đã được tạo sẵn. Phần dữ liệu sẽ được nối ở bước tiếp theo.',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: palette.textSecondary,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
+                    child: _buildPostsTab(
+                      context: context,
+                      controller: controller,
+                      palette: palette,
+                      theme: theme,
+                      status: status,
+                      posts: repostPosts,
+                      emptyMessage:
+                          widget.isOwnerView
+                              ? 'Bạn chưa đăng lại bài viết nào.'
+                              : 'Người dùng này chưa có bài đăng lại công khai.',
                     ),
                   ),
                 ],
@@ -99,6 +126,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   double _buildTabHeight({
     required ProfilePostsController controller,
     required ProfilePostsStatus status,
+    required List<PostModel> visiblePosts,
   }) {
     if ((status == ProfilePostsStatus.initial ||
             status == ProfilePostsStatus.loading) &&
@@ -110,17 +138,16 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       return 170;
     }
 
-    if (status == ProfilePostsStatus.empty || controller.posts.isEmpty) {
+    if (status == ProfilePostsStatus.empty || visiblePosts.isEmpty) {
       return 120;
     }
 
-    final postCount = controller.posts.length;
     final privateCount =
         widget.isOwnerView
-            ? controller.posts.where((post) => !post.isPublic).length
+            ? visiblePosts.where((post) => !post.isPublic).length
             : 0;
 
-    final postsHeight = postCount * 355.0;
+    final postsHeight = visiblePosts.length * 355.0;
     final privateBannerHeight = privateCount * 28.0;
     final loadMoreHeight =
         controller.isLoadingMore.value || controller.hasMore.value ? 56.0 : 0.0;
@@ -134,6 +161,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     required FeedPalette palette,
     required ThemeData theme,
     required ProfilePostsStatus status,
+    required List<PostModel> posts,
+    required String emptyMessage,
   }) {
     if ((status == ProfilePostsStatus.initial ||
             status == ProfilePostsStatus.loading) &&
@@ -177,15 +206,13 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       );
     }
 
-    if (status == ProfilePostsStatus.empty || controller.posts.isEmpty) {
+    if (status == ProfilePostsStatus.empty || posts.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: _SectionStateCard(
           palette: palette,
           child: Text(
-            widget.isOwnerView
-                ? 'Bạn chưa có bài viết nào.'
-                : 'Người dùng này chưa có bài viết công khai nào.',
+            emptyMessage,
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: palette.textSecondary,
@@ -202,26 +229,20 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           color: palette.surface,
           child: Column(
             children: [
-              for (var index = 0; index < controller.posts.length; index++) ...[
+              for (var index = 0; index < posts.length; index++) ...[
                 if (index > 0)
                   Divider(height: 1, thickness: 1, color: palette.border),
-                if (widget.isOwnerView && !controller.posts[index].isPublic)
+                if (widget.isOwnerView && !posts[index].isPublic)
                   _PrivatePostBanner(palette: palette),
                 PostItem(
-                  key: ValueKey(
-                    'profile_post_${controller.posts[index].postId}',
-                  ),
-                  post: controller.posts[index],
-                  onTap: () => _openPostDetail(controller.posts[index]),
-                  onLikeTap:
-                      () => controller.toggleLike(controller.posts[index].postId),
-                  onCommentTap: () => _openPostDetail(controller.posts[index]),
+                  key: ValueKey('profile_post_${posts[index].postId}'),
+                  post: posts[index],
+                  onTap: () => _openPostDetail(posts[index]),
+                  onLikeTap: () => controller.toggleLike(posts[index].postId),
+                  onCommentTap: () => _openPostDetail(posts[index]),
+                  onRepostTap: () => _openRepostSheet(context, posts[index]),
                   onShareTap: controller.onShareTap,
-                  onMoreTap:
-                      () => _openPostActionSheet(
-                        context,
-                        controller.posts[index],
-                      ),
+                  onMoreTap: () => _openPostActionSheet(context, posts[index]),
                 ),
               ],
             ],
@@ -257,6 +278,45 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
     return PostActionSheet.show(context, post: post);
   }
+
+  Future<void> _openRepostSheet(BuildContext context, PostModel post) {
+    return PostRepostSheet.show(
+      context,
+      post: post,
+      onRepostTap: () => _repostPost(post),
+      onQuoteTap: () => _quotePost(context, post),
+    );
+  }
+
+  Future<void> _quotePost(BuildContext context, PostModel sourcePost) async {
+    final createdPost = await CreatePostSheet.show(
+      context,
+      quotedPost: sourcePost,
+    );
+    _handlePostCreated(createdPost);
+  }
+
+  Future<void> _repostPost(PostModel sourcePost) async {
+    final controller = Get.find<ProfilePostsController>(
+      tag: widget.controllerTag,
+    );
+    final createdPost = await controller.repostPost(sourcePost);
+    _handlePostCreated(createdPost);
+  }
+
+  void _handlePostCreated(PostModel? createdPost) {
+    if (createdPost == null) return;
+
+    PostCreationSync.sync(createdPost);
+    if (createdPost.isPublic) return;
+
+    Get.snackbar(
+      'Thông báo',
+      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
+  }
 }
 
 class _ProfilePostsTabBar extends StatelessWidget {
@@ -277,10 +337,7 @@ class _ProfilePostsTabBar extends StatelessWidget {
         unselectedLabelColor: theme.textTheme.bodySmall?.color,
         indicatorColor: theme.colorScheme.onSurface,
         dividerColor: Colors.transparent,
-        tabs: const [
-          Tab(text: 'Bài viết'),
-          Tab(text: 'Bài đăng lại'),
-        ],
+        tabs: const [Tab(text: 'Bài viết'), Tab(text: 'Bài đăng lại')],
       ),
     );
   }

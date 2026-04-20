@@ -161,22 +161,101 @@ class PostService {
     required List<PostMediaDraft> mediaDrafts,
     required List<String> tags,
     bool isPublic = true,
+  }) {
+    return _createPost(
+      postType: PostType.post,
+      content: content,
+      mediaDrafts: mediaDrafts,
+      tags: tags,
+      isPublic: isPublic,
+    );
+  }
+
+  Future<PostModel> createQuotePost({
+    required String content,
+    required List<PostMediaDraft> mediaDrafts,
+    required List<String> tags,
+    required PostModel sourcePost,
+    bool isPublic = true,
+  }) {
+    return _createPost(
+      postType: PostType.quote,
+      content: content,
+      mediaDrafts: mediaDrafts,
+      tags: tags,
+      isPublic: isPublic,
+      referencePost: _resolveReferencePost(sourcePost),
+    );
+  }
+
+  Future<PostModel> createRepost({
+    required PostModel sourcePost,
+    bool isPublic = true,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError('Bạn cần đăng nhập để đăng lại bài viết.');
+    }
+
+    final referencePost = _resolveReferencePost(sourcePost);
+    if (referencePost.postId.trim().isEmpty) {
+      throw StateError('Không tìm thấy bài viết gốc để đăng lại.');
+    }
+
+    final repostRef = _postsRef.doc(_repostDocId(referencePost.postId));
+    final existingSnap = await repostRef.get();
+    if (existingSnap.exists) {
+      final existing = PostModel.fromDoc(existingSnap);
+      if (existing.deletedAt == null) {
+        throw StateError('Bạn đã đăng lại bài viết này rồi.');
+      }
+    }
+
+    return _createPost(
+      postType: PostType.repost,
+      content: '',
+      mediaDrafts: const <PostMediaDraft>[],
+      tags: const <String>[],
+      isPublic: isPublic,
+      referencePost: referencePost,
+      explicitPostRef: repostRef,
+    );
+  }
+
+  Future<PostModel> _createPost({
+    required PostType postType,
+    required String content,
+    required List<PostMediaDraft> mediaDrafts,
+    required List<String> tags,
+    required bool isPublic,
+    PostReferenceModel? referencePost,
+    DocumentReference<Map<String, dynamic>>? explicitPostRef,
   }) async {
     if (uid.isEmpty) {
       throw StateError('Bạn cần đăng nhập để đăng bài viết.');
     }
 
     final normalizedContent = content.trim();
-    if (normalizedContent.isEmpty && mediaDrafts.isEmpty) {
-      throw StateError('Bài viết cần có nội dung hoặc media.');
-    }
     if (normalizedContent.length > maxContentLength) {
       throw StateError('Nội dung bài viết không được vượt quá 300 ký tự.');
     }
 
+    final hasBody = normalizedContent.isNotEmpty || mediaDrafts.isNotEmpty;
+    if (!postType.requiresReference && !hasBody) {
+      throw StateError('Bài viết cần có nội dung hoặc media.');
+    }
+
+    if (postType == PostType.repost && hasBody) {
+      throw StateError('Đăng lại không kèm nội dung hoặc tệp đính kèm.');
+    }
+
+    if (postType.requiresReference && referencePost == null) {
+      throw StateError('Dạng bài này cần có bài viết gốc.');
+    }
+
     final author = await _resolveCurrentAuthor();
-    final normalizedTags = _normalizeTags(tags);
-    final postRef = _postsRef.doc();
+    final normalizedTags =
+        postType == PostType.repost ? const <String>[] : _normalizeTags(tags);
+    final postRef = explicitPostRef ?? _postsRef.doc();
     final uploadedRefs = <Reference>[];
     final createdAt = DateTime.now();
 
@@ -190,6 +269,7 @@ class PostService {
       final payload = {
         'postId': postRef.id,
         'authorId': uid,
+        'postType': postType.firestoreValue,
         'content': normalizedContent,
         'media': uploadedMedia
             .map((item) => item.toJson())
@@ -200,6 +280,8 @@ class PostService {
         'trendScore': 0,
         'trendBucket': 0,
         'author': author.toJson(),
+        'referencePostId': referencePost?.postId,
+        'referencePost': referencePost?.toJson(),
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'deletedAt': null,
@@ -211,11 +293,21 @@ class PostService {
         'totalPosts': FieldValue.increment(1),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      final referencePostId = referencePost?.postId.trim() ?? '';
+      if (referencePostId.isNotEmpty) {
+        batch.update(_postsRef.doc(referencePostId), {
+          'stats.shareCount': FieldValue.increment(1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
       await batch.commit();
 
       return PostModel(
         postId: postRef.id,
         authorId: uid,
+        postType: postType,
         content: normalizedContent,
         media: uploadedMedia,
         tags: normalizedTags,
@@ -224,6 +316,8 @@ class PostService {
         trendScore: 0,
         trendBucket: 0,
         author: author,
+        referencePostId: referencePost?.postId,
+        referencePost: referencePost,
         createdAt: createdAt,
         updatedAt: createdAt,
         deletedAt: null,
@@ -422,6 +516,19 @@ class PostService {
       avatar: user.avatarUrl,
       isVerified: user.isFaceVerified,
     );
+  }
+
+  PostReferenceModel _resolveReferencePost(PostModel sourcePost) {
+    if (sourcePost.isRepostOnly && sourcePost.referencePost != null) {
+      return sourcePost.referencePost!;
+    }
+
+    return PostReferenceModel.fromPost(sourcePost);
+  }
+
+  String _repostDocId(String sourcePostId) {
+    final sanitized = sourcePostId.trim().replaceAll('/', '_');
+    return 'repost_${uid}_$sanitized';
   }
 
   List<String> _normalizeTags(List<String> tags) {

@@ -11,14 +11,19 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CreatePostSheet extends StatefulWidget {
-  const CreatePostSheet({super.key});
+  const CreatePostSheet({super.key, this.quotedPost});
 
-  static Future<PostModel?> show(BuildContext context) {
+  final PostModel? quotedPost;
+
+  static Future<PostModel?> show(
+    BuildContext context, {
+    PostModel? quotedPost,
+  }) {
     return showModalBottomSheet<PostModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const CreatePostSheet(),
+      builder: (_) => CreatePostSheet(quotedPost: quotedPost),
     );
   }
 
@@ -36,7 +41,10 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
   void initState() {
     super.initState();
     _tag = 'post_composer_${DateTime.now().microsecondsSinceEpoch}';
-    _controller = Get.put(PostComposerController(), tag: _tag);
+    _controller = Get.put(
+      PostComposerController(quotedPost: widget.quotedPost),
+      tag: _tag,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 180), () {
@@ -188,7 +196,9 @@ class _SheetHeader extends StatelessWidget {
             Expanded(
               child: Center(
                 child: Text(
-                  'Tạo bài viết',
+                  controller.isQuoteComposer
+                      ? 'Trích dẫn bài viết'
+                      : 'Tạo bài viết',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: palette.textPrimary,
@@ -260,10 +270,10 @@ class _ComposerBody extends StatelessWidget {
         controller: controller,
         palette: palette,
         avatarUrl: '',
-        fullName: 'Nguoi dung',
+        fullName: 'Người dùng',
         nicknameLabel: '@nguoi.dung',
         isVerified: false,
-        handle: 'người.dùng',
+        handle: 'nguoi.dung',
         contentFocusNode: contentFocusNode,
         tagFocusNode: tagFocusNode,
       );
@@ -374,7 +384,10 @@ class _ComposerLayout extends StatelessWidget {
                 ),
                 cursorColor: theme.colorScheme.primary,
                 decoration: _borderlessInputDecoration(
-                  hintText: 'Có gì mới?',
+                  hintText:
+                      controller.isQuoteComposer
+                          ? 'Thêm nhận xét của bạn...'
+                          : 'Có gì mới?',
                   fillColor: palette.sheetBackground,
                   hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     fontSize: 16,
@@ -439,6 +452,13 @@ class _ComposerLayout extends StatelessWidget {
                   ),
                 );
               }),
+              if (controller.quotedPost != null) ...[
+                const SizedBox(height: 14),
+                _QuotedPostPreview(
+                  post: controller.quotedPost!,
+                  palette: palette,
+                ),
+              ],
             ],
           ),
         ),
@@ -484,6 +504,146 @@ class _ComposerAvatar extends StatelessWidget {
                   ),
                 )
                 : null,
+      ),
+    );
+  }
+}
+
+class _QuotedPostPreview extends StatelessWidget {
+  const _QuotedPostPreview({required this.post, required this.palette});
+
+  final PostModel post;
+  final _CreatePostPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reference = post.isRepostOnly ? post.referencePost : null;
+    final authorName =
+        reference != null
+            ? _quotedReferenceAuthorName(reference)
+            : _quotedAuthorName(post);
+    final authorHandle =
+        reference != null
+            ? _quotedReferenceAuthorHandle(reference)
+            : _quotedAuthorHandle(post);
+    final previewMedia =
+        reference != null
+            ? (reference.media.isNotEmpty ? reference.media.first : null)
+            : (post.media.isNotEmpty ? post.media.first : null);
+    final previewContent = reference?.content ?? post.content;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.border),
+                ),
+                child: CircleAvatar(
+                  radius: 15,
+                  backgroundColor: palette.sheetBackground,
+                  backgroundImage:
+                      (reference?.author.avatar ?? post.author.avatar)
+                              .trim()
+                              .isNotEmpty
+                          ? CachedNetworkImageProvider(
+                            reference?.author.avatar ?? post.author.avatar,
+                          )
+                          : null,
+                  child:
+                      (reference?.author.avatar ?? post.author.avatar)
+                              .trim()
+                              .isEmpty
+                          ? Text(
+                            _initialOf(authorName),
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: palette.textPrimary,
+                            ),
+                          )
+                          : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      authorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    if (authorHandle.isNotEmpty)
+                      Text(
+                        '@$authorHandle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textTertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (previewContent.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              previewContent,
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+                height: 1.45,
+              ),
+            ),
+          ],
+          if (previewMedia != null) ...[
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child:
+                  previewMedia.isImage
+                      ? Image.network(
+                        previewMedia.url,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      )
+                      : Container(
+                        height: 120,
+                        width: double.infinity,
+                        color: const Color(0xFF0F172A),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Iconsax.play_circle,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          size: 30,
+                        ),
+                      ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -985,7 +1145,7 @@ String _composerFullNameOf(UserController? controller) {
   final nickname = controller?.nickname.trim() ?? '';
   if (nickname.isNotEmpty) return nickname;
 
-  return 'Nguoi dung';
+  return 'Người dùng';
 }
 
 String _composerNicknameLabelOf(UserController? controller) {
@@ -1015,7 +1175,51 @@ String _composerHandleOf(UserController? controller) {
     return fullname.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
   }
 
-  return 'người.dùng';
+  return 'nguoi.dung';
+}
+
+String _quotedAuthorName(PostModel post) {
+  final name = post.author.name.trim();
+  if (name.isNotEmpty) return name;
+
+  final handle = _quotedAuthorHandle(post);
+  if (handle.isNotEmpty) return handle;
+
+  return 'Người dùng';
+}
+
+String _quotedAuthorHandle(PostModel post) {
+  final nickname = post.author.nickname.trim();
+  if (nickname.isNotEmpty) return nickname;
+
+  final name = post.author.name.trim();
+  if (name.isNotEmpty) {
+    return name.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
+  }
+
+  return '';
+}
+
+String _quotedReferenceAuthorName(PostReferenceModel reference) {
+  final name = reference.author.name.trim();
+  if (name.isNotEmpty) return name;
+
+  final handle = _quotedReferenceAuthorHandle(reference);
+  if (handle.isNotEmpty) return handle;
+
+  return 'Người dùng';
+}
+
+String _quotedReferenceAuthorHandle(PostReferenceModel reference) {
+  final nickname = reference.author.nickname.trim();
+  if (nickname.isNotEmpty) return nickname;
+
+  final name = reference.author.name.trim();
+  if (name.isNotEmpty) {
+    return name.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
+  }
+
+  return '';
 }
 
 String _initialOf(String value) {

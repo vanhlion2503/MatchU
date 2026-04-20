@@ -253,8 +253,20 @@ service cloud.firestore {
         return isSignedIn() && request.resource.data.authorId == request.auth.uid;
       }
 
+      function isOwnRepostDocPath() {
+        return isSignedIn()
+          && postId.matches('^repost_' + request.auth.uid + '_.*$');
+      }
+
+      function canProbeOwnRepostDoc() {
+        return isOwnRepostDocPath()
+          && !exists(/databases/$(database)/documents/posts/$(postId));
+      }
+
       function canReadPost() {
-        return resource.data.isPublic == true || isAuthor();
+        return resource.data.isPublic == true
+          || isAuthor()
+          || canProbeOwnRepostDoc();
       }
 
       function oldStatsValue(key) {
@@ -295,6 +307,12 @@ service cloud.firestore {
                 .changedKeys()
                 .hasOnly(["commentCount"])
               && isCounterDelta("commentCount")
+            )
+            || (
+              request.resource.data.stats.diff(resource.data.stats)
+                .changedKeys()
+                .hasOnly(["shareCount"])
+              && isCounterDelta("shareCount")
             )
           );
       }

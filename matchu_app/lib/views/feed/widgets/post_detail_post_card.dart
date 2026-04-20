@@ -12,6 +12,7 @@ class PostDetailPostCard extends StatelessWidget {
     required this.post,
     required this.onLikeTap,
     required this.onCommentTap,
+    required this.onRepostTap,
     required this.onShareTap,
     required this.onMoreTap,
   });
@@ -19,6 +20,7 @@ class PostDetailPostCard extends StatelessWidget {
   final PostModel post;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
+  final VoidCallback onRepostTap;
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
 
@@ -37,6 +39,26 @@ class PostDetailPostCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (post.isRepostOnly) ...[
+                Row(
+                  children: [
+                    Icon(Iconsax.repeat, size: 14, color: palette.textTertiary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '$authorName đã đăng lại',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textTertiary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -141,6 +163,10 @@ class PostDetailPostCard extends StatelessWidget {
                       PostMediaGalleryMultiImageLayout.horizontalScroll,
                 ),
               ],
+              if (post.referencePost != null) ...[
+                const SizedBox(height: 14),
+                _ReferencePostCard(reference: post.referencePost!),
+              ],
               const SizedBox(height: 14),
               Align(
                 alignment: Alignment.centerRight,
@@ -187,7 +213,7 @@ class PostDetailPostCard extends StatelessWidget {
                   icon: Iconsax.repeat,
                   label: _countLabelOrNull(post.stats.shareCount),
                   color: palette.iconMuted,
-                  onTap: onShareTap,
+                  onTap: onRepostTap,
                 ),
               ),
               Expanded(
@@ -201,6 +227,100 @@ class PostDetailPostCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReferencePostCard extends StatelessWidget {
+  const _ReferencePostCard({required this.reference});
+
+  final PostReferenceModel reference;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = FeedPalette.of(context);
+    final authorName = _referenceAuthorName(reference);
+    final authorHandle = _referenceAuthorHandle(reference);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              FeedAvatar(
+                imageUrl: reference.author.avatar,
+                fallbackLabel: authorName,
+                size: 32,
+                borderColor: palette.border,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      authorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    if (authorHandle.isNotEmpty)
+                      Text(
+                        '@$authorHandle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textTertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (reference.isUnavailable) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Bài viết gốc không còn khả dụng.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+          ] else ...[
+            if (reference.hasContent) ...[
+              const SizedBox(height: 10),
+              Text(
+                reference.content,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: palette.textSecondary,
+                  height: 1.45,
+                ),
+              ),
+            ],
+            if (reference.hasMedia) ...[
+              const SizedBox(height: 12),
+              PostMediaGallery(
+                media: reference.media,
+                multiImageLayout:
+                    PostMediaGalleryMultiImageLayout.horizontalScroll,
+              ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }
@@ -257,6 +377,28 @@ class _PostDetailActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String _referenceAuthorName(PostReferenceModel reference) {
+  final name = reference.author.name.trim();
+  if (name.isNotEmpty) return name;
+
+  final handle = _referenceAuthorHandle(reference);
+  if (handle.isNotEmpty) return handle;
+
+  return 'Người dùng';
+}
+
+String _referenceAuthorHandle(PostReferenceModel reference) {
+  final nickname = reference.author.nickname.trim();
+  if (nickname.isNotEmpty) return nickname;
+
+  final displayName = reference.author.name.trim();
+  if (displayName.isNotEmpty) {
+    return displayName.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
+  }
+
+  return '';
 }
 
 String? _countLabelOrNull(int value) {

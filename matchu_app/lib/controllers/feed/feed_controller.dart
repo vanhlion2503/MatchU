@@ -80,8 +80,38 @@ class FeedController extends GetxController {
     );
   }
 
+  void adjustShareCount(String postId, {int delta = 1}) {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+
+    final nextCount = currentPost.stats.shareCount + delta;
+    _replacePost(
+      currentPost.copyWith(
+        stats: currentPost.stats.copyWith(
+          shareCount: nextCount < 0 ? 0 : nextCount,
+        ),
+      ),
+    );
+  }
+
   PostModel? findPostById(String postId) {
     return _findPost(postId);
+  }
+
+  Future<PostModel?> repostPost(PostModel sourcePost) async {
+    try {
+      final created = await _service.createRepost(sourcePost: sourcePost);
+      Get.snackbar(
+        'Thông báo',
+        'Đã đăng lại bài viết thành công.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return created;
+    } catch (error) {
+      _showError(_mapError(error));
+      return null;
+    }
   }
 
   Future<void> _loadFeed({

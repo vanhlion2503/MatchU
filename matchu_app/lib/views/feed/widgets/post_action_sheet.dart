@@ -106,7 +106,7 @@ class PostActionSheet extends StatelessWidget {
                     _PostActionTile(
                       icon: Iconsax.link_2,
                       title: 'Sao chép liên kết',
-                      subtitle:'Chia sẻ liên kết.',
+                      subtitle: 'Chia sẻ liên kết bài viết.',
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),
@@ -117,7 +117,7 @@ class PostActionSheet extends StatelessWidget {
                           authorHandle.isNotEmpty
                               ? 'Ẩn bài viết từ @$authorHandle'
                               : 'Ẩn bài viết từ tác giả này',
-                      subtitle:'Ẩn bớt các bài viết tương tự',
+                      subtitle: 'Ẩn bớt bài viết từ người này trong feed.',
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),

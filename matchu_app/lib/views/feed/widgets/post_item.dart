@@ -13,6 +13,7 @@ class PostItem extends StatelessWidget {
     required this.onTap,
     required this.onLikeTap,
     required this.onCommentTap,
+    required this.onRepostTap,
     required this.onShareTap,
     required this.onMoreTap,
   });
@@ -21,6 +22,7 @@ class PostItem extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
+  final VoidCallback onRepostTap;
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
 
@@ -45,6 +47,10 @@ class PostItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (post.isRepostOnly) ...[
+                      _RepostBadge(post: post),
+                      const SizedBox(height: 8),
+                    ],
                     _PostHeader(post: post, onMoreTap: onMoreTap),
                     if (metaLabel.isNotEmpty) ...[
                       const SizedBox(height: 2),
@@ -95,6 +101,10 @@ class PostItem extends StatelessWidget {
                             PostMediaGalleryMultiImageLayout.horizontalScroll,
                       ),
                     ],
+                    if (post.referencePost != null) ...[
+                      const SizedBox(height: 12),
+                      _ReferencePostCard(reference: post.referencePost!),
+                    ],
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -121,7 +131,7 @@ class PostItem extends StatelessWidget {
                         _ActionStatButton(
                           icon: Iconsax.repeat,
                           color: palette.iconMuted,
-                          onTap: onShareTap,
+                          onTap: onRepostTap,
                           countLabel: _countLabelOrNull(post.stats.shareCount),
                         ),
                         _ActionStatButton(
@@ -201,6 +211,130 @@ class _PostRail extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RepostBadge extends StatelessWidget {
+  const _RepostBadge({required this.post});
+
+  final PostModel post;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Icon(Iconsax.repeat, size: 14, color: palette.textTertiary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '${postAuthorName(post)} đã đăng lại',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: palette.textTertiary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReferencePostCard extends StatelessWidget {
+  const _ReferencePostCard({required this.reference});
+
+  final PostReferenceModel reference;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+    final authorName = _referenceAuthorName(reference);
+    final handle = _referenceAuthorHandle(reference);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: palette.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              FeedAvatar(
+                imageUrl: reference.author.avatar,
+                fallbackLabel: authorName,
+                size: 28,
+                borderColor: palette.border,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      authorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    if (handle.isNotEmpty)
+                      Text(
+                        '@$handle',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textTertiary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (reference.isUnavailable) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Bài viết gốc không còn khả dụng.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+          ] else ...[
+            if (reference.hasContent) ...[
+              const SizedBox(height: 8),
+              Text(
+                reference.content,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                  height: 1.45,
+                ),
+              ),
+            ],
+            if (reference.hasMedia) ...[
+              const SizedBox(height: 10),
+              PostMediaGallery(
+                media: reference.media,
+                multiImageLayout:
+                    PostMediaGalleryMultiImageLayout.horizontalScroll,
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }
@@ -376,6 +510,28 @@ class _ActionStatButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String _referenceAuthorName(PostReferenceModel reference) {
+  final trimmedName = reference.author.name.trim();
+  if (trimmedName.isNotEmpty) return trimmedName;
+
+  final handle = _referenceAuthorHandle(reference);
+  if (handle.isNotEmpty) return handle;
+
+  return 'Người dùng';
+}
+
+String _referenceAuthorHandle(PostReferenceModel reference) {
+  final nickname = reference.author.nickname.trim();
+  if (nickname.isNotEmpty) return nickname;
+
+  final displayName = reference.author.name.trim();
+  if (displayName.isNotEmpty) {
+    return displayName.replaceAll(RegExp(r'\s+'), '.').toLowerCase();
+  }
+
+  return '';
 }
 
 String? _countLabelOrNull(int value) {

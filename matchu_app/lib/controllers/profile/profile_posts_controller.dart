@@ -105,6 +105,20 @@ class ProfilePostsController extends GetxController {
     );
   }
 
+  void adjustShareCount(String postId, {int delta = 1}) {
+    final currentPost = findPostById(postId);
+    if (currentPost == null) return;
+
+    final nextCount = currentPost.stats.shareCount + delta;
+    _replacePost(
+      currentPost.copyWith(
+        stats: currentPost.stats.copyWith(
+          shareCount: nextCount < 0 ? 0 : nextCount,
+        ),
+      ),
+    );
+  }
+
   Future<void> toggleLike(String postId) async {
     final currentPost = findPostById(postId);
     if (currentPost == null) return;
@@ -122,6 +136,22 @@ class ProfilePostsController extends GetxController {
     _likeCache[postId] = shouldLike;
     _queuedLikeStates[postId] = shouldLike;
     unawaited(_syncLikeState(postId));
+  }
+
+  Future<PostModel?> repostPost(PostModel sourcePost) async {
+    try {
+      final created = await _service.createRepost(sourcePost: sourcePost);
+      Get.snackbar(
+        'Thông báo',
+        'Đã đăng lại bài viết thành công.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return created;
+    } catch (error) {
+      _showError(_mapError(error));
+      return null;
+    }
   }
 
   void onShareTap() {

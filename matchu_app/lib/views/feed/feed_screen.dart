@@ -14,12 +14,30 @@ import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/feed_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
+import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 
 class FeedScreen extends GetView<FeedController> {
   const FeedScreen({super.key});
 
   Future<void> _openCreatePostSheet(BuildContext context) async {
     final createdPost = await CreatePostSheet.show(context);
+    _handlePostCreated(createdPost);
+  }
+
+  Future<void> _quotePost(BuildContext context, PostModel sourcePost) async {
+    final createdPost = await CreatePostSheet.show(
+      context,
+      quotedPost: sourcePost,
+    );
+    _handlePostCreated(createdPost);
+  }
+
+  Future<void> _repostPost(PostModel sourcePost) async {
+    final createdPost = await controller.repostPost(sourcePost);
+    _handlePostCreated(createdPost);
+  }
+
+  void _handlePostCreated(PostModel? createdPost) {
     if (createdPost == null) return;
 
     PostCreationSync.sync(createdPost);
@@ -27,7 +45,7 @@ class FeedScreen extends GetView<FeedController> {
 
     Get.snackbar(
       'Thông báo',
-      'Bài viết được tạo ở chế độ riêng tư nên sẽ không hiển thị trong bảng tin công khai.',
+      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -42,6 +60,15 @@ class FeedScreen extends GetView<FeedController> {
 
   Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
     return PostActionSheet.show(context, post: post);
+  }
+
+  Future<void> _openRepostSheet(BuildContext context, PostModel post) {
+    return PostRepostSheet.show(
+      context,
+      post: post,
+      onRepostTap: () => _repostPost(post),
+      onQuoteTap: () => _quotePost(context, post),
+    );
   }
 
   @override
@@ -147,6 +174,7 @@ class FeedScreen extends GetView<FeedController> {
                     onTap: () => _openPostDetail(post),
                     onLikeTap: () => controller.toggleLike(post.postId),
                     onCommentTap: () => _openPostDetail(post),
+                    onRepostTap: () => _openRepostSheet(context, post),
                     onShareTap: controller.onShareTap,
                     onMoreTap: () => _openPostActionSheet(context, post),
                   ),
