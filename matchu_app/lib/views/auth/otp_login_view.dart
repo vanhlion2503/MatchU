@@ -8,12 +8,20 @@ class OtpLoginView extends StatelessWidget {
   const OtpLoginView({super.key});
 
   String maskPhone(String phone) {
-    if (phone.isEmpty || phone.length < 6) return phone;
+    final value = phone.trim();
+    if (value.isEmpty) return value;
+    if (value.length <= 8) return value;
 
-    final start = phone.substring(0, 3);
-    final end = phone.substring(phone.length - 4);
+    final prefixLength = value.startsWith('+') ? 5 : 4;
+    final safePrefixLength = prefixLength.clamp(0, value.length - 4).toInt();
+    final hiddenCount = value.length - safePrefixLength - 4;
+    if (hiddenCount <= 0) return value;
 
-    return '$start***$end';
+    final start = value.substring(0, safePrefixLength);
+    final end = value.substring(value.length - 4);
+    final stars = List.filled(hiddenCount, '*').join();
+
+    return '$start$stars$end';
   }
 
   @override

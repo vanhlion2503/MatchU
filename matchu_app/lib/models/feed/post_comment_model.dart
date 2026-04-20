@@ -61,6 +61,7 @@ class PostCommentModel {
     this.author,
     this.isLiked = false,
     this.isLikePending = false,
+    this.isSending = false,
   });
 
   final String commentId;
@@ -75,6 +76,7 @@ class PostCommentModel {
   // Local UI state, not stored in Firestore.
   final bool isLiked;
   final bool isLikePending;
+  final bool isSending;
 
   bool get isReply => parentId != null && parentId!.trim().isNotEmpty;
 
@@ -120,6 +122,7 @@ class PostCommentModel {
     PostCommentAuthorModel? author,
     bool? isLiked,
     bool? isLikePending,
+    bool? isSending,
   }) {
     return PostCommentModel(
       commentId: commentId ?? this.commentId,
@@ -132,6 +135,7 @@ class PostCommentModel {
       author: author ?? this.author,
       isLiked: isLiked ?? this.isLiked,
       isLikePending: isLikePending ?? this.isLikePending,
+      isSending: isSending ?? this.isSending,
     );
   }
 

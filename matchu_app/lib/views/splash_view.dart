@@ -64,9 +64,6 @@ class _SplashViewState extends State<SplashView>
                     height: 120,
                     fit: BoxFit.contain,
                   ),
-
-                  const SizedBox(height: 12),
-
                   RichText(
                     text: TextSpan(
                       children: [

@@ -335,17 +335,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                     vertical: 16,
                                   ),
                                 ),
-                                child:
-                                    _controller.isSubmitting.value
-                                        ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                        : const Icon(Iconsax.send_1),
+                                child: const Icon(Iconsax.send_1),
                               ),
                             ),
                           ],

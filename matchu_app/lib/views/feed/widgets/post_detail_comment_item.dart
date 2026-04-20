@@ -45,7 +45,17 @@ class PostDetailCommentItem extends StatelessWidget {
         isReply ? leftInset - 2.0 : leftInset + avatarSize + 6.0;
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
-    final canToggleReplies = comment.replyCount > 0 && !isReplyLoading;
+    final isSending = comment.isSending;
+    final canToggleReplies =
+        comment.replyCount > 0 && !isReplyLoading && !isSending;
+    final metaTimeLabel =
+        isSending
+            ? 'Đang gửi...'
+            : formatRelativeTime(comment.createdAt, compact: true);
+    final metaTimeColor =
+        isSending
+            ? theme.colorScheme.primary.withValues(alpha: 0.9)
+            : palette.textTertiary;
 
     return Padding(
       padding: const EdgeInsets.only(right: 16),
@@ -107,14 +117,11 @@ class PostDetailCommentItem extends StatelessWidget {
                               const SizedBox(width: 8),
                               Flexible(
                                 child: Text(
-                                  formatRelativeTime(
-                                    comment.createdAt,
-                                    compact: true,
-                                  ),
+                                  metaTimeLabel,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                    color: palette.textTertiary,
+                                    color: metaTimeColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -176,7 +183,7 @@ class PostDetailCommentItem extends StatelessWidget {
                                         alpha: comment.isLikePending ? 0.58 : 1,
                                       )
                                       : null,
-                              onTap: onLikeTap,
+                              onTap: isSending ? null : onLikeTap,
                             ),
                             _CommentMetaButton(
                               icon: Iconsax.message_text,
@@ -185,7 +192,7 @@ class PostDetailCommentItem extends StatelessWidget {
                                       ? formatCompactCount(comment.replyCount)
                                       : null,
                               palette: palette,
-                              onTap: onReplyTap,
+                              onTap: isSending ? null : onReplyTap,
                             ),
                           ],
                         ),

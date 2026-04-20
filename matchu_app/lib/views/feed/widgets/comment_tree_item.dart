@@ -47,7 +47,15 @@ class CommentTreeItem extends StatelessWidget {
               alpha: comment.isLikePending ? 0.58 : 1,
             )
             : null;
-    final canToggleReplies = comment.replyCount > 0 && !isReplyLoading;
+    final isSending = comment.isSending;
+    final canToggleReplies =
+        comment.replyCount > 0 && !isReplyLoading && !isSending;
+    final timeLabel =
+        isSending
+            ? 'Đang gửi...'
+            : formatRelativeTime(comment.createdAt, withSuffix: true);
+    final subtitleLabel =
+        nickname.isNotEmpty ? '@$nickname - $timeLabel' : timeLabel;
 
     return CommentThreadGuides(
       depth: depth,
@@ -110,13 +118,15 @@ class CommentTreeItem extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      nickname.isNotEmpty
-                          ? '@$nickname • ${formatRelativeTime(comment.createdAt, withSuffix: true)}'
-                          : formatRelativeTime(
-                            comment.createdAt,
-                            withSuffix: true,
-                          ),
-                      style: theme.textTheme.bodySmall,
+                      subtitleLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color:
+                            isSending
+                                ? theme.colorScheme.primary.withValues(
+                                  alpha: 0.9,
+                                )
+                                : null,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -141,7 +151,7 @@ class CommentTreeItem extends StatelessWidget {
                                       ? formatCompactCount(comment.likeCount)
                                       : null,
                               color: likeColor,
-                              onTap: onLikeTap,
+                              onTap: isSending ? null : onLikeTap,
                             ),
                             _CommentActionChip(
                               icon: Iconsax.message_text,
@@ -150,7 +160,7 @@ class CommentTreeItem extends StatelessWidget {
                                       ? formatCompactCount(comment.replyCount)
                                       : 'Trả lời',
                               color: theme.colorScheme.primary,
-                              onTap: onReplyTap,
+                              onTap: isSending ? null : onReplyTap,
                             ),
                           ],
                         ),

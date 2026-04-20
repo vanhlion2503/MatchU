@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
@@ -59,6 +60,7 @@ class PostCommentsController extends GetxController {
   final Set<String> _likeSyncingCommentIds = <String>{};
   final Set<String> _loadedReplyParentIds = <String>{};
   final Map<String, int> _topLevelOrderRanks = <String, int>{};
+  int _optimisticCommentSequence = 0;
 
   DocumentSnapshot<Map<String, dynamic>>? _topLevelCursor;
 
@@ -235,6 +237,7 @@ class PostCommentsController extends GetxController {
   Future<void> toggleLike(PostCommentModel comment) async {
     final currentComment = _findComment(comment.commentId);
     if (currentComment == null) return;
+    if (currentComment.isSending) return;
 
     final shouldLike = !currentComment.isLiked;
     _replaceComment(
@@ -253,27 +256,208 @@ class PostCommentsController extends GetxController {
   Future<void> submitComment() async {
     if (isSubmitting.value) return;
 
+    final currentUid = _service.uid.trim();
+    if (currentUid.isEmpty) {
+      _showError('Bạn cần đăng nhập để bình luận.');
+      return;
+    }
+
     final content = inputController.text.trim();
     if (content.isEmpty) return;
 
+    final parentId = replyingTo.value?.commentId;
+    final optimisticComment = _createOptimisticComment(
+      userId: currentUid,
+      content: content,
+      parentId: parentId,
+    );
+
     isSubmitting.value = true;
+    _insertLocalComment(optimisticComment);
+    totalCommentCount.value += 1;
+    onCommentCountChanged?.call(1);
+    inputController.clear();
+    replyingTo.value = null;
+
     try {
       final created = await _service.addComment(
         postId: postId,
         content: content,
-        parentId: replyingTo.value?.commentId,
+        parentId: parentId,
       );
-
-      _insertLocalComment(created);
-      totalCommentCount.value += 1;
-      inputController.clear();
-      replyingTo.value = null;
-      onCommentCountChanged?.call(1);
+      _resolveOptimisticComment(
+        optimisticCommentId: optimisticComment.commentId,
+        serverComment: created,
+      );
     } catch (error) {
+      _rollbackOptimisticComment(optimisticComment.commentId);
+      totalCommentCount.value = max(0, totalCommentCount.value - 1);
+      onCommentCountChanged?.call(-1);
       _showError(_mapError(error));
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  PostCommentModel _createOptimisticComment({
+    required String userId,
+    required String content,
+    required String? parentId,
+  }) {
+    final normalizedParentId = parentId?.trim();
+    final resolvedParentId =
+        normalizedParentId == null || normalizedParentId.isEmpty
+            ? null
+            : normalizedParentId;
+
+    return PostCommentModel(
+      commentId:
+          '__local_comment_${DateTime.now().microsecondsSinceEpoch}_${_optimisticCommentSequence++}',
+      userId: userId,
+      content: content,
+      parentId: resolvedParentId,
+      likeCount: 0,
+      replyCount: 0,
+      createdAt: DateTime.now(),
+      author: _currentUserAuthor(userId),
+      isSending: true,
+    );
+  }
+
+  void _resolveOptimisticComment({
+    required String optimisticCommentId,
+    required PostCommentModel serverComment,
+  }) {
+    final nextComments = comments.toList(growable: true);
+    final index = nextComments.indexWhere(
+      (comment) => comment.commentId == optimisticCommentId,
+    );
+
+    if (index == -1) {
+      _topLevelOrderRanks.remove(optimisticCommentId);
+      if (expandedCommentIds.contains(optimisticCommentId)) {
+        expandedCommentIds.remove(optimisticCommentId);
+        expandedCommentIds.refresh();
+      }
+      _clearLikeCachesForComment(optimisticCommentId);
+      _upsertComments(<PostCommentModel>[
+        serverComment.copyWith(isSending: false),
+      ], rebuildThreadEntries: false);
+      if (!serverComment.isReply &&
+          !_topLevelOrderRanks.containsKey(serverComment.commentId)) {
+        _pinTopLevelCommentToFront(serverComment.commentId);
+      }
+      _rebuildThreadEntries();
+      return;
+    }
+
+    final optimisticComment = nextComments[index];
+    nextComments[index] = serverComment.copyWith(
+      isSending: false,
+      isLiked: optimisticComment.isLiked,
+      isLikePending: optimisticComment.isLikePending,
+    );
+    comments.assignAll(nextComments);
+
+    _replaceTopLevelCommentId(
+      oldCommentId: optimisticCommentId,
+      newCommentId: serverComment.commentId,
+    );
+    _replaceExpandedCommentId(
+      oldCommentId: optimisticCommentId,
+      newCommentId: serverComment.commentId,
+    );
+    _clearLikeCachesForComment(optimisticCommentId);
+    _rebuildThreadEntries();
+  }
+
+  void _rollbackOptimisticComment(String optimisticCommentId) {
+    final removedComment = _removeCommentById(optimisticCommentId);
+    if (removedComment == null) return;
+
+    _topLevelOrderRanks.remove(optimisticCommentId);
+    _clearLikeCachesForComment(optimisticCommentId);
+    if (expandedCommentIds.contains(optimisticCommentId)) {
+      expandedCommentIds.remove(optimisticCommentId);
+      expandedCommentIds.refresh();
+    }
+
+    final parentId = removedComment.parentId;
+    if (parentId != null) {
+      final parent = _findComment(parentId);
+      if (parent != null && parent.replyCount > 0) {
+        _replaceComment(parent.copyWith(replyCount: parent.replyCount - 1));
+        return;
+      }
+    }
+
+    _rebuildThreadEntries();
+  }
+
+  PostCommentModel? _removeCommentById(String commentId) {
+    final nextComments = comments.toList(growable: true);
+    final index = nextComments.indexWhere(
+      (comment) => comment.commentId == commentId,
+    );
+    if (index == -1) return null;
+
+    final removed = nextComments.removeAt(index);
+    comments.assignAll(nextComments);
+    return removed;
+  }
+
+  void _replaceTopLevelCommentId({
+    required String oldCommentId,
+    required String newCommentId,
+  }) {
+    final rank = _topLevelOrderRanks.remove(oldCommentId);
+    if (rank == null) return;
+    _topLevelOrderRanks[newCommentId] = rank;
+  }
+
+  void _replaceExpandedCommentId({
+    required String oldCommentId,
+    required String newCommentId,
+  }) {
+    if (!expandedCommentIds.contains(oldCommentId)) return;
+
+    final nextExpanded =
+        Set<String>.from(expandedCommentIds)
+          ..remove(oldCommentId)
+          ..add(newCommentId);
+    expandedCommentIds
+      ..clear()
+      ..addAll(nextExpanded);
+  }
+
+  void _clearLikeCachesForComment(String commentId) {
+    _likeCache.remove(commentId);
+    _confirmedLikeStates.remove(commentId);
+    _queuedLikeStates.remove(commentId);
+    _likeSyncingCommentIds.remove(commentId);
+  }
+
+  PostCommentAuthorModel _currentUserAuthor(String userId) {
+    if (Get.isRegistered<UserController>()) {
+      final user = Get.find<UserController>().userRx.value;
+      if (user != null) {
+        return PostCommentAuthorModel.fromUser(user, userId);
+      }
+    }
+
+    for (final comment in comments) {
+      if (comment.userId == userId && comment.author != null) {
+        return comment.author!;
+      }
+    }
+
+    return PostCommentAuthorModel(
+      userId: userId,
+      displayName: 'Bạn',
+      nickname: '',
+      avatarUrl: '',
+      isVerified: false,
+    );
   }
 
   Future<void> _loadMoreTopLevelComments({bool resetCursor = false}) async {
@@ -315,17 +499,21 @@ class PostCommentsController extends GetxController {
   }
 
   void _insertLocalComment(PostCommentModel comment) {
-    _upsertComments(<PostCommentModel>[comment]);
+    _upsertComments(<PostCommentModel>[comment], rebuildThreadEntries: false);
 
     final parentId = comment.parentId;
     if (parentId != null) {
       final parent = _findComment(parentId);
       if (parent != null) {
-        _replaceComment(parent.copyWith(replyCount: parent.replyCount + 1));
+        _replaceComment(
+          parent.copyWith(replyCount: parent.replyCount + 1),
+          rebuildThreadEntries: false,
+        );
       }
       _expandThreadPath(parentId);
     } else {
       _pinTopLevelCommentToFront(comment.commentId);
+      _rebuildThreadEntries();
     }
   }
 
@@ -443,7 +631,10 @@ class PostCommentsController extends GetxController {
     return null;
   }
 
-  void _replaceComment(PostCommentModel updatedComment) {
+  void _replaceComment(
+    PostCommentModel updatedComment, {
+    bool rebuildThreadEntries = true,
+  }) {
     final nextComments = comments.toList(growable: true);
     final index = nextComments.indexWhere(
       (comment) => comment.commentId == updatedComment.commentId,
@@ -452,7 +643,9 @@ class PostCommentsController extends GetxController {
 
     nextComments[index] = updatedComment;
     comments.assignAll(nextComments);
-    _rebuildThreadEntries();
+    if (rebuildThreadEntries) {
+      _rebuildThreadEntries();
+    }
   }
 
   bool _isLikeSyncPending(String commentId) {

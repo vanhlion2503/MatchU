@@ -711,29 +711,7 @@ class _ComposerSubmitButton extends StatelessWidget {
           disabledBackgroundColor: backgroundColor.withValues(alpha: 0.62),
           disabledForegroundColor: foregroundColor.withValues(alpha: 0.92),
         ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 150),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child:
-              isSubmitting
-                  ? SizedBox(
-                    key: const ValueKey('composer_submit_loading'),
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: foregroundColor,
-                    ),
-                  )
-                  : const Row(
-                    key: ValueKey('composer_submit_label'),
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Iconsax.send_1, size: 22),
-                    ],
-                  ),
-        ),
+        child: const Icon(Iconsax.send_1, size: 22),
       ),
     );
   }
