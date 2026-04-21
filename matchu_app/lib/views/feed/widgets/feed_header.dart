@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -31,6 +32,19 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       titleSpacing: 20,
+      leading: Container(
+        margin: const EdgeInsets.only(left: 12),
+        child: IconButton(
+          icon: Icon(
+            Iconsax.search_normal,
+            size: 22,
+            color: palette.textPrimary,
+          ),
+          onPressed: () {
+            // TODO: xử lý khi bấm icon trái
+          },
+        ),
+      ),
       title: Text(
         'Bảng tin',
         style: theme.textTheme.titleLarge?.copyWith(
@@ -63,6 +77,21 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 12),
+          child: IconButton(
+            icon: Icon(
+              Iconsax.notification,
+              size: 22,
+              color: palette.textPrimary,
+            ),
+            onPressed: () {
+              // TODO: xử lý khi bấm chuông
+            },
+          ),
+        ),
+      ],
     );
   }
 }

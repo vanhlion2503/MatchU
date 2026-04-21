@@ -258,31 +258,97 @@ class FeedScreen extends GetView<FeedController> {
 
               final post = controller.posts[postIndex];
 
-              return Column(
-                children: [
-                  if (postIndex > 0)
-                    Divider(height: 1, thickness: 1, color: palette.border),
-                  PostItem(
-                    key: ValueKey(post.postId),
-                    post: post,
-                    onTap: () => _openPostDetail(post),
-                    onLikeTap: () => controller.toggleLike(post.postId),
-                    onCommentTap: () => _openPostDetail(post),
-                    onRepostTap: () => _openRepostSheet(context, post),
-                    onShareTap: controller.onShareTap,
-                    onMoreTap: () => _openPostActionSheet(context, post),
-                    onReferenceTap:
-                        post.referencePost != null
-                            ? () => _openReferencePostDetail(post)
-                            : null,
-                  ),
-                ],
+              return _FeedRemovalAnimatedPostItem(
+                key: ValueKey('feed_post_${post.postId}'),
+                controller: controller,
+                post: post,
+                showDivider: postIndex > 0,
+                onTap: () => _openPostDetail(post),
+                onLikeTap: () => controller.toggleLike(post.postId),
+                onCommentTap: () => _openPostDetail(post),
+                onRepostTap: () => _openRepostSheet(context, post),
+                onShareTap: controller.onShareTap,
+                onMoreTap: () => _openPostActionSheet(context, post),
+                onReferenceTap:
+                    post.referencePost != null
+                        ? () => _openReferencePostDetail(post)
+                        : null,
               );
             },
           ),
         );
       }),
     );
+  }
+}
+
+class _FeedRemovalAnimatedPostItem extends StatelessWidget {
+  const _FeedRemovalAnimatedPostItem({
+    super.key,
+    required this.controller,
+    required this.post,
+    required this.showDivider,
+    required this.onTap,
+    required this.onLikeTap,
+    required this.onCommentTap,
+    required this.onRepostTap,
+    required this.onShareTap,
+    required this.onMoreTap,
+    this.onReferenceTap,
+  });
+
+  final FeedController controller;
+  final PostModel post;
+  final bool showDivider;
+  final VoidCallback onTap;
+  final VoidCallback onLikeTap;
+  final VoidCallback onCommentTap;
+  final VoidCallback onRepostTap;
+  final VoidCallback onShareTap;
+  final VoidCallback onMoreTap;
+  final VoidCallback? onReferenceTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+
+    return Obx(() {
+      final isRemoving = controller.isPostRemoving(post.postId);
+
+      return AnimatedSwitcher(
+        duration: controller.postRemovalAnimationDuration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: -1,
+            child: FadeTransition(opacity: animation, child: child),
+          );
+        },
+        child:
+            isRemoving
+                ? SizedBox(key: ValueKey('feed_post_removing_${post.postId}'))
+                : Column(
+                  key: ValueKey('feed_post_visible_${post.postId}'),
+                  children: [
+                    if (showDivider)
+                      Divider(height: 1, thickness: 1, color: palette.border),
+                    PostItem(
+                      key: ValueKey(post.postId),
+                      post: post,
+                      onTap: onTap,
+                      onLikeTap: onLikeTap,
+                      onCommentTap: onCommentTap,
+                      onRepostTap: onRepostTap,
+                      onShareTap: onShareTap,
+                      onMoreTap: onMoreTap,
+                      onReferenceTap: onReferenceTap,
+                    ),
+                  ],
+                ),
+      );
+    });
   }
 }
 

@@ -14,6 +14,9 @@ class FeedController extends GetxController {
   static const int _pageSize = 10;
   static const double _loadMoreThreshold = 640;
   static const String _hiddenPostsStorageKeyPrefix = 'feed_hidden_posts_';
+  static const Duration _postRemovalAnimationDuration = Duration(
+    milliseconds: 220,
+  );
 
   final PostService _service = PostService();
   final GetStorage _storage = GetStorage();
@@ -35,9 +38,17 @@ class FeedController extends GetxController {
   final Map<String, bool> _repostCache = <String, bool>{};
   final Set<String> _repostPendingTargetIds = <String>{};
   final Set<String> _hiddenPostIds = <String>{};
+  final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   String get currentUserId => _service.uid;
+  Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
+
+  bool isPostRemoving(String postId) {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return false;
+    return _removingPostIds.contains(normalizedPostId);
+  }
 
   @override
   void onInit() {
@@ -68,7 +79,7 @@ class FeedController extends GetxController {
       await _persistHiddenPostIds();
     }
 
-    _removeHiddenPostFromMemory(normalizedPostId);
+    await _removePostByIdWithAnimation(normalizedPostId);
 
     if (posts.isEmpty && hasMore.value) {
       unawaited(loadMore());
@@ -294,7 +305,7 @@ class FeedController extends GetxController {
   Future<PostModel?> deletePost(PostModel post) async {
     try {
       final deletedPost = await _service.deletePost(post: post);
-      removePostById(deletedPost.postId);
+      await _removePostByIdWithAnimation(deletedPost.postId);
       Get.snackbar(
         'Thông báo',
         'Đã xóa bài viết.',
@@ -312,16 +323,8 @@ class FeedController extends GetxController {
     final normalizedPostId = postId.trim();
     if (normalizedPostId.isEmpty) return;
 
-    posts.removeWhere((post) => post.postId == normalizedPostId);
-    _locallyPrependedPosts.remove(normalizedPostId);
-    _likeCache.remove(normalizedPostId);
-    _confirmedLikeStates.remove(normalizedPostId);
-    _queuedLikeStates.remove(normalizedPostId);
-    _likeSyncingPosts.remove(normalizedPostId);
-
-    if (posts.isEmpty) {
-      status.value = FeedStatus.empty;
-    }
+    _removePostByIdImmediate(normalizedPostId);
+    _removingPostIds.remove(normalizedPostId);
   }
 
   Future<void> _loadFeed({
@@ -552,8 +555,9 @@ class FeedController extends GetxController {
     if (_locallyPrependedPosts.containsKey(updatedPost.postId)) {
       _locallyPrependedPosts[updatedPost.postId] = updatedPost;
     }
-    posts[index] = updatedPost;
-    posts.refresh();
+    final updatedPosts = posts.toList(growable: false);
+    updatedPosts[index] = updatedPost;
+    posts.assignAll(updatedPosts);
   }
 
   String get _hiddenPostsStorageKey =>
@@ -596,21 +600,58 @@ class FeedController extends GetxController {
         .toList(growable: false);
   }
 
-  void _removeHiddenPostFromMemory(String postId) {
-    posts.removeWhere((post) => post.postId == postId);
+  Future<void> _removePostByIdWithAnimation(String postId) async {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    final postIndex = posts.indexWhere(
+      (post) => post.postId == normalizedPostId,
+    );
+    if (postIndex == -1) {
+      _clearPostCaches(normalizedPostId);
+      _updateStatusAfterPostMutation();
+      return;
+    }
+
+    if (_removingPostIds.contains(normalizedPostId)) {
+      return;
+    }
+
+    _removingPostIds.add(normalizedPostId);
+    await Future<void>.delayed(_postRemovalAnimationDuration);
+    _removePostByIdImmediate(normalizedPostId);
+    _removingPostIds.remove(normalizedPostId);
+  }
+
+  void _removePostByIdImmediate(String postId) {
+    final postIndex = posts.indexWhere((post) => post.postId == postId);
+    if (postIndex != -1) {
+      posts.removeAt(postIndex);
+    }
+
+    _clearPostCaches(postId);
+    _updateStatusAfterPostMutation();
+  }
+
+  void _clearPostCaches(String postId) {
     _locallyPrependedPosts.remove(postId);
     _likeCache.remove(postId);
     _confirmedLikeStates.remove(postId);
     _queuedLikeStates.remove(postId);
     _likeSyncingPosts.remove(postId);
+  }
 
+  void _updateStatusAfterPostMutation() {
     if (posts.isEmpty) {
-      status.value = FeedStatus.empty;
+      if (status.value != FeedStatus.empty) {
+        status.value = FeedStatus.empty;
+      }
       return;
     }
 
-    status.value = FeedStatus.success;
-    posts.refresh();
+    if (status.value == FeedStatus.empty) {
+      status.value = FeedStatus.success;
+    }
   }
 
   String _repostTargetPostIdOf(PostModel post) {
@@ -632,9 +673,10 @@ class FeedController extends GetxController {
     }
 
     var hasChanges = false;
+    final updatedPosts = posts.toList(growable: false);
 
-    for (var index = 0; index < posts.length; index++) {
-      final current = posts[index];
+    for (var index = 0; index < updatedPosts.length; index++) {
+      final current = updatedPosts[index];
       if (_repostTargetPostIdOf(current) != targetPostId) {
         continue;
       }
@@ -648,7 +690,7 @@ class FeedController extends GetxController {
         isReposted: isReposted,
         isRepostPending: isPending,
       );
-      posts[index] = updated;
+      updatedPosts[index] = updated;
       if (_locallyPrependedPosts.containsKey(updated.postId)) {
         _locallyPrependedPosts[updated.postId] = updated;
       }
@@ -656,7 +698,7 @@ class FeedController extends GetxController {
     }
 
     if (hasChanges) {
-      posts.refresh();
+      posts.assignAll(updatedPosts);
     }
   }
 

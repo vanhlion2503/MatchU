@@ -45,7 +45,10 @@ class PostCreationSync {
 
   static void _removePostFromFeedAndProfiles(PostModel post) {
     if (Get.isRegistered<FeedController>()) {
-      Get.find<FeedController>().removePostById(post.postId);
+      final feedController = Get.find<FeedController>();
+      if (feedController.findPostById(post.postId) != null) {
+        feedController.removePostById(post.postId);
+      }
     }
 
     final candidateTags = <String>{
@@ -64,7 +67,10 @@ class PostCreationSync {
       if (!Get.isRegistered<ProfilePostsController>(tag: tag)) {
         continue;
       }
-      Get.find<ProfilePostsController>(tag: tag).removePostById(post.postId);
+      final profileController = Get.find<ProfilePostsController>(tag: tag);
+      if (profileController.findPostById(post.postId) != null) {
+        profileController.removePostById(post.postId);
+      }
     }
   }
 
@@ -81,9 +87,10 @@ class PostCreationSync {
       if (!Get.isRegistered<ProfilePostsController>(tag: tag)) {
         continue;
       }
-      Get.find<ProfilePostsController>(
-        tag: tag,
-      ).removePostById(repostPost.postId);
+      final profileController = Get.find<ProfilePostsController>(tag: tag);
+      if (profileController.findPostById(repostPost.postId) != null) {
+        profileController.removePostById(repostPost.postId);
+      }
     }
   }
 

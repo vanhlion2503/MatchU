@@ -17,6 +17,9 @@ class ProfilePostsController extends GetxController {
   }) : _service = postService ?? PostService();
 
   static const int _pageSize = 10;
+  static const Duration _postRemovalAnimationDuration = Duration(
+    milliseconds: 220,
+  );
 
   static String ownerProfileTag(String userId) => 'profile_posts_self_$userId';
 
@@ -52,8 +55,16 @@ class ProfilePostsController extends GetxController {
       <String, PostModel>{}.obs;
   final Set<String> _repostReferenceLoadingIds = <String>{};
   final Set<String> _fetchedRepostReferenceIds = <String>{};
+  final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   String get currentUserId => _service.uid;
+  Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
+
+  bool isPostRemoving(String postId) {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return false;
+    return _removingPostIds.contains(normalizedPostId);
+  }
 
   @override
   void onInit() {
@@ -210,19 +221,8 @@ class ProfilePostsController extends GetxController {
     final normalizedPostId = postId.trim();
     if (normalizedPostId.isEmpty) return;
 
-    posts.removeWhere((post) => post.postId == normalizedPostId);
-    _locallyPrependedPosts.remove(normalizedPostId);
-    _likeCache.remove(normalizedPostId);
-    _confirmedLikeStates.remove(normalizedPostId);
-    _queuedLikeStates.remove(normalizedPostId);
-    _likeSyncingPosts.remove(normalizedPostId);
-    _resolvedRepostPostsByReferenceId.remove(normalizedPostId);
-    _repostReferenceLoadingIds.remove(normalizedPostId);
-    _fetchedRepostReferenceIds.remove(normalizedPostId);
-
-    if (posts.isEmpty) {
-      status.value = ProfilePostsStatus.empty;
-    }
+    _removePostByIdImmediate(normalizedPostId);
+    _removingPostIds.remove(normalizedPostId);
   }
 
   Future<void> toggleLike(String postId) async {
@@ -333,7 +333,7 @@ class ProfilePostsController extends GetxController {
   Future<PostModel?> deletePost(PostModel post) async {
     try {
       final deletedPost = await _service.deletePost(post: post);
-      removePostById(deletedPost.postId);
+      await _removePostByIdWithAnimation(deletedPost.postId);
       Get.snackbar(
         'Thông báo',
         'Đã xóa bài viết.',
@@ -543,6 +543,63 @@ class ProfilePostsController extends GetxController {
     return _mergePosts(incoming, localPosts);
   }
 
+  Future<void> _removePostByIdWithAnimation(String postId) async {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    final postIndex = posts.indexWhere(
+      (post) => post.postId == normalizedPostId,
+    );
+    if (postIndex == -1) {
+      _clearPostCaches(normalizedPostId);
+      _updateStatusAfterPostMutation();
+      return;
+    }
+
+    if (_removingPostIds.contains(normalizedPostId)) {
+      return;
+    }
+
+    _removingPostIds.add(normalizedPostId);
+    await Future<void>.delayed(_postRemovalAnimationDuration);
+    _removePostByIdImmediate(normalizedPostId);
+    _removingPostIds.remove(normalizedPostId);
+  }
+
+  void _removePostByIdImmediate(String postId) {
+    final postIndex = posts.indexWhere((post) => post.postId == postId);
+    if (postIndex != -1) {
+      posts.removeAt(postIndex);
+    }
+
+    _clearPostCaches(postId);
+    _updateStatusAfterPostMutation();
+  }
+
+  void _clearPostCaches(String postId) {
+    _locallyPrependedPosts.remove(postId);
+    _likeCache.remove(postId);
+    _confirmedLikeStates.remove(postId);
+    _queuedLikeStates.remove(postId);
+    _likeSyncingPosts.remove(postId);
+    _resolvedRepostPostsByReferenceId.remove(postId);
+    _repostReferenceLoadingIds.remove(postId);
+    _fetchedRepostReferenceIds.remove(postId);
+  }
+
+  void _updateStatusAfterPostMutation() {
+    if (posts.isEmpty) {
+      if (status.value != ProfilePostsStatus.empty) {
+        status.value = ProfilePostsStatus.empty;
+      }
+      return;
+    }
+
+    if (status.value == ProfilePostsStatus.empty) {
+      status.value = ProfilePostsStatus.success;
+    }
+  }
+
   bool _isLikeSyncPending(String postId) {
     return _queuedLikeStates.containsKey(postId) ||
         _likeSyncingPosts.contains(postId);
@@ -630,8 +687,9 @@ class ProfilePostsController extends GetxController {
       if (_locallyPrependedPosts.containsKey(updatedPost.postId)) {
         _locallyPrependedPosts[updatedPost.postId] = updatedPost;
       }
-      posts[index] = updatedPost;
-      posts.refresh();
+      final updatedPosts = posts.toList(growable: false);
+      updatedPosts[index] = updatedPost;
+      posts.assignAll(updatedPosts);
     }
 
     if (_resolvedRepostPostsByReferenceId.containsKey(updatedPost.postId)) {
@@ -658,8 +716,9 @@ class ProfilePostsController extends GetxController {
     }
 
     var hasPostUpdates = false;
-    for (var index = 0; index < posts.length; index++) {
-      final current = posts[index];
+    final updatedPosts = posts.toList(growable: false);
+    for (var index = 0; index < updatedPosts.length; index++) {
+      final current = updatedPosts[index];
       if (_repostTargetPostIdOf(current) != targetPostId) {
         continue;
       }
@@ -673,7 +732,7 @@ class ProfilePostsController extends GetxController {
         isReposted: isReposted,
         isRepostPending: isPending,
       );
-      posts[index] = updated;
+      updatedPosts[index] = updated;
       if (_locallyPrependedPosts.containsKey(updated.postId)) {
         _locallyPrependedPosts[updated.postId] = updated;
       }
@@ -698,7 +757,7 @@ class ProfilePostsController extends GetxController {
     }
 
     if (hasPostUpdates) {
-      posts.refresh();
+      posts.assignAll(updatedPosts);
     }
   }
 

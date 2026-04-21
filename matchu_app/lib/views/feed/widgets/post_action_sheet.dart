@@ -18,6 +18,7 @@ class PostActionSheet extends StatelessWidget {
   final Future<void> Function()? onHidePostTap;
   final bool canDeletePost;
   final Future<void> Function()? onDeleteTap;
+  static const Duration _sheetExitDelay = Duration(milliseconds: 220);
 
   static Future<void> show(
     BuildContext context, {
@@ -54,7 +55,7 @@ class PostActionSheet extends StatelessWidget {
       child: Container(
         height: sheetHeight,
         decoration: BoxDecoration(
-          color: palette.surface,
+          color: theme.scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
@@ -185,7 +186,7 @@ class PostActionSheet extends StatelessWidget {
     Navigator.of(context).pop();
     if (onHidePostTap == null) return;
 
-    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await Future<void>.delayed(_sheetExitDelay);
     await onHidePostTap!();
   }
 
@@ -197,7 +198,7 @@ class PostActionSheet extends StatelessWidget {
     Navigator.of(context).pop();
     if (onDeleteTap == null) return;
 
-    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await Future<void>.delayed(_sheetExitDelay);
     await onDeleteTap!();
   }
 

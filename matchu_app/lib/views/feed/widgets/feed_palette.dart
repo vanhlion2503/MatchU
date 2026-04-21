@@ -42,14 +42,19 @@ class FeedPalette {
 
     return FeedPalette(
       pageBackground:
-          isDark ? const Color(0xFF090D14) : const Color(0xFFFAFAFA),
+          isDark ? AppTheme.darkBackground : const Color(0xFFFAFAFA),
       headerBackground:
-          isDark ? const Color(0xE6141821) : const Color(0xF2FFFFFF),
-      surface: isDark ? const Color(0xFF11151F) : Colors.white,
-      surfaceMuted: isDark ? const Color(0xFF171C27) : const Color(0xFFF5F5F5),
-      inputSurface: isDark ? const Color(0xFF171C27) : const Color(0xFFF6F6F7),
-      border: isDark ? const Color(0xFF242B38) : const Color(0xFFE8EBEF),
-      threadLine: isDark ? const Color(0xFF313847) : const Color(0xFFD8DDE5),
+          isDark
+              ? AppTheme.darkBackground.withValues(alpha: 0.95)
+              : const Color(0xF2FFFFFF),
+      surface: isDark ? AppTheme.darkBackground : Colors.white,
+      surfaceMuted: isDark ? AppTheme.darkSurface : const Color(0xFFF5F5F5),
+      inputSurface: isDark ? AppTheme.darkSurface : const Color(0xFFF6F6F7),
+      border: isDark ? AppTheme.darkBorder : const Color(0xFFE8EBEF),
+      threadLine:
+          isDark
+              ? AppTheme.darkBorder.withValues(alpha: 0.92)
+              : const Color(0xFFD8DDE5),
       textPrimary: theme.colorScheme.onSurface,
       textSecondary:
           isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,

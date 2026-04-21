@@ -77,48 +77,53 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _ProfilePostsTabBar(controller: _tabController),
-            SizedBox(
-              height: _buildTabHeight(
-                controller: controller,
-                status: status,
-                visiblePosts: visiblePosts,
-              ),
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  SingleChildScrollView(
-                    physics: const NeverScrollableScrollPhysics(),
-                    child: _buildPostsTab(
-                      context: context,
-                      controller: controller,
-                      palette: palette,
-                      theme: theme,
-                      status: status,
-                      posts: normalPosts,
-                      isRepostTab: false,
-                      emptyMessage:
-                          widget.isOwnerView
-                              ? 'Bạn chưa có bài viết nào.'
-                              : 'Người dùng này chưa có bài viết công khai nào.',
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                height: _buildTabHeight(
+                  controller: controller,
+                  status: status,
+                  visiblePosts: visiblePosts,
+                ),
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: _buildPostsTab(
+                        context: context,
+                        controller: controller,
+                        palette: palette,
+                        theme: theme,
+                        status: status,
+                        posts: normalPosts,
+                        isRepostTab: false,
+                        emptyMessage:
+                            widget.isOwnerView
+                                ? 'Bạn chưa có bài viết nào.'
+                                : 'Người dùng này chưa có bài viết công khai nào.',
+                      ),
                     ),
-                  ),
-                  SingleChildScrollView(
-                    physics: const NeverScrollableScrollPhysics(),
-                    child: _buildPostsTab(
-                      context: context,
-                      controller: controller,
-                      palette: palette,
-                      theme: theme,
-                      status: status,
-                      posts: repostPosts,
-                      isRepostTab: true,
-                      emptyMessage:
-                          widget.isOwnerView
-                              ? 'Bạn chưa đăng lại bài viết nào.'
-                              : 'Người dùng này chưa có bài đăng lại công khai.',
+                    SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: _buildPostsTab(
+                        context: context,
+                        controller: controller,
+                        palette: palette,
+                        theme: theme,
+                        status: status,
+                        posts: repostPosts,
+                        isRepostTab: true,
+                        emptyMessage:
+                            widget.isOwnerView
+                                ? 'Bạn chưa đăng lại bài viết nào.'
+                                : 'Người dùng này chưa có bài đăng lại công khai.',
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -231,19 +236,18 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     return Column(
       children: [
         Container(
-          color: palette.surface,
+          color: theme.scaffoldBackgroundColor,
           child: Column(
             children: [
               for (var index = 0; index < posts.length; index++) ...[
-                if (index > 0)
-                  Divider(height: 1, thickness: 1, color: palette.border),
-                if (widget.isOwnerView && !posts[index].isPublic)
-                  _PrivatePostBanner(palette: palette),
                 _buildPostItem(
                   context: context,
                   controller: controller,
                   sourcePost: posts[index],
                   isRepostTab: isRepostTab,
+                  showDivider: index > 0,
+                  showPrivateBanner:
+                      widget.isOwnerView && !posts[index].isPublic,
                 ),
               ],
             ],
@@ -271,6 +275,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     required ProfilePostsController controller,
     required PostModel sourcePost,
     required bool isRepostTab,
+    required bool showDivider,
+    required bool showPrivateBanner,
   }) {
     final displayPost = _resolveDisplayPost(
       controller: controller,
@@ -278,11 +284,15 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       isRepostTab: isRepostTab,
     );
 
-    return PostItem(
+    return _ProfileRemovalAnimatedPostItem(
       key: ValueKey(
         'profile_post_${sourcePost.postId}_${isRepostTab ? 'repost' : 'normal'}',
       ),
-      post: displayPost,
+      controller: controller,
+      listPostId: sourcePost.postId,
+      displayPost: displayPost,
+      showDivider: showDivider,
+      showPrivateBanner: showPrivateBanner,
       onTap: () => _openPostDetail(displayPost),
       onLikeTap: () => controller.toggleLike(displayPost.postId),
       onCommentTap: () => _openPostDetail(displayPost),
@@ -475,6 +485,81 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   }
 }
 
+class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
+  const _ProfileRemovalAnimatedPostItem({
+    super.key,
+    required this.controller,
+    required this.listPostId,
+    required this.displayPost,
+    required this.showDivider,
+    required this.showPrivateBanner,
+    required this.onTap,
+    required this.onLikeTap,
+    required this.onCommentTap,
+    required this.onRepostTap,
+    required this.onShareTap,
+    required this.onMoreTap,
+    this.onReferenceTap,
+  });
+
+  final ProfilePostsController controller;
+  final String listPostId;
+  final PostModel displayPost;
+  final bool showDivider;
+  final bool showPrivateBanner;
+  final VoidCallback onTap;
+  final VoidCallback onLikeTap;
+  final VoidCallback onCommentTap;
+  final VoidCallback onRepostTap;
+  final VoidCallback onShareTap;
+  final VoidCallback onMoreTap;
+  final VoidCallback? onReferenceTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+
+    return Obx(() {
+      final isRemoving = controller.isPostRemoving(listPostId);
+
+      return AnimatedSwitcher(
+        duration: controller.postRemovalAnimationDuration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: -1,
+            child: FadeTransition(opacity: animation, child: child),
+          );
+        },
+        child:
+            isRemoving
+                ? SizedBox(key: ValueKey('profile_post_removing_$listPostId'))
+                : Column(
+                  key: ValueKey('profile_post_visible_$listPostId'),
+                  children: [
+                    if (showDivider)
+                      Divider(height: 1, thickness: 1, color: palette.border),
+                    if (showPrivateBanner) _PrivatePostBanner(palette: palette),
+                    PostItem(
+                      key: ValueKey('profile_post_item_$listPostId'),
+                      post: displayPost,
+                      onTap: onTap,
+                      onLikeTap: onLikeTap,
+                      onCommentTap: onCommentTap,
+                      onRepostTap: onRepostTap,
+                      onShareTap: onShareTap,
+                      onMoreTap: onMoreTap,
+                      onReferenceTap: onReferenceTap,
+                    ),
+                  ],
+                ),
+      );
+    });
+  }
+}
+
 class _ProfilePostsTabBar extends StatelessWidget {
   const _ProfilePostsTabBar({required this.controller});
 
@@ -482,11 +567,10 @@ class _ProfilePostsTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
 
     return Container(
-      color: palette.surface,
+      color: theme.scaffoldBackgroundColor,
       child: TabBar(
         controller: controller,
         labelColor: theme.colorScheme.onSurface,
