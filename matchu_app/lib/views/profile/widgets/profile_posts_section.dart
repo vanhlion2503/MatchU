@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
@@ -93,6 +94,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                       theme: theme,
                       status: status,
                       posts: normalPosts,
+                      isRepostTab: false,
                       emptyMessage:
                           widget.isOwnerView
                               ? 'Bạn chưa có bài viết nào.'
@@ -108,6 +110,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                       theme: theme,
                       status: status,
                       posts: repostPosts,
+                      isRepostTab: true,
                       emptyMessage:
                           widget.isOwnerView
                               ? 'Bạn chưa đăng lại bài viết nào.'
@@ -162,6 +165,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     required ThemeData theme,
     required ProfilePostsStatus status,
     required List<PostModel> posts,
+    required bool isRepostTab,
     required String emptyMessage,
   }) {
     if ((status == ProfilePostsStatus.initial ||
@@ -234,15 +238,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                   Divider(height: 1, thickness: 1, color: palette.border),
                 if (widget.isOwnerView && !posts[index].isPublic)
                   _PrivatePostBanner(palette: palette),
-                PostItem(
-                  key: ValueKey('profile_post_${posts[index].postId}'),
-                  post: posts[index],
-                  onTap: () => _openPostDetail(posts[index]),
-                  onLikeTap: () => controller.toggleLike(posts[index].postId),
-                  onCommentTap: () => _openPostDetail(posts[index]),
-                  onRepostTap: () => _openRepostSheet(context, posts[index]),
-                  onShareTap: controller.onShareTap,
-                  onMoreTap: () => _openPostActionSheet(context, posts[index]),
+                _buildPostItem(
+                  context: context,
+                  controller: controller,
+                  sourcePost: posts[index],
+                  isRepostTab: isRepostTab,
                 ),
               ],
             ],
@@ -265,6 +265,45 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     );
   }
 
+  Widget _buildPostItem({
+    required BuildContext context,
+    required ProfilePostsController controller,
+    required PostModel sourcePost,
+    required bool isRepostTab,
+  }) {
+    final displayPost = _resolveDisplayPost(
+      controller: controller,
+      sourcePost: sourcePost,
+      isRepostTab: isRepostTab,
+    );
+
+    return PostItem(
+      key: ValueKey(
+        'profile_post_${sourcePost.postId}_${isRepostTab ? 'repost' : 'normal'}',
+      ),
+      post: displayPost,
+      onTap: () => _openPostDetail(displayPost),
+      onLikeTap: () => controller.toggleLike(displayPost.postId),
+      onCommentTap: () => _openPostDetail(displayPost),
+      onRepostTap: () => _openRepostSheet(context, displayPost),
+      onShareTap: controller.onShareTap,
+      onMoreTap: () => _openPostActionSheet(context, displayPost),
+      onReferenceTap:
+          displayPost.referencePost != null
+              ? () => _openReferencePostDetail(displayPost)
+              : null,
+    );
+  }
+
+  PostModel _resolveDisplayPost({
+    required ProfilePostsController controller,
+    required PostModel sourcePost,
+    required bool isRepostTab,
+  }) {
+    if (!isRepostTab) return sourcePost;
+    return controller.resolveDisplayPost(sourcePost);
+  }
+
   Future<void> _openPostDetail(PostModel post) async {
     await Get.toNamed(
       AppRouter.postDetail,
@@ -272,6 +311,71 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
         post: post,
         profilePostsControllerTag: widget.controllerTag,
       ),
+    );
+  }
+
+  Future<void> _openReferencePostDetail(PostModel sourcePost) async {
+    final resolvedPost = await _resolvePostDetailPost(sourcePost);
+    await Get.toNamed(
+      AppRouter.postDetail,
+      arguments: PostDetailRouteArgs(
+        post: resolvedPost,
+        profilePostsControllerTag: widget.controllerTag,
+      ),
+    );
+  }
+
+  Future<PostModel> _resolvePostDetailPost(PostModel tappedPost) async {
+    if (!tappedPost.postType.requiresReference ||
+        tappedPost.referencePost == null) {
+      return tappedPost;
+    }
+
+    final reference = tappedPost.referencePost;
+    final referencePostId =
+        (tappedPost.referencePostId ?? reference?.postId ?? '').trim();
+
+    if (referencePostId.isEmpty || reference?.isUnavailable == true) {
+      return tappedPost;
+    }
+
+    final controller = Get.find<ProfilePostsController>(
+      tag: widget.controllerTag,
+    );
+    final localOriginal = controller.findPostById(referencePostId);
+    if (localOriginal != null) {
+      return localOriginal;
+    }
+
+    final fetchedOriginal = await controller.fetchPostById(referencePostId);
+    if (fetchedOriginal != null) {
+      return fetchedOriginal;
+    }
+
+    return _fallbackOriginalPostFromReference(reference) ?? tappedPost;
+  }
+
+  PostModel? _fallbackOriginalPostFromReference(PostReferenceModel? reference) {
+    if (reference == null) return null;
+
+    final postId = reference.postId.trim();
+    if (postId.isEmpty) return null;
+
+    return PostModel(
+      postId: postId,
+      authorId: reference.authorId,
+      postType: reference.postType,
+      content: reference.content,
+      media: reference.media,
+      tags: reference.tags,
+      isPublic: reference.isPublic,
+      stats: const StatsModel(),
+      trendScore: 0,
+      trendBucket: 0,
+      author: reference.author,
+      createdAt: reference.createdAt,
+      updatedAt: reference.createdAt,
+      deletedAt: reference.deletedAt,
     );
   }
 
@@ -284,6 +388,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       context,
       post: post,
       onRepostTap: () => _repostPost(post),
+      onUndoRepostTap: () => _undoRepostPost(post),
       onQuoteTap: () => _quotePost(context, post),
     );
   }
@@ -304,6 +409,14 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     _handlePostCreated(createdPost);
   }
 
+  Future<void> _undoRepostPost(PostModel sourcePost) async {
+    final controller = Get.find<ProfilePostsController>(
+      tag: widget.controllerTag,
+    );
+    final removedPost = await controller.undoRepost(sourcePost);
+    _handlePostRemoved(removedPost);
+  }
+
   void _handlePostCreated(PostModel? createdPost) {
     if (createdPost == null) return;
 
@@ -316,6 +429,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  void _handlePostRemoved(PostModel? removedPost) {
+    if (removedPost == null) return;
+    PostCreationSync.syncRepostRemoved(removedPost);
   }
 }
 

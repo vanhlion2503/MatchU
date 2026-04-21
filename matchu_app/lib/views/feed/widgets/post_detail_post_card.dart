@@ -212,7 +212,11 @@ class PostDetailPostCard extends StatelessWidget {
                 child: _PostDetailActionButton(
                   icon: Iconsax.repeat,
                   label: _countLabelOrNull(post.stats.shareCount),
-                  color: palette.iconMuted,
+                  color: (post.isReposted
+                          ? palette.repostColor
+                          : palette.iconMuted)
+                      .withValues(alpha: post.isRepostPending ? 0.58 : 1),
+                  isActive: post.isReposted,
                   onTap: onRepostTap,
                 ),
               ),

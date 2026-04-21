@@ -16,6 +16,7 @@ class FeedPalette {
     required this.iconPrimary,
     required this.iconMuted,
     required this.likeColor,
+    required this.repostColor,
     required this.shadowColor,
   });
 
@@ -32,6 +33,7 @@ class FeedPalette {
   final Color iconPrimary;
   final Color iconMuted;
   final Color likeColor;
+  final Color repostColor;
   final Color shadowColor;
 
   factory FeedPalette.of(BuildContext context) {
@@ -55,6 +57,7 @@ class FeedPalette {
       iconPrimary: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF171717),
       iconMuted: isDark ? const Color(0xFFB7BECA) : const Color(0xFF5F6670),
       likeColor: const Color(0xFFE11D48),
+      repostColor: const Color(0xFF059669),
       shadowColor:
           isDark
               ? Colors.black.withValues(alpha: 0.26)

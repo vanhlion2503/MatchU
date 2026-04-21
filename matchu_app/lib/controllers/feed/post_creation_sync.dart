@@ -20,15 +20,47 @@ class PostCreationSync {
       Get.find<ProfilePostsController>(tag: tag).prependPost(post);
     }
 
-    _syncShareCount(post);
+    _syncShareCount(post, delta: 1);
+    if (post.postType.isRepostOnly) {
+      _syncRepostState(post, isReposted: true);
+    }
   }
 
-  static void _syncShareCount(PostModel post) {
+  static void syncRepostRemoved(PostModel repostPost) {
+    if (!repostPost.postType.isRepostOnly) return;
+    _removeRepostFromSelfProfiles(repostPost);
+    _syncShareCount(repostPost, delta: -1);
+    _syncRepostState(repostPost, isReposted: false);
+  }
+
+  static void _removeRepostFromSelfProfiles(PostModel repostPost) {
+    final candidateTags = <String>{
+      ...ProfilePostsController.selfProfileTags(repostPost.authorId),
+      ProfilePostsController.otherProfileTag(
+        repostPost.authorId,
+        includePrivate: false,
+      ),
+    };
+
+    for (final tag in candidateTags) {
+      if (!Get.isRegistered<ProfilePostsController>(tag: tag)) {
+        continue;
+      }
+      Get.find<ProfilePostsController>(
+        tag: tag,
+      ).removePostById(repostPost.postId);
+    }
+  }
+
+  static void _syncShareCount(PostModel post, {required int delta}) {
     final referencePostId = post.referencePostId?.trim() ?? '';
     if (referencePostId.isEmpty) return;
 
     if (Get.isRegistered<FeedController>()) {
-      Get.find<FeedController>().adjustShareCount(referencePostId);
+      Get.find<FeedController>().adjustShareCount(
+        referencePostId,
+        delta: delta,
+      );
     }
 
     final referenceAuthorId = post.referencePost?.authorId.trim() ?? '';
@@ -51,12 +83,58 @@ class PostCreationSync {
         }
         Get.find<ProfilePostsController>(
           tag: tag,
-        ).adjustShareCount(referencePostId);
+        ).adjustShareCount(referencePostId, delta: delta);
       }
     }
 
     if (Get.isRegistered<PostDetailController>()) {
-      Get.find<PostDetailController>().adjustShareCount(referencePostId);
+      Get.find<PostDetailController>().adjustShareCount(
+        referencePostId,
+        delta: delta,
+      );
+    }
+  }
+
+  static void _syncRepostState(PostModel post, {required bool isReposted}) {
+    final referencePostId = post.referencePostId?.trim() ?? '';
+    if (referencePostId.isEmpty) return;
+
+    if (Get.isRegistered<FeedController>()) {
+      Get.find<FeedController>().applyRepostState(
+        referencePostId,
+        isReposted: isReposted,
+      );
+    }
+
+    final referenceAuthorId = post.referencePost?.authorId.trim() ?? '';
+    if (referenceAuthorId.isNotEmpty) {
+      final candidateTags = <String>{
+        ProfilePostsController.ownerProfileTag(referenceAuthorId),
+        ProfilePostsController.otherProfileTag(
+          referenceAuthorId,
+          includePrivate: false,
+        ),
+        ProfilePostsController.otherProfileTag(
+          referenceAuthorId,
+          includePrivate: true,
+        ),
+      };
+
+      for (final tag in candidateTags) {
+        if (!Get.isRegistered<ProfilePostsController>(tag: tag)) {
+          continue;
+        }
+        Get.find<ProfilePostsController>(
+          tag: tag,
+        ).applyRepostState(referencePostId, isReposted: isReposted);
+      }
+    }
+
+    if (Get.isRegistered<PostDetailController>()) {
+      Get.find<PostDetailController>().applyRepostState(
+        referencePostId,
+        isReposted: isReposted,
+      );
     }
   }
 }

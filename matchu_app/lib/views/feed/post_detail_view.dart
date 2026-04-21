@@ -77,6 +77,7 @@ class _PostDetailViewState extends State<PostDetailView> {
       context,
       post: post,
       onRepostTap: _repostPost,
+      onUndoRepostTap: _undoRepostPost,
       onQuoteTap: () => _quotePost(context, post),
     );
   }
@@ -94,6 +95,11 @@ class _PostDetailViewState extends State<PostDetailView> {
     _handlePostCreated(createdPost);
   }
 
+  Future<void> _undoRepostPost() async {
+    final removedPost = await controller.undoCurrentRepost();
+    _handlePostRemoved(removedPost);
+  }
+
   void _handlePostCreated(PostModel? createdPost) {
     if (createdPost == null) return;
 
@@ -106,6 +112,11 @@ class _PostDetailViewState extends State<PostDetailView> {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  void _handlePostRemoved(PostModel? removedPost) {
+    if (removedPost == null) return;
+    PostCreationSync.syncRepostRemoved(removedPost);
   }
 
   @override

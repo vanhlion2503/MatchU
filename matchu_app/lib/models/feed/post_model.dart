@@ -249,6 +249,8 @@ class PostModel {
     this.deletedAt,
     this.isLiked = false,
     this.isLikePending = false,
+    this.isReposted = false,
+    this.isRepostPending = false,
   });
 
   final String postId;
@@ -271,6 +273,8 @@ class PostModel {
   // Local UI state, not stored in Firestore.
   final bool isLiked;
   final bool isLikePending;
+  final bool isReposted;
+  final bool isRepostPending;
 
   bool get hasContent => content.trim().isNotEmpty;
   bool get hasMedia => media.isNotEmpty;
@@ -358,6 +362,8 @@ class PostModel {
     DateTime? deletedAt,
     bool? isLiked,
     bool? isLikePending,
+    bool? isReposted,
+    bool? isRepostPending,
   }) {
     return PostModel(
       postId: postId ?? this.postId,
@@ -378,6 +384,8 @@ class PostModel {
       deletedAt: deletedAt ?? this.deletedAt,
       isLiked: isLiked ?? this.isLiked,
       isLikePending: isLikePending ?? this.isLikePending,
+      isReposted: isReposted ?? this.isReposted,
+      isRepostPending: isRepostPending ?? this.isRepostPending,
     );
   }
 

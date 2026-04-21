@@ -8,17 +8,20 @@ class PostRepostSheet extends StatelessWidget {
     super.key,
     required this.post,
     this.onRepostTap,
+    this.onUndoRepostTap,
     this.onQuoteTap,
   });
 
   final PostModel post;
   final Future<void> Function()? onRepostTap;
+  final Future<void> Function()? onUndoRepostTap;
   final Future<void> Function()? onQuoteTap;
 
   static Future<void> show(
     BuildContext context, {
     required PostModel post,
     Future<void> Function()? onRepostTap,
+    Future<void> Function()? onUndoRepostTap,
     Future<void> Function()? onQuoteTap,
   }) {
     return showModalBottomSheet<void>(
@@ -28,6 +31,7 @@ class PostRepostSheet extends StatelessWidget {
           (_) => PostRepostSheet(
             post: post,
             onRepostTap: onRepostTap,
+            onUndoRepostTap: onUndoRepostTap,
             onQuoteTap: onQuoteTap,
           ),
     );
@@ -36,6 +40,19 @@ class PostRepostSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+    final isReposted = post.isReposted;
+
+    final repostTitle = isReposted ? 'Hủy đăng lại' : 'Đăng lại';
+    final repostSubtitle =
+        isReposted
+            ? 'Xóa bài đăng lại này khỏi hồ sơ của bạn.'
+            : 'Đăng lại bài viết này trên hồ sơ của bạn.';
+
+    final repostIconColor =
+        isReposted ? theme.colorScheme.error : palette.repostColor;
+    final repostTitleColor =
+        isReposted ? theme.colorScheme.error : palette.textPrimary;
 
     return SafeArea(
       top: false,
@@ -68,10 +85,16 @@ class PostRepostSheet extends StatelessWidget {
               const SizedBox(height: 14),
               _RepostActionTile(
                 icon: Iconsax.repeat,
-                title: 'Đăng lại',
-                subtitle: 'Đăng lại bài viết này trên hồ sơ của bạn.',
+                title: repostTitle,
+                subtitle: repostSubtitle,
                 palette: palette,
-                onTap: () => _handleAsyncAction(context, onRepostTap),
+                iconColor: repostIconColor,
+                titleColor: repostTitleColor,
+                onTap:
+                    () => _handleAsyncAction(
+                      context,
+                      isReposted ? onUndoRepostTap : onRepostTap,
+                    ),
               ),
               const SizedBox(height: 10),
               _RepostActionTile(
@@ -105,6 +128,8 @@ class _RepostActionTile extends StatelessWidget {
     required this.subtitle,
     required this.palette,
     required this.onTap,
+    this.iconColor,
+    this.titleColor,
   });
 
   final IconData icon;
@@ -112,6 +137,8 @@ class _RepostActionTile extends StatelessWidget {
   final String subtitle;
   final FeedPalette palette;
   final VoidCallback onTap;
+  final Color? iconColor;
+  final Color? titleColor;
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +165,11 @@ class _RepostActionTile extends StatelessWidget {
                   color: palette.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, size: 20, color: palette.iconPrimary),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: iconColor ?? palette.iconPrimary,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -148,7 +179,7 @@ class _RepostActionTile extends StatelessWidget {
                     Text(
                       title,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: palette.textPrimary,
+                        color: titleColor ?? palette.textPrimary,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

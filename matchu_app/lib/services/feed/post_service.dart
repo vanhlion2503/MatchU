@@ -68,7 +68,7 @@ class PostService {
 
       for (final doc in docs) {
         final post = PostModel.fromDoc(doc);
-        if (post.deletedAt != null) {
+        if (post.deletedAt != null || post.postType.isRepostOnly) {
           continue;
         }
         collectedPosts.add(post);
@@ -156,6 +156,18 @@ class PostService {
     );
   }
 
+  Future<PostModel?> fetchPostById(String postId) async {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return null;
+
+    final doc = await _postsRef.doc(normalizedPostId).get();
+    if (!doc.exists) return null;
+
+    final post = PostModel.fromDoc(doc);
+    if (post.deletedAt != null) return null;
+    return post;
+  }
+
   Future<PostModel> createPost({
     required String content,
     required List<PostMediaDraft> mediaDrafts,
@@ -193,12 +205,16 @@ class PostService {
     bool isPublic = true,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Bạn cần đăng nhập để đăng lại bài viết.');
+      throw StateError(
+        'Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ Ä‘Äƒng láº¡i bÃ i viáº¿t.',
+      );
     }
 
     final referencePost = _resolveReferencePost(sourcePost);
     if (referencePost.postId.trim().isEmpty) {
-      throw StateError('Không tìm thấy bài viết gốc để đăng lại.');
+      throw StateError(
+        'KhÃ´ng tÃ¬m tháº¥y bÃ i viáº¿t gá»‘c Ä‘á»ƒ Ä‘Äƒng láº¡i.',
+      );
     }
 
     final repostRef = _postsRef.doc(_repostDocId(referencePost.postId));
@@ -206,7 +222,7 @@ class PostService {
     if (existingSnap.exists) {
       final existing = PostModel.fromDoc(existingSnap);
       if (existing.deletedAt == null) {
-        throw StateError('Bạn đã đăng lại bài viết này rồi.');
+        throw StateError('Báº¡n Ä‘Ã£ Ä‘Äƒng láº¡i bÃ i viáº¿t nÃ y rá»“i.');
       }
     }
 
@@ -221,6 +237,116 @@ class PostService {
     );
   }
 
+  String resolveRepostTargetPostId(PostModel sourcePost) {
+    final referencePost = _resolveReferencePost(sourcePost);
+    return referencePost.postId.trim();
+  }
+
+  Future<bool> isPostReposted(PostModel sourcePost) async {
+    final targetPostId = resolveRepostTargetPostId(sourcePost);
+    if (targetPostId.isEmpty) return false;
+
+    final states = await getRepostStates(<String>[targetPostId]);
+    return states[targetPostId] ?? false;
+  }
+
+  Future<Map<String, bool>> getRepostStates(List<String> sourcePostIds) async {
+    final normalizedIds = sourcePostIds
+        .map((postId) => postId.trim())
+        .where((postId) => postId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (normalizedIds.isEmpty) {
+      return const {};
+    }
+
+    if (uid.isEmpty) {
+      return {for (final postId in normalizedIds) postId: false};
+    }
+
+    final entries = await Future.wait(
+      normalizedIds.map((postId) async {
+        final repostSnap = await _postsRef.doc(_repostDocId(postId)).get();
+        if (!repostSnap.exists) {
+          return MapEntry(postId, false);
+        }
+
+        final repostData = repostSnap.data() ?? const <String, dynamic>{};
+        final isDeleted = repostData['deletedAt'] != null;
+        return MapEntry(postId, !isDeleted);
+      }),
+    );
+
+    return Map<String, bool>.fromEntries(entries);
+  }
+
+  Future<PostModel> undoRepost({required PostModel sourcePost}) async {
+    if (uid.isEmpty) {
+      throw StateError('Ban can dang nhap de huy dang lai.');
+    }
+
+    final referencePost = _resolveReferencePost(sourcePost);
+    final referencePostId = referencePost.postId.trim();
+    if (referencePostId.isEmpty) {
+      throw StateError('Khong tim thay bai viet goc de huy dang lai.');
+    }
+
+    final repostRef = _postsRef.doc(_repostDocId(referencePostId));
+
+    return _firestore.runTransaction((transaction) async {
+      final repostSnap = await transaction.get(repostRef);
+      if (!repostSnap.exists) {
+        throw StateError('Ban chua dang lai bai viet nay.');
+      }
+
+      final repost = PostModel.fromDoc(repostSnap);
+      if (repost.deletedAt != null) {
+        throw StateError('Ban chua dang lai bai viet nay.');
+      }
+
+      if (repost.authorId != uid) {
+        throw StateError('Ban khong the huy dang lai bai viet nay.');
+      }
+
+      final resolvedReferencePostId =
+          (repost.referencePostId ?? referencePostId).trim();
+      if (resolvedReferencePostId.isNotEmpty) {
+        final referencePostRef = _postsRef.doc(resolvedReferencePostId);
+        final referenceSnap = await transaction.get(referencePostRef);
+
+        if (referenceSnap.exists) {
+          final referenceData = referenceSnap.data() ?? <String, dynamic>{};
+          final rawStats = referenceData['stats'];
+          final statsMap =
+              rawStats is Map
+                  ? Map<String, dynamic>.from(rawStats)
+                  : const <String, dynamic>{};
+          final currentShareCount =
+              (statsMap['shareCount'] as num?)?.toInt() ?? 0;
+
+          transaction.update(referencePostRef, {
+            'stats.shareCount':
+                currentShareCount > 0 ? currentShareCount - 1 : 0,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      transaction.update(repostRef, {
+        'deletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(_firestore.collection('users').doc(uid), {
+        'totalPosts': FieldValue.increment(-1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return repost;
+    });
+  }
+
   Future<PostModel> _createPost({
     required PostType postType,
     required String content,
@@ -231,25 +357,29 @@ class PostService {
     DocumentReference<Map<String, dynamic>>? explicitPostRef,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Bạn cần đăng nhập để đăng bài viết.');
+      throw StateError('Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ Ä‘Äƒng bÃ i viáº¿t.');
     }
 
     final normalizedContent = content.trim();
     if (normalizedContent.length > maxContentLength) {
-      throw StateError('Nội dung bài viết không được vượt quá 300 ký tự.');
+      throw StateError(
+        'Ná»™i dung bÃ i viáº¿t khÃ´ng Ä‘Æ°á»£c vÆ°á»£t quÃ¡ 300 kÃ½ tá»±.',
+      );
     }
 
     final hasBody = normalizedContent.isNotEmpty || mediaDrafts.isNotEmpty;
     if (!postType.requiresReference && !hasBody) {
-      throw StateError('Bài viết cần có nội dung hoặc media.');
+      throw StateError('BÃ i viáº¿t cáº§n cÃ³ ná»™i dung hoáº·c media.');
     }
 
     if (postType == PostType.repost && hasBody) {
-      throw StateError('Đăng lại không kèm nội dung hoặc tệp đính kèm.');
+      throw StateError(
+        'ÄÄƒng láº¡i khÃ´ng kÃ¨m ná»™i dung hoáº·c tá»‡p Ä‘Ã­nh kÃ¨m.',
+      );
     }
 
     if (postType.requiresReference && referencePost == null) {
-      throw StateError('Dạng bài này cần có bài viết gốc.');
+      throw StateError('Dáº¡ng bÃ i nÃ y cáº§n cÃ³ bÃ i viáº¿t gá»‘c.');
     }
 
     final author = await _resolveCurrentAuthor();
@@ -374,7 +504,9 @@ class PostService {
     required bool shouldLike,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Bạn cần đăng nhập để tương tác với bài viết.');
+      throw StateError(
+        'Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ tÆ°Æ¡ng tÃ¡c vá»›i bÃ i viáº¿t.',
+      );
     }
 
     final postRef = _postsRef.doc(postId);
@@ -383,7 +515,7 @@ class PostService {
     await _firestore.runTransaction((transaction) async {
       final postSnap = await transaction.get(postRef);
       if (!postSnap.exists) {
-        throw StateError('Bài viết không còn tồn tại.');
+        throw StateError('BÃ i viáº¿t khÃ´ng cÃ²n tá»“n táº¡i.');
       }
 
       final likeSnap = await transaction.get(likeRef);
@@ -423,7 +555,9 @@ class PostService {
   Future<PostAuthorModel> _resolveCurrentAuthor() async {
     final user = await _userService.getUser(uid);
     if (user == null) {
-      throw StateError('Không tìm thấy thông tin người dùng hiện tại.');
+      throw StateError(
+        'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin ngÆ°á»i dÃ¹ng hiá»‡n táº¡i.',
+      );
     }
 
     return _authorFromUser(user);
@@ -512,7 +646,7 @@ class PostService {
     return PostAuthorModel(
       id: user.uid,
       nickname: nickname,
-      name: displayName.isNotEmpty ? displayName : 'Người dùng',
+      name: displayName.isNotEmpty ? displayName : 'NgÆ°á»i dÃ¹ng',
       avatar: user.avatarUrl,
       isVerified: user.isFaceVerified,
     );

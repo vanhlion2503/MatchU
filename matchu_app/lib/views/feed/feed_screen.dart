@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/feed_empty_state.dart';
@@ -37,6 +38,11 @@ class FeedScreen extends GetView<FeedController> {
     _handlePostCreated(createdPost);
   }
 
+  Future<void> _undoRepostPost(PostModel sourcePost) async {
+    final removedPost = await controller.undoRepost(sourcePost);
+    _handlePostRemoved(removedPost);
+  }
+
   void _handlePostCreated(PostModel? createdPost) {
     if (createdPost == null) return;
 
@@ -51,10 +57,74 @@ class FeedScreen extends GetView<FeedController> {
     );
   }
 
-  void _openPostDetail(PostModel post) {
+  void _handlePostRemoved(PostModel? removedPost) {
+    if (removedPost == null) return;
+    PostCreationSync.syncRepostRemoved(removedPost);
+  }
+
+  Future<void> _openPostDetail(PostModel post) async {
     Get.toNamed(
       AppRouter.postDetail,
       arguments: PostDetailRouteArgs(post: post),
+    );
+  }
+
+  Future<void> _openReferencePostDetail(PostModel sourcePost) async {
+    final resolvedPost = await _resolvePostDetailPost(sourcePost);
+    await Get.toNamed(
+      AppRouter.postDetail,
+      arguments: PostDetailRouteArgs(post: resolvedPost),
+    );
+  }
+
+  Future<PostModel> _resolvePostDetailPost(PostModel tappedPost) async {
+    if (!tappedPost.postType.requiresReference ||
+        tappedPost.referencePost == null) {
+      return tappedPost;
+    }
+
+    final reference = tappedPost.referencePost;
+    final referencePostId =
+        (tappedPost.referencePostId ?? reference?.postId ?? '').trim();
+
+    if (referencePostId.isEmpty || reference?.isUnavailable == true) {
+      return tappedPost;
+    }
+
+    final localOriginal = controller.findPostById(referencePostId);
+    if (localOriginal != null) {
+      return localOriginal;
+    }
+
+    final fetchedOriginal = await controller.fetchPostById(referencePostId);
+    if (fetchedOriginal != null) {
+      return fetchedOriginal;
+    }
+
+    return _fallbackOriginalPostFromReference(reference) ?? tappedPost;
+  }
+
+  PostModel? _fallbackOriginalPostFromReference(PostReferenceModel? reference) {
+    if (reference == null) return null;
+
+    final postId = reference.postId.trim();
+    if (postId.isEmpty) return null;
+
+    return PostModel(
+      postId: postId,
+      authorId: reference.authorId,
+      postType: reference.postType,
+      content: reference.content,
+      media: reference.media,
+      tags: reference.tags,
+      isPublic: reference.isPublic,
+      stats: const StatsModel(),
+      trendScore: 0,
+      trendBucket: 0,
+      author: reference.author,
+      createdAt: reference.createdAt,
+      updatedAt: reference.createdAt,
+      deletedAt: reference.deletedAt,
     );
   }
 
@@ -67,6 +137,7 @@ class FeedScreen extends GetView<FeedController> {
       context,
       post: post,
       onRepostTap: () => _repostPost(post),
+      onUndoRepostTap: () => _undoRepostPost(post),
       onQuoteTap: () => _quotePost(context, post),
     );
   }
@@ -177,6 +248,10 @@ class FeedScreen extends GetView<FeedController> {
                     onRepostTap: () => _openRepostSheet(context, post),
                     onShareTap: controller.onShareTap,
                     onMoreTap: () => _openPostActionSheet(context, post),
+                    onReferenceTap:
+                        post.referencePost != null
+                            ? () => _openReferencePostDetail(post)
+                            : null,
                   ),
                 ],
               );

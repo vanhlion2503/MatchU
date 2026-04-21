@@ -16,6 +16,7 @@ class PostItem extends StatelessWidget {
     required this.onRepostTap,
     required this.onShareTap,
     required this.onMoreTap,
+    this.onReferenceTap,
   });
 
   final PostModel post;
@@ -25,6 +26,7 @@ class PostItem extends StatelessWidget {
   final VoidCallback onRepostTap;
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
+  final VoidCallback? onReferenceTap;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +105,16 @@ class PostItem extends StatelessWidget {
                     ],
                     if (post.referencePost != null) ...[
                       const SizedBox(height: 12),
-                      _ReferencePostCard(reference: post.referencePost!),
+                      if (onReferenceTap == null)
+                        _ReferencePostCard(reference: post.referencePost!)
+                      else
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onReferenceTap,
+                          child: _ReferencePostCard(
+                            reference: post.referencePost!,
+                          ),
+                        ),
                     ],
                     const SizedBox(height: 12),
                     Wrap(
@@ -130,9 +141,15 @@ class PostItem extends StatelessWidget {
                         ),
                         _ActionStatButton(
                           icon: Iconsax.repeat,
-                          color: palette.iconMuted,
+                          color: (post.isReposted
+                                  ? palette.repostColor
+                                  : palette.iconMuted)
+                              .withValues(
+                                alpha: post.isRepostPending ? 0.58 : 1,
+                              ),
                           onTap: onRepostTap,
                           countLabel: _countLabelOrNull(post.stats.shareCount),
+                          isActive: post.isReposted,
                         ),
                         _ActionStatButton(
                           icon: Iconsax.send_1,

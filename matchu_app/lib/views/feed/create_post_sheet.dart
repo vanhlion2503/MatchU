@@ -8,6 +8,7 @@ import 'package:matchu_app/models/feed/post_media_draft.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CreatePostSheet extends StatefulWidget {
@@ -517,7 +518,6 @@ class _QuotedPostPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double quotedPreviewMediaHeight = 168;
     final theme = Theme.of(context);
     final reference = post.isRepostOnly ? post.referencePost : null;
     final authorName =
@@ -528,10 +528,7 @@ class _QuotedPostPreview extends StatelessWidget {
         reference != null
             ? _quotedReferenceAuthorHandle(reference)
             : _quotedAuthorHandle(post);
-    final previewMedia =
-        reference != null
-            ? (reference.media.isNotEmpty ? reference.media.first : null)
-            : (post.media.isNotEmpty ? post.media.first : null);
+    final previewMedia = reference?.media ?? post.media;
     final previewContent = reference?.content ?? post.content;
 
     return Container(
@@ -619,29 +616,12 @@ class _QuotedPostPreview extends StatelessWidget {
               ),
             ),
           ],
-          if (previewMedia != null) ...[
+          if (previewMedia.isNotEmpty) ...[
             const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child:
-                  previewMedia.isImage
-                      ? Image.network(
-                        previewMedia.url,
-                        height: quotedPreviewMediaHeight,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                      : Container(
-                        height: quotedPreviewMediaHeight,
-                        width: double.infinity,
-                        color: const Color(0xFF0F172A),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Iconsax.play_circle,
-                          color: Colors.white.withValues(alpha: 0.9),
-                          size: 30,
-                        ),
-                      ),
+            PostMediaGallery(
+              media: previewMedia,
+              multiImageLayout:
+                  PostMediaGalleryMultiImageLayout.horizontalScroll,
             ),
           ],
         ],

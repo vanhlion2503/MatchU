@@ -104,8 +104,8 @@ class PostDetailController extends GetxController {
     }
 
     Get.snackbar(
-      'Thông báo',
-      'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.',
+      'ThÃ´ng bÃ¡o',
+      'TÃ­nh nÄƒng chia sáº» sáº½ Ä‘Æ°á»£c cáº­p nháº­t á»Ÿ bÆ°á»›c tiáº¿p theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -116,16 +116,90 @@ class PostDetailController extends GetxController {
   }
 
   Future<PostModel?> repostCurrentPost() async {
+    final currentPost = post.value;
+
+    final profilePostsController = _profilePostsController;
+    if (profilePostsController != null &&
+        profilePostsController.findPostById(currentPost.postId) != null) {
+      final created = await profilePostsController.repostPost(currentPost);
+      _syncPostFromSources();
+      return created;
+    }
+
+    final feedController = _feedController;
+    if (feedController != null &&
+        feedController.findPostById(currentPost.postId) != null) {
+      final created = await feedController.repostPost(currentPost);
+      _syncPostFromSources();
+      return created;
+    }
+
+    final targetPostId = _postService.resolveRepostTargetPostId(currentPost);
+    if (targetPostId.isEmpty) {
+      _showError('Khong tim thay bai viet goc de dang lai.');
+      return null;
+    }
+
+    final previousState = currentPost.isReposted;
+    _updateLocalRepostState(isReposted: true, isPending: true);
+
     try {
-      final created = await _postService.createRepost(sourcePost: post.value);
+      final created = await _postService.createRepost(sourcePost: currentPost);
+      _updateLocalRepostState(isReposted: true, isPending: false);
       Get.snackbar(
-        'Thông báo',
-        'Đã đăng lại bài viết thành công.',
+        'Thong bao',
+        'Da dang lai bai viet thanh cong.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
       return created;
     } catch (error) {
+      _updateLocalRepostState(isReposted: previousState, isPending: false);
+      _showError(_mapError(error));
+      return null;
+    }
+  }
+
+  Future<PostModel?> undoCurrentRepost() async {
+    final currentPost = post.value;
+
+    final profilePostsController = _profilePostsController;
+    if (profilePostsController != null &&
+        profilePostsController.findPostById(currentPost.postId) != null) {
+      final removed = await profilePostsController.undoRepost(currentPost);
+      _syncPostFromSources();
+      return removed;
+    }
+
+    final feedController = _feedController;
+    if (feedController != null &&
+        feedController.findPostById(currentPost.postId) != null) {
+      final removed = await feedController.undoRepost(currentPost);
+      _syncPostFromSources();
+      return removed;
+    }
+
+    final targetPostId = _postService.resolveRepostTargetPostId(currentPost);
+    if (targetPostId.isEmpty) {
+      _showError('Khong tim thay bai viet goc de huy dang lai.');
+      return null;
+    }
+
+    final previousState = currentPost.isReposted;
+    _updateLocalRepostState(isReposted: false, isPending: true);
+
+    try {
+      final removed = await _postService.undoRepost(sourcePost: currentPost);
+      _updateLocalRepostState(isReposted: false, isPending: false);
+      Get.snackbar(
+        'Thong bao',
+        'Da huy dang lai bai viet.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return removed;
+    } catch (error) {
+      _updateLocalRepostState(isReposted: previousState, isPending: false);
       _showError(_mapError(error));
       return null;
     }
@@ -160,6 +234,16 @@ class PostDetailController extends GetxController {
     _feedController?.adjustShareCount(targetPostId, delta: delta);
   }
 
+  void applyRepostState(String targetPostId, {required bool isReposted}) {
+    final normalizedTargetId = targetPostId.trim();
+    if (normalizedTargetId.isEmpty) return;
+
+    final currentTargetId = _postService.resolveRepostTargetPostId(post.value);
+    if (currentTargetId != normalizedTargetId) return;
+
+    _updateLocalRepostState(isReposted: isReposted, isPending: false);
+  }
+
   void _syncPostFromSources() {
     final latestProfilePost = _profilePostsController?.findPostById(postId);
     if (latestProfilePost != null) {
@@ -170,6 +254,16 @@ class PostDetailController extends GetxController {
     final latestPost = _feedController?.findPostById(postId);
     if (latestPost == null) return;
     post.value = latestPost;
+  }
+
+  void _updateLocalRepostState({
+    required bool isReposted,
+    required bool isPending,
+  }) {
+    post.value = post.value.copyWith(
+      isReposted: isReposted,
+      isRepostPending: isPending,
+    );
   }
 
   Future<void> _toggleLikeFallback() async {
@@ -213,12 +307,12 @@ class PostDetailController extends GetxController {
       return error.message.toString();
     }
 
-    return 'Không thể xử lý bài viết lúc này. Vui lòng thử lại.';
+    return 'KhÃ´ng thá»ƒ xá»­ lÃ½ bÃ i viáº¿t lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
+      'Lá»—i',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

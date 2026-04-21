@@ -29,6 +29,8 @@ class FeedController extends GetxController {
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingPosts = <String>{};
   final Map<String, PostModel> _locallyPrependedPosts = <String, PostModel>{};
+  final Map<String, bool> _repostCache = <String, bool>{};
+  final Set<String> _repostPendingTargetIds = <String>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   @override
@@ -56,7 +58,12 @@ class FeedController extends GetxController {
   }
 
   void prependPost(PostModel post) {
-    if (!post.isPublic) return;
+    if (!post.isPublic || post.postType.isRepostOnly) return;
+
+    final targetPostId = _repostTargetPostIdOf(post);
+    if (targetPostId.isNotEmpty && !_repostCache.containsKey(targetPostId)) {
+      _repostCache[targetPostId] = post.isReposted;
+    }
 
     _locallyPrependedPosts[post.postId] = post;
     _likeCache[post.postId] = post.isLiked;
@@ -94,21 +101,148 @@ class FeedController extends GetxController {
     );
   }
 
+  bool isPostReposted(PostModel sourcePost) {
+    final targetPostId = _repostTargetPostIdOf(sourcePost);
+    if (targetPostId.isEmpty) return false;
+    return _repostCache[targetPostId] ?? false;
+  }
+
+  void applyRepostState(String targetPostId, {required bool isReposted}) {
+    final normalizedTargetId = targetPostId.trim();
+    if (normalizedTargetId.isEmpty) return;
+    _updateRepostStateForTarget(
+      normalizedTargetId,
+      isReposted: isReposted,
+      isPending: false,
+    );
+  }
+
   PostModel? findPostById(String postId) {
     return _findPost(postId);
   }
 
+  Future<PostModel?> fetchPostById(String postId) async {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return null;
+
+    final post = await _service.fetchPostById(normalizedPostId);
+    if (post == null) return null;
+
+    final cachedLikeState =
+        _likeCache[normalizedPostId] ?? _confirmedLikeStates[normalizedPostId];
+    final isLiked =
+        cachedLikeState ?? await _service.isPostLiked(normalizedPostId);
+
+    if (cachedLikeState == null) {
+      _likeCache[normalizedPostId] = isLiked;
+      _confirmedLikeStates[normalizedPostId] = isLiked;
+    }
+
+    final repostTargetPostId = _repostTargetPostIdOf(post);
+    var isReposted = false;
+
+    if (repostTargetPostId.isNotEmpty) {
+      final cachedRepostState = _repostCache[repostTargetPostId];
+      if (cachedRepostState != null) {
+        isReposted = cachedRepostState;
+      } else {
+        final repostStates = await _service.getRepostStates(<String>[
+          repostTargetPostId,
+        ]);
+        isReposted = repostStates[repostTargetPostId] ?? false;
+        _repostCache[repostTargetPostId] = isReposted;
+      }
+    }
+
+    return post.copyWith(
+      isLiked: isLiked,
+      isLikePending: _isLikeSyncPending(normalizedPostId),
+      isReposted: isReposted,
+      isRepostPending: _repostPendingTargetIds.contains(repostTargetPostId),
+    );
+  }
+
   Future<PostModel?> repostPost(PostModel sourcePost) async {
+    final targetPostId = _repostTargetPostIdOf(sourcePost);
+    if (targetPostId.isEmpty) {
+      _showError('Khong tim thay bai viet goc de dang lai.');
+      return null;
+    }
+
+    if (_repostPendingTargetIds.contains(targetPostId)) {
+      return null;
+    }
+
+    final previousState = _repostCache[targetPostId] ?? sourcePost.isReposted;
+    _updateRepostStateForTarget(
+      targetPostId,
+      isReposted: true,
+      isPending: true,
+    );
+
     try {
       final created = await _service.createRepost(sourcePost: sourcePost);
+      _updateRepostStateForTarget(
+        targetPostId,
+        isReposted: true,
+        isPending: false,
+      );
       Get.snackbar(
-        'Thông báo',
-        'Đã đăng lại bài viết thành công.',
+        'Thong bao',
+        'Da dang lai bai viet thanh cong.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
       return created;
     } catch (error) {
+      _updateRepostStateForTarget(
+        targetPostId,
+        isReposted: previousState,
+        isPending: false,
+      );
+      _showError(_mapError(error));
+      return null;
+    }
+  }
+
+  Future<PostModel?> undoRepost(PostModel sourcePost) async {
+    final targetPostId = _repostTargetPostIdOf(sourcePost);
+    if (targetPostId.isEmpty) {
+      _showError('Khong tim thay bai viet goc de huy dang lai.');
+      return null;
+    }
+
+    if (_repostPendingTargetIds.contains(targetPostId)) {
+      return null;
+    }
+
+    final previousState = _repostCache[targetPostId] ?? sourcePost.isReposted;
+    _updateRepostStateForTarget(
+      targetPostId,
+      isReposted: false,
+      isPending: true,
+    );
+
+    try {
+      final removed = await _service.undoRepost(sourcePost: sourcePost);
+      _updateRepostStateForTarget(
+        targetPostId,
+        isReposted: false,
+        isPending: false,
+      );
+      Get.snackbar(
+        'Thong bao',
+        'Da huy dang lai bai viet.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return removed;
+    } catch (error) {
+      _updateRepostStateForTarget(
+        targetPostId,
+        isReposted: previousState,
+        isPending: false,
+      );
       _showError(_mapError(error));
       return null;
     }
@@ -138,7 +272,14 @@ class FeedController extends GetxController {
         limit: _pageSize,
       );
 
-      final hydratedPosts = await _attachLikeStates(page.posts, reset: reset);
+      final likedHydratedPosts = await _attachLikeStates(
+        page.posts,
+        reset: reset,
+      );
+      final hydratedPosts = await _attachRepostStates(
+        likedHydratedPosts,
+        reset: reset,
+      );
 
       if (reset) {
         posts.assignAll(_mergeWithLocallyPrependedPosts(hydratedPosts));
@@ -193,8 +334,8 @@ class FeedController extends GetxController {
 
   void onShareTap() {
     Get.snackbar(
-      'Thông báo',
-      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.',
+      'ThÃ´ng bÃ¡o',
+      'TÃ­nh nÄƒng chia sáº» sáº½ Ä‘Æ°á»£c triá»ƒn khai á»Ÿ bÆ°á»›c tiáº¿p theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -246,6 +387,45 @@ class FeedController extends GetxController {
         .toList(growable: false);
   }
 
+  Future<List<PostModel>> _attachRepostStates(
+    List<PostModel> incoming, {
+    required bool reset,
+  }) async {
+    if (incoming.isEmpty) return incoming;
+
+    final targetPostIds = incoming
+        .map(_repostTargetPostIdOf)
+        .where((postId) => postId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    final idsToFetch =
+        reset
+            ? targetPostIds
+            : targetPostIds
+                .where((postId) => !_repostCache.containsKey(postId))
+                .toList(growable: false);
+
+    if (idsToFetch.isNotEmpty) {
+      final latestStates = await _service.getRepostStates(idsToFetch);
+      _repostCache.addAll(latestStates);
+    }
+
+    return incoming
+        .map((post) {
+          final targetPostId = _repostTargetPostIdOf(post);
+          if (targetPostId.isEmpty) {
+            return post.copyWith(isReposted: false, isRepostPending: false);
+          }
+
+          return post.copyWith(
+            isReposted: _repostCache[targetPostId] ?? false,
+            isRepostPending: _repostPendingTargetIds.contains(targetPostId),
+          );
+        })
+        .toList(growable: false);
+  }
+
   List<PostModel> _mergePosts(
     List<PostModel> current,
     List<PostModel> incoming,
@@ -288,6 +468,53 @@ class FeedController extends GetxController {
     }
     posts[index] = updatedPost;
     posts.refresh();
+  }
+
+  String _repostTargetPostIdOf(PostModel post) {
+    return _service.resolveRepostTargetPostId(post);
+  }
+
+  void _updateRepostStateForTarget(
+    String targetPostId, {
+    required bool isReposted,
+    required bool isPending,
+  }) {
+    if (targetPostId.isEmpty) return;
+
+    _repostCache[targetPostId] = isReposted;
+    if (isPending) {
+      _repostPendingTargetIds.add(targetPostId);
+    } else {
+      _repostPendingTargetIds.remove(targetPostId);
+    }
+
+    var hasChanges = false;
+
+    for (var index = 0; index < posts.length; index++) {
+      final current = posts[index];
+      if (_repostTargetPostIdOf(current) != targetPostId) {
+        continue;
+      }
+
+      if (current.isReposted == isReposted &&
+          current.isRepostPending == isPending) {
+        continue;
+      }
+
+      final updated = current.copyWith(
+        isReposted: isReposted,
+        isRepostPending: isPending,
+      );
+      posts[index] = updated;
+      if (_locallyPrependedPosts.containsKey(updated.postId)) {
+        _locallyPrependedPosts[updated.postId] = updated;
+      }
+      hasChanges = true;
+    }
+
+    if (hasChanges) {
+      posts.refresh();
+    }
   }
 
   bool _isLikeSyncPending(String postId) {
@@ -400,12 +627,12 @@ class FeedController extends GetxController {
       return error.message.toString();
     }
 
-    return 'Không thể tải bảng tin lúc này. Vui lòng thử lại.';
+    return 'KhÃ´ng thá»ƒ táº£i báº£ng tin lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
+      'Lá»—i',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
