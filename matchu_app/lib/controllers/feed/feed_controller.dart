@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
@@ -12,8 +13,10 @@ enum FeedStatus { initial, loading, success, empty, error }
 class FeedController extends GetxController {
   static const int _pageSize = 10;
   static const double _loadMoreThreshold = 640;
+  static const String _hiddenPostsStorageKeyPrefix = 'feed_hidden_posts_';
 
   final PostService _service = PostService();
+  final GetStorage _storage = GetStorage();
 
   final RxList<PostModel> posts = <PostModel>[].obs;
   final Rx<FeedStatus> status = FeedStatus.initial.obs;
@@ -31,6 +34,7 @@ class FeedController extends GetxController {
   final Map<String, PostModel> _locallyPrependedPosts = <String, PostModel>{};
   final Map<String, bool> _repostCache = <String, bool>{};
   final Set<String> _repostPendingTargetIds = <String>{};
+  final Set<String> _hiddenPostIds = <String>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
   String get currentUserId => _service.uid;
@@ -38,8 +42,44 @@ class FeedController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _loadHiddenPostIds();
     scrollController.addListener(_handleScroll);
     loadInitialFeed();
+  }
+
+  bool canHidePostFromFeed(PostModel post) {
+    final normalizedCurrentUserId = currentUserId.trim();
+    if (normalizedCurrentUserId.isEmpty) return false;
+    return post.authorId.trim() != normalizedCurrentUserId;
+  }
+
+  Future<void> hidePostFromFeed(PostModel post) async {
+    if (!canHidePostFromFeed(post)) {
+      return;
+    }
+
+    final normalizedPostId = post.postId.trim();
+    if (normalizedPostId.isEmpty) {
+      return;
+    }
+
+    final isNewHiddenPost = _hiddenPostIds.add(normalizedPostId);
+    if (isNewHiddenPost) {
+      await _persistHiddenPostIds();
+    }
+
+    _removeHiddenPostFromMemory(normalizedPostId);
+
+    if (posts.isEmpty && hasMore.value) {
+      unawaited(loadMore());
+    }
+
+    Get.snackbar(
+      'Thông báo',
+      'Đã ẩn bài viết khỏi bảng tin của bạn.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
   }
 
   Future<void> loadInitialFeed() async {
@@ -61,6 +101,7 @@ class FeedController extends GetxController {
 
   void prependPost(PostModel post) {
     if (!post.isPublic || post.postType.isRepostOnly) return;
+    if (_isPostHidden(post.postId)) return;
 
     final targetPostId = _repostTargetPostIdOf(post);
     if (targetPostId.isNotEmpty && !_repostCache.containsKey(targetPostId)) {
@@ -167,7 +208,7 @@ class FeedController extends GetxController {
   Future<PostModel?> repostPost(PostModel sourcePost) async {
     final targetPostId = _repostTargetPostIdOf(sourcePost);
     if (targetPostId.isEmpty) {
-      _showError('Khong tim thay bai viet goc de dang lai.');
+      _showError('Không tìm thấy bài viết gốc để đăng lại.');
       return null;
     }
 
@@ -190,8 +231,8 @@ class FeedController extends GetxController {
         isPending: false,
       );
       Get.snackbar(
-        'Thong bao',
-        'Da dang lai bai viet thanh cong.',
+        'Thông báo',
+        'Đã đăng lại bài viết thành công.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -210,7 +251,7 @@ class FeedController extends GetxController {
   Future<PostModel?> undoRepost(PostModel sourcePost) async {
     final targetPostId = _repostTargetPostIdOf(sourcePost);
     if (targetPostId.isEmpty) {
-      _showError('Khong tim thay bai viet goc de huy dang lai.');
+      _showError('Không tìm thấy bài viết gốc để hủy đăng lại.');
       return null;
     }
 
@@ -233,8 +274,8 @@ class FeedController extends GetxController {
         isPending: false,
       );
       Get.snackbar(
-        'Thong bao',
-        'Da huy dang lai bai viet.',
+        'Thông báo',
+        'Đã hủy đăng lại bài viết.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -255,8 +296,8 @@ class FeedController extends GetxController {
       final deletedPost = await _service.deletePost(post: post);
       removePostById(deletedPost.postId);
       Get.snackbar(
-        'Thong bao',
-        'Da xoa bai viet.',
+        'Thông báo',
+        'Đã xóa bài viết.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -315,11 +356,12 @@ class FeedController extends GetxController {
         likedHydratedPosts,
         reset: reset,
       );
+      final visibleHydratedPosts = _filterHiddenPosts(hydratedPosts);
 
       if (reset) {
-        posts.assignAll(_mergeWithLocallyPrependedPosts(hydratedPosts));
+        posts.assignAll(_mergeWithLocallyPrependedPosts(visibleHydratedPosts));
       } else {
-        posts.assignAll(_mergePosts(posts, hydratedPosts));
+        posts.assignAll(_mergePosts(posts, visibleHydratedPosts));
       }
 
       _lastDocument = page.lastDocument;
@@ -369,8 +411,8 @@ class FeedController extends GetxController {
 
   void onShareTap() {
     Get.snackbar(
-      'ThÃ´ng bÃ¡o',
-      'TÃ­nh nÄƒng chia sáº» sáº½ Ä‘Æ°á»£c triá»ƒn khai á»Ÿ bÆ°á»›c tiáº¿p theo.',
+      'Thông báo',
+      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -466,10 +508,14 @@ class FeedController extends GetxController {
     List<PostModel> incoming,
   ) {
     final merged = <String, PostModel>{
-      for (final post in current) post.postId: post,
+      for (final post in current)
+        if (!_isPostHidden(post.postId)) post.postId: post,
     };
 
     for (final post in incoming) {
+      if (_isPostHidden(post.postId)) {
+        continue;
+      }
       merged[post.postId] = post;
     }
 
@@ -485,7 +531,12 @@ class FeedController extends GetxController {
   List<PostModel> _mergeWithLocallyPrependedPosts(List<PostModel> incoming) {
     if (_locallyPrependedPosts.isEmpty) return incoming;
 
-    return _mergePosts(incoming, _locallyPrependedPosts.values.toList());
+    final visibleLocalPosts = _locallyPrependedPosts.values
+        .where((post) => !_isPostHidden(post.postId))
+        .toList(growable: false);
+
+    if (visibleLocalPosts.isEmpty) return incoming;
+    return _mergePosts(incoming, visibleLocalPosts);
   }
 
   PostModel? _findPost(String postId) {
@@ -502,6 +553,63 @@ class FeedController extends GetxController {
       _locallyPrependedPosts[updatedPost.postId] = updatedPost;
     }
     posts[index] = updatedPost;
+    posts.refresh();
+  }
+
+  String get _hiddenPostsStorageKey =>
+      '$_hiddenPostsStorageKeyPrefix${currentUserId.trim()}';
+
+  void _loadHiddenPostIds() {
+    final storedValue = _storage.read(_hiddenPostsStorageKey);
+    if (storedValue is! List) {
+      _hiddenPostIds.clear();
+      return;
+    }
+
+    _hiddenPostIds
+      ..clear()
+      ..addAll(
+        storedValue
+            .map((value) => value.toString().trim())
+            .where((postId) => postId.isNotEmpty),
+      );
+  }
+
+  Future<void> _persistHiddenPostIds() {
+    final values = _hiddenPostIds.toList(growable: false);
+    return _storage.write(_hiddenPostsStorageKey, values);
+  }
+
+  bool _isPostHidden(String postId) {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return false;
+    return _hiddenPostIds.contains(normalizedPostId);
+  }
+
+  List<PostModel> _filterHiddenPosts(List<PostModel> incoming) {
+    if (_hiddenPostIds.isEmpty || incoming.isEmpty) {
+      return incoming;
+    }
+
+    return incoming
+        .where((post) => !_hiddenPostIds.contains(post.postId.trim()))
+        .toList(growable: false);
+  }
+
+  void _removeHiddenPostFromMemory(String postId) {
+    posts.removeWhere((post) => post.postId == postId);
+    _locallyPrependedPosts.remove(postId);
+    _likeCache.remove(postId);
+    _confirmedLikeStates.remove(postId);
+    _queuedLikeStates.remove(postId);
+    _likeSyncingPosts.remove(postId);
+
+    if (posts.isEmpty) {
+      status.value = FeedStatus.empty;
+      return;
+    }
+
+    status.value = FeedStatus.success;
     posts.refresh();
   }
 
@@ -662,12 +770,12 @@ class FeedController extends GetxController {
       return error.message.toString();
     }
 
-    return 'KhÃ´ng thá»ƒ táº£i báº£ng tin lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i.';
+    return 'Không thể tải bảng tin lúc này. Vui lòng thử lại.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Lá»—i',
+      'Lỗi',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

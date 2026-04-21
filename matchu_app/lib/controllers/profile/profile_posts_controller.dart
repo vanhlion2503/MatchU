@@ -247,7 +247,7 @@ class ProfilePostsController extends GetxController {
   Future<PostModel?> repostPost(PostModel sourcePost) async {
     final targetPostId = _repostTargetPostIdOf(sourcePost);
     if (targetPostId.isEmpty) {
-      _showError('Khong tim thay bai viet goc de dang lai.');
+      _showError('Không tìm thấy bài viết gốc để đăng lại.');
       return null;
     }
 
@@ -270,8 +270,8 @@ class ProfilePostsController extends GetxController {
         isPending: false,
       );
       Get.snackbar(
-        'Thong bao',
-        'Da dang lai bai viet thanh cong.',
+        'Thông báo',
+        'Đã đăng lại bài viết thành công.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -290,7 +290,7 @@ class ProfilePostsController extends GetxController {
   Future<PostModel?> undoRepost(PostModel sourcePost) async {
     final targetPostId = _repostTargetPostIdOf(sourcePost);
     if (targetPostId.isEmpty) {
-      _showError('Khong tim thay bai viet goc de huy dang lai.');
+      _showError('Không tìm thấy bài viết gốc để hủy đăng lại.');
       return null;
     }
 
@@ -313,8 +313,8 @@ class ProfilePostsController extends GetxController {
         isPending: false,
       );
       Get.snackbar(
-        'Thong bao',
-        'Da huy dang lai bai viet.',
+        'Thông báo',
+        'Đã hủy đăng lại bài viết.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -335,8 +335,8 @@ class ProfilePostsController extends GetxController {
       final deletedPost = await _service.deletePost(post: post);
       removePostById(deletedPost.postId);
       Get.snackbar(
-        'Thong bao',
-        'Da xoa bai viet.',
+        'Thông báo',
+        'Đã xóa bài viết.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -349,8 +349,8 @@ class ProfilePostsController extends GetxController {
 
   void onShareTap() {
     Get.snackbar(
-      'ThÃ´ng bÃ¡o',
-      'TÃ­nh nÄƒng chia sáº» sáº½ Ä‘Æ°á»£c triá»ƒn khai á»Ÿ bÆ°á»›c tiáº¿p theo.',
+      'Thông báo',
+      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -812,12 +812,12 @@ class ProfilePostsController extends GetxController {
       return error.message.toString();
     }
 
-    return 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch bÃ i viáº¿t lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i.';
+    return 'Không thể tải danh sách bài viết lúc này. Vui lòng thử lại.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Lá»—i',
+      'Lỗi',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

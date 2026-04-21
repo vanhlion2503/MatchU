@@ -7,17 +7,23 @@ class PostActionSheet extends StatelessWidget {
   const PostActionSheet({
     super.key,
     required this.post,
+    this.canHidePost = false,
+    this.onHidePostTap,
     this.canDeletePost = false,
     this.onDeleteTap,
   });
 
   final PostModel post;
+  final bool canHidePost;
+  final Future<void> Function()? onHidePostTap;
   final bool canDeletePost;
   final Future<void> Function()? onDeleteTap;
 
   static Future<void> show(
     BuildContext context, {
     required PostModel post,
+    bool canHidePost = false,
+    Future<void> Function()? onHidePostTap,
     bool canDeletePost = false,
     Future<void> Function()? onDeleteTap,
   }) {
@@ -28,6 +34,8 @@ class PostActionSheet extends StatelessWidget {
       builder:
           (_) => PostActionSheet(
             post: post,
+            canHidePost: canHidePost,
+            onHidePostTap: onHidePostTap,
             canDeletePost: canDeletePost,
             onDeleteTap: onDeleteTap,
           ),
@@ -104,14 +112,16 @@ class PostActionSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _PostActionTile(
-                      icon: Iconsax.eye_slash,
-                      title: 'Ẩn bài viết',
-                      subtitle: 'Ẩn bài viết này khỏi trang tin.',
-                      palette: palette,
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(height: 12),
+                    if (canHidePost) ...[
+                      _PostActionTile(
+                        icon: Iconsax.eye_slash,
+                        title: 'Ẩn bài viết',
+                        subtitle: 'Ẩn bài viết này khỏi trang tin.',
+                        palette: palette,
+                        onTap: () => _onHidePostTap(context),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     _PostActionTile(
                       icon: Iconsax.bookmark,
                       title: 'Lưu bài viết',
@@ -169,6 +179,14 @@ class PostActionSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _onHidePostTap(BuildContext context) async {
+    Navigator.of(context).pop();
+    if (onHidePostTap == null) return;
+
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await onHidePostTap!();
   }
 
   Future<void> _onDeletePostTap(BuildContext context) async {

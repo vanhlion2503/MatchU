@@ -47,6 +47,21 @@ class PostDetailController extends GetxController {
   String get postId => post.value.postId;
   String get currentUserId => _postService.uid;
 
+  bool canHidePostFromFeed(PostModel targetPost) {
+    final normalizedCurrentUserId = currentUserId.trim();
+    if (normalizedCurrentUserId.isEmpty) return false;
+    return targetPost.authorId.trim() != normalizedCurrentUserId;
+  }
+
+  Future<void> hidePostFromFeed(PostModel targetPost) async {
+    if (!canHidePostFromFeed(targetPost)) return;
+    final feedController = _feedController;
+    if (feedController == null) return;
+
+    await feedController.hidePostFromFeed(targetPost);
+    _syncPostFromSources();
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -105,8 +120,8 @@ class PostDetailController extends GetxController {
     }
 
     Get.snackbar(
-      'ThÃ´ng bÃ¡o',
-      'TÃ­nh nÄƒng chia sáº» sáº½ Ä‘Æ°á»£c cáº­p nháº­t á»Ÿ bÆ°á»›c tiáº¿p theo.',
+      'Thông báo',
+      'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -137,7 +152,7 @@ class PostDetailController extends GetxController {
 
     final targetPostId = _postService.resolveRepostTargetPostId(currentPost);
     if (targetPostId.isEmpty) {
-      _showError('Khong tim thay bai viet goc de dang lai.');
+      _showError('Không tìm thấy bài viết gốc để đăng lại.');
       return null;
     }
 
@@ -148,8 +163,8 @@ class PostDetailController extends GetxController {
       final created = await _postService.createRepost(sourcePost: currentPost);
       _updateLocalRepostState(isReposted: true, isPending: false);
       Get.snackbar(
-        'Thong bao',
-        'Da dang lai bai viet thanh cong.',
+        'Thông báo',
+        'Đã đăng lại bài viết thành công.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -182,7 +197,7 @@ class PostDetailController extends GetxController {
 
     final targetPostId = _postService.resolveRepostTargetPostId(currentPost);
     if (targetPostId.isEmpty) {
-      _showError('Khong tim thay bai viet goc de huy dang lai.');
+      _showError('Không tìm thấy bài viết gốc để hủy đăng lại.');
       return null;
     }
 
@@ -193,8 +208,8 @@ class PostDetailController extends GetxController {
       final removed = await _postService.undoRepost(sourcePost: currentPost);
       _updateLocalRepostState(isReposted: false, isPending: false);
       Get.snackbar(
-        'Thong bao',
-        'Da huy dang lai bai viet.',
+        'Thông báo',
+        'Đã hủy đăng lại bài viết.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -336,12 +351,12 @@ class PostDetailController extends GetxController {
       return error.message.toString();
     }
 
-    return 'KhÃ´ng thá»ƒ xá»­ lÃ½ bÃ i viáº¿t lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i.';
+    return 'Không thể xử lý bài viết lúc này. Vui lòng thử lại.';
   }
 
   void _showError(String message) {
     Get.snackbar(
-      'Lá»—i',
+      'Lỗi',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

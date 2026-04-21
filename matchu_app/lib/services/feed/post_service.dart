@@ -205,16 +205,12 @@ class PostService {
     bool isPublic = true,
   }) async {
     if (uid.isEmpty) {
-      throw StateError(
-        'Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ Ä‘Äƒng láº¡i bÃ i viáº¿t.',
-      );
+      throw StateError('Bạn cần đăng nhập để đăng lại bài viết.');
     }
 
     final referencePost = _resolveReferencePost(sourcePost);
     if (referencePost.postId.trim().isEmpty) {
-      throw StateError(
-        'KhÃ´ng tÃ¬m tháº¥y bÃ i viáº¿t gá»‘c Ä‘á»ƒ Ä‘Äƒng láº¡i.',
-      );
+      throw StateError('Không tìm thấy bài viết gốc để đăng lại.');
     }
 
     final repostRef = _postsRef.doc(_repostDocId(referencePost.postId));
@@ -222,7 +218,7 @@ class PostService {
     if (existingSnap.exists) {
       final existing = PostModel.fromDoc(existingSnap);
       if (existing.deletedAt == null) {
-        throw StateError('Báº¡n Ä‘Ã£ Ä‘Äƒng láº¡i bÃ i viáº¿t nÃ y rá»“i.');
+        throw StateError('Bạn đã đăng lại bài viết này rồi.');
       }
     }
 
@@ -283,13 +279,13 @@ class PostService {
 
   Future<PostModel> undoRepost({required PostModel sourcePost}) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de huy dang lai.');
+      throw StateError('Bạn cần đăng nhập để hủy đăng lại.');
     }
 
     final referencePost = _resolveReferencePost(sourcePost);
     final referencePostId = referencePost.postId.trim();
     if (referencePostId.isEmpty) {
-      throw StateError('Khong tim thay bai viet goc de huy dang lai.');
+      throw StateError('Không tìm thấy bài viết gốc để hủy đăng lại.');
     }
 
     final repostRef = _postsRef.doc(_repostDocId(referencePostId));
@@ -297,16 +293,16 @@ class PostService {
     return _firestore.runTransaction((transaction) async {
       final repostSnap = await transaction.get(repostRef);
       if (!repostSnap.exists) {
-        throw StateError('Ban chua dang lai bai viet nay.');
+        throw StateError('Bạn chưa đăng lại bài viết này.');
       }
 
       final repost = PostModel.fromDoc(repostSnap);
       if (repost.deletedAt != null) {
-        throw StateError('Ban chua dang lai bai viet nay.');
+        throw StateError('Bạn chưa đăng lại bài viết này.');
       }
 
       if (repost.authorId != uid) {
-        throw StateError('Ban khong the huy dang lai bai viet nay.');
+        throw StateError('Bạn không thể hủy đăng lại bài viết này.');
       }
 
       final resolvedReferencePostId =
@@ -349,12 +345,12 @@ class PostService {
 
   Future<PostModel> deletePost({required PostModel post}) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de xoa bai viet.');
+      throw StateError('Bạn cần đăng nhập để xóa bài viết.');
     }
 
     final normalizedPostId = post.postId.trim();
     if (normalizedPostId.isEmpty) {
-      throw StateError('Khong tim thay bai viet de xoa.');
+      throw StateError('Không tìm thấy bài viết để xóa.');
     }
 
     final postRef = _postsRef.doc(normalizedPostId);
@@ -362,16 +358,16 @@ class PostService {
     return _firestore.runTransaction((transaction) async {
       final postSnap = await transaction.get(postRef);
       if (!postSnap.exists) {
-        throw StateError('Bai viet khong con ton tai.');
+        throw StateError('Bài viết không còn tồn tại.');
       }
 
       final existingPost = PostModel.fromDoc(postSnap);
       if (existingPost.deletedAt != null) {
-        throw StateError('Bai viet da duoc xoa truoc do.');
+        throw StateError('Bài viết đã được xóa trước đó.');
       }
 
       if (existingPost.authorId != uid) {
-        throw StateError('Ban khong the xoa bai viet nay.');
+        throw StateError('Bạn không thể xóa bài viết này.');
       }
 
       final referencePostId = existingPost.referencePostId?.trim() ?? '';
@@ -421,29 +417,25 @@ class PostService {
     DocumentReference<Map<String, dynamic>>? explicitPostRef,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ Ä‘Äƒng bÃ i viáº¿t.');
+      throw StateError('Bạn cần đăng nhập để đăng bài viết.');
     }
 
     final normalizedContent = content.trim();
     if (normalizedContent.length > maxContentLength) {
-      throw StateError(
-        'Ná»™i dung bÃ i viáº¿t khÃ´ng Ä‘Æ°á»£c vÆ°á»£t quÃ¡ 300 kÃ½ tá»±.',
-      );
+      throw StateError('Nội dung bài viết không được vượt quá 300 ký tự.');
     }
 
     final hasBody = normalizedContent.isNotEmpty || mediaDrafts.isNotEmpty;
     if (!postType.requiresReference && !hasBody) {
-      throw StateError('BÃ i viáº¿t cáº§n cÃ³ ná»™i dung hoáº·c media.');
+      throw StateError('Bài viết cần có nội dung hoặc media.');
     }
 
     if (postType == PostType.repost && hasBody) {
-      throw StateError(
-        'ÄÄƒng láº¡i khÃ´ng kÃ¨m ná»™i dung hoáº·c tá»‡p Ä‘Ã­nh kÃ¨m.',
-      );
+      throw StateError('Đăng lại không kèm nội dung hoặc tệp đính kèm.');
     }
 
     if (postType.requiresReference && referencePost == null) {
-      throw StateError('Dáº¡ng bÃ i nÃ y cáº§n cÃ³ bÃ i viáº¿t gá»‘c.');
+      throw StateError('Dạng bài này cần có bài viết gốc.');
     }
 
     final author = await _resolveCurrentAuthor();
@@ -568,9 +560,7 @@ class PostService {
     required bool shouldLike,
   }) async {
     if (uid.isEmpty) {
-      throw StateError(
-        'Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ tÆ°Æ¡ng tÃ¡c vá»›i bÃ i viáº¿t.',
-      );
+      throw StateError('Bạn cần đăng nhập để tương tác với bài viết.');
     }
 
     final postRef = _postsRef.doc(postId);
@@ -579,7 +569,7 @@ class PostService {
     await _firestore.runTransaction((transaction) async {
       final postSnap = await transaction.get(postRef);
       if (!postSnap.exists) {
-        throw StateError('BÃ i viáº¿t khÃ´ng cÃ²n tá»“n táº¡i.');
+        throw StateError('Bài viết không còn tồn tại.');
       }
 
       final likeSnap = await transaction.get(likeRef);
@@ -619,9 +609,7 @@ class PostService {
   Future<PostAuthorModel> _resolveCurrentAuthor() async {
     final user = await _userService.getUser(uid);
     if (user == null) {
-      throw StateError(
-        'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin ngÆ°á»i dÃ¹ng hiá»‡n táº¡i.',
-      );
+      throw StateError('Không tìm thấy thông tin người dùng hiện tại.');
     }
 
     return _authorFromUser(user);
@@ -710,7 +698,7 @@ class PostService {
     return PostAuthorModel(
       id: user.uid,
       nickname: nickname,
-      name: displayName.isNotEmpty ? displayName : 'NgÆ°á»i dÃ¹ng',
+      name: displayName.isNotEmpty ? displayName : 'Người dùng',
       avatar: user.avatarUrl,
       isVerified: user.isFaceVerified,
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
@@ -386,13 +387,25 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     final currentUserId = controller.currentUserId.trim();
     final canDeletePost =
         currentUserId.isNotEmpty && post.authorId.trim() == currentUserId;
+    final canHidePost =
+        currentUserId.isNotEmpty && post.authorId.trim() != currentUserId;
 
     return PostActionSheet.show(
       context,
       post: post,
+      canHidePost: canHidePost,
+      onHidePostTap: canHidePost ? () => _hidePostFromFeed(post) : null,
       canDeletePost: canDeletePost,
       onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
     );
+  }
+
+  Future<void> _hidePostFromFeed(PostModel post) async {
+    if (!Get.isRegistered<FeedController>()) {
+      return;
+    }
+
+    await Get.find<FeedController>().hidePostFromFeed(post);
   }
 
   Future<void> _openRepostSheet(BuildContext context, PostModel post) {

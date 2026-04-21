@@ -142,10 +142,14 @@ class FeedScreen extends GetView<FeedController> {
     final currentUserId = controller.currentUserId.trim();
     final canDeletePost =
         currentUserId.isNotEmpty && post.authorId.trim() == currentUserId;
+    final canHidePost = controller.canHidePostFromFeed(post);
 
     return PostActionSheet.show(
       context,
       post: post,
+      canHidePost: canHidePost,
+      onHidePostTap:
+          canHidePost ? () => controller.hidePostFromFeed(post) : null,
       canDeletePost: canDeletePost,
       onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
     );
