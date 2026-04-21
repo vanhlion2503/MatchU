@@ -33,6 +33,8 @@ class FeedController extends GetxController {
   final Set<String> _repostPendingTargetIds = <String>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
 
+  String get currentUserId => _service.uid;
+
   @override
   void onInit() {
     super.onInit();
@@ -245,6 +247,39 @@ class FeedController extends GetxController {
       );
       _showError(_mapError(error));
       return null;
+    }
+  }
+
+  Future<PostModel?> deletePost(PostModel post) async {
+    try {
+      final deletedPost = await _service.deletePost(post: post);
+      removePostById(deletedPost.postId);
+      Get.snackbar(
+        'Thong bao',
+        'Da xoa bai viet.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return deletedPost;
+    } catch (error) {
+      _showError(_mapError(error));
+      return null;
+    }
+  }
+
+  void removePostById(String postId) {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    posts.removeWhere((post) => post.postId == normalizedPostId);
+    _locallyPrependedPosts.remove(normalizedPostId);
+    _likeCache.remove(normalizedPostId);
+    _confirmedLikeStates.remove(normalizedPostId);
+    _queuedLikeStates.remove(normalizedPostId);
+    _likeSyncingPosts.remove(normalizedPostId);
+
+    if (posts.isEmpty) {
+      status.value = FeedStatus.empty;
     }
   }
 

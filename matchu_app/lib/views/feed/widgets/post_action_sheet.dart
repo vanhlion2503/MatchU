@@ -4,16 +4,33 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class PostActionSheet extends StatelessWidget {
-  const PostActionSheet({super.key, required this.post});
+  const PostActionSheet({
+    super.key,
+    required this.post,
+    this.canDeletePost = false,
+    this.onDeleteTap,
+  });
 
   final PostModel post;
+  final bool canDeletePost;
+  final Future<void> Function()? onDeleteTap;
 
-  static Future<void> show(BuildContext context, {required PostModel post}) {
+  static Future<void> show(
+    BuildContext context, {
+    required PostModel post,
+    bool canDeletePost = false,
+    Future<void> Function()? onDeleteTap,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => PostActionSheet(post: post),
+      builder:
+          (_) => PostActionSheet(
+            post: post,
+            canDeletePost: canDeletePost,
+            onDeleteTap: onDeleteTap,
+          ),
     );
   }
 
@@ -121,6 +138,19 @@ class PostActionSheet extends StatelessWidget {
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),
+                    if (canDeletePost) ...[
+                      const SizedBox(height: 12),
+                      _PostActionTile(
+                        icon: Iconsax.trash,
+                        title: 'Xóa bài viết',
+                        subtitle:
+                            'Xóa vĩnh viễn bài viết này khỏi tài khoản của bạn.',
+                        palette: palette,
+                        iconColor: theme.colorScheme.error,
+                        textColor: theme.colorScheme.error,
+                        onTap: () => _onDeletePostTap(context),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _PostActionTile(
                       icon: Iconsax.flag,
@@ -136,6 +166,142 @@ class PostActionSheet extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onDeletePostTap(BuildContext context) async {
+    final shouldDelete = await _confirmDeletePost(context);
+    if (!shouldDelete) return;
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop();
+    if (onDeleteTap == null) return;
+
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await onDeleteTap!();
+  }
+
+  Future<bool> _confirmDeletePost(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final palette = FeedPalette.of(dialogContext);
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: palette.border),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadowColor,
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Xóa bài viết',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Bạn có muốn xóa bài viết này vĩnh viễn?',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: palette.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DeleteDialogButton(
+                        label: 'Không',
+                        onTap: () => Navigator.of(dialogContext).pop(false),
+                        backgroundColor: palette.surfaceMuted,
+                        borderColor: palette.border,
+                        textColor: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _DeleteDialogButton(
+                        label: 'Có',
+                        onTap: () => Navigator.of(dialogContext).pop(true),
+                        backgroundColor: theme.colorScheme.error,
+                        borderColor: theme.colorScheme.error,
+                        textColor: theme.colorScheme.onError,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+}
+
+class _DeleteDialogButton extends StatelessWidget {
+  const _DeleteDialogButton({
+    required this.label,
+    required this.onTap,
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.textColor,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final Color backgroundColor;
+  final Color borderColor;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Ink(
+          height: 44,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: textColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
         ),
       ),
     );

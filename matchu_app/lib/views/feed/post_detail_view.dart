@@ -69,7 +69,16 @@ class _PostDetailViewState extends State<PostDetailView> {
   }
 
   Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
-    return PostActionSheet.show(context, post: post);
+    final currentUserId = controller.currentUserId.trim();
+    final canDeletePost =
+        currentUserId.isNotEmpty && post.authorId.trim() == currentUserId;
+
+    return PostActionSheet.show(
+      context,
+      post: post,
+      canDeletePost: canDeletePost,
+      onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
+    );
   }
 
   Future<void> _openRepostSheet(BuildContext context, PostModel post) {
@@ -98,6 +107,17 @@ class _PostDetailViewState extends State<PostDetailView> {
   Future<void> _undoRepostPost() async {
     final removedPost = await controller.undoCurrentRepost();
     _handlePostRemoved(removedPost);
+  }
+
+  Future<void> _deletePost(PostModel post) async {
+    if (post.postId.trim() != controller.post.value.postId.trim()) return;
+
+    final deletedPost = await controller.deleteCurrentPost();
+    if (deletedPost == null) return;
+
+    PostCreationSync.syncPostDeleted(deletedPost);
+    if (!mounted) return;
+    Get.back();
   }
 
   void _handlePostCreated(PostModel? createdPost) {

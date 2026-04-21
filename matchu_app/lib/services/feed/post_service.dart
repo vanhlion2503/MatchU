@@ -347,6 +347,70 @@ class PostService {
     });
   }
 
+  Future<PostModel> deletePost({required PostModel post}) async {
+    if (uid.isEmpty) {
+      throw StateError('Ban can dang nhap de xoa bai viet.');
+    }
+
+    final normalizedPostId = post.postId.trim();
+    if (normalizedPostId.isEmpty) {
+      throw StateError('Khong tim thay bai viet de xoa.');
+    }
+
+    final postRef = _postsRef.doc(normalizedPostId);
+
+    return _firestore.runTransaction((transaction) async {
+      final postSnap = await transaction.get(postRef);
+      if (!postSnap.exists) {
+        throw StateError('Bai viet khong con ton tai.');
+      }
+
+      final existingPost = PostModel.fromDoc(postSnap);
+      if (existingPost.deletedAt != null) {
+        throw StateError('Bai viet da duoc xoa truoc do.');
+      }
+
+      if (existingPost.authorId != uid) {
+        throw StateError('Ban khong the xoa bai viet nay.');
+      }
+
+      final referencePostId = existingPost.referencePostId?.trim() ?? '';
+      if (referencePostId.isNotEmpty) {
+        final referencePostRef = _postsRef.doc(referencePostId);
+        final referenceSnap = await transaction.get(referencePostRef);
+
+        if (referenceSnap.exists) {
+          final referenceData = referenceSnap.data() ?? <String, dynamic>{};
+          final rawStats = referenceData['stats'];
+          final statsMap =
+              rawStats is Map
+                  ? Map<String, dynamic>.from(rawStats)
+                  : const <String, dynamic>{};
+          final currentShareCount =
+              (statsMap['shareCount'] as num?)?.toInt() ?? 0;
+
+          transaction.update(referencePostRef, {
+            'stats.shareCount':
+                currentShareCount > 0 ? currentShareCount - 1 : 0,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      transaction.update(postRef, {
+        'deletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(_firestore.collection('users').doc(uid), {
+        'totalPosts': FieldValue.increment(-1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return existingPost;
+    });
+  }
+
   Future<PostModel> _createPost({
     required PostType postType,
     required String content,

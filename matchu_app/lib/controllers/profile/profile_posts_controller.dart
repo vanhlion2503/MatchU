@@ -53,6 +53,7 @@ class ProfilePostsController extends GetxController {
   final Set<String> _repostReferenceLoadingIds = <String>{};
   final Set<String> _fetchedRepostReferenceIds = <String>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
+  String get currentUserId => _service.uid;
 
   @override
   void onInit() {
@@ -215,6 +216,9 @@ class ProfilePostsController extends GetxController {
     _confirmedLikeStates.remove(normalizedPostId);
     _queuedLikeStates.remove(normalizedPostId);
     _likeSyncingPosts.remove(normalizedPostId);
+    _resolvedRepostPostsByReferenceId.remove(normalizedPostId);
+    _repostReferenceLoadingIds.remove(normalizedPostId);
+    _fetchedRepostReferenceIds.remove(normalizedPostId);
 
     if (posts.isEmpty) {
       status.value = ProfilePostsStatus.empty;
@@ -321,6 +325,23 @@ class ProfilePostsController extends GetxController {
         isReposted: previousState,
         isPending: false,
       );
+      _showError(_mapError(error));
+      return null;
+    }
+  }
+
+  Future<PostModel?> deletePost(PostModel post) async {
+    try {
+      final deletedPost = await _service.deletePost(post: post);
+      removePostById(deletedPost.postId);
+      Get.snackbar(
+        'Thong bao',
+        'Da xoa bai viet.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return deletedPost;
+    } catch (error) {
       _showError(_mapError(error));
       return null;
     }

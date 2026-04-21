@@ -380,7 +380,19 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   }
 
   Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
-    return PostActionSheet.show(context, post: post);
+    final controller = Get.find<ProfilePostsController>(
+      tag: widget.controllerTag,
+    );
+    final currentUserId = controller.currentUserId.trim();
+    final canDeletePost =
+        currentUserId.isNotEmpty && post.authorId.trim() == currentUserId;
+
+    return PostActionSheet.show(
+      context,
+      post: post,
+      canDeletePost: canDeletePost,
+      onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
+    );
   }
 
   Future<void> _openRepostSheet(BuildContext context, PostModel post) {
@@ -417,6 +429,14 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     _handlePostRemoved(removedPost);
   }
 
+  Future<void> _deletePost(PostModel post) async {
+    final controller = Get.find<ProfilePostsController>(
+      tag: widget.controllerTag,
+    );
+    final deletedPost = await controller.deletePost(post);
+    _handlePostDeleted(deletedPost);
+  }
+
   void _handlePostCreated(PostModel? createdPost) {
     if (createdPost == null) return;
 
@@ -434,6 +454,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   void _handlePostRemoved(PostModel? removedPost) {
     if (removedPost == null) return;
     PostCreationSync.syncRepostRemoved(removedPost);
+  }
+
+  void _handlePostDeleted(PostModel? deletedPost) {
+    if (deletedPost == null) return;
+    PostCreationSync.syncPostDeleted(deletedPost);
   }
 }
 

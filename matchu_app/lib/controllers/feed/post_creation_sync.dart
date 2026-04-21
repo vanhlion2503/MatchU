@@ -33,6 +33,41 @@ class PostCreationSync {
     _syncRepostState(repostPost, isReposted: false);
   }
 
+  static void syncPostDeleted(PostModel post) {
+    _removePostFromFeedAndProfiles(post);
+    if (post.postType.requiresReference) {
+      _syncShareCount(post, delta: -1);
+    }
+    if (post.postType.isRepostOnly) {
+      _syncRepostState(post, isReposted: false);
+    }
+  }
+
+  static void _removePostFromFeedAndProfiles(PostModel post) {
+    if (Get.isRegistered<FeedController>()) {
+      Get.find<FeedController>().removePostById(post.postId);
+    }
+
+    final candidateTags = <String>{
+      ...ProfilePostsController.selfProfileTags(post.authorId),
+      ProfilePostsController.otherProfileTag(
+        post.authorId,
+        includePrivate: false,
+      ),
+      ProfilePostsController.otherProfileTag(
+        post.authorId,
+        includePrivate: true,
+      ),
+    };
+
+    for (final tag in candidateTags) {
+      if (!Get.isRegistered<ProfilePostsController>(tag: tag)) {
+        continue;
+      }
+      Get.find<ProfilePostsController>(tag: tag).removePostById(post.postId);
+    }
+  }
+
   static void _removeRepostFromSelfProfiles(PostModel repostPost) {
     final candidateTags = <String>{
       ...ProfilePostsController.selfProfileTags(repostPost.authorId),

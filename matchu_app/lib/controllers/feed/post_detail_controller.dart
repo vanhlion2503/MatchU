@@ -45,6 +45,7 @@ class PostDetailController extends GetxController {
   Worker? _profileWorker;
 
   String get postId => post.value.postId;
+  String get currentUserId => _postService.uid;
 
   @override
   void onInit() {
@@ -200,6 +201,34 @@ class PostDetailController extends GetxController {
       return removed;
     } catch (error) {
       _updateLocalRepostState(isReposted: previousState, isPending: false);
+      _showError(_mapError(error));
+      return null;
+    }
+  }
+
+  Future<PostModel?> deleteCurrentPost() async {
+    final currentPost = post.value;
+
+    final profilePostsController = _profilePostsController;
+    if (profilePostsController != null &&
+        profilePostsController.findPostById(currentPost.postId) != null) {
+      final deleted = await profilePostsController.deletePost(currentPost);
+      _syncPostFromSources();
+      return deleted;
+    }
+
+    final feedController = _feedController;
+    if (feedController != null &&
+        feedController.findPostById(currentPost.postId) != null) {
+      final deleted = await feedController.deletePost(currentPost);
+      _syncPostFromSources();
+      return deleted;
+    }
+
+    try {
+      final deletedPost = await _postService.deletePost(post: currentPost);
+      return deletedPost;
+    } catch (error) {
       _showError(_mapError(error));
       return null;
     }
