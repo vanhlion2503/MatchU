@@ -112,6 +112,33 @@ class PostDetailController extends GetxController {
     await _toggleLikeFallback();
   }
 
+  Future<void> toggleSave() async {
+    final previousSavedState = post.value.isSaved;
+    final profilePostsController = _profilePostsController;
+    if (profilePostsController != null &&
+        profilePostsController.findPostById(postId) != null) {
+      await profilePostsController.toggleSave(postId);
+      _syncPostFromSources();
+      if (post.value.postId == postId &&
+          post.value.isSaved == previousSavedState) {
+        post.value = post.value.copyWith(
+          isSaved: !previousSavedState,
+          isSavePending: false,
+        );
+      }
+      return;
+    }
+
+    final feedController = _feedController;
+    if (feedController != null && feedController.findPostById(postId) != null) {
+      await feedController.toggleSave(postId);
+      _syncPostFromSources();
+      return;
+    }
+
+    await _toggleSaveFallback();
+  }
+
   void sharePost() {
     final feedController = _feedController;
     if (feedController != null) {
@@ -330,6 +357,32 @@ class PostDetailController extends GetxController {
       }
 
       post.value = post.value.copyWith(isLikePending: false);
+    } catch (error) {
+      post.value = currentPost;
+      _showError(_mapError(error));
+    }
+  }
+
+  Future<void> _toggleSaveFallback() async {
+    final currentPost = post.value;
+    final shouldSave = !currentPost.isSaved;
+
+    post.value = currentPost.copyWith(isSaved: shouldSave, isSavePending: true);
+
+    try {
+      if (shouldSave) {
+        await _postService.savePost(postId);
+      } else {
+        await _postService.unsavePost(postId);
+      }
+
+      post.value = post.value.copyWith(isSavePending: false);
+      Get.snackbar(
+        'Thông báo',
+        shouldSave ? 'Đã lưu bài viết vào lưu trữ.' : 'Đã bỏ lưu bài viết.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
     } catch (error) {
       post.value = currentPost;
       _showError(_mapError(error));

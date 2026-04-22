@@ -27,6 +27,7 @@ class PostService {
 
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
+  static const int _whereInLimit = 30;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -37,6 +38,57 @@ class PostService {
       _firestore.collection('posts');
 
   String get uid => _auth.currentUser?.uid ?? '';
+
+  CollectionReference<Map<String, dynamic>> _savedPostsRef(String userId) {
+    return _firestore.collection('users').doc(userId).collection('savedPosts');
+  }
+
+  Future<String?> _resolveAuthenticatedUid({bool forceRefresh = false}) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+
+    final normalizedUid = user.uid.trim();
+    if (normalizedUid.isEmpty) return null;
+
+    try {
+      await user.getIdToken(forceRefresh);
+    } catch (_) {
+      return null;
+    }
+
+    final latestUid = _auth.currentUser?.uid.trim() ?? '';
+    if (latestUid.isEmpty || latestUid != normalizedUid) {
+      return null;
+    }
+
+    return latestUid;
+  }
+
+  Future<T> _runSavedReadsWithAuthRetry<T>({
+    required Future<T> Function(String authenticatedUid) action,
+    required T fallbackValue,
+  }) async {
+    final firstUid = await _resolveAuthenticatedUid();
+    if (firstUid == null) return fallbackValue;
+
+    try {
+      return await action(firstUid);
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') rethrow;
+    }
+
+    final refreshedUid = await _resolveAuthenticatedUid(forceRefresh: true);
+    if (refreshedUid == null) return fallbackValue;
+
+    try {
+      return await action(refreshedUid);
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') {
+        return fallbackValue;
+      }
+      rethrow;
+    }
+  }
 
   Future<PostPageResult> fetchLatestPosts({
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
@@ -166,6 +218,106 @@ class PostService {
     final post = PostModel.fromDoc(doc);
     if (post.deletedAt != null) return null;
     return post;
+  }
+
+  Future<PostPageResult> fetchSavedPosts({
+    required String userId,
+    DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int limit = defaultPageSize,
+  }) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return const PostPageResult(
+        posts: <PostModel>[],
+        lastDocument: null,
+        hasMore: false,
+      );
+    }
+
+    return _runSavedReadsWithAuthRetry(
+      action: (authenticatedUid) async {
+        if (authenticatedUid != normalizedUserId) {
+          throw StateError('Bạn không có quyền xem danh sách lưu trữ này.');
+        }
+
+        final collectedPosts = <PostModel>[];
+        final savedAtByPostId = <String, DateTime?>{};
+        DocumentSnapshot<Map<String, dynamic>>? cursor = startAfter;
+        var canLoadMore = true;
+
+        while (collectedPosts.length < limit && canLoadMore) {
+          final remaining = limit - collectedPosts.length;
+          var query = _savedPostsRef(
+            authenticatedUid,
+          ).orderBy('savedAt', descending: true);
+          query = query.limit(remaining * 2);
+
+          if (cursor != null) {
+            query = query.startAfterDocument(cursor);
+          }
+
+          final snapshot = await query.get();
+          final docs = snapshot.docs;
+
+          if (docs.isEmpty) {
+            canLoadMore = false;
+            break;
+          }
+
+          cursor = docs.last;
+
+          for (final doc in docs) {
+            final savedData = doc.data();
+            final postId = (savedData['postId'] ?? doc.id).toString().trim();
+            if (postId.isEmpty) continue;
+
+            try {
+              final postSnap = await _postsRef.doc(postId).get();
+              if (!postSnap.exists) continue;
+
+              final post = PostModel.fromDoc(postSnap);
+              if (post.deletedAt != null) continue;
+              if (!post.isPublic && post.authorId.trim() != authenticatedUid) {
+                continue;
+              }
+
+              final isDuplicated = collectedPosts.any(
+                (item) => item.postId == post.postId,
+              );
+              if (isDuplicated) continue;
+
+              collectedPosts.add(post);
+              savedAtByPostId[post.postId] = _asDateTime(savedData['savedAt']);
+
+              if (collectedPosts.length == limit) {
+                break;
+              }
+            } on FirebaseException catch (error) {
+              if (error.code == 'permission-denied') {
+                continue;
+              }
+              rethrow;
+            }
+          }
+
+          if (docs.length < remaining * 2) {
+            canLoadMore = false;
+          }
+        }
+
+        return PostPageResult(
+          posts: collectedPosts,
+          lastDocument: cursor,
+          hasMore: canLoadMore,
+          savedAtByPostId: savedAtByPostId,
+        );
+      },
+      fallbackValue: const PostPageResult(
+        posts: <PostModel>[],
+        lastDocument: null,
+        hasMore: false,
+      ),
+    );
   }
 
   Future<PostModel> createPost({
@@ -540,6 +692,72 @@ class PostService {
     return Map<String, bool>.fromEntries(entries);
   }
 
+  Future<Map<String, bool>> getSavedStates(List<String> postIds) async {
+    final normalizedIds = postIds
+        .map((postId) => postId.trim())
+        .where((postId) => postId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (normalizedIds.isEmpty) {
+      return const {};
+    }
+
+    final defaultStates = {for (final postId in normalizedIds) postId: false};
+
+    return _runSavedReadsWithAuthRetry(
+      action: (authenticatedUid) async {
+        final resolvedStates = Map<String, bool>.from(defaultStates);
+
+        for (
+          var index = 0;
+          index < normalizedIds.length;
+          index += _whereInLimit
+        ) {
+          final end =
+              index + _whereInLimit < normalizedIds.length
+                  ? index + _whereInLimit
+                  : normalizedIds.length;
+          final chunk = normalizedIds.sublist(index, end);
+
+          final snapshot =
+              await _savedPostsRef(
+                authenticatedUid,
+              ).where(FieldPath.documentId, whereIn: chunk).get();
+
+          for (final doc in snapshot.docs) {
+            resolvedStates[doc.id] = true;
+          }
+        }
+
+        return resolvedStates;
+      },
+      fallbackValue: defaultStates,
+    );
+  }
+
+  Future<bool> isPostSaved(String postId) async {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return false;
+
+    return _runSavedReadsWithAuthRetry(
+      action: (authenticatedUid) async {
+        final savedDoc =
+            await _savedPostsRef(authenticatedUid).doc(normalizedPostId).get();
+        return savedDoc.exists;
+      },
+      fallbackValue: false,
+    );
+  }
+
+  Future<void> savePost(String postId) {
+    return _setSaved(postId: postId, shouldSave: true);
+  }
+
+  Future<void> unsavePost(String postId) {
+    return _setSaved(postId: postId, shouldSave: false);
+  }
+
   Future<bool> isPostLiked(String postId) async {
     if (uid.isEmpty) return false;
     final likeDoc =
@@ -603,6 +821,59 @@ class PostService {
         'stats.likeCount': currentLikeCount > 0 ? currentLikeCount - 1 : 0,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+    });
+  }
+
+  Future<void> _setSaved({
+    required String postId,
+    required bool shouldSave,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError('Bạn cần đăng nhập để lưu bài viết.');
+    }
+
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) {
+      throw StateError('Không tìm thấy bài viết để lưu.');
+    }
+
+    final postRef = _postsRef.doc(normalizedPostId);
+    final savedRef = _savedPostsRef(uid).doc(normalizedPostId);
+
+    await _firestore.runTransaction((transaction) async {
+      final postSnap = await transaction.get(postRef);
+      if (!postSnap.exists) {
+        throw StateError('Bài viết không còn tồn tại.');
+      }
+
+      final postData = postSnap.data() ?? const <String, dynamic>{};
+      final isDeleted = postData['deletedAt'] != null;
+      if (isDeleted) {
+        throw StateError('Bài viết này không còn khả dụng.');
+      }
+
+      final isPublic = postData['isPublic'] == true;
+      final authorId = (postData['authorId'] ?? '').toString().trim();
+      if (!isPublic && authorId != uid) {
+        throw StateError('Bạn không thể lưu bài viết riêng tư này.');
+      }
+
+      final savedSnap = await transaction.get(savedRef);
+
+      if (shouldSave) {
+        if (savedSnap.exists) return;
+
+        transaction.set(savedRef, {
+          'postId': normalizedPostId,
+          'userId': uid,
+          'savedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      if (!savedSnap.exists) return;
+      transaction.delete(savedRef);
     });
   }
 
@@ -736,5 +1007,13 @@ class PostService {
     final segments = fileName.toLowerCase().split('.');
     if (segments.length < 2) return 'mp4';
     return segments.last;
+  }
+
+  DateTime? _asDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 }

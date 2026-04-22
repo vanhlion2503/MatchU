@@ -18,10 +18,12 @@ class ProfilePostsSection extends StatefulWidget {
     super.key,
     required this.controllerTag,
     required this.isOwnerView,
+    this.savedControllerTag,
   });
 
   final String controllerTag;
   final bool isOwnerView;
+  final String? savedControllerTag;
 
   @override
   State<ProfilePostsSection> createState() => _ProfilePostsSectionState();
@@ -29,13 +31,41 @@ class ProfilePostsSection extends StatefulWidget {
 
 class _ProfilePostsSectionState extends State<ProfilePostsSection>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+  late TabController _tabController;
+
+  bool get _showSavedTab =>
+      widget.isOwnerView && (widget.savedControllerTag?.isNotEmpty ?? false);
+
+  int get _tabCount => _showSavedTab ? 3 : 2;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this)
+    _tabController = TabController(length: _tabCount, vsync: this)
       ..addListener(_handleTabChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfilePostsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldShowSavedTab =
+        oldWidget.isOwnerView &&
+        (oldWidget.savedControllerTag?.isNotEmpty ?? false);
+    final newShowSavedTab = _showSavedTab;
+    if (oldShowSavedTab == newShowSavedTab) {
+      return;
+    }
+
+    final nextLength = _tabCount;
+    final nextIndex = _tabController.index.clamp(0, nextLength - 1).toInt();
+    _tabController
+      ..removeListener(_handleTabChanged)
+      ..dispose();
+    _tabController = TabController(
+      length: nextLength,
+      vsync: this,
+      initialIndex: nextIndex,
+    )..addListener(_handleTabChanged);
   }
 
   @override
@@ -53,76 +83,132 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<ProfilePostsController>(
+    final postsController = Get.find<ProfilePostsController>(
       tag: widget.controllerTag,
     );
+    final savedControllerTag = widget.savedControllerTag;
+    final savedController =
+        _showSavedTab &&
+                savedControllerTag != null &&
+                Get.isRegistered<ProfilePostsController>(
+                  tag: savedControllerTag,
+                )
+            ? Get.find<ProfilePostsController>(tag: savedControllerTag)
+            : null;
+    final canShowSavedTab = _showSavedTab && savedController != null;
     final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
 
     return Obx(() {
-      final status = controller.status.value;
-      final allPosts = controller.posts.toList(growable: false);
+      final authoredStatus = postsController.status.value;
+      final allPosts = postsController.posts.toList(growable: false);
       final normalPosts = allPosts
           .where((post) => !post.isRepostOnly)
           .toList(growable: false);
       final repostPosts = allPosts
           .where((post) => post.isRepostOnly)
           .toList(growable: false);
-      final isRepostTab = _tabController.index == 1;
-      final visiblePosts = isRepostTab ? repostPosts : normalPosts;
+      final savedStatus = savedController?.status.value;
+      final savedPosts = savedController?.posts.toList(growable: false);
+      final tabIndex = _tabController.index;
+      final resolvedSavedController = savedController;
+      final resolvedSavedControllerTag = savedControllerTag;
+
+      final activeController =
+          canShowSavedTab && tabIndex == 2
+              ? (resolvedSavedController ?? postsController)
+              : postsController;
+      final activeStatus =
+          canShowSavedTab && tabIndex == 2
+              ? savedStatus ?? ProfilePostsStatus.initial
+              : authoredStatus;
+      final activePosts =
+          canShowSavedTab && tabIndex == 2
+              ? savedPosts ?? const <PostModel>[]
+              : tabIndex == 1
+              ? repostPosts
+              : normalPosts;
+
+      final tabChildren = <Widget>[
+        SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: _buildPostsTab(
+            context: context,
+            controller: postsController,
+            controllerTag: widget.controllerTag,
+            palette: palette,
+            theme: theme,
+            status: authoredStatus,
+            posts: normalPosts,
+            isRepostTab: false,
+            emptyMessage:
+                widget.isOwnerView
+                    ? 'Bạn chưa có bài viết nào.'
+                    : 'Người dùng này chưa có bài viết công khai nào.',
+          ),
+        ),
+        SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: _buildPostsTab(
+            context: context,
+            controller: postsController,
+            controllerTag: widget.controllerTag,
+            palette: palette,
+            theme: theme,
+            status: authoredStatus,
+            posts: repostPosts,
+            isRepostTab: true,
+            emptyMessage:
+                widget.isOwnerView
+                    ? 'Bạn chưa đăng lại bài viết nào.'
+                    : 'Người dùng này chưa có bài đăng lại công khai.',
+          ),
+        ),
+      ];
+
+      if (canShowSavedTab &&
+          resolvedSavedController != null &&
+          resolvedSavedControllerTag != null) {
+        tabChildren.add(
+          SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: _buildPostsTab(
+              context: context,
+              controller: resolvedSavedController,
+              controllerTag: resolvedSavedControllerTag,
+              palette: palette,
+              theme: theme,
+              status: savedStatus ?? ProfilePostsStatus.initial,
+              posts: savedPosts ?? const <PostModel>[],
+              isRepostTab: false,
+              emptyMessage: 'Bạn chưa lưu bài viết nào.',
+            ),
+          ),
+        );
+      }
 
       return Padding(
         padding: const EdgeInsets.fromLTRB(0, 0, 0, 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ProfilePostsTabBar(controller: _tabController),
+            _ProfilePostsTabBar(
+              controller: _tabController,
+              showSavedTab: canShowSavedTab,
+            ),
             AnimatedSize(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
               child: SizedBox(
                 height: _buildTabHeight(
-                  controller: controller,
-                  status: status,
-                  visiblePosts: visiblePosts,
+                  controller: activeController,
+                  status: activeStatus,
+                  visiblePosts: activePosts,
                 ),
                 child: TabBarView(
                   controller: _tabController,
-                  children: [
-                    SingleChildScrollView(
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: _buildPostsTab(
-                        context: context,
-                        controller: controller,
-                        palette: palette,
-                        theme: theme,
-                        status: status,
-                        posts: normalPosts,
-                        isRepostTab: false,
-                        emptyMessage:
-                            widget.isOwnerView
-                                ? 'Bạn chưa có bài viết nào.'
-                                : 'Người dùng này chưa có bài viết công khai nào.',
-                      ),
-                    ),
-                    SingleChildScrollView(
-                      physics: const NeverScrollableScrollPhysics(),
-                      child: _buildPostsTab(
-                        context: context,
-                        controller: controller,
-                        palette: palette,
-                        theme: theme,
-                        status: status,
-                        posts: repostPosts,
-                        isRepostTab: true,
-                        emptyMessage:
-                            widget.isOwnerView
-                                ? 'Bạn chưa đăng lại bài viết nào.'
-                                : 'Người dùng này chưa có bài đăng lại công khai.',
-                      ),
-                    ),
-                  ],
+                  children: tabChildren,
                 ),
               ),
             ),
@@ -167,6 +253,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   Widget _buildPostsTab({
     required BuildContext context,
     required ProfilePostsController controller,
+    required String controllerTag,
     required FeedPalette palette,
     required ThemeData theme,
     required ProfilePostsStatus status,
@@ -243,6 +330,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                 _buildPostItem(
                   context: context,
                   controller: controller,
+                  controllerTag: controllerTag,
                   sourcePost: posts[index],
                   isRepostTab: isRepostTab,
                   showDivider: index > 0,
@@ -273,6 +361,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   Widget _buildPostItem({
     required BuildContext context,
     required ProfilePostsController controller,
+    required String controllerTag,
     required PostModel sourcePost,
     required bool isRepostTab,
     required bool showDivider,
@@ -293,15 +382,29 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       displayPost: displayPost,
       showDivider: showDivider,
       showPrivateBanner: showPrivateBanner,
-      onTap: () => _openPostDetail(displayPost),
+      onTap: () => _openPostDetail(displayPost, controllerTag: controllerTag),
       onLikeTap: () => controller.toggleLike(displayPost.postId),
-      onCommentTap: () => _openPostDetail(displayPost),
-      onRepostTap: () => _openRepostSheet(context, displayPost),
+      onCommentTap:
+          () => _openPostDetail(displayPost, controllerTag: controllerTag),
+      onRepostTap:
+          () => _openRepostSheet(
+            context,
+            displayPost,
+            controllerTag: controllerTag,
+          ),
       onShareTap: controller.onShareTap,
-      onMoreTap: () => _openPostActionSheet(context, displayPost),
+      onMoreTap:
+          () => _openPostActionSheet(
+            context,
+            displayPost,
+            controllerTag: controllerTag,
+          ),
       onReferenceTap:
           displayPost.referencePost != null
-              ? () => _openReferencePostDetail(displayPost)
+              ? () => _openReferencePostDetail(
+                displayPost,
+                controllerTag: controllerTag,
+              )
               : null,
     );
   }
@@ -315,28 +418,40 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     return controller.resolveDisplayPost(sourcePost);
   }
 
-  Future<void> _openPostDetail(PostModel post) async {
+  Future<void> _openPostDetail(
+    PostModel post, {
+    required String controllerTag,
+  }) async {
     await Get.toNamed(
       AppRouter.postDetail,
       arguments: PostDetailRouteArgs(
         post: post,
-        profilePostsControllerTag: widget.controllerTag,
+        profilePostsControllerTag: controllerTag,
       ),
     );
   }
 
-  Future<void> _openReferencePostDetail(PostModel sourcePost) async {
-    final resolvedPost = await _resolvePostDetailPost(sourcePost);
+  Future<void> _openReferencePostDetail(
+    PostModel sourcePost, {
+    required String controllerTag,
+  }) async {
+    final resolvedPost = await _resolvePostDetailPost(
+      sourcePost,
+      controllerTag: controllerTag,
+    );
     await Get.toNamed(
       AppRouter.postDetail,
       arguments: PostDetailRouteArgs(
         post: resolvedPost,
-        profilePostsControllerTag: widget.controllerTag,
+        profilePostsControllerTag: controllerTag,
       ),
     );
   }
 
-  Future<PostModel> _resolvePostDetailPost(PostModel tappedPost) async {
+  Future<PostModel> _resolvePostDetailPost(
+    PostModel tappedPost, {
+    required String controllerTag,
+  }) async {
     if (!tappedPost.postType.requiresReference ||
         tappedPost.referencePost == null) {
       return tappedPost;
@@ -350,9 +465,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       return tappedPost;
     }
 
-    final controller = Get.find<ProfilePostsController>(
-      tag: widget.controllerTag,
-    );
+    final controller = Get.find<ProfilePostsController>(tag: controllerTag);
     final localOriginal = controller.findPostById(referencePostId);
     if (localOriginal != null) {
       return localOriginal;
@@ -390,10 +503,12 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     );
   }
 
-  Future<void> _openPostActionSheet(BuildContext context, PostModel post) {
-    final controller = Get.find<ProfilePostsController>(
-      tag: widget.controllerTag,
-    );
+  Future<void> _openPostActionSheet(
+    BuildContext context,
+    PostModel post, {
+    required String controllerTag,
+  }) {
+    final controller = Get.find<ProfilePostsController>(tag: controllerTag);
     final currentUserId = controller.currentUserId.trim();
     final canDeletePost =
         currentUserId.isNotEmpty && post.authorId.trim() == currentUserId;
@@ -403,10 +518,15 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     return PostActionSheet.show(
       context,
       post: post,
+      isSaved: post.isSaved,
+      onSaveTap: () => controller.toggleSave(post.postId),
       canHidePost: canHidePost,
       onHidePostTap: canHidePost ? () => _hidePostFromFeed(post) : null,
       canDeletePost: canDeletePost,
-      onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
+      onDeleteTap:
+          canDeletePost
+              ? () => _deletePost(post, controllerTag: controllerTag)
+              : null,
     );
   }
 
@@ -418,12 +538,17 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     await Get.find<FeedController>().hidePostFromFeed(post);
   }
 
-  Future<void> _openRepostSheet(BuildContext context, PostModel post) {
+  Future<void> _openRepostSheet(
+    BuildContext context,
+    PostModel post, {
+    required String controllerTag,
+  }) {
     return PostRepostSheet.show(
       context,
       post: post,
-      onRepostTap: () => _repostPost(post),
-      onUndoRepostTap: () => _undoRepostPost(post),
+      onRepostTap: () => _repostPost(post, controllerTag: controllerTag),
+      onUndoRepostTap:
+          () => _undoRepostPost(post, controllerTag: controllerTag),
       onQuoteTap: () => _quotePost(context, post),
     );
   }
@@ -436,26 +561,29 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     _handlePostCreated(createdPost);
   }
 
-  Future<void> _repostPost(PostModel sourcePost) async {
-    final controller = Get.find<ProfilePostsController>(
-      tag: widget.controllerTag,
-    );
+  Future<void> _repostPost(
+    PostModel sourcePost, {
+    required String controllerTag,
+  }) async {
+    final controller = Get.find<ProfilePostsController>(tag: controllerTag);
     final createdPost = await controller.repostPost(sourcePost);
     _handlePostCreated(createdPost);
   }
 
-  Future<void> _undoRepostPost(PostModel sourcePost) async {
-    final controller = Get.find<ProfilePostsController>(
-      tag: widget.controllerTag,
-    );
+  Future<void> _undoRepostPost(
+    PostModel sourcePost, {
+    required String controllerTag,
+  }) async {
+    final controller = Get.find<ProfilePostsController>(tag: controllerTag);
     final removedPost = await controller.undoRepost(sourcePost);
     _handlePostRemoved(removedPost);
   }
 
-  Future<void> _deletePost(PostModel post) async {
-    final controller = Get.find<ProfilePostsController>(
-      tag: widget.controllerTag,
-    );
+  Future<void> _deletePost(
+    PostModel post, {
+    required String controllerTag,
+  }) async {
+    final controller = Get.find<ProfilePostsController>(tag: controllerTag);
     final deletedPost = await controller.deletePost(post);
     _handlePostDeleted(deletedPost);
   }
@@ -561,9 +689,13 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
 }
 
 class _ProfilePostsTabBar extends StatelessWidget {
-  const _ProfilePostsTabBar({required this.controller});
+  const _ProfilePostsTabBar({
+    required this.controller,
+    required this.showSavedTab,
+  });
 
   final TabController controller;
+  final bool showSavedTab;
 
   @override
   Widget build(BuildContext context) {
@@ -577,7 +709,11 @@ class _ProfilePostsTabBar extends StatelessWidget {
         unselectedLabelColor: theme.textTheme.bodySmall?.color,
         indicatorColor: theme.colorScheme.onSurface,
         dividerColor: Colors.transparent,
-        tabs: const [Tab(text: 'Bài viết'), Tab(text: 'Bài đăng lại')],
+        tabs: [
+          const Tab(text: 'Bài viết'),
+          const Tab(text: 'Bài đăng lại'),
+          if (showSavedTab) const Tab(text: 'Lưu trữ'),
+        ],
       ),
     );
   }

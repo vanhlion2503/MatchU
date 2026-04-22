@@ -147,6 +147,8 @@ class FeedScreen extends GetView<FeedController> {
     return PostActionSheet.show(
       context,
       post: post,
+      isSaved: post.isSaved,
+      onSaveTap: () => controller.toggleSave(post.postId),
       canHidePost: canHidePost,
       onHidePostTap:
           canHidePost ? () => controller.hidePostFromFeed(post) : null,

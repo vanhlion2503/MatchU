@@ -251,6 +251,8 @@ class PostModel {
     this.isLikePending = false,
     this.isReposted = false,
     this.isRepostPending = false,
+    this.isSaved = false,
+    this.isSavePending = false,
   });
 
   final String postId;
@@ -275,6 +277,8 @@ class PostModel {
   final bool isLikePending;
   final bool isReposted;
   final bool isRepostPending;
+  final bool isSaved;
+  final bool isSavePending;
 
   bool get hasContent => content.trim().isNotEmpty;
   bool get hasMedia => media.isNotEmpty;
@@ -364,6 +368,8 @@ class PostModel {
     bool? isLikePending,
     bool? isReposted,
     bool? isRepostPending,
+    bool? isSaved,
+    bool? isSavePending,
   }) {
     return PostModel(
       postId: postId ?? this.postId,
@@ -386,6 +392,8 @@ class PostModel {
       isLikePending: isLikePending ?? this.isLikePending,
       isReposted: isReposted ?? this.isReposted,
       isRepostPending: isRepostPending ?? this.isRepostPending,
+      isSaved: isSaved ?? this.isSaved,
+      isSavePending: isSavePending ?? this.isSavePending,
     );
   }
 

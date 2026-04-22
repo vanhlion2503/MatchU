@@ -76,10 +76,21 @@ class ProfileView extends StatelessWidget {
         }
         final user = c.user.value!;
         final postsTag = ProfilePostsController.ownerProfileTag(user.uid);
+        final savedPostsTag = ProfilePostsController.ownerSavedTag(user.uid);
         if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
           Get.put(
             ProfilePostsController(userId: user.uid, includePrivate: true),
             tag: postsTag,
+          );
+        }
+        if (!Get.isRegistered<ProfilePostsController>(tag: savedPostsTag)) {
+          Get.put(
+            ProfilePostsController(
+              userId: user.uid,
+              includePrivate: true,
+              source: ProfilePostsSource.saved,
+            ),
+            tag: savedPostsTag,
           );
         }
 
@@ -425,7 +436,11 @@ class ProfileView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              ProfilePostsSection(controllerTag: postsTag, isOwnerView: true),
+              ProfilePostsSection(
+                controllerTag: postsTag,
+                isOwnerView: true,
+                savedControllerTag: savedPostsTag,
+              ),
               const SizedBox(height: 96),
             ],
           ),

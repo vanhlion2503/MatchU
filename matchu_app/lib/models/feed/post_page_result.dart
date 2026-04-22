@@ -6,9 +6,11 @@ class PostPageResult {
     required this.posts,
     required this.lastDocument,
     required this.hasMore,
+    this.savedAtByPostId = const <String, DateTime?>{},
   });
 
   final List<PostModel> posts;
   final DocumentSnapshot<Map<String, dynamic>>? lastDocument;
   final bool hasMore;
+  final Map<String, DateTime?> savedAtByPostId;
 }

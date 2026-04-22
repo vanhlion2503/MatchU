@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
@@ -34,6 +35,10 @@ class FeedController extends GetxController {
   final Map<String, bool> _confirmedLikeStates = <String, bool>{};
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingPosts = <String>{};
+  final Map<String, bool> _savedCache = <String, bool>{};
+  final Map<String, bool> _confirmedSavedStates = <String, bool>{};
+  final Map<String, bool> _queuedSavedStates = <String, bool>{};
+  final Set<String> _saveSyncingPosts = <String>{};
   final Map<String, PostModel> _locallyPrependedPosts = <String, PostModel>{};
   final Map<String, bool> _repostCache = <String, bool>{};
   final Set<String> _repostPendingTargetIds = <String>{};
@@ -122,6 +127,8 @@ class FeedController extends GetxController {
     _locallyPrependedPosts[post.postId] = post;
     _likeCache[post.postId] = post.isLiked;
     _confirmedLikeStates[post.postId] = post.isLiked;
+    _savedCache[post.postId] = post.isSaved;
+    _confirmedSavedStates[post.postId] = post.isSaved;
     posts.assignAll(_mergePosts(posts, [post]));
     errorMessage.value = null;
     status.value = FeedStatus.success;
@@ -186,10 +193,19 @@ class FeedController extends GetxController {
         _likeCache[normalizedPostId] ?? _confirmedLikeStates[normalizedPostId];
     final isLiked =
         cachedLikeState ?? await _service.isPostLiked(normalizedPostId);
+    final cachedSavedState =
+        _savedCache[normalizedPostId] ??
+        _confirmedSavedStates[normalizedPostId];
+    final isSaved =
+        cachedSavedState ?? await _service.isPostSaved(normalizedPostId);
 
     if (cachedLikeState == null) {
       _likeCache[normalizedPostId] = isLiked;
       _confirmedLikeStates[normalizedPostId] = isLiked;
+    }
+    if (cachedSavedState == null) {
+      _savedCache[normalizedPostId] = isSaved;
+      _confirmedSavedStates[normalizedPostId] = isSaved;
     }
 
     final repostTargetPostId = _repostTargetPostIdOf(post);
@@ -211,6 +227,8 @@ class FeedController extends GetxController {
     return post.copyWith(
       isLiked: isLiked,
       isLikePending: _isLikeSyncPending(normalizedPostId),
+      isSaved: isSaved,
+      isSavePending: _isSaveSyncPending(normalizedPostId),
       isReposted: isReposted,
       isRepostPending: _repostPendingTargetIds.contains(repostTargetPostId),
     );
@@ -240,12 +258,6 @@ class FeedController extends GetxController {
         targetPostId,
         isReposted: true,
         isPending: false,
-      );
-      Get.snackbar(
-        'Thông báo',
-        'Đã đăng lại bài viết thành công.',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(12),
       );
       return created;
     } catch (error) {
@@ -283,12 +295,6 @@ class FeedController extends GetxController {
         targetPostId,
         isReposted: false,
         isPending: false,
-      );
-      Get.snackbar(
-        'Thông báo',
-        'Đã hủy đăng lại bài viết.',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(12),
       );
       return removed;
     } catch (error) {
@@ -359,7 +365,11 @@ class FeedController extends GetxController {
         likedHydratedPosts,
         reset: reset,
       );
-      final visibleHydratedPosts = _filterHiddenPosts(hydratedPosts);
+      final savedHydratedPosts = await _attachSavedStates(
+        hydratedPosts,
+        reset: reset,
+      );
+      final visibleHydratedPosts = _filterHiddenPosts(savedHydratedPosts);
 
       if (reset) {
         posts.assignAll(_mergeWithLocallyPrependedPosts(visibleHydratedPosts));
@@ -410,6 +420,26 @@ class FeedController extends GetxController {
     _likeCache[postId] = shouldLike;
     _queuedLikeStates[postId] = shouldLike;
     unawaited(_syncLikeState(postId));
+  }
+
+  Future<void> toggleSave(String postId) async {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+
+    final shouldSave = !currentPost.isSaved;
+    final optimisticPost = currentPost.copyWith(
+      isSaved: shouldSave,
+      isSavePending: true,
+    );
+
+    _replacePost(optimisticPost);
+    _savedCache[postId] = shouldSave;
+    _queuedSavedStates[postId] = shouldSave;
+    _syncSavedStateToProfile(
+      optimisticPost.copyWith(isSavePending: false),
+      isSaved: shouldSave,
+    );
+    unawaited(_syncSavedState(postId));
   }
 
   void onShareTap() {
@@ -501,6 +531,43 @@ class FeedController extends GetxController {
           return post.copyWith(
             isReposted: _repostCache[targetPostId] ?? false,
             isRepostPending: _repostPendingTargetIds.contains(targetPostId),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<List<PostModel>> _attachSavedStates(
+    List<PostModel> incoming, {
+    required bool reset,
+  }) async {
+    if (incoming.isEmpty) return incoming;
+
+    final postIds = incoming.map((post) => post.postId).toList(growable: false);
+    final idsToFetch =
+        reset
+            ? postIds
+            : postIds
+                .where((postId) => !_savedCache.containsKey(postId))
+                .toList(growable: false);
+
+    if (idsToFetch.isNotEmpty) {
+      final latestStates = await _service.getSavedStates(idsToFetch);
+      _confirmedSavedStates.addAll(latestStates);
+
+      for (final entry in latestStates.entries) {
+        if (_isSaveSyncPending(entry.key)) continue;
+        _savedCache[entry.key] = entry.value;
+      }
+    }
+
+    return incoming
+        .map((post) {
+          return post.copyWith(
+            isSaved:
+                _savedCache[post.postId] ??
+                _confirmedSavedStates[post.postId] ??
+                false,
+            isSavePending: _isSaveSyncPending(post.postId),
           );
         })
         .toList(growable: false);
@@ -639,6 +706,10 @@ class FeedController extends GetxController {
     _confirmedLikeStates.remove(postId);
     _queuedLikeStates.remove(postId);
     _likeSyncingPosts.remove(postId);
+    _savedCache.remove(postId);
+    _confirmedSavedStates.remove(postId);
+    _queuedSavedStates.remove(postId);
+    _saveSyncingPosts.remove(postId);
   }
 
   void _updateStatusAfterPostMutation() {
@@ -780,6 +851,102 @@ class FeedController extends GetxController {
         isLikePending: false,
         stats: currentPost.stats.copyWith(likeCount: resolvedLikeCount),
       ),
+    );
+  }
+
+  bool _isSaveSyncPending(String postId) {
+    return _queuedSavedStates.containsKey(postId) ||
+        _saveSyncingPosts.contains(postId);
+  }
+
+  Future<void> _syncSavedState(String postId) async {
+    if (_saveSyncingPosts.contains(postId)) return;
+
+    _saveSyncingPosts.add(postId);
+    _updateSavePendingState(postId);
+
+    try {
+      while (true) {
+        final targetState = _queuedSavedStates[postId];
+        if (targetState == null) break;
+
+        final confirmedState = _confirmedSavedStates[postId] ?? false;
+        if (targetState == confirmedState) {
+          _queuedSavedStates.remove(postId);
+          _updateSavePendingState(postId);
+          continue;
+        }
+
+        try {
+          if (targetState) {
+            await _service.savePost(postId);
+          } else {
+            await _service.unsavePost(postId);
+          }
+
+          _confirmedSavedStates[postId] = targetState;
+          if (_queuedSavedStates[postId] == targetState) {
+            _queuedSavedStates.remove(postId);
+          }
+        } catch (error) {
+          _queuedSavedStates.remove(postId);
+          _revertSaveState(postId);
+          final revertedPost = _findPost(postId);
+          if (revertedPost != null) {
+            _syncSavedStateToProfile(
+              revertedPost.copyWith(isSavePending: false),
+              isSaved: revertedPost.isSaved,
+            );
+          }
+          _showError(_mapError(error));
+          break;
+        }
+      }
+    } finally {
+      _saveSyncingPosts.remove(postId);
+      _updateSavePendingState(postId);
+      if (_queuedSavedStates.containsKey(postId)) {
+        unawaited(_syncSavedState(postId));
+      }
+    }
+  }
+
+  void _updateSavePendingState(String postId) {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+
+    final shouldBePending = _isSaveSyncPending(postId);
+    if (currentPost.isSavePending == shouldBePending) return;
+
+    _replacePost(currentPost.copyWith(isSavePending: shouldBePending));
+  }
+
+  void _revertSaveState(String postId) {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+
+    final confirmedState = _confirmedSavedStates[postId] ?? false;
+    _savedCache[postId] = confirmedState;
+    _replacePost(
+      currentPost.copyWith(isSaved: confirmedState, isSavePending: false),
+    );
+  }
+
+  void _syncSavedStateToProfile(PostModel post, {required bool isSaved}) {
+    final normalizedCurrentUserId = currentUserId.trim();
+    if (normalizedCurrentUserId.isEmpty) return;
+
+    final savedTag = ProfilePostsController.ownerSavedTag(
+      normalizedCurrentUserId,
+    );
+    if (!Get.isRegistered<ProfilePostsController>(tag: savedTag)) {
+      return;
+    }
+
+    Get.find<ProfilePostsController>(tag: savedTag).syncSavedStateFromExternal(
+      post: post,
+      isSaved: isSaved,
+      savedAt: isSaved ? DateTime.now() : null,
     );
   }
 

@@ -44,10 +44,23 @@ class OtherProfileView extends StatelessWidget {
           u.uid,
           includePrivate: isMe,
         );
+        final savedPostsTag =
+            isMe ? ProfilePostsController.ownerSavedTag(u.uid) : null;
         if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
           Get.put(
             ProfilePostsController(userId: u.uid, includePrivate: isMe),
             tag: postsTag,
+          );
+        }
+        if (savedPostsTag != null &&
+            !Get.isRegistered<ProfilePostsController>(tag: savedPostsTag)) {
+          Get.put(
+            ProfilePostsController(
+              userId: u.uid,
+              includePrivate: true,
+              source: ProfilePostsSource.saved,
+            ),
+            tag: savedPostsTag,
           );
         }
 
@@ -361,7 +374,11 @@ class OtherProfileView extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              ProfilePostsSection(controllerTag: postsTag, isOwnerView: isMe),
+              ProfilePostsSection(
+                controllerTag: postsTag,
+                isOwnerView: isMe,
+                savedControllerTag: savedPostsTag,
+              ),
             ],
           ),
         );

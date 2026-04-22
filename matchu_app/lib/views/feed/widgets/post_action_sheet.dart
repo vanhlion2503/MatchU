@@ -7,6 +7,8 @@ class PostActionSheet extends StatelessWidget {
   const PostActionSheet({
     super.key,
     required this.post,
+    this.isSaved = false,
+    this.onSaveTap,
     this.canHidePost = false,
     this.onHidePostTap,
     this.canDeletePost = false,
@@ -14,6 +16,8 @@ class PostActionSheet extends StatelessWidget {
   });
 
   final PostModel post;
+  final bool isSaved;
+  final Future<void> Function()? onSaveTap;
   final bool canHidePost;
   final Future<void> Function()? onHidePostTap;
   final bool canDeletePost;
@@ -23,6 +27,8 @@ class PostActionSheet extends StatelessWidget {
   static Future<void> show(
     BuildContext context, {
     required PostModel post,
+    bool isSaved = false,
+    Future<void> Function()? onSaveTap,
     bool canHidePost = false,
     Future<void> Function()? onHidePostTap,
     bool canDeletePost = false,
@@ -35,6 +41,8 @@ class PostActionSheet extends StatelessWidget {
       builder:
           (_) => PostActionSheet(
             post: post,
+            isSaved: isSaved,
+            onSaveTap: onSaveTap,
             canHidePost: canHidePost,
             onHidePostTap: onHidePostTap,
             canDeletePost: canDeletePost,
@@ -49,6 +57,7 @@ class PostActionSheet extends StatelessWidget {
     final palette = FeedPalette.of(context);
     final authorHandle = _authorHandle(post);
     final sheetHeight = MediaQuery.of(context).size.height * 0.75;
+    const savedHighlightColor = Color(0xFFF59E0B);
 
     return SafeArea(
       top: false,
@@ -125,10 +134,16 @@ class PostActionSheet extends StatelessWidget {
                     ],
                     _PostActionTile(
                       icon: Iconsax.bookmark,
-                      title: 'Lưu bài viết',
-                      subtitle: 'Đánh dấu để xem lại sau.',
+                      title: isSaved ? 'Đã lưu bài viết' : 'Lưu bài viết',
+                      subtitle:
+                          isSaved
+                              ? 'Nhấn lần nữa để bỏ lưu bài viết.'
+                              : 'Đánh dấu để xem lại sau.',
                       palette: palette,
-                      onTap: () => Navigator.of(context).pop(),
+                      iconColor:
+                          isSaved ? savedHighlightColor : palette.iconPrimary,
+                      textColor: isSaved ? savedHighlightColor : null,
+                      onTap: () => _onSavePostTap(context),
                     ),
                     const SizedBox(height: 12),
                     _PostActionTile(
@@ -188,6 +203,14 @@ class PostActionSheet extends StatelessWidget {
 
     await Future<void>.delayed(_sheetExitDelay);
     await onHidePostTap!();
+  }
+
+  Future<void> _onSavePostTap(BuildContext context) async {
+    Navigator.of(context).pop();
+    if (onSaveTap == null) return;
+
+    await Future<void>.delayed(_sheetExitDelay);
+    await onSaveTap!();
   }
 
   Future<void> _onDeletePostTap(BuildContext context) async {

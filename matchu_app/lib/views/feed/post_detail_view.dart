@@ -77,6 +77,8 @@ class _PostDetailViewState extends State<PostDetailView> {
     return PostActionSheet.show(
       context,
       post: post,
+      isSaved: post.isSaved,
+      onSaveTap: controller.toggleSave,
       canHidePost: canHidePost,
       onHidePostTap:
           canHidePost ? () => controller.hidePostFromFeed(post) : null,

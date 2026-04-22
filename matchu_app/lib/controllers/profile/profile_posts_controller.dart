@@ -9,10 +9,13 @@ import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 enum ProfilePostsStatus { initial, loading, success, empty, error }
 
+enum ProfilePostsSource { authored, saved }
+
 class ProfilePostsController extends GetxController {
   ProfilePostsController({
     required this.userId,
     required this.includePrivate,
+    this.source = ProfilePostsSource.authored,
     PostService? postService,
   }) : _service = postService ?? PostService();
 
@@ -33,8 +36,11 @@ class ProfilePostsController extends GetxController {
     otherProfileTag(userId, includePrivate: true),
   ];
 
+  static String ownerSavedTag(String userId) => 'profile_saved_self_$userId';
+
   final String userId;
   final bool includePrivate;
+  final ProfilePostsSource source;
   final PostService _service;
 
   final RxList<PostModel> posts = <PostModel>[].obs;
@@ -48,6 +54,11 @@ class ProfilePostsController extends GetxController {
   final Map<String, bool> _confirmedLikeStates = <String, bool>{};
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingPosts = <String>{};
+  final Map<String, bool> _savedCache = <String, bool>{};
+  final Map<String, bool> _confirmedSavedStates = <String, bool>{};
+  final Map<String, bool> _queuedSavedStates = <String, bool>{};
+  final Set<String> _saveSyncingPosts = <String>{};
+  final Map<String, DateTime?> _savedAtByPostId = <String, DateTime?>{};
   final Map<String, PostModel> _locallyPrependedPosts = <String, PostModel>{};
   final Map<String, bool> _repostCache = <String, bool>{};
   final Set<String> _repostPendingTargetIds = <String>{};
@@ -91,6 +102,7 @@ class ProfilePostsController extends GetxController {
   }
 
   void prependPost(PostModel post) {
+    if (source == ProfilePostsSource.saved) return;
     if (post.authorId != userId) return;
     if (!includePrivate && !post.isPublic) return;
 
@@ -102,6 +114,8 @@ class ProfilePostsController extends GetxController {
     _locallyPrependedPosts[post.postId] = post;
     _likeCache[post.postId] = post.isLiked;
     _confirmedLikeStates[post.postId] = post.isLiked;
+    _savedCache[post.postId] = post.isSaved;
+    _confirmedSavedStates[post.postId] = post.isSaved;
     posts.assignAll(_mergePosts(posts, [post]));
     _ensureRepostReferencesLoaded(<PostModel>[post]);
     errorMessage.value = null;
@@ -143,10 +157,19 @@ class ProfilePostsController extends GetxController {
         _likeCache[normalizedPostId] ?? _confirmedLikeStates[normalizedPostId];
     final isLiked =
         cachedLikeState ?? await _service.isPostLiked(normalizedPostId);
+    final cachedSavedState =
+        _savedCache[normalizedPostId] ??
+        _confirmedSavedStates[normalizedPostId];
+    final isSaved =
+        cachedSavedState ?? await _service.isPostSaved(normalizedPostId);
 
     if (cachedLikeState == null) {
       _likeCache[normalizedPostId] = isLiked;
       _confirmedLikeStates[normalizedPostId] = isLiked;
+    }
+    if (cachedSavedState == null) {
+      _savedCache[normalizedPostId] = isSaved;
+      _confirmedSavedStates[normalizedPostId] = isSaved;
     }
 
     final repostTargetPostId = _repostTargetPostIdOf(post);
@@ -168,6 +191,8 @@ class ProfilePostsController extends GetxController {
     return post.copyWith(
       isLiked: isLiked,
       isLikePending: _isLikeSyncPending(normalizedPostId),
+      isSaved: isSaved,
+      isSavePending: _isSaveSyncPending(normalizedPostId),
       isReposted: isReposted,
       isRepostPending: _repostPendingTargetIds.contains(repostTargetPostId),
     );
@@ -225,6 +250,55 @@ class ProfilePostsController extends GetxController {
     _removingPostIds.remove(normalizedPostId);
   }
 
+  void syncSavedStateFromExternal({
+    required PostModel post,
+    required bool isSaved,
+    DateTime? savedAt,
+  }) {
+    final normalizedPostId = post.postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    final syncedPost = post.copyWith(
+      postId: normalizedPostId,
+      isSaved: isSaved,
+      isSavePending: false,
+    );
+
+    _savedCache[normalizedPostId] = isSaved;
+    _confirmedSavedStates[normalizedPostId] = isSaved;
+
+    if (source == ProfilePostsSource.saved) {
+      if (!isSaved) {
+        removePostById(normalizedPostId);
+        return;
+      }
+
+      _savedAtByPostId[normalizedPostId] =
+          savedAt ?? _savedAtByPostId[normalizedPostId] ?? DateTime.now();
+
+      final existingPost = findPostById(normalizedPostId);
+      if (existingPost != null) {
+        _replacePost(
+          existingPost.copyWith(isSaved: true, isSavePending: false),
+        );
+      } else {
+        posts.assignAll(_mergePosts(posts, <PostModel>[syncedPost]));
+        _ensureRepostReferencesLoaded(posts);
+      }
+
+      if (posts.isEmpty) {
+        status.value = ProfilePostsStatus.empty;
+      } else {
+        status.value = ProfilePostsStatus.success;
+      }
+      return;
+    }
+
+    final existingPost = findPostById(normalizedPostId);
+    if (existingPost == null) return;
+    _replacePost(existingPost.copyWith(isSaved: isSaved, isSavePending: false));
+  }
+
   Future<void> toggleLike(String postId) async {
     final currentPost = findPostById(postId);
     if (currentPost == null) return;
@@ -242,6 +316,22 @@ class ProfilePostsController extends GetxController {
     _likeCache[postId] = shouldLike;
     _queuedLikeStates[postId] = shouldLike;
     unawaited(_syncLikeState(postId));
+  }
+
+  Future<void> toggleSave(String postId) async {
+    final currentPost = findPostById(postId);
+    if (currentPost == null) return;
+
+    final shouldSave = !currentPost.isSaved;
+    final optimisticPost = currentPost.copyWith(
+      isSaved: shouldSave,
+      isSavePending: true,
+    );
+
+    _replacePost(optimisticPost);
+    _savedCache[postId] = shouldSave;
+    _queuedSavedStates[postId] = shouldSave;
+    unawaited(_syncSavedState(postId));
   }
 
   Future<PostModel?> repostPost(PostModel sourcePost) async {
@@ -375,12 +465,27 @@ class ProfilePostsController extends GetxController {
     }
 
     try {
-      final page = await _service.fetchPostsByAuthor(
-        authorId: userId,
-        startAfter: reset ? null : _lastDocument,
-        limit: _pageSize,
-        publicOnly: !includePrivate,
-      );
+      final page =
+          source == ProfilePostsSource.saved
+              ? await _service.fetchSavedPosts(
+                userId: userId,
+                startAfter: reset ? null : _lastDocument,
+                limit: _pageSize,
+              )
+              : await _service.fetchPostsByAuthor(
+                authorId: userId,
+                startAfter: reset ? null : _lastDocument,
+                limit: _pageSize,
+                publicOnly: !includePrivate,
+              );
+
+      if (reset) {
+        _savedAtByPostId
+          ..clear()
+          ..addAll(page.savedAtByPostId);
+      } else {
+        _savedAtByPostId.addAll(page.savedAtByPostId);
+      }
 
       final likedHydratedPosts = await _attachLikeStates(
         page.posts,
@@ -390,11 +495,15 @@ class ProfilePostsController extends GetxController {
         likedHydratedPosts,
         reset: reset,
       );
+      final savedHydratedPosts = await _attachSavedStates(
+        hydratedPosts,
+        reset: reset,
+      );
 
       if (reset) {
-        posts.assignAll(_mergeWithLocallyPrependedPosts(hydratedPosts));
+        posts.assignAll(_mergeWithLocallyPrependedPosts(savedHydratedPosts));
       } else {
-        posts.assignAll(_mergePosts(posts, hydratedPosts));
+        posts.assignAll(_mergePosts(posts, savedHydratedPosts));
       }
       _pruneResolvedRepostCache(posts);
       _ensureRepostReferencesLoaded(posts);
@@ -510,6 +619,43 @@ class ProfilePostsController extends GetxController {
         .toList(growable: false);
   }
 
+  Future<List<PostModel>> _attachSavedStates(
+    List<PostModel> incoming, {
+    required bool reset,
+  }) async {
+    if (incoming.isEmpty) return incoming;
+
+    final postIds = incoming.map((post) => post.postId).toList(growable: false);
+    final idsToFetch =
+        reset
+            ? postIds
+            : postIds
+                .where((postId) => !_savedCache.containsKey(postId))
+                .toList(growable: false);
+
+    if (idsToFetch.isNotEmpty) {
+      final latestStates = await _service.getSavedStates(idsToFetch);
+      _confirmedSavedStates.addAll(latestStates);
+
+      for (final entry in latestStates.entries) {
+        if (_isSaveSyncPending(entry.key)) continue;
+        _savedCache[entry.key] = entry.value;
+      }
+    }
+
+    return incoming
+        .map((post) {
+          return post.copyWith(
+            isSaved:
+                _savedCache[post.postId] ??
+                _confirmedSavedStates[post.postId] ??
+                false,
+            isSavePending: _isSaveSyncPending(post.postId),
+          );
+        })
+        .toList(growable: false);
+  }
+
   List<PostModel> _mergePosts(
     List<PostModel> current,
     List<PostModel> incoming,
@@ -524,6 +670,18 @@ class ProfilePostsController extends GetxController {
 
     final items = merged.values.toList(growable: false);
     items.sort((a, b) {
+      if (source == ProfilePostsSource.saved) {
+        final aSavedAt =
+            _savedAtByPostId[a.postId] ??
+            a.createdAt ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bSavedAt =
+            _savedAtByPostId[b.postId] ??
+            b.createdAt ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        return bSavedAt.compareTo(aSavedAt);
+      }
+
       final aCreatedAt = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       final bCreatedAt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return bCreatedAt.compareTo(aCreatedAt);
@@ -532,6 +690,7 @@ class ProfilePostsController extends GetxController {
   }
 
   List<PostModel> _mergeWithLocallyPrependedPosts(List<PostModel> incoming) {
+    if (source == ProfilePostsSource.saved) return incoming;
     if (_locallyPrependedPosts.isEmpty) return incoming;
 
     final localPosts = _locallyPrependedPosts.values
@@ -582,6 +741,11 @@ class ProfilePostsController extends GetxController {
     _confirmedLikeStates.remove(postId);
     _queuedLikeStates.remove(postId);
     _likeSyncingPosts.remove(postId);
+    _savedCache.remove(postId);
+    _confirmedSavedStates.remove(postId);
+    _queuedSavedStates.remove(postId);
+    _saveSyncingPosts.remove(postId);
+    _savedAtByPostId.remove(postId);
     _resolvedRepostPostsByReferenceId.remove(postId);
     _repostReferenceLoadingIds.remove(postId);
     _fetchedRepostReferenceIds.remove(postId);
@@ -678,6 +842,89 @@ class ProfilePostsController extends GetxController {
         isLikePending: false,
         stats: currentPost.stats.copyWith(likeCount: resolvedLikeCount),
       ),
+    );
+  }
+
+  bool _isSaveSyncPending(String postId) {
+    return _queuedSavedStates.containsKey(postId) ||
+        _saveSyncingPosts.contains(postId);
+  }
+
+  Future<void> _syncSavedState(String postId) async {
+    if (_saveSyncingPosts.contains(postId)) return;
+
+    _saveSyncingPosts.add(postId);
+    _updateSavePendingState(postId);
+
+    try {
+      while (true) {
+        final targetState = _queuedSavedStates[postId];
+        if (targetState == null) break;
+
+        final confirmedState = _confirmedSavedStates[postId] ?? false;
+        if (targetState == confirmedState) {
+          _queuedSavedStates.remove(postId);
+          _updateSavePendingState(postId);
+          continue;
+        }
+
+        try {
+          if (targetState) {
+            await _service.savePost(postId);
+          } else {
+            await _service.unsavePost(postId);
+          }
+
+          _confirmedSavedStates[postId] = targetState;
+          if (_queuedSavedStates[postId] == targetState) {
+            _queuedSavedStates.remove(postId);
+          }
+          Get.snackbar(
+            'Thông báo',
+            targetState
+                ? 'Đã lưu bài viết vào lưu trữ.'
+                : 'Đã bỏ lưu bài viết.',
+            snackPosition: SnackPosition.BOTTOM,
+            margin: const EdgeInsets.all(12),
+          );
+
+          if (source == ProfilePostsSource.saved && !targetState) {
+            await _removePostByIdWithAnimation(postId);
+          }
+        } catch (error) {
+          _queuedSavedStates.remove(postId);
+          _revertSaveState(postId);
+          _showError(_mapError(error));
+          break;
+        }
+      }
+    } finally {
+      _saveSyncingPosts.remove(postId);
+      _updateSavePendingState(postId);
+      if (_queuedSavedStates.containsKey(postId)) {
+        unawaited(_syncSavedState(postId));
+      }
+    }
+  }
+
+  void _updateSavePendingState(String postId) {
+    final currentPost = findPostById(postId);
+    if (currentPost == null) return;
+
+    final shouldBePending = _isSaveSyncPending(postId);
+    if (currentPost.isSavePending == shouldBePending) return;
+
+    _replacePost(currentPost.copyWith(isSavePending: shouldBePending));
+  }
+
+  void _revertSaveState(String postId) {
+    final currentPost = findPostById(postId);
+    if (currentPost == null) return;
+
+    final confirmedState = _confirmedSavedStates[postId] ?? false;
+    _savedCache[postId] = confirmedState;
+    _replacePost(
+      currentPost.copyWith(isSaved: confirmedState, isSavePending: false),
     );
   }
 
@@ -851,6 +1098,11 @@ class ProfilePostsController extends GetxController {
           _confirmedLikeStates[referencePostId] ??
           false,
       isLikePending: _isLikeSyncPending(referencePostId),
+      isSaved:
+          _savedCache[referencePostId] ??
+          _confirmedSavedStates[referencePostId] ??
+          false,
+      isSavePending: _isSaveSyncPending(referencePostId),
       isReposted: _repostCache[referencePostId] ?? false,
       isRepostPending: _repostPendingTargetIds.contains(referencePostId),
     );
@@ -869,6 +1121,10 @@ class ProfilePostsController extends GetxController {
 
     if (error is StateError) {
       return error.message.toString();
+    }
+
+    if (source == ProfilePostsSource.saved) {
+      return 'Không thể tải danh sách lưu trữ lúc này. Vui lòng thử lại.';
     }
 
     return 'Không thể tải danh sách bài viết lúc này. Vui lòng thử lại.';
