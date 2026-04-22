@@ -17,6 +17,8 @@ class PostItem extends StatelessWidget {
     required this.onShareTap,
     required this.onMoreTap,
     this.onReferenceTap,
+    this.onAuthorTap,
+    this.onReferenceAuthorTap,
   });
 
   final PostModel post;
@@ -27,12 +29,18 @@ class PostItem extends StatelessWidget {
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
   final VoidCallback? onReferenceTap;
+  final ValueChanged<String>? onAuthorTap;
+  final ValueChanged<String>? onReferenceAuthorTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
     final metaLabel = buildFeedPostMetaLabel(post);
+    final onPostAuthorTap = _resolveUserTapHandler(
+      _postAuthorId(post),
+      onAuthorTap,
+    );
 
     return Material(
       color: Colors.transparent,
@@ -53,7 +61,11 @@ class PostItem extends StatelessWidget {
                       _RepostBadge(post: post),
                       const SizedBox(height: 8),
                     ],
-                    _PostHeader(post: post, onMoreTap: onMoreTap),
+                    _PostHeader(
+                      post: post,
+                      onMoreTap: onMoreTap,
+                      onAuthorTap: onPostAuthorTap,
+                    ),
                     if (metaLabel.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -106,13 +118,23 @@ class PostItem extends StatelessWidget {
                     if (post.referencePost != null) ...[
                       const SizedBox(height: 12),
                       if (onReferenceTap == null)
-                        _ReferencePostCard(reference: post.referencePost!)
+                        _ReferencePostCard(
+                          reference: post.referencePost!,
+                          onAuthorTap: _resolveUserTapHandler(
+                            _referenceAuthorId(post.referencePost!),
+                            onReferenceAuthorTap ?? onAuthorTap,
+                          ),
+                        )
                       else
                         GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: onReferenceTap,
                           child: _ReferencePostCard(
                             reference: post.referencePost!,
+                            onAuthorTap: _resolveUserTapHandler(
+                              _referenceAuthorId(post.referencePost!),
+                              onReferenceAuthorTap ?? onAuthorTap,
+                            ),
                           ),
                         ),
                     ],
@@ -161,7 +183,7 @@ class PostItem extends StatelessWidget {
                   ],
                 ),
               ),
-              _PostRail(post: post),
+              _PostRail(post: post, onAvatarTap: onPostAuthorTap),
             ],
           ),
         ),
@@ -185,9 +207,10 @@ class _PostRailLayout {
 }
 
 class _PostRail extends StatelessWidget {
-  const _PostRail({required this.post});
+  const _PostRail({required this.post, this.onAvatarTap});
 
   final PostModel post;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -195,12 +218,13 @@ class _PostRail extends StatelessWidget {
     final showReplyCluster = post.stats.commentCount > 0;
 
     return Positioned.fill(
-      child: IgnorePointer(
-        child: Stack(
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            child: _AvatarTapTarget(
+              onTap: onAvatarTap,
               child: FeedAvatar(
                 imageUrl: post.author.avatar,
                 fallbackLabel: postAuthorName(post),
@@ -208,26 +232,62 @@ class _PostRail extends StatelessWidget {
                 borderColor: palette.border,
               ),
             ),
-            Positioned(
-              left: _PostRailLayout.lineLeft,
-              top: _PostRailLayout.lineTopOffset,
-              bottom: _PostRailLayout.lineBottomOffset,
-              child: Container(
-                width: _PostRailLayout.lineWidth,
-                decoration: BoxDecoration(
-                  color: palette.threadLine,
-                  borderRadius: BorderRadius.circular(999),
-                ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: _PostRailLayout.lineLeft,
+                    top: _PostRailLayout.lineTopOffset,
+                    bottom: _PostRailLayout.lineBottomOffset,
+                    child: Container(
+                      width: _PostRailLayout.lineWidth,
+                      decoration: BoxDecoration(
+                        color: palette.threadLine,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  if (showReplyCluster)
+                    Positioned(
+                      left: _PostRailLayout.replyClusterLeft,
+                      bottom: _PostRailLayout.replyClusterBottomOffset,
+                      child: _ReplyCluster(count: post.stats.commentCount),
+                    ),
+                ],
               ),
             ),
-            if (showReplyCluster)
-              Positioned(
-                left: _PostRailLayout.replyClusterLeft,
-                bottom: _PostRailLayout.replyClusterBottomOffset,
-                child: _ReplyCluster(count: post.stats.commentCount),
-              ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarTapTarget extends StatelessWidget {
+  const _AvatarTapTarget({required this.child, this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 24,
+        customBorder: const CircleBorder(),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
+        child: child,
       ),
     );
   }
@@ -264,9 +324,10 @@ class _RepostBadge extends StatelessWidget {
 }
 
 class _ReferencePostCard extends StatelessWidget {
-  const _ReferencePostCard({required this.reference});
+  const _ReferencePostCard({required this.reference, this.onAuthorTap});
 
   final PostReferenceModel reference;
+  final VoidCallback? onAuthorTap;
 
   @override
   Widget build(BuildContext context) {
@@ -288,37 +349,44 @@ class _ReferencePostCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              FeedAvatar(
-                imageUrl: reference.author.avatar,
-                fallbackLabel: authorName,
-                size: 28,
-                borderColor: palette.border,
+              _AvatarTapTarget(
+                onTap: onAuthorTap,
+                child: FeedAvatar(
+                  imageUrl: reference.author.avatar,
+                  fallbackLabel: authorName,
+                  size: 28,
+                  borderColor: palette.border,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      authorName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                    if (handle.isNotEmpty)
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onAuthorTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '@$handle',
+                        authorName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: palette.textTertiary,
-                          fontWeight: FontWeight.w500,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: palette.textPrimary,
                         ),
                       ),
-                  ],
+                      if (handle.isNotEmpty)
+                        Text(
+                          '@$handle',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: palette.textTertiary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -427,35 +495,48 @@ class _MiniReplyDot extends StatelessWidget {
 }
 
 class _PostHeader extends StatelessWidget {
-  const _PostHeader({required this.post, required this.onMoreTap});
+  const _PostHeader({
+    required this.post,
+    required this.onMoreTap,
+    this.onAuthorTap,
+  });
 
   final PostModel post;
   final VoidCallback onMoreTap;
+  final VoidCallback? onAuthorTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
+    final authorNameWidget = VerifiedNameRow(
+      isVerified: post.author.isVerified,
+      badgeSize: 15,
+      badgePadding: const EdgeInsets.only(left: 4),
+      child: Text(
+        postAuthorName(post),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: palette.textPrimary,
+        ),
+      ),
+    );
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: VerifiedNameRow(
-            isVerified: post.author.isVerified,
-            badgeSize: 15,
-            badgePadding: const EdgeInsets.only(left: 4),
-            child: Text(
-              postAuthorName(post),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: palette.textPrimary,
-              ),
-            ),
-          ),
+          child:
+              onAuthorTap == null
+                  ? authorNameWidget
+                  : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onAuthorTap,
+                    child: authorNameWidget,
+                  ),
         ),
         const SizedBox(width: 4),
         Material(
@@ -554,4 +635,25 @@ String _referenceAuthorHandle(PostReferenceModel reference) {
 String? _countLabelOrNull(int value) {
   if (value <= 0) return null;
   return formatCompactCount(value);
+}
+
+String _postAuthorId(PostModel post) {
+  final primaryAuthorId = post.authorId.trim();
+  if (primaryAuthorId.isNotEmpty) return primaryAuthorId;
+  return post.author.id.trim();
+}
+
+String _referenceAuthorId(PostReferenceModel reference) {
+  final primaryAuthorId = reference.authorId.trim();
+  if (primaryAuthorId.isNotEmpty) return primaryAuthorId;
+  return reference.author.id.trim();
+}
+
+VoidCallback? _resolveUserTapHandler(
+  String userId,
+  ValueChanged<String>? onTap,
+) {
+  final normalizedUserId = userId.trim();
+  if (onTap == null || normalizedUserId.isEmpty) return null;
+  return () => onTap(normalizedUserId);
 }

@@ -16,6 +16,7 @@ import 'package:matchu_app/views/feed/widgets/feed_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
+import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class FeedScreen extends GetView<FeedController> {
   const FeedScreen({super.key});
@@ -77,6 +78,13 @@ class FeedScreen extends GetView<FeedController> {
       AppRouter.postDetail,
       arguments: PostDetailRouteArgs(post: post),
     );
+  }
+
+  void _openAuthorProfile(String rawUserId) {
+    final userId = rawUserId.trim();
+    if (userId.isEmpty) return;
+
+    Get.to(() => OtherProfileView(userId: userId));
   }
 
   Future<void> _openReferencePostDetail(PostModel sourcePost) async {
@@ -271,6 +279,8 @@ class FeedScreen extends GetView<FeedController> {
                 onRepostTap: () => _openRepostSheet(context, post),
                 onShareTap: controller.onShareTap,
                 onMoreTap: () => _openPostActionSheet(context, post),
+                onAuthorTap: _openAuthorProfile,
+                onReferenceAuthorTap: _openAuthorProfile,
                 onReferenceTap:
                     post.referencePost != null
                         ? () => _openReferencePostDetail(post)
@@ -296,6 +306,8 @@ class _FeedRemovalAnimatedPostItem extends StatelessWidget {
     required this.onRepostTap,
     required this.onShareTap,
     required this.onMoreTap,
+    this.onAuthorTap,
+    this.onReferenceAuthorTap,
     this.onReferenceTap,
   });
 
@@ -308,6 +320,8 @@ class _FeedRemovalAnimatedPostItem extends StatelessWidget {
   final VoidCallback onRepostTap;
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
+  final ValueChanged<String>? onAuthorTap;
+  final ValueChanged<String>? onReferenceAuthorTap;
   final VoidCallback? onReferenceTap;
 
   @override
@@ -345,6 +359,8 @@ class _FeedRemovalAnimatedPostItem extends StatelessWidget {
                       onRepostTap: onRepostTap,
                       onShareTap: onShareTap,
                       onMoreTap: onMoreTap,
+                      onAuthorTap: onAuthorTap,
+                      onReferenceAuthorTap: onReferenceAuthorTap,
                       onReferenceTap: onReferenceTap,
                     ),
                   ],

@@ -19,6 +19,7 @@ import 'package:matchu_app/views/feed/widgets/post_detail_comment_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 const double _kComposerFloatingGap = 10;
 const double _kComposerListBottomPadding = 104;
@@ -95,6 +96,13 @@ class _PostDetailViewState extends State<PostDetailView> {
       onUndoRepostTap: _undoRepostPost,
       onQuoteTap: () => _quotePost(context, post),
     );
+  }
+
+  void _openAuthorProfile(String rawUserId) {
+    final userId = rawUserId.trim();
+    if (userId.isEmpty) return;
+
+    Get.to(() => OtherProfileView(userId: userId));
   }
 
   Future<void> _quotePost(BuildContext context, PostModel sourcePost) async {
@@ -178,6 +186,8 @@ class _PostDetailViewState extends State<PostDetailView> {
                       onRepostTap: () => _openRepostSheet(context, post),
                       onShareTap: controller.sharePost,
                       onMoreTap: () => _openPostActionSheet(context, post),
+                      onAuthorTap: _openAuthorProfile,
+                      onReferenceAuthorTap: _openAuthorProfile,
                     ),
                   ),
                   _CommentsSliverSection(controller: controller),

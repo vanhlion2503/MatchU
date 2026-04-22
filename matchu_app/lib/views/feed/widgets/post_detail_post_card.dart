@@ -15,6 +15,8 @@ class PostDetailPostCard extends StatelessWidget {
     required this.onRepostTap,
     required this.onShareTap,
     required this.onMoreTap,
+    this.onAuthorTap,
+    this.onReferenceAuthorTap,
   });
 
   final PostModel post;
@@ -23,6 +25,8 @@ class PostDetailPostCard extends StatelessWidget {
   final VoidCallback onRepostTap;
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
+  final ValueChanged<String>? onAuthorTap;
+  final ValueChanged<String>? onReferenceAuthorTap;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +34,10 @@ class PostDetailPostCard extends StatelessWidget {
     final palette = FeedPalette.of(context);
     final authorName = postAuthorName(post);
     final metaLabel = buildPostMetaLabel(post);
+    final onPostAuthorTap = _resolveUserTapHandler(
+      _postAuthorId(post),
+      onAuthorTap,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -62,28 +70,35 @@ class PostDetailPostCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FeedAvatar(
-                    imageUrl: post.author.avatar,
-                    fallbackLabel: authorName,
-                    size: 46,
-                    borderColor: palette.border,
+                  _AvatarTapTarget(
+                    onTap: onPostAuthorTap,
+                    child: FeedAvatar(
+                      imageUrl: post.author.avatar,
+                      fallbackLabel: authorName,
+                      size: 46,
+                      borderColor: palette.border,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        VerifiedNameRow(
-                          isVerified: post.author.isVerified,
-                          badgeSize: 16,
-                          badgePadding: const EdgeInsets.only(left: 4),
-                          child: Text(
-                            authorName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: palette.textPrimary,
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onPostAuthorTap,
+                          child: VerifiedNameRow(
+                            isVerified: post.author.isVerified,
+                            badgeSize: 16,
+                            badgePadding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              authorName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: palette.textPrimary,
+                              ),
                             ),
                           ),
                         ),
@@ -165,7 +180,13 @@ class PostDetailPostCard extends StatelessWidget {
               ],
               if (post.referencePost != null) ...[
                 const SizedBox(height: 14),
-                _ReferencePostCard(reference: post.referencePost!),
+                _ReferencePostCard(
+                  reference: post.referencePost!,
+                  onAuthorTap: _resolveUserTapHandler(
+                    _referenceAuthorId(post.referencePost!),
+                    onReferenceAuthorTap ?? onAuthorTap,
+                  ),
+                ),
               ],
               const SizedBox(height: 14),
               Align(
@@ -236,9 +257,10 @@ class PostDetailPostCard extends StatelessWidget {
 }
 
 class _ReferencePostCard extends StatelessWidget {
-  const _ReferencePostCard({required this.reference});
+  const _ReferencePostCard({required this.reference, this.onAuthorTap});
 
   final PostReferenceModel reference;
+  final VoidCallback? onAuthorTap;
 
   @override
   Widget build(BuildContext context) {
@@ -260,37 +282,44 @@ class _ReferencePostCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              FeedAvatar(
-                imageUrl: reference.author.avatar,
-                fallbackLabel: authorName,
-                size: 32,
-                borderColor: palette.border,
+              _AvatarTapTarget(
+                onTap: onAuthorTap,
+                child: FeedAvatar(
+                  imageUrl: reference.author.avatar,
+                  fallbackLabel: authorName,
+                  size: 32,
+                  borderColor: palette.border,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      authorName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                    if (authorHandle.isNotEmpty)
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onAuthorTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '@$authorHandle',
+                        authorName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: palette.textTertiary,
-                          fontWeight: FontWeight.w500,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: palette.textPrimary,
                         ),
                       ),
-                  ],
+                      if (authorHandle.isNotEmpty)
+                        Text(
+                          '@$authorHandle',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: palette.textTertiary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -324,6 +353,34 @@ class _ReferencePostCard extends StatelessWidget {
             ],
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _AvatarTapTarget extends StatelessWidget {
+  const _AvatarTapTarget({required this.child, this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 26,
+        customBorder: const CircleBorder(),
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
+        child: child,
       ),
     );
   }
@@ -408,4 +465,25 @@ String _referenceAuthorHandle(PostReferenceModel reference) {
 String? _countLabelOrNull(int value) {
   if (value <= 0) return null;
   return formatCompactCount(value);
+}
+
+String _postAuthorId(PostModel post) {
+  final primaryAuthorId = post.authorId.trim();
+  if (primaryAuthorId.isNotEmpty) return primaryAuthorId;
+  return post.author.id.trim();
+}
+
+String _referenceAuthorId(PostReferenceModel reference) {
+  final primaryAuthorId = reference.authorId.trim();
+  if (primaryAuthorId.isNotEmpty) return primaryAuthorId;
+  return reference.author.id.trim();
+}
+
+VoidCallback? _resolveUserTapHandler(
+  String userId,
+  ValueChanged<String>? onTap,
+) {
+  final normalizedUserId = userId.trim();
+  if (onTap == null || normalizedUserId.isEmpty) return null;
+  return () => onTap(normalizedUserId);
 }

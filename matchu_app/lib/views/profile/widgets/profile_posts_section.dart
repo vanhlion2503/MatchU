@@ -12,6 +12,7 @@ import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
+import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class ProfilePostsSection extends StatefulWidget {
   const ProfilePostsSection({
@@ -399,6 +400,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
             displayPost,
             controllerTag: controllerTag,
           ),
+      onAuthorTap: _openAuthorProfile,
+      onReferenceAuthorTap: _openAuthorProfile,
       onReferenceTap:
           displayPost.referencePost != null
               ? () => _openReferencePostDetail(
@@ -611,6 +614,13 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     if (deletedPost == null) return;
     PostCreationSync.syncPostDeleted(deletedPost);
   }
+
+  void _openAuthorProfile(String rawUserId) {
+    final userId = rawUserId.trim();
+    if (userId.isEmpty) return;
+
+    Get.to(() => OtherProfileView(userId: userId));
+  }
 }
 
 class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
@@ -627,6 +637,8 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
     required this.onRepostTap,
     required this.onShareTap,
     required this.onMoreTap,
+    this.onAuthorTap,
+    this.onReferenceAuthorTap,
     this.onReferenceTap,
   });
 
@@ -641,6 +653,8 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
   final VoidCallback onRepostTap;
   final VoidCallback onShareTap;
   final VoidCallback onMoreTap;
+  final ValueChanged<String>? onAuthorTap;
+  final ValueChanged<String>? onReferenceAuthorTap;
   final VoidCallback? onReferenceTap;
 
   @override
@@ -679,6 +693,8 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
                       onRepostTap: onRepostTap,
                       onShareTap: onShareTap,
                       onMoreTap: onMoreTap,
+                      onAuthorTap: onAuthorTap,
+                      onReferenceAuthorTap: onReferenceAuthorTap,
                       onReferenceTap: onReferenceTap,
                     ),
                   ],
