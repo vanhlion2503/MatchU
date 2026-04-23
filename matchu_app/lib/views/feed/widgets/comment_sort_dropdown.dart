@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class CommentSortDropdown extends StatelessWidget {
@@ -17,13 +18,15 @@ class CommentSortDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sortSurface = isDark ? AppTheme.darkSurface : palette.surface;
 
     return PopupMenuButton<CommentSortMode>(
       tooltip: 'Sắp xếp bình luận',
       position: PopupMenuPosition.under,
       offset: const Offset(0, 3),
       splashRadius: 20,
-      color: palette.surface,
+      color: sortSurface,
       elevation: 10,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       constraints: const BoxConstraints(minWidth: 80),
@@ -63,8 +66,13 @@ class CommentSortDropdown extends StatelessWidget {
                 ),
               )
               .toList(growable: false),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: sortSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: palette.border),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

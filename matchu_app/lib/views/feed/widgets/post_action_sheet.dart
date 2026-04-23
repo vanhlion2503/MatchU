@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class PostActionSheet extends StatelessWidget {
@@ -55,6 +56,7 @@ class PostActionSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final authorHandle = _authorHandle(post);
     final sheetHeight = MediaQuery.of(context).size.height * 0.75;
     const savedHighlightColor = Color(0xFFF59E0B);
@@ -64,7 +66,7 @@ class PostActionSheet extends StatelessWidget {
       child: Container(
         height: sheetHeight,
         decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
+          color: isDark ? AppTheme.darkSurface : theme.scaffoldBackgroundColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
@@ -231,6 +233,7 @@ class PostActionSheet extends StatelessWidget {
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
         final palette = FeedPalette.of(dialogContext);
+        final isDark = theme.brightness == Brightness.dark;
 
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -241,7 +244,7 @@ class PostActionSheet extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
             decoration: BoxDecoration(
-              color: palette.surface,
+              color: isDark ? AppTheme.darkSurface : palette.surface,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: palette.border),
               boxShadow: [

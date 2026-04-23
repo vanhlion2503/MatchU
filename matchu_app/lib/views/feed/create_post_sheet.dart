@@ -1074,10 +1074,9 @@ class _CreatePostPalette {
 
     return _CreatePostPalette(
       sheetBackground:
-          isDark ? AppTheme.darkBackground : theme.scaffoldBackgroundColor,
-      headerBackground:
-          isDark ? AppTheme.darkBackground : const Color(0xF8FFFFFF),
-      surfaceMuted: isDark ? const Color(0xFF171D28) : const Color(0xFFF7F7F8),
+          isDark ? AppTheme.darkSurface : theme.scaffoldBackgroundColor,
+      headerBackground: isDark ? AppTheme.darkSurface : const Color(0xF8FFFFFF),
+      surfaceMuted: isDark ? AppTheme.darkSurface : const Color(0xFFF7F7F8),
       border: isDark ? AppTheme.darkBorder : const Color(0xFFE9ECEF),
       textPrimary: theme.colorScheme.onSurface,
       textSecondary:
