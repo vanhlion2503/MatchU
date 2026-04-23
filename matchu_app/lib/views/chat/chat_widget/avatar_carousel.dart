@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
@@ -5,7 +7,14 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_page_indicator.dart';
 
 class AvatarCarousel extends StatefulWidget {
-  const AvatarCarousel({super.key});
+  const AvatarCarousel({
+    super.key,
+    required this.selectedAvatar,
+    required this.onChanged,
+  });
+
+  final String? selectedAvatar;
+  final ValueChanged<String> onChanged;
 
   @override
   State<AvatarCarousel> createState() => _AvatarCarouselState();
@@ -16,15 +25,12 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
   final c = Get.find<AnonymousAvatarController>();
   final ValueNotifier<double> _page = ValueNotifier(0);
   late final Worker _avatarsWorker;
-  late final Worker _selectedAvatarWorker;
 
-  int _safeInitialIndex() {
+  int _indexFor(String? avatarKey) {
     if (c.avatars.isEmpty) return 0;
+    if (avatarKey == null) return 0;
 
-    final selected = c.selectedAvatar.value;
-    if (selected == null) return 0;
-
-    final index = c.avatars.indexOf(selected);
+    final index = c.avatars.indexOf(avatarKey);
     if (index < 0) return 0;
 
     return index;
@@ -34,27 +40,49 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
   void initState() {
     super.initState();
 
-    final initialIndex = _safeInitialIndex();
+    final initialIndex = _indexFor(widget.selectedAvatar);
     final maxIndex = c.avatars.length - 1;
     final targetIndex = maxIndex < 0 ? 0 : initialIndex.clamp(0, maxIndex);
 
     _pageController = PageController(
       initialPage: targetIndex,
-      viewportFraction: 0.55,
+      viewportFraction: 0.58,
     );
 
     _page.value = targetIndex.toDouble();
 
     _pageController.addListener(() {
-      _page.value = _pageController.page ?? _page.value;
+      final nextPage = _pageController.page;
+      if (nextPage == null) return;
+      _page.value = nextPage;
     });
 
     _avatarsWorker = ever<List<String>>(c.avatars, (_) {
+      _ensureValidSelection();
       _syncPageWithSelection(jump: true);
     });
 
-    _selectedAvatarWorker = ever<String?>(c.selectedAvatar, (_) {
+    _ensureValidSelection();
+  }
+
+  @override
+  void didUpdateWidget(covariant AvatarCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.selectedAvatar != widget.selectedAvatar) {
       _syncPageWithSelection();
+    }
+  }
+
+  void _ensureValidSelection() {
+    if (c.avatars.isEmpty) return;
+
+    final selected = widget.selectedAvatar;
+    if (selected != null && c.avatars.contains(selected)) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || c.avatars.isEmpty) return;
+      widget.onChanged(c.avatars.first);
     });
   }
 
@@ -64,7 +92,7 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
     }
 
     final maxIndex = c.avatars.length - 1;
-    final targetIndex = _safeInitialIndex().clamp(0, maxIndex);
+    final targetIndex = _indexFor(widget.selectedAvatar).clamp(0, maxIndex);
     final currentPage = _pageController.page;
     final isSamePage =
         currentPage != null && (currentPage - targetIndex).abs() < 0.01;
@@ -75,8 +103,8 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
       } else {
         _pageController.animateToPage(
           targetIndex,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeInOutCubic,
         );
       }
     }
@@ -87,7 +115,6 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
   @override
   void dispose() {
     _avatarsWorker.dispose();
-    _selectedAvatarWorker.dispose();
     _pageController.dispose();
     _page.dispose();
     super.dispose();
@@ -96,12 +123,12 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 60),
+      padding: const EdgeInsets.only(top: 36),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 230,
+            height: 240,
             child: Obx(() {
               if (c.avatars.isEmpty) {
                 return const SizedBox();
@@ -110,70 +137,97 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
               return PageView.builder(
                 controller: _pageController,
                 itemCount: c.avatars.length,
-                onPageChanged: (i) {
-                  if (i < 0 || i >= c.avatars.length) return;
-                  c.selectAndSave(c.avatars[i]);
+                physics: const BouncingScrollPhysics(),
+                onPageChanged: (index) {
+                  if (index < 0 || index >= c.avatars.length) return;
+                  widget.onChanged(c.avatars[index]);
                 },
                 itemBuilder: (context, index) {
+                  final avatarKey = c.avatars[index];
+
                   return ValueListenableBuilder<double>(
                     valueListenable: _page,
                     builder: (_, page, __) {
-                      final diff = (page - index).abs();
-                      final scale = (1 - diff * 0.35).clamp(0.75, 1.0);
-                      final opacity = (1 - diff * 0.6).clamp(0.4, 1.0);
-                      final isSelected =
-                          c.selectedAvatar.value == c.avatars[index];
+                      final rawDiff = (page - index).abs();
+                      final diff = rawDiff.clamp(0.0, 1.0);
+                      final focus = Curves.easeOutCubic.transform(1 - diff);
+                      final scale = lerpDouble(0.84, 1.0, focus)!;
+                      final opacity = lerpDouble(0.46, 1.0, focus)!;
+                      final avatarRadius = lerpDouble(52, 70, focus)!;
+                      final liftY = lerpDouble(8, 0, focus)!;
+                      final glowSize = lerpDouble(128, 158, focus)!;
+                      final isSelected = widget.selectedAvatar == avatarKey;
 
                       return Center(
                         child: Opacity(
                           opacity: opacity,
-                          child: Transform.scale(
-                            scale: scale,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                if (isSelected)
-                                  Container(
-                                    width: 150,
-                                    height: 150,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.cyanAccent.withValues(
-                                            alpha: 0.8,
+                          child: Transform.translate(
+                            offset: Offset(0, liftY),
+                            child: Transform.scale(
+                              scale: scale,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                clipBehavior: Clip.none,
+                                children: [
+                                  AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 220),
+                                    curve: Curves.easeOutCubic,
+                                    opacity: isSelected ? 1 : 0,
+                                    child: Container(
+                                      width: glowSize,
+                                      height: glowSize,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.cyanAccent.withValues(
+                                              alpha: 0.68,
+                                            ),
+                                            blurRadius: 34,
+                                            spreadRadius: 5,
                                           ),
-                                          blurRadius: 30,
-                                          spreadRadius: 6,
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                CircleAvatar(
-                                  radius: isSelected ? 70 : 55,
-                                  backgroundImage: AssetImage(
-                                    'assets/anonymous/${c.avatars[index]}.png',
+                                  CircleAvatar(
+                                    radius: avatarRadius,
+                                    backgroundImage: AssetImage(
+                                      'assets/anonymous/$avatarKey.png',
+                                    ),
                                   ),
-                                ),
-                                if (isSelected)
                                   Positioned(
                                     bottom: 8,
                                     right: 8,
-                                    child: Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF2ED8FF),
-                                        shape: BoxShape.circle,
+                                    child: AnimatedScale(
+                                      duration: const Duration(
+                                        milliseconds: 180,
                                       ),
-                                      child: const Icon(
-                                        Icons.check,
-                                        color: Colors.black,
-                                        size: 18,
+                                      curve: Curves.easeOutBack,
+                                      scale: isSelected ? 1 : 0,
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(
+                                          milliseconds: 140,
+                                        ),
+                                        opacity: isSelected ? 1 : 0,
+                                        child: Container(
+                                          width: 30,
+                                          height: 30,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF2ED8FF),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.check,
+                                            color: Colors.black,
+                                            size: 18,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -185,13 +239,35 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
             }),
           ),
           Obx(() {
-            final key = c.selectedAvatar.value;
+            final selected = widget.selectedAvatar;
+            final label = selected == null ? '' : c.getAvatarName(selected);
 
-            return Text(
-              key == null ? '' : c.getAvatarName(key),
-              style: Theme.of(context).textTheme.headlineMedium!.copyWith(
-                fontWeight: FontWeight.w900,
-                color: AppTheme.darkTextPrimary,
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              transitionBuilder: (child, animation) {
+                final curved = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                  reverseCurve: Curves.easeInCubic,
+                );
+                return FadeTransition(
+                  opacity: curved,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.12),
+                      end: Offset.zero,
+                    ).animate(curved),
+                    child: child,
+                  ),
+                );
+              },
+              child: Text(
+                label,
+                key: ValueKey(label),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.darkTextPrimary,
+                ),
               ),
             );
           }),

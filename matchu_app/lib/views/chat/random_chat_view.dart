@@ -572,48 +572,80 @@ class _RandomChatViewState extends State<RandomChatView>
               border: Border.all(color: color.primary, width: 3),
             ),
           ),
-          GestureDetector(
-            onTap: () => AvatarOverlayService.show(context),
-            child: Obx(() {
-              final key = anonAvatarC.selectedAvatar.value;
+          Material(
+            type: MaterialType.transparency,
+            child: InkResponse(
+              onTap: () => AvatarOverlayService.show(context),
+              radius: avatarRadius + 18,
+              customBorder: const CircleBorder(),
+              highlightShape: BoxShape.circle,
+              splashColor: color.primary.withValues(alpha: 0.16),
+              highlightColor: color.primary.withValues(alpha: 0.08),
+              child: Obx(() {
+                final key = anonAvatarC.selectedAvatar.value;
+                final ImageProvider<Object> imageProvider =
+                    key == null
+                        ? const AssetImage('assets/anonymous/placeholder.png')
+                        : AssetImage('assets/anonymous/$key.png');
 
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: avatarRadius,
-                    backgroundColor: color.surface,
-                    backgroundImage:
-                        key == null
-                            ? const AssetImage(
-                              'assets/anonymous/placeholder.png',
-                            )
-                            : AssetImage('assets/anonymous/$key.png'),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: editBadgeSize,
-                      height: editBadgeSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: color.primary,
-                        border: Border.all(
-                          color: theme.scaffoldBackgroundColor,
-                          width: 1.5,
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  reverseDuration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    final curved = CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                      reverseCurve: Curves.easeInCubic,
+                    );
+
+                    return FadeTransition(
+                      opacity: curved,
+                      child: ScaleTransition(
+                        scale: Tween<double>(
+                          begin: 0.92,
+                          end: 1,
+                        ).animate(curved),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Stack(
+                    key: ValueKey(key ?? 'placeholder'),
+                    alignment: Alignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: avatarRadius,
+                        backgroundColor: color.surface,
+                        backgroundImage: imageProvider,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: editBadgeSize,
+                          height: editBadgeSize,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: color.primary,
+                            border: Border.all(
+                              color: theme.scaffoldBackgroundColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(
+                            Iconsax.edit_2,
+                            size: compact ? 13 : 14,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                      child: Icon(
-                        Iconsax.edit_2,
-                        size: compact ? 13 : 14,
-                        color: Colors.white,
-                      ),
-                    ),
+                    ],
                   ),
-                ],
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ],
       ),
@@ -741,40 +773,46 @@ class _RandomChatViewState extends State<RandomChatView>
     final selected = selectedTarget == value;
     final isLight = theme.brightness == Brightness.light;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => selectedTarget = value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.center,
-        padding: EdgeInsets.symmetric(vertical: compact ? 8 : 12),
-        decoration: BoxDecoration(
-          color:
-              selected
-                  ? (isLight
-                      ? const Color(0xFF2A2F36).withValues(alpha: 0.8)
-                      : const Color.fromARGB(
-                        255,
-                        255,
-                        255,
-                        255,
-                      ).withValues(alpha: 0.2))
-                  : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontSize: compact ? 14 : 16,
-            fontWeight: FontWeight.w600,
+    final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle();
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: selected ? null : () => setState(() => selectedTarget = value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(vertical: compact ? 8 : 12),
+          decoration: BoxDecoration(
             color:
                 selected
-                    ? Colors.white
-                    : (isLight
-                        ? const Color(0xFF2A2F36).withValues(alpha: 0.7)
-                        : color.onSurface.withValues(alpha: 0.7)),
+                    ? (isLight
+                        ? const Color(0xFF2A2F36).withValues(alpha: 0.8)
+                        : const Color.fromARGB(
+                          255,
+                          255,
+                          255,
+                          255,
+                        ).withValues(alpha: 0.2))
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            style: baseStyle.copyWith(
+              fontSize: compact ? 14 : 16,
+              fontWeight: FontWeight.w600,
+              color:
+                  selected
+                      ? Colors.white
+                      : (isLight
+                          ? const Color(0xFF2A2F36).withValues(alpha: 0.7)
+                          : color.onSurface.withValues(alpha: 0.7)),
+            ),
+            child: Text(label, textAlign: TextAlign.center, maxLines: 2),
           ),
         ),
       ),
