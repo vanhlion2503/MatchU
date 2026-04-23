@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -18,8 +20,104 @@ import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
-class FeedScreen extends GetView<FeedController> {
+class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
+
+  @override
+  State<FeedScreen> createState() => _FeedScreenState();
+}
+
+class _FeedScreenState extends State<FeedScreen>
+    with SingleTickerProviderStateMixin {
+  static const double _loadMoreThreshold = 640;
+
+  late final FeedController controller;
+  late final TabController _tabController;
+  final ScrollController _latestScrollController = ScrollController();
+  final ScrollController _featuredScrollController = ScrollController();
+  final ScrollController _followingScrollController = ScrollController();
+  int _lastSyncedTabIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<FeedController>();
+    final initialIndex = switch (controller.activeTimeline.value) {
+      FeedTimeline.featured => 0,
+      FeedTimeline.latest => 1,
+      FeedTimeline.following => 2,
+    };
+    _lastSyncedTabIndex = initialIndex;
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: initialIndex,
+    );
+    _tabController.addListener(_handleTabControllerChanged);
+    _latestScrollController.addListener(_handleLatestScroll);
+    _featuredScrollController.addListener(_handleFeaturedScroll);
+    _followingScrollController.addListener(_handleFollowingScroll);
+  }
+
+  @override
+  void dispose() {
+    _latestScrollController.removeListener(_handleLatestScroll);
+    _featuredScrollController.removeListener(_handleFeaturedScroll);
+    _followingScrollController.removeListener(_handleFollowingScroll);
+    _tabController.removeListener(_handleTabControllerChanged);
+    _latestScrollController.dispose();
+    _featuredScrollController.dispose();
+    _followingScrollController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _handleTabControllerChanged() {
+    if (_tabController.indexIsChanging) return;
+    final tabIndex = _tabController.index;
+    if (tabIndex == _lastSyncedTabIndex) return;
+    _lastSyncedTabIndex = tabIndex;
+    unawaited(_syncTimelineWithTab(tabIndex));
+  }
+
+  void _handleLatestScroll() {
+    if (!_latestScrollController.hasClients) return;
+    final remainingDistance =
+        _latestScrollController.position.maxScrollExtent -
+        _latestScrollController.position.pixels;
+    if (remainingDistance <= _loadMoreThreshold) {
+      controller.loadMore();
+    }
+  }
+
+  void _handleFeaturedScroll() {
+    if (!_featuredScrollController.hasClients) return;
+    final remainingDistance =
+        _featuredScrollController.position.maxScrollExtent -
+        _featuredScrollController.position.pixels;
+    if (remainingDistance <= _loadMoreThreshold) {
+      controller.loadMoreFeaturedFeed();
+    }
+  }
+
+  void _handleFollowingScroll() {
+    if (!_followingScrollController.hasClients) return;
+    final remainingDistance =
+        _followingScrollController.position.maxScrollExtent -
+        _followingScrollController.position.pixels;
+    if (remainingDistance <= _loadMoreThreshold) {
+      controller.loadMoreFollowingFeed();
+    }
+  }
+
+  Future<void> _syncTimelineWithTab(int index) {
+    final timeline = switch (index) {
+      0 => FeedTimeline.featured,
+      1 => FeedTimeline.latest,
+      _ => FeedTimeline.following,
+    };
+    return controller.selectTimeline(timeline);
+  }
 
   Future<void> _openCreatePostSheet(BuildContext context) async {
     final createdPost = await CreatePostSheet.show(context);
@@ -56,8 +154,8 @@ class FeedScreen extends GetView<FeedController> {
     if (createdPost.isPublic) return;
 
     Get.snackbar(
-      'Thông báo',
-      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
+      'Thong bao',
+      'Bai viet o che do rieng tu se khong hien thi trong bang tin cong khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -83,7 +181,6 @@ class FeedScreen extends GetView<FeedController> {
   void _openAuthorProfile(String rawUserId) {
     final userId = rawUserId.trim();
     if (userId.isEmpty) return;
-
     Get.to(() => OtherProfileView(userId: userId));
   }
 
@@ -184,11 +281,16 @@ class FeedScreen extends GetView<FeedController> {
     return Scaffold(
       backgroundColor: palette.pageBackground,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight + 6),
+        preferredSize: const Size.fromHeight(kToolbarHeight + 46 + 6),
         child: Obx(
           () => FeedAppBar(
-            isRefreshing: controller.isRefreshing.value,
-            onRefresh: controller.refreshFeed,
+            isRefreshing: controller.visibleIsRefreshing,
+            onRefresh: controller.refreshActiveFeed,
+            tabController: _tabController,
+            onTabTap: (index) {
+              _lastSyncedTabIndex = index;
+              unawaited(_syncTimelineWithTab(index));
+            },
           ),
         ),
       ),
@@ -197,99 +299,224 @@ class FeedScreen extends GetView<FeedController> {
         padding: EdgeInsets.only(bottom: bottomInset + 80),
         child: FloatingActionButton(
           heroTag: 'feed_create_post_fab',
-          tooltip: 'Tạo bài viết',
+          tooltip: 'Tao bai viet',
           backgroundColor: theme.colorScheme.primary,
           foregroundColor: theme.colorScheme.onPrimary,
           onPressed: () => _openCreatePostSheet(context),
           child: const Icon(Iconsax.edit_2),
         ),
       ),
-      body: Obx(() {
-        final status = controller.status.value;
-
-        if ((status == FeedStatus.initial || status == FeedStatus.loading) &&
-            controller.posts.isEmpty) {
-          return const FeedShimmer();
-        }
-
-        if (status == FeedStatus.error && controller.posts.isEmpty) {
-          return _FeedStateScrollView(
-            onRefresh: controller.refreshFeed,
-            children: [
-              const SizedBox(height: 72),
-              FeedErrorState(
-                message:
-                    controller.errorMessage.value ??
-                    'Đã xảy ra lỗi khi tải bảng tin.',
-                onRetry: controller.loadInitialFeed,
-              ),
-            ],
-          );
-        }
-
-        if (status == FeedStatus.empty) {
-          return _FeedStateScrollView(
-            onRefresh: controller.refreshFeed,
-            children: [
-              const SizedBox(height: 72),
-              FeedEmptyState(onRefresh: controller.refreshFeed),
-            ],
-          );
-        }
-
-        final itemCount =
-            controller.posts.length + (controller.isLoadingMore.value ? 1 : 0);
-
-        return RefreshIndicator(
-          onRefresh: controller.refreshFeed,
-          color: theme.colorScheme.primary,
-          backgroundColor: palette.surface,
-          child: ListView.builder(
-            controller: controller.scrollController,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
+      body: TabBarView(
+        controller: _tabController,
+        physics: const BouncingScrollPhysics(),
+        children: [
+          Obx(
+            () => _FeedTimelineBody(
+              controller: controller,
+              posts: controller.featuredPosts.toList(growable: false),
+              status: controller.featuredStatus.value,
+              isLoadingMore: controller.featuredIsLoadingMore.value,
+              errorMessage: controller.featuredErrorMessage.value,
+              scrollController: _featuredScrollController,
+              onRefresh: controller.refreshFeaturedFeed,
+              onRetry: controller.loadInitialFeaturedFeed,
+              onPostTap: _openPostDetail,
+              onLikeTap: (postId) => controller.toggleLike(postId),
+              onCommentTap: _openPostDetail,
+              onRepostTap: (post) => _openRepostSheet(context, post),
+              onShareTap: controller.onShareTap,
+              onMoreTap: (post) => _openPostActionSheet(context, post),
+              onAuthorTap: _openAuthorProfile,
+              onReferenceAuthorTap: _openAuthorProfile,
+              onReferenceTap: (post) {
+                if (post.referencePost == null) return;
+                _openReferencePostDetail(post);
+              },
             ),
-            padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
-            itemCount: itemCount,
-            itemBuilder: (context, index) {
-              final postIndex = index;
-              if (postIndex >= controller.posts.length) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 18),
-                  child: Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.3),
-                    ),
-                  ),
-                );
-              }
-
-              final post = controller.posts[postIndex];
-
-              return _FeedRemovalAnimatedPostItem(
-                key: ValueKey('feed_post_${post.postId}'),
-                controller: controller,
-                post: post,
-                showDivider: postIndex > 0,
-                onTap: () => _openPostDetail(post),
-                onLikeTap: () => controller.toggleLike(post.postId),
-                onCommentTap: () => _openPostDetail(post),
-                onRepostTap: () => _openRepostSheet(context, post),
-                onShareTap: controller.onShareTap,
-                onMoreTap: () => _openPostActionSheet(context, post),
-                onAuthorTap: _openAuthorProfile,
-                onReferenceAuthorTap: _openAuthorProfile,
-                onReferenceTap:
-                    post.referencePost != null
-                        ? () => _openReferencePostDetail(post)
-                        : null,
-              );
-            },
           ),
-        );
-      }),
+          Obx(
+            () => _FeedTimelineBody(
+              controller: controller,
+              posts: controller.posts.toList(growable: false),
+              status: controller.status.value,
+              isLoadingMore: controller.isLoadingMore.value,
+              errorMessage: controller.errorMessage.value,
+              scrollController: _latestScrollController,
+              onRefresh: controller.refreshFeed,
+              onRetry: controller.loadInitialFeed,
+              onPostTap: _openPostDetail,
+              onLikeTap: (postId) => controller.toggleLike(postId),
+              onCommentTap: _openPostDetail,
+              onRepostTap: (post) => _openRepostSheet(context, post),
+              onShareTap: controller.onShareTap,
+              onMoreTap: (post) => _openPostActionSheet(context, post),
+              onAuthorTap: _openAuthorProfile,
+              onReferenceAuthorTap: _openAuthorProfile,
+              onReferenceTap: (post) {
+                if (post.referencePost == null) return;
+                _openReferencePostDetail(post);
+              },
+            ),
+          ),
+          Obx(
+            () => _FeedTimelineBody(
+              controller: controller,
+              posts: controller.followingPosts.toList(growable: false),
+              status: controller.followingStatus.value,
+              isLoadingMore: controller.followingIsLoadingMore.value,
+              errorMessage: controller.followingErrorMessage.value,
+              scrollController: _followingScrollController,
+              onRefresh: controller.refreshFollowingFeed,
+              onRetry: controller.loadInitialFollowingFeed,
+              emptyTitle: 'Chua co bai viet tu nguoi ban theo doi.',
+              emptyDescription:
+                  'Hay theo doi them nguoi dung hoac keo xuong de lam moi bang tin.',
+              onPostTap: _openPostDetail,
+              onLikeTap: (postId) => controller.toggleLike(postId),
+              onCommentTap: _openPostDetail,
+              onRepostTap: (post) => _openRepostSheet(context, post),
+              onShareTap: controller.onShareTap,
+              onMoreTap: (post) => _openPostActionSheet(context, post),
+              onAuthorTap: _openAuthorProfile,
+              onReferenceAuthorTap: _openAuthorProfile,
+              onReferenceTap: (post) {
+                if (post.referencePost == null) return;
+                _openReferencePostDetail(post);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedTimelineBody extends StatelessWidget {
+  const _FeedTimelineBody({
+    required this.controller,
+    required this.posts,
+    required this.status,
+    required this.isLoadingMore,
+    required this.errorMessage,
+    required this.scrollController,
+    required this.onRefresh,
+    required this.onRetry,
+    required this.onPostTap,
+    required this.onLikeTap,
+    required this.onCommentTap,
+    required this.onRepostTap,
+    required this.onShareTap,
+    required this.onMoreTap,
+    this.emptyTitle,
+    this.emptyDescription,
+    this.onAuthorTap,
+    this.onReferenceAuthorTap,
+    this.onReferenceTap,
+  });
+
+  final FeedController controller;
+  final List<PostModel> posts;
+  final FeedStatus status;
+  final bool isLoadingMore;
+  final String? errorMessage;
+  final ScrollController scrollController;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function() onRetry;
+  final ValueChanged<PostModel> onPostTap;
+  final ValueChanged<String> onLikeTap;
+  final ValueChanged<PostModel> onCommentTap;
+  final ValueChanged<PostModel> onRepostTap;
+  final VoidCallback onShareTap;
+  final ValueChanged<PostModel> onMoreTap;
+  final String? emptyTitle;
+  final String? emptyDescription;
+  final ValueChanged<String>? onAuthorTap;
+  final ValueChanged<String>? onReferenceAuthorTap;
+  final ValueChanged<PostModel>? onReferenceTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if ((status == FeedStatus.initial || status == FeedStatus.loading) &&
+        posts.isEmpty) {
+      return const FeedShimmer();
+    }
+
+    if (status == FeedStatus.error && posts.isEmpty) {
+      return _FeedStateScrollView(
+        onRefresh: onRefresh,
+        children: [
+          const SizedBox(height: 72),
+          FeedErrorState(
+            message: errorMessage ?? 'Da xay ra loi khi tai bang tin.',
+            onRetry: onRetry,
+          ),
+        ],
+      );
+    }
+
+    if (status == FeedStatus.empty) {
+      return _FeedStateScrollView(
+        onRefresh: onRefresh,
+        children: [
+          const SizedBox(height: 72),
+          FeedEmptyState(
+            onRefresh: onRefresh,
+            title: emptyTitle,
+            description: emptyDescription,
+          ),
+        ],
+      );
+    }
+
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+    final itemCount = posts.length + (isLoadingMore ? 1 : 0);
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: theme.colorScheme.primary,
+      backgroundColor: palette.surface,
+      child: ListView.builder(
+        controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          if (index >= posts.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2.3),
+                ),
+              ),
+            );
+          }
+
+          final post = posts[index];
+
+          return _FeedRemovalAnimatedPostItem(
+            key: ValueKey('feed_post_${post.postId}'),
+            controller: controller,
+            post: post,
+            showDivider: index > 0,
+            onTap: () => onPostTap(post),
+            onLikeTap: () => onLikeTap(post.postId),
+            onCommentTap: () => onCommentTap(post),
+            onRepostTap: () => onRepostTap(post),
+            onShareTap: onShareTap,
+            onMoreTap: () => onMoreTap(post),
+            onAuthorTap: onAuthorTap,
+            onReferenceAuthorTap: onReferenceAuthorTap,
+            onReferenceTap:
+                onReferenceTap == null ? null : () => onReferenceTap!(post),
+          );
+        },
+      ),
     );
   }
 }

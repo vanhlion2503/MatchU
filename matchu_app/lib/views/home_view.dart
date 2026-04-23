@@ -19,7 +19,9 @@ class _HomeViewState extends State<HomeView> {
   double _scrollDeltaSinceLastToggle = 0;
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+    // Feed list is wrapped by widgets like RefreshIndicator/TabBarView,
+    // so scroll notifications can arrive with depth > 0.
+    if (notification.metrics.axis != Axis.vertical) {
       return false;
     }
 

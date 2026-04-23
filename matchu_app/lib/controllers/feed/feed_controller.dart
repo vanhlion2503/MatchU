@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -11,10 +12,20 @@ import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 enum FeedStatus { initial, loading, success, empty, error }
 
+enum FeedTimeline { latest, featured, following }
+
 class FeedController extends GetxController {
   static const int _pageSize = 10;
   static const double _loadMoreThreshold = 640;
   static const String _hiddenPostsStorageKeyPrefix = 'feed_hidden_posts_';
+  static const int _featuredCandidateBatchSize = 24;
+  static const int _featuredScanPassesPerRequest = 4;
+  static const int _featuredShufflePoolMinSize = 15;
+  static const int _featuredShufflePoolMaxSize = 20;
+  static const double _featuredShuffleSwapChance = 0.42;
+  static const int _featuredShuffleMaxJump = 3;
+  static const int _followingCandidateBatchSize = 24;
+  static const int _followingScanPassesPerRequest = 6;
   static const Duration _postRemovalAnimationDuration = Duration(
     milliseconds: 220,
   );
@@ -28,6 +39,21 @@ class FeedController extends GetxController {
   final RxBool isLoadingMore = false.obs;
   final RxBool hasMore = true.obs;
   final RxnString errorMessage = RxnString();
+  final Rx<FeedTimeline> activeTimeline = FeedTimeline.featured.obs;
+
+  final RxList<PostModel> featuredPosts = <PostModel>[].obs;
+  final Rx<FeedStatus> featuredStatus = FeedStatus.initial.obs;
+  final RxBool featuredIsRefreshing = false.obs;
+  final RxBool featuredIsLoadingMore = false.obs;
+  final RxBool featuredHasMore = true.obs;
+  final RxnString featuredErrorMessage = RxnString();
+
+  final RxList<PostModel> followingPosts = <PostModel>[].obs;
+  final Rx<FeedStatus> followingStatus = FeedStatus.initial.obs;
+  final RxBool followingIsRefreshing = false.obs;
+  final RxBool followingIsLoadingMore = false.obs;
+  final RxBool followingHasMore = true.obs;
+  final RxnString followingErrorMessage = RxnString();
 
   final ScrollController scrollController = ScrollController();
 
@@ -45,9 +71,81 @@ class FeedController extends GetxController {
   final Set<String> _hiddenPostIds = <String>{};
   final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
+  DocumentSnapshot<Map<String, dynamic>>? _featuredLastDocument;
+  DocumentSnapshot<Map<String, dynamic>>? _followingLastDocument;
+  Set<String> _followingAuthorIds = <String>{};
+  int _featuredRefreshNonce = 0;
 
   String get currentUserId => _service.uid;
   Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
+  bool get isFeaturedTimeline => activeTimeline.value == FeedTimeline.featured;
+  bool get isFollowingTimeline =>
+      activeTimeline.value == FeedTimeline.following;
+  List<PostModel> get visiblePosts {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return featuredPosts;
+      case FeedTimeline.following:
+        return followingPosts;
+      case FeedTimeline.latest:
+        return posts;
+    }
+  }
+
+  FeedStatus get visibleStatus {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return featuredStatus.value;
+      case FeedTimeline.following:
+        return followingStatus.value;
+      case FeedTimeline.latest:
+        return status.value;
+    }
+  }
+
+  bool get visibleIsRefreshing {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return featuredIsRefreshing.value;
+      case FeedTimeline.following:
+        return followingIsRefreshing.value;
+      case FeedTimeline.latest:
+        return isRefreshing.value;
+    }
+  }
+
+  bool get visibleIsLoadingMore {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return featuredIsLoadingMore.value;
+      case FeedTimeline.following:
+        return followingIsLoadingMore.value;
+      case FeedTimeline.latest:
+        return isLoadingMore.value;
+    }
+  }
+
+  bool get visibleHasMore {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return featuredHasMore.value;
+      case FeedTimeline.following:
+        return followingHasMore.value;
+      case FeedTimeline.latest:
+        return hasMore.value;
+    }
+  }
+
+  String? get visibleErrorMessage {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return featuredErrorMessage.value;
+      case FeedTimeline.following:
+        return followingErrorMessage.value;
+      case FeedTimeline.latest:
+        return errorMessage.value;
+    }
+  }
 
   bool isPostRemoving(String postId) {
     final normalizedPostId = postId.trim();
@@ -60,7 +158,7 @@ class FeedController extends GetxController {
     super.onInit();
     _loadHiddenPostIds();
     scrollController.addListener(_handleScroll);
-    loadInitialFeed();
+    loadInitialFeaturedFeed();
   }
 
   bool canHidePostFromFeed(PostModel post) {
@@ -86,8 +184,8 @@ class FeedController extends GetxController {
 
     await _removePostByIdWithAnimation(normalizedPostId);
 
-    if (posts.isEmpty && hasMore.value) {
-      unawaited(loadMore());
+    if (visiblePosts.isEmpty && visibleHasMore) {
+      unawaited(loadMoreActiveFeed());
     }
 
     Get.snackbar(
@@ -102,8 +200,24 @@ class FeedController extends GetxController {
     await _loadFeed(reset: true);
   }
 
+  Future<void> loadInitialFeaturedFeed() async {
+    await _loadFeaturedFeed(reset: true);
+  }
+
+  Future<void> loadInitialFollowingFeed() async {
+    await _loadFollowingFeed(reset: true);
+  }
+
   Future<void> refreshFeed() async {
     await _loadFeed(reset: true, isManualRefresh: true);
+  }
+
+  Future<void> refreshFeaturedFeed() async {
+    await _loadFeaturedFeed(reset: true, isManualRefresh: true);
+  }
+
+  Future<void> refreshFollowingFeed() async {
+    await _loadFollowingFeed(reset: true, isManualRefresh: true);
   }
 
   Future<void> loadMore() async {
@@ -113,6 +227,72 @@ class FeedController extends GetxController {
       return;
     }
     await _loadFeed(reset: false);
+  }
+
+  Future<void> loadMoreFeaturedFeed() async {
+    if (featuredIsLoadingMore.value ||
+        !featuredHasMore.value ||
+        featuredStatus.value == FeedStatus.loading) {
+      return;
+    }
+    await _loadFeaturedFeed(reset: false);
+  }
+
+  Future<void> loadMoreFollowingFeed() async {
+    if (followingIsLoadingMore.value ||
+        !followingHasMore.value ||
+        followingStatus.value == FeedStatus.loading) {
+      return;
+    }
+    await _loadFollowingFeed(reset: false);
+  }
+
+  Future<void> refreshActiveFeed() {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return refreshFeaturedFeed();
+      case FeedTimeline.following:
+        return refreshFollowingFeed();
+      case FeedTimeline.latest:
+        return refreshFeed();
+    }
+  }
+
+  Future<void> loadMoreActiveFeed() {
+    switch (activeTimeline.value) {
+      case FeedTimeline.featured:
+        return loadMoreFeaturedFeed();
+      case FeedTimeline.following:
+        return loadMoreFollowingFeed();
+      case FeedTimeline.latest:
+        return loadMore();
+    }
+  }
+
+  Future<void> selectTimeline(FeedTimeline timeline) async {
+    if (activeTimeline.value == timeline) return;
+    activeTimeline.value = timeline;
+
+    switch (timeline) {
+      case FeedTimeline.featured:
+        if (featuredPosts.isEmpty &&
+            featuredStatus.value == FeedStatus.initial) {
+          await loadInitialFeaturedFeed();
+        }
+        return;
+      case FeedTimeline.following:
+        if (followingPosts.isEmpty &&
+            (followingStatus.value == FeedStatus.initial ||
+                followingStatus.value == FeedStatus.empty)) {
+          await loadInitialFollowingFeed();
+        }
+        return;
+      case FeedTimeline.latest:
+        if (posts.isEmpty && status.value == FeedStatus.initial) {
+          await loadInitialFeed();
+        }
+        return;
+    }
   }
 
   void prependPost(PostModel post) {
@@ -130,6 +310,11 @@ class FeedController extends GetxController {
     _savedCache[post.postId] = post.isSaved;
     _confirmedSavedStates[post.postId] = post.isSaved;
     posts.assignAll(_mergePosts(posts, [post]));
+    if (_followingAuthorIds.contains(post.authorId.trim())) {
+      followingPosts.assignAll(_mergePosts(followingPosts, [post]));
+      followingErrorMessage.value = null;
+      followingStatus.value = FeedStatus.success;
+    }
     errorMessage.value = null;
     status.value = FeedStatus.success;
   }
@@ -357,19 +542,10 @@ class FeedController extends GetxController {
         limit: _pageSize,
       );
 
-      final likedHydratedPosts = await _attachLikeStates(
+      final visibleHydratedPosts = await _hydrateFeedPosts(
         page.posts,
         reset: reset,
       );
-      final hydratedPosts = await _attachRepostStates(
-        likedHydratedPosts,
-        reset: reset,
-      );
-      final savedHydratedPosts = await _attachSavedStates(
-        hydratedPosts,
-        reset: reset,
-      );
-      final visibleHydratedPosts = _filterHiddenPosts(savedHydratedPosts);
 
       if (reset) {
         posts.assignAll(_mergeWithLocallyPrependedPosts(visibleHydratedPosts));
@@ -401,6 +577,241 @@ class FeedController extends GetxController {
         isLoadingMore.value = false;
       }
     }
+  }
+
+  Future<void> _loadFeaturedFeed({
+    required bool reset,
+    bool isManualRefresh = false,
+  }) async {
+    final hadPostsBeforeRequest = featuredPosts.isNotEmpty;
+
+    if (reset) {
+      if (featuredIsRefreshing.value) return;
+      featuredIsRefreshing.value = isManualRefresh;
+      if (!isManualRefresh) {
+        featuredStatus.value = FeedStatus.loading;
+      }
+      featuredErrorMessage.value = null;
+      _featuredLastDocument = null;
+      _featuredRefreshNonce++;
+      featuredHasMore.value = true;
+    } else {
+      if (featuredIsLoadingMore.value || !featuredHasMore.value) return;
+      featuredIsLoadingMore.value = true;
+    }
+
+    try {
+      final loadedPosts = <PostModel>[];
+      var cursor = reset ? null : _featuredLastDocument;
+      var sourceHasMore = true;
+      var scanPass = 0;
+      final existingIds = <String>{
+        if (!reset) ...featuredPosts.map((post) => post.postId),
+      };
+
+      while (loadedPosts.length < _pageSize &&
+          sourceHasMore &&
+          scanPass < _featuredScanPassesPerRequest) {
+        final page = await _service.fetchLatestPosts(
+          startAfter: cursor,
+          limit: _featuredCandidateBatchSize,
+        );
+        cursor = page.lastDocument;
+        sourceHasMore = page.hasMore;
+
+        final hydratedBatch = await _hydrateFeedPosts(page.posts, reset: false);
+        final rankedBatch = _rankFeaturedCandidates(
+          hydratedBatch,
+          excludedIds: <String>{
+            ...existingIds,
+            ...loadedPosts.map((post) => post.postId),
+          },
+        );
+
+        final remaining = _pageSize - loadedPosts.length;
+        if (remaining > 0 && rankedBatch.isNotEmpty) {
+          loadedPosts.addAll(
+            rankedBatch.take(remaining).toList(growable: false),
+          );
+        }
+        scanPass++;
+      }
+
+      if (reset) {
+        featuredPosts.assignAll(loadedPosts);
+      } else if (loadedPosts.isNotEmpty) {
+        featuredPosts.assignAll(
+          _mergeFeaturedPosts(featuredPosts, loadedPosts),
+        );
+      }
+
+      _featuredLastDocument = cursor;
+      featuredHasMore.value = sourceHasMore;
+
+      if (featuredPosts.isEmpty) {
+        featuredStatus.value = FeedStatus.empty;
+      } else {
+        featuredStatus.value = FeedStatus.success;
+      }
+    } catch (error) {
+      final message = _mapError(error);
+      if (hadPostsBeforeRequest) {
+        featuredStatus.value = FeedStatus.success;
+        _showError(message);
+      } else {
+        featuredErrorMessage.value = message;
+        featuredStatus.value = FeedStatus.error;
+      }
+    } finally {
+      if (reset) {
+        featuredIsRefreshing.value = false;
+      } else {
+        featuredIsLoadingMore.value = false;
+      }
+    }
+  }
+
+  Future<void> _loadFollowingFeed({
+    required bool reset,
+    bool isManualRefresh = false,
+  }) async {
+    final hadPostsBeforeRequest = followingPosts.isNotEmpty;
+
+    if (reset) {
+      if (followingIsRefreshing.value) return;
+      followingIsRefreshing.value = isManualRefresh;
+      if (!isManualRefresh) {
+        followingStatus.value = FeedStatus.loading;
+      }
+      followingErrorMessage.value = null;
+      _followingLastDocument = null;
+      followingHasMore.value = true;
+    } else {
+      if (followingIsLoadingMore.value || !followingHasMore.value) return;
+      followingIsLoadingMore.value = true;
+    }
+
+    try {
+      final followingAuthorIds = await _resolveFollowingAuthorIds(
+        forceRefresh: reset,
+      );
+      if (followingAuthorIds.isEmpty) {
+        if (reset) {
+          followingPosts.clear();
+        }
+        _followingLastDocument = null;
+        followingHasMore.value = false;
+        followingStatus.value = FeedStatus.empty;
+        return;
+      }
+
+      final loadedPosts = <PostModel>[];
+      final loadedPostIds = <String>{};
+      var cursor = reset ? null : _followingLastDocument;
+      var sourceHasMore = true;
+      var scanPass = 0;
+      final existingIds = <String>{
+        if (!reset) ...followingPosts.map((post) => post.postId.trim()),
+      };
+
+      while (loadedPosts.length < _pageSize &&
+          sourceHasMore &&
+          scanPass < _followingScanPassesPerRequest) {
+        final page = await _service.fetchLatestPosts(
+          startAfter: cursor,
+          limit: _followingCandidateBatchSize,
+        );
+        cursor = page.lastDocument;
+        sourceHasMore = page.hasMore;
+
+        final followingCandidates = page.posts
+            .where((post) => followingAuthorIds.contains(post.authorId.trim()))
+            .toList(growable: false);
+
+        if (followingCandidates.isEmpty) {
+          scanPass++;
+          continue;
+        }
+
+        final hydratedBatch = await _hydrateFeedPosts(
+          followingCandidates,
+          reset: false,
+        );
+
+        for (final post in hydratedBatch) {
+          final postId = post.postId.trim();
+          if (postId.isEmpty ||
+              existingIds.contains(postId) ||
+              loadedPostIds.contains(postId)) {
+            continue;
+          }
+          loadedPosts.add(post);
+          loadedPostIds.add(postId);
+          if (loadedPosts.length >= _pageSize) {
+            break;
+          }
+        }
+        scanPass++;
+      }
+
+      if (reset) {
+        followingPosts.assignAll(loadedPosts);
+      } else if (loadedPosts.isNotEmpty) {
+        followingPosts.assignAll(_mergePosts(followingPosts, loadedPosts));
+      }
+
+      _followingLastDocument = cursor;
+      followingHasMore.value = sourceHasMore;
+
+      if (followingPosts.isEmpty) {
+        followingStatus.value = FeedStatus.empty;
+      } else {
+        followingStatus.value = FeedStatus.success;
+      }
+    } catch (error) {
+      final message = _mapError(error);
+      if (hadPostsBeforeRequest) {
+        followingStatus.value = FeedStatus.success;
+        _showError(message);
+      } else {
+        followingErrorMessage.value = message;
+        followingStatus.value = FeedStatus.error;
+      }
+    } finally {
+      if (reset) {
+        followingIsRefreshing.value = false;
+      } else {
+        followingIsLoadingMore.value = false;
+      }
+    }
+  }
+
+  Future<Set<String>> _resolveFollowingAuthorIds({
+    required bool forceRefresh,
+  }) async {
+    if (!forceRefresh && _followingAuthorIds.isNotEmpty) {
+      return _followingAuthorIds;
+    }
+
+    final followingIds = await _service.fetchFollowingUserIds();
+    _followingAuthorIds = followingIds.toSet();
+    return _followingAuthorIds;
+  }
+
+  Future<List<PostModel>> _hydrateFeedPosts(
+    List<PostModel> incoming, {
+    required bool reset,
+  }) async {
+    final likedHydratedPosts = await _attachLikeStates(incoming, reset: reset);
+    final repostHydratedPosts = await _attachRepostStates(
+      likedHydratedPosts,
+      reset: reset,
+    );
+    final savedHydratedPosts = await _attachSavedStates(
+      repostHydratedPosts,
+      reset: reset,
+    );
+    return _filterHiddenPosts(savedHydratedPosts);
   }
 
   Future<void> toggleLike(String postId) async {
@@ -573,6 +984,134 @@ class FeedController extends GetxController {
         .toList(growable: false);
   }
 
+  List<PostModel> _rankFeaturedCandidates(
+    List<PostModel> candidates, {
+    required Set<String> excludedIds,
+  }) {
+    if (candidates.isEmpty) return const <PostModel>[];
+
+    final unique = <String, PostModel>{};
+    for (final post in candidates) {
+      final postId = post.postId.trim();
+      if (postId.isEmpty || excludedIds.contains(postId)) continue;
+      unique[postId] = post;
+    }
+
+    final now = DateTime.now();
+    final seed = Object.hash(currentUserId.trim(), _featuredRefreshNonce);
+    final ranked = unique.values.toList(growable: false);
+
+    ranked.sort((a, b) {
+      final bScore = _featuredScore(b, now: now, seed: seed);
+      final aScore = _featuredScore(a, now: now, seed: seed);
+      final scoreCompare = bScore.compareTo(aScore);
+      if (scoreCompare != 0) return scoreCompare;
+
+      final aCreatedAt = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bCreatedAt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bCreatedAt.compareTo(aCreatedAt);
+    });
+
+    final shufflePoolSize = _selectFeaturedShufflePoolSize(
+      candidateCount: ranked.length,
+      seed: seed,
+    );
+    if (shufflePoolSize <= 1) {
+      return ranked;
+    }
+
+    final topPool = ranked.take(shufflePoolSize).toList(growable: false);
+    final lightlyShuffledTopPool = _lightlyShuffleFeaturedPool(
+      topPool,
+      seed: Object.hash(seed, ranked.length),
+    );
+
+    if (shufflePoolSize >= ranked.length) {
+      return lightlyShuffledTopPool;
+    }
+
+    return <PostModel>[
+      ...lightlyShuffledTopPool,
+      ...ranked.skip(shufflePoolSize),
+    ];
+  }
+
+  int _selectFeaturedShufflePoolSize({
+    required int candidateCount,
+    required int seed,
+  }) {
+    if (candidateCount <= _featuredShufflePoolMinSize) {
+      return candidateCount;
+    }
+
+    final maxPoolSize = math.min(_featuredShufflePoolMaxSize, candidateCount);
+    final minPoolSize = math.min(_featuredShufflePoolMinSize, maxPoolSize);
+    if (minPoolSize >= maxPoolSize) {
+      return minPoolSize;
+    }
+
+    final range = (maxPoolSize - minPoolSize) + 1;
+    final offset = (seed & 0x7fffffff) % range;
+    return minPoolSize + offset;
+  }
+
+  List<PostModel> _lightlyShuffleFeaturedPool(
+    List<PostModel> rankedPool, {
+    required int seed,
+  }) {
+    if (rankedPool.length <= 1) return rankedPool;
+
+    final shuffled = rankedPool.toList(growable: false);
+    final random = math.Random(seed & 0x7fffffff);
+
+    for (var index = 0; index < shuffled.length - 1; index++) {
+      if (random.nextDouble() > _featuredShuffleSwapChance) {
+        continue;
+      }
+
+      final maxJump = math.min(
+        _featuredShuffleMaxJump,
+        (shuffled.length - 1) - index,
+      );
+      if (maxJump <= 0) {
+        continue;
+      }
+
+      final swapIndex = index + random.nextInt(maxJump) + 1;
+      final current = shuffled[index];
+      shuffled[index] = shuffled[swapIndex];
+      shuffled[swapIndex] = current;
+    }
+
+    return shuffled;
+  }
+
+  double _featuredScore(
+    PostModel post, {
+    required DateTime now,
+    required int seed,
+  }) {
+    final createdAt = post.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final ageInHours = now.difference(createdAt).inMinutes / 60;
+    final clampedAgeInHours = ageInHours.isNegative ? 0 : ageInHours;
+    final freshnessScore = 1 / (1 + (clampedAgeInHours / 24));
+
+    final engagementScore =
+        post.stats.likeCount * 1.0 +
+        post.stats.commentCount * 2.2 +
+        post.stats.shareCount * 3.0;
+    final trendScore = post.trendScore + (post.trendBucket * 0.75);
+    final jitter = _deterministicJitter(post.postId, seed) * 1.15;
+
+    return (freshnessScore * 9.5) + engagementScore + trendScore + jitter;
+  }
+
+  double _deterministicJitter(String postId, int seed) {
+    final hash = Object.hash(seed, postId.trim());
+    final normalized = (hash & 0x7fffffff) % 10000;
+    return normalized / 10000;
+  }
+
   List<PostModel> _mergePosts(
     List<PostModel> current,
     List<PostModel> incoming,
@@ -598,6 +1137,19 @@ class FeedController extends GetxController {
     return items;
   }
 
+  List<PostModel> _mergeFeaturedPosts(
+    List<PostModel> current,
+    List<PostModel> incoming,
+  ) {
+    final merged = <String, PostModel>{
+      for (final post in current) post.postId: post,
+    };
+    for (final post in incoming) {
+      merged[post.postId] = post;
+    }
+    return merged.values.toList(growable: false);
+  }
+
   List<PostModel> _mergeWithLocallyPrependedPosts(List<PostModel> incoming) {
     if (_locallyPrependedPosts.isEmpty) return incoming;
 
@@ -613,18 +1165,55 @@ class FeedController extends GetxController {
     for (final post in posts) {
       if (post.postId == postId) return post;
     }
+    for (final post in featuredPosts) {
+      if (post.postId == postId) return post;
+    }
+    for (final post in followingPosts) {
+      if (post.postId == postId) return post;
+    }
     return null;
   }
 
   void _replacePost(PostModel updatedPost) {
-    final index = posts.indexWhere((post) => post.postId == updatedPost.postId);
-    if (index == -1) return;
+    var hasLatestChanges = false;
+    final latestIndex = posts.indexWhere(
+      (post) => post.postId == updatedPost.postId,
+    );
+    if (latestIndex != -1) {
+      final updatedPosts = posts.toList(growable: false);
+      updatedPosts[latestIndex] = updatedPost;
+      posts.assignAll(updatedPosts);
+      hasLatestChanges = true;
+    }
+
+    var hasFeaturedChanges = false;
+    final featuredIndex = featuredPosts.indexWhere(
+      (post) => post.postId == updatedPost.postId,
+    );
+    if (featuredIndex != -1) {
+      final updatedFeaturedPosts = featuredPosts.toList(growable: false);
+      updatedFeaturedPosts[featuredIndex] = updatedPost;
+      featuredPosts.assignAll(updatedFeaturedPosts);
+      hasFeaturedChanges = true;
+    }
+
+    var hasFollowingChanges = false;
+    final followingIndex = followingPosts.indexWhere(
+      (post) => post.postId == updatedPost.postId,
+    );
+    if (followingIndex != -1) {
+      final updatedFollowingPosts = followingPosts.toList(growable: false);
+      updatedFollowingPosts[followingIndex] = updatedPost;
+      followingPosts.assignAll(updatedFollowingPosts);
+      hasFollowingChanges = true;
+    }
+
+    if (!hasLatestChanges && !hasFeaturedChanges && !hasFollowingChanges) {
+      return;
+    }
     if (_locallyPrependedPosts.containsKey(updatedPost.postId)) {
       _locallyPrependedPosts[updatedPost.postId] = updatedPost;
     }
-    final updatedPosts = posts.toList(growable: false);
-    updatedPosts[index] = updatedPost;
-    posts.assignAll(updatedPosts);
   }
 
   String get _hiddenPostsStorageKey =>
@@ -671,10 +1260,20 @@ class FeedController extends GetxController {
     final normalizedPostId = postId.trim();
     if (normalizedPostId.isEmpty) return;
 
-    final postIndex = posts.indexWhere(
+    final latestPostIndex = posts.indexWhere(
       (post) => post.postId == normalizedPostId,
     );
-    if (postIndex == -1) {
+    final featuredPostIndex = featuredPosts.indexWhere(
+      (post) => post.postId == normalizedPostId,
+    );
+    final followingPostIndex = followingPosts.indexWhere(
+      (post) => post.postId == normalizedPostId,
+    );
+    final hasPostInFeed =
+        latestPostIndex != -1 ||
+        featuredPostIndex != -1 ||
+        followingPostIndex != -1;
+    if (!hasPostInFeed) {
       _clearPostCaches(normalizedPostId);
       _updateStatusAfterPostMutation();
       return;
@@ -695,6 +1294,18 @@ class FeedController extends GetxController {
     if (postIndex != -1) {
       posts.removeAt(postIndex);
     }
+    final featuredIndex = featuredPosts.indexWhere(
+      (post) => post.postId == postId,
+    );
+    if (featuredIndex != -1) {
+      featuredPosts.removeAt(featuredIndex);
+    }
+    final followingIndex = followingPosts.indexWhere(
+      (post) => post.postId == postId,
+    );
+    if (followingIndex != -1) {
+      followingPosts.removeAt(followingIndex);
+    }
 
     _clearPostCaches(postId);
     _updateStatusAfterPostMutation();
@@ -713,15 +1324,30 @@ class FeedController extends GetxController {
   }
 
   void _updateStatusAfterPostMutation() {
-    if (posts.isEmpty) {
-      if (status.value != FeedStatus.empty) {
+    if (status.value != FeedStatus.initial) {
+      if (posts.isEmpty && status.value != FeedStatus.empty) {
         status.value = FeedStatus.empty;
+      } else if (posts.isNotEmpty && status.value == FeedStatus.empty) {
+        status.value = FeedStatus.success;
       }
-      return;
     }
 
-    if (status.value == FeedStatus.empty) {
-      status.value = FeedStatus.success;
+    if (featuredStatus.value != FeedStatus.initial) {
+      if (featuredPosts.isEmpty && featuredStatus.value != FeedStatus.empty) {
+        featuredStatus.value = FeedStatus.empty;
+      } else if (featuredPosts.isNotEmpty &&
+          featuredStatus.value == FeedStatus.empty) {
+        featuredStatus.value = FeedStatus.success;
+      }
+    }
+
+    if (followingStatus.value != FeedStatus.initial) {
+      if (followingPosts.isEmpty && followingStatus.value != FeedStatus.empty) {
+        followingStatus.value = FeedStatus.empty;
+      } else if (followingPosts.isNotEmpty &&
+          followingStatus.value == FeedStatus.empty) {
+        followingStatus.value = FeedStatus.success;
+      }
     }
   }
 
@@ -743,7 +1369,7 @@ class FeedController extends GetxController {
       _repostPendingTargetIds.remove(targetPostId);
     }
 
-    var hasChanges = false;
+    var hasLatestChanges = false;
     final updatedPosts = posts.toList(growable: false);
 
     for (var index = 0; index < updatedPosts.length; index++) {
@@ -765,11 +1391,61 @@ class FeedController extends GetxController {
       if (_locallyPrependedPosts.containsKey(updated.postId)) {
         _locallyPrependedPosts[updated.postId] = updated;
       }
-      hasChanges = true;
+      hasLatestChanges = true;
     }
 
-    if (hasChanges) {
+    if (hasLatestChanges) {
       posts.assignAll(updatedPosts);
+    }
+
+    var hasFeaturedChanges = false;
+    final updatedFeaturedPosts = featuredPosts.toList(growable: false);
+
+    for (var index = 0; index < updatedFeaturedPosts.length; index++) {
+      final current = updatedFeaturedPosts[index];
+      if (_repostTargetPostIdOf(current) != targetPostId) {
+        continue;
+      }
+
+      if (current.isReposted == isReposted &&
+          current.isRepostPending == isPending) {
+        continue;
+      }
+
+      updatedFeaturedPosts[index] = current.copyWith(
+        isReposted: isReposted,
+        isRepostPending: isPending,
+      );
+      hasFeaturedChanges = true;
+    }
+
+    if (hasFeaturedChanges) {
+      featuredPosts.assignAll(updatedFeaturedPosts);
+    }
+
+    var hasFollowingChanges = false;
+    final updatedFollowingPosts = followingPosts.toList(growable: false);
+
+    for (var index = 0; index < updatedFollowingPosts.length; index++) {
+      final current = updatedFollowingPosts[index];
+      if (_repostTargetPostIdOf(current) != targetPostId) {
+        continue;
+      }
+
+      if (current.isReposted == isReposted &&
+          current.isRepostPending == isPending) {
+        continue;
+      }
+
+      updatedFollowingPosts[index] = current.copyWith(
+        isReposted: isReposted,
+        isRepostPending: isPending,
+      );
+      hasFollowingChanges = true;
+    }
+
+    if (hasFollowingChanges) {
+      followingPosts.assignAll(updatedFollowingPosts);
     }
   }
 
@@ -951,7 +1627,9 @@ class FeedController extends GetxController {
   }
 
   void _handleScroll() {
-    if (!scrollController.hasClients || isLoadingMore.value || !hasMore.value) {
+    if (!scrollController.hasClients ||
+        visibleIsLoadingMore ||
+        !visibleHasMore) {
       return;
     }
 
@@ -960,7 +1638,7 @@ class FeedController extends GetxController {
         scrollController.position.pixels;
 
     if (remainingDistance <= _loadMoreThreshold) {
-      loadMore();
+      loadMoreActiveFeed();
     }
   }
 

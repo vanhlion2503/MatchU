@@ -39,6 +39,24 @@ class PostService {
 
   String get uid => _auth.currentUser?.uid ?? '';
 
+  Future<List<String>> fetchFollowingUserIds() async {
+    final normalizedCurrentUserId = uid.trim();
+    if (normalizedCurrentUserId.isEmpty) {
+      return const <String>[];
+    }
+
+    final user = await _userService.getUser(normalizedCurrentUserId);
+    if (user == null) {
+      return const <String>[];
+    }
+
+    return user.following
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty && id != normalizedCurrentUserId)
+        .toSet()
+        .toList(growable: false);
+  }
+
   CollectionReference<Map<String, dynamic>> _savedPostsRef(String userId) {
     return _firestore.collection('users').doc(userId).collection('savedPosts');
   }
