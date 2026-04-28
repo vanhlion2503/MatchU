@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:pinput/pinput.dart';
 
 enum PasscodePromptAction { submitted, reset }
@@ -87,7 +88,13 @@ Widget _buildPasscodeInput({
   );
 }
 
-Future<String?> showPasscodeSetupDialog(BuildContext context) {
+Future<String?> showPasscodeSetupDialog(
+  BuildContext context, {
+  String? title,
+  String? description,
+  String? confirmTitle,
+  String? confirmDescription,
+}) {
   final firstController = TextEditingController();
   final secondController = TextEditingController();
 
@@ -103,19 +110,23 @@ Future<String?> showPasscodeSetupDialog(BuildContext context) {
       return StatefulBuilder(
         builder: (context, setState) {
           final controller = confirmStep ? secondController : firstController;
-          final title = confirmStep ? 'Xác nhận mã PIN' : 'Thiết lập mã PIN';
-          final description =
+          final currentTitle =
               confirmStep
-                  ? 'Nhập lại mã PIN để xác nhận'
-                  : 'Tạo mã PIN để khôi phục tin nhắn trên thiết bị mới';
+                  ? (confirmTitle ?? 'Xác nhận mã PIN')
+                  : title ?? 'Thiết lập mã PIN';
+          final currentDescription =
+              confirmStep
+                  ? confirmDescription ?? 'Nhập lại mã PIN để xác nhận'
+                  : description ??
+                      'Tạo mã PIN để khôi phục tin nhắn trên thiết bị mới';
 
           return PopScope(
             canPop: false,
             child: AlertDialog(
-              title: Text(title),
+              title: Text(currentTitle),
               content: _PasscodeDialogContent(
                 children: [
-                  Text(description, style: theme.textTheme.bodyMedium),
+                  Text(currentDescription, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: 12),
                   _buildPasscodeInput(
                     controller: controller,
@@ -190,6 +201,8 @@ Future<String?> showPasscodeSetupDialog(BuildContext context) {
 Future<PasscodePromptResult?> showPasscodeUnlockDialog(
   BuildContext context, {
   String? errorText,
+  String? title,
+  String? description,
 }) {
   final controller = TextEditingController();
 
@@ -223,12 +236,13 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
           return PopScope(
             canPop: false,
             child: AlertDialog(
-              title: const Text('Nhập mã PIN'),
+              title: Text(title ?? 'Nhập mã PIN'),
               content: _PasscodeDialogContent(
                 children: [
                   Text(
-                    'Nhập mã PIN để khôi phục tin nhắn cũ trên thiết bị này. '
-                    'Nếu quên mã PIN, bạn có thể đặt lại để bắt đầu khóa khôi phục mới.',
+                    description ??
+                        'Nhập mã PIN để khôi phục tin nhắn cũ trên thiết bị này. '
+                            'Nếu quên mã PIN, bạn có thể đặt lại để bắt đầu khóa khôi phục mới.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 12),
@@ -313,4 +327,94 @@ Future<bool> showPasscodeResetConfirmDialog(BuildContext context) async {
   );
 
   return result ?? false;
+}
+
+Future<bool> ensurePasscodeReady(
+  BuildContext context, {
+  bool allowHistoryLockedBypass = true,
+  bool Function()? shouldContinue,
+  Future<void> Function()? onPasscodeReset,
+  Future<void> Function()? onUnlocked,
+  String? setupTitle,
+  String? setupDescription,
+  String? unlockTitle,
+  String? unlockDescription,
+}) async {
+  bool canContinue() => context.mounted && (shouldContinue?.call() ?? true);
+
+  if (!canContinue()) return false;
+
+  final hasLocal = await PasscodeBackupService.hasLocalBackupKey();
+  if (!context.mounted) return false;
+  if (hasLocal) return true;
+  if (!canContinue()) return false;
+
+  if (allowHistoryLockedBypass) {
+    final historyLocked = await PasscodeBackupService.isHistoryLocked();
+    if (!context.mounted) return false;
+    if (historyLocked) return true;
+    if (!canContinue()) return false;
+  }
+
+  final hasBackup = await PasscodeBackupService.hasBackupOnServer();
+  if (!context.mounted) return false;
+  if (!canContinue()) return false;
+
+  if (!hasBackup) {
+    final passcode = await showPasscodeSetupDialog(
+      context,
+      title: setupTitle,
+      description: setupDescription,
+    );
+    if (passcode == null || passcode.isEmpty) return false;
+    await PasscodeBackupService.setPasscode(passcode);
+    return true;
+  }
+
+  String? errorText;
+  while (canContinue()) {
+    if (!context.mounted) return false;
+    if (shouldContinue != null && !shouldContinue()) return false;
+    final result = await showPasscodeUnlockDialog(
+      context,
+      errorText: errorText,
+      title: unlockTitle,
+      description: unlockDescription,
+    );
+
+    if (result == null) return false;
+
+    if (result.action == PasscodePromptAction.reset) {
+      if (!context.mounted) return false;
+      if (shouldContinue != null && !shouldContinue()) return false;
+      final confirm = await showPasscodeResetConfirmDialog(context);
+      if (!confirm) continue;
+
+      await PasscodeBackupService.resetPasscode();
+      await onPasscodeReset?.call();
+
+      if (!context.mounted) return false;
+      if (!canContinue()) return false;
+      final newPasscode = await showPasscodeSetupDialog(
+        context,
+        title: setupTitle,
+        description: setupDescription,
+      );
+      if (newPasscode == null || newPasscode.isEmpty) return false;
+      await PasscodeBackupService.setPasscode(newPasscode, lockHistory: true);
+      return true;
+    }
+
+    final passcode = result.passcode ?? '';
+    final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
+    if (!unlocked) {
+      errorText = 'Mã pin không đúng';
+      continue;
+    }
+
+    await onUnlocked?.call();
+    return true;
+  }
+
+  return false;
 }

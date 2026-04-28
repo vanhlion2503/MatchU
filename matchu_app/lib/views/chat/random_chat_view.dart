@@ -7,6 +7,7 @@ import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
+import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
 
 class RandomChatView extends StatefulWidget {
@@ -317,6 +318,18 @@ class _RandomChatViewState extends State<RandomChatView>
       );
       return;
     }
+
+    final passcodeReady = await ensurePasscodeReady(
+      context,
+      allowHistoryLockedBypass: false,
+      setupTitle: 'Thiết lập mã PIN',
+      setupDescription:
+          'Bạn cần thiết lập mã PIN để bảo vệ tin nhắn trước khi bắt đầu tìm kiếm.',
+      unlockTitle: 'Nhập mã PIN',
+      unlockDescription:
+          'Bạn cần nhập mã PIN để mở khóa bảo vệ tin nhắn trước khi bắt đầu tìm kiếm.',
+    );
+    if (!passcodeReady || !mounted) return;
 
     setState(() => _isStarting = true);
 
