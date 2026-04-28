@@ -73,7 +73,11 @@ class FeedController extends GetxController {
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   DocumentSnapshot<Map<String, dynamic>>? _featuredLastDocument;
   DocumentSnapshot<Map<String, dynamic>>? _followingLastDocument;
+  final List<PostModel> _featuredBufferedPosts = <PostModel>[];
+  final List<PostModel> _followingBufferedPosts = <PostModel>[];
   Set<String> _followingAuthorIds = <String>{};
+  bool _featuredSourceHasMore = true;
+  bool _followingSourceHasMore = true;
   int _featuredRefreshNonce = 0;
 
   String get currentUserId => _service.uid;
@@ -531,26 +535,27 @@ class FeedController extends GetxController {
         status.value = FeedStatus.loading;
       }
       errorMessage.value = null;
+      _lastDocument = null;
+      hasMore.value = true;
     } else {
       if (isLoadingMore.value || !hasMore.value) return;
       isLoadingMore.value = true;
     }
 
     try {
-      final page = await _service.fetchLatestPosts(
+      final page = await _loadVisibleLatestFeedPage(
         startAfter: reset ? null : _lastDocument,
-        limit: _pageSize,
-      );
-
-      final visibleHydratedPosts = await _hydrateFeedPosts(
-        page.posts,
         reset: reset,
+        excludedIds:
+            reset
+                ? const <String>{}
+                : posts.map((post) => post.postId.trim()).toSet(),
       );
 
       if (reset) {
-        posts.assignAll(_mergeWithLocallyPrependedPosts(visibleHydratedPosts));
+        posts.assignAll(_mergeWithLocallyPrependedPosts(page.posts));
       } else {
-        posts.assignAll(_mergePosts(posts, visibleHydratedPosts));
+        posts.assignAll(_mergePosts(posts, page.posts));
       }
 
       _lastDocument = page.lastDocument;
@@ -579,6 +584,49 @@ class FeedController extends GetxController {
     }
   }
 
+  Future<
+    ({
+      List<PostModel> posts,
+      DocumentSnapshot<Map<String, dynamic>>? lastDocument,
+      bool hasMore,
+    })
+  >
+  _loadVisibleLatestFeedPage({
+    required DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    required bool reset,
+    required Set<String> excludedIds,
+  }) async {
+    final loadedPosts = <PostModel>[];
+    final seenIds = excludedIds.where((postId) => postId.isNotEmpty).toSet();
+    DocumentSnapshot<Map<String, dynamic>>? cursor = startAfter;
+    var sourceHasMore = true;
+
+    while (loadedPosts.length < _pageSize && sourceHasMore) {
+      final page = await _service.fetchLatestPosts(
+        startAfter: cursor,
+        limit: _pageSize,
+      );
+      cursor = page.lastDocument;
+      sourceHasMore = page.hasMore;
+
+      final hydratedPosts = await _hydrateFeedPosts(page.posts, reset: reset);
+      for (final post in hydratedPosts) {
+        final postId = post.postId.trim();
+        if (postId.isEmpty || seenIds.contains(postId)) {
+          continue;
+        }
+
+        loadedPosts.add(post);
+        seenIds.add(postId);
+        if (loadedPosts.length >= _pageSize) {
+          break;
+        }
+      }
+    }
+
+    return (posts: loadedPosts, lastDocument: cursor, hasMore: sourceHasMore);
+  }
+
   Future<void> _loadFeaturedFeed({
     required bool reset,
     bool isManualRefresh = false,
@@ -593,6 +641,8 @@ class FeedController extends GetxController {
       }
       featuredErrorMessage.value = null;
       _featuredLastDocument = null;
+      _featuredBufferedPosts.clear();
+      _featuredSourceHasMore = true;
       _featuredRefreshNonce++;
       featuredHasMore.value = true;
     } else {
@@ -603,11 +653,21 @@ class FeedController extends GetxController {
     try {
       final loadedPosts = <PostModel>[];
       var cursor = reset ? null : _featuredLastDocument;
-      var sourceHasMore = true;
+      var sourceHasMore = reset ? true : _featuredSourceHasMore;
       var scanPass = 0;
       final existingIds = <String>{
-        if (!reset) ...featuredPosts.map((post) => post.postId),
+        if (!reset) ...featuredPosts.map((post) => post.postId.trim()),
       };
+
+      if (!reset) {
+        loadedPosts.addAll(
+          await _takeBufferedPosts(
+            _featuredBufferedPosts,
+            limit: _pageSize,
+            excludedIds: existingIds,
+          ),
+        );
+      }
 
       while (loadedPosts.length < _pageSize &&
           sourceHasMore &&
@@ -630,9 +690,17 @@ class FeedController extends GetxController {
 
         final remaining = _pageSize - loadedPosts.length;
         if (remaining > 0 && rankedBatch.isNotEmpty) {
-          loadedPosts.addAll(
-            rankedBatch.take(remaining).toList(growable: false),
-          );
+          final visiblePosts = rankedBatch
+              .take(remaining)
+              .toList(growable: false);
+          loadedPosts.addAll(visiblePosts);
+          existingIds.addAll(visiblePosts.map((post) => post.postId.trim()));
+
+          final bufferedPosts = rankedBatch
+              .skip(remaining)
+              .where((post) => post.postId.trim().isNotEmpty)
+              .toList(growable: false);
+          _featuredBufferedPosts.addAll(bufferedPosts);
         }
         scanPass++;
       }
@@ -646,7 +714,9 @@ class FeedController extends GetxController {
       }
 
       _featuredLastDocument = cursor;
-      featuredHasMore.value = sourceHasMore;
+      _featuredSourceHasMore = sourceHasMore;
+      featuredHasMore.value =
+          _featuredBufferedPosts.isNotEmpty || _featuredSourceHasMore;
 
       if (featuredPosts.isEmpty) {
         featuredStatus.value = FeedStatus.empty;
@@ -685,6 +755,8 @@ class FeedController extends GetxController {
       }
       followingErrorMessage.value = null;
       _followingLastDocument = null;
+      _followingBufferedPosts.clear();
+      _followingSourceHasMore = true;
       followingHasMore.value = true;
     } else {
       if (followingIsLoadingMore.value || !followingHasMore.value) return;
@@ -700,6 +772,8 @@ class FeedController extends GetxController {
           followingPosts.clear();
         }
         _followingLastDocument = null;
+        _followingBufferedPosts.clear();
+        _followingSourceHasMore = false;
         followingHasMore.value = false;
         followingStatus.value = FeedStatus.empty;
         return;
@@ -708,11 +782,21 @@ class FeedController extends GetxController {
       final loadedPosts = <PostModel>[];
       final loadedPostIds = <String>{};
       var cursor = reset ? null : _followingLastDocument;
-      var sourceHasMore = true;
+      var sourceHasMore = reset ? true : _followingSourceHasMore;
       var scanPass = 0;
       final existingIds = <String>{
         if (!reset) ...followingPosts.map((post) => post.postId.trim()),
       };
+
+      if (!reset) {
+        final bufferedPosts = await _takeBufferedPosts(
+          _followingBufferedPosts,
+          limit: _pageSize,
+          excludedIds: existingIds,
+        );
+        loadedPosts.addAll(bufferedPosts);
+        loadedPostIds.addAll(bufferedPosts.map((post) => post.postId.trim()));
+      }
 
       while (loadedPosts.length < _pageSize &&
           sourceHasMore &&
@@ -738,6 +822,7 @@ class FeedController extends GetxController {
           reset: false,
         );
 
+        final acceptedBatch = <PostModel>[];
         for (final post in hydratedBatch) {
           final postId = post.postId.trim();
           if (postId.isEmpty ||
@@ -745,11 +830,23 @@ class FeedController extends GetxController {
               loadedPostIds.contains(postId)) {
             continue;
           }
-          loadedPosts.add(post);
+          acceptedBatch.add(post);
           loadedPostIds.add(postId);
-          if (loadedPosts.length >= _pageSize) {
-            break;
-          }
+        }
+
+        final remaining = _pageSize - loadedPosts.length;
+        if (remaining > 0 && acceptedBatch.isNotEmpty) {
+          final visiblePosts = acceptedBatch
+              .take(remaining)
+              .toList(growable: false);
+          loadedPosts.addAll(visiblePosts);
+          existingIds.addAll(visiblePosts.map((post) => post.postId.trim()));
+
+          final bufferedPosts = acceptedBatch
+              .skip(remaining)
+              .where((post) => post.postId.trim().isNotEmpty)
+              .toList(growable: false);
+          _followingBufferedPosts.addAll(bufferedPosts);
         }
         scanPass++;
       }
@@ -761,7 +858,9 @@ class FeedController extends GetxController {
       }
 
       _followingLastDocument = cursor;
-      followingHasMore.value = sourceHasMore;
+      _followingSourceHasMore = sourceHasMore;
+      followingHasMore.value =
+          _followingBufferedPosts.isNotEmpty || _followingSourceHasMore;
 
       if (followingPosts.isEmpty) {
         followingStatus.value = FeedStatus.empty;
@@ -812,6 +911,48 @@ class FeedController extends GetxController {
       reset: reset,
     );
     return _filterHiddenPosts(savedHydratedPosts);
+  }
+
+  Future<List<PostModel>> _takeBufferedPosts(
+    List<PostModel> buffer, {
+    required int limit,
+    required Set<String> excludedIds,
+  }) async {
+    if (limit <= 0 || buffer.isEmpty) {
+      return const <PostModel>[];
+    }
+
+    final loadedPosts = <PostModel>[];
+
+    while (buffer.isNotEmpty && loadedPosts.length < limit) {
+      final candidates = <PostModel>[];
+      final remaining = limit - loadedPosts.length;
+
+      while (buffer.isNotEmpty && candidates.length < remaining) {
+        final candidate = buffer.removeAt(0);
+        final postId = candidate.postId.trim();
+        if (postId.isEmpty ||
+            excludedIds.contains(postId) ||
+            _isPostHidden(postId)) {
+          continue;
+        }
+
+        candidates.add(candidate);
+        excludedIds.add(postId);
+      }
+
+      if (candidates.isEmpty) {
+        continue;
+      }
+
+      final hydratedCandidates = await _hydrateFeedPosts(
+        candidates,
+        reset: false,
+      );
+      loadedPosts.addAll(hydratedCandidates);
+    }
+
+    return loadedPosts;
   }
 
   Future<void> toggleLike(String postId) async {

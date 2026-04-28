@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:matchu_app/services/security/message_crypto_service.dart';
 
 class PasscodeBackupService {
   static final _db = FirebaseFirestore.instance;
@@ -332,6 +333,7 @@ class PasscodeBackupService {
     await clearLocalBackupKey();
     await setHistoryLocked(true);
     await _clearLocalSessionKeys();
+    MessageCryptoService.clearSessionKeyCache();
   }
 
   static Future<Uint8List?> _loadBackupKey() async {
@@ -391,6 +393,11 @@ class PasscodeBackupService {
         key: _localSessionKeyKey(roomId, keyId),
         value: base64Encode(sessionKey),
       );
+      MessageCryptoService.cacheSessionKey(
+        roomId: roomId,
+        keyId: keyId,
+        key: Uint8List.fromList(sessionKey),
+      );
 
       return true;
     } catch (_) {
@@ -422,5 +429,6 @@ class PasscodeBackupService {
         await _storage.delete(key: k);
       }
     }
+    MessageCryptoService.clearSessionKeyCache();
   }
 }

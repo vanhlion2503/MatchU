@@ -67,7 +67,6 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
                   style: textTheme.headlineSmall?.copyWith(
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
                   ),
                 ),
 
@@ -78,7 +77,6 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
                   'Quá trình này chỉ mất vài giây',
                   style: textTheme.bodySmall?.copyWith(
                     fontSize: 13,
-                    color: colorScheme.onSurface.withOpacity(0.62),
                   ),
                 ),
 

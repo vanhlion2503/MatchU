@@ -5,7 +5,6 @@ import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
-import 'package:matchu_app/services/security/session_key_service.dart';
 import 'package:matchu_app/views/chat/list_chat/chat_list_view.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/views/chat/random_chat_view.dart';
@@ -127,11 +126,7 @@ class _MainViewState extends State<MainView> {
         continue;
       }
 
-      final restoredRooms = await PasscodeBackupService.restoreAllSessionKeys();
-      for (final roomId in restoredRooms) {
-        SessionKeyService.notifyUpdated(roomId);
-      }
-      if (restoredRooms.isNotEmpty && Get.isRegistered<ChatListController>()) {
+      if (Get.isRegistered<ChatListController>()) {
         await Get.find<ChatListController>().refreshLastMessagePreviews();
       }
       return;

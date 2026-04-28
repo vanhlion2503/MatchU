@@ -15,13 +15,14 @@ import '../../controllers/chat/chat_list_controller.dart';
 import '../../controllers/profile/profile_controller.dart';
 import '../../controllers/auth/avatar_controller.dart';
 import '../../services/user/presence_service.dart';
+import '../../services/security/message_crypto_service.dart';
 
 class LogoutService {
   static final _auth = FirebaseAuth.instance;
   static final _storage = FlutterSecureStorage();
 
   /// 🔥 LOGOUT CHUẨN – DÙNG CHO TOÀN APP
-  static Future<void> logout() async {
+  static Future<bool> logout() async {
     // 🔥 LẤY UID TRƯỚC KHI LOGOUT (QUAN TRỌNG!)
     final currentUser = _auth.currentUser;
     final uid = currentUser?.uid;
@@ -31,11 +32,27 @@ class LogoutService {
       if (currentUser != null && uid != null) {
         try {
           // 1️⃣.1️⃣ Update Firestore offline
+          var didUpdateFirestorePresence = false;
           if (Get.isRegistered<UserController>()) {
             try {
               await Get.find<UserController>().updateProfile({
                 "activeStatus": "offline",
               });
+              didUpdateFirestorePresence = true;
+            } catch (e) {
+              // Ignore errors - continue
+            }
+          }
+
+          if (!didUpdateFirestorePresence) {
+            try {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .set({
+                    "activeStatus": "offline",
+                    "lastActiveAt": FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
             } catch (e) {
               // Ignore errors - continue
             }
@@ -159,6 +176,7 @@ class LogoutService {
             await _storage.delete(key: k);
           }
         }
+        MessageCryptoService.clearSessionKeyCache();
       } catch (e) {
         // Ignore errors - continue with logout
       }
@@ -177,8 +195,10 @@ class LogoutService {
 
       // 9️⃣ Firebase sign out
       await _auth.signOut();
+      return true;
     } catch (e) {
       debugPrint('Logout error: $e');
+      return false;
     }
   }
 }

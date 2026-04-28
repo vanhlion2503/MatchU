@@ -208,6 +208,10 @@ class _RandomChatViewState extends State<RandomChatView>
             return StatefulBuilder(
               builder: (context, setStateDialog) {
                 return AlertDialog(
+                  insetPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   title: Text(
                     'Hướng dẫn Chat Matching',
                     style: theme.textTheme.headlineSmall?.copyWith(
@@ -216,6 +220,7 @@ class _RandomChatViewState extends State<RandomChatView>
                   ),
                   content: SizedBox(
                     width: double.maxFinite,
+                    height: MediaQuery.of(dialogContext).size.height * 0.9,
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

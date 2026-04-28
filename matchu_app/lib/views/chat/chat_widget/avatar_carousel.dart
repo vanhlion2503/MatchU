@@ -197,8 +197,8 @@ class _AvatarCarouselState extends State<AvatarCarousel> {
                                     ),
                                   ),
                                   Positioned(
-                                    bottom: 8,
-                                    right: 8,
+                                    bottom: 15,
+                                    right: 15,
                                     child: AnimatedScale(
                                       duration: const Duration(
                                         milliseconds: 180,

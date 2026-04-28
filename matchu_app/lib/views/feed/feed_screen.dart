@@ -82,31 +82,22 @@ class _FeedScreenState extends State<FeedScreen>
 
   void _handleLatestScroll() {
     if (!_latestScrollController.hasClients) return;
-    final remainingDistance =
-        _latestScrollController.position.maxScrollExtent -
-        _latestScrollController.position.pixels;
-    if (remainingDistance <= _loadMoreThreshold) {
-      controller.loadMore();
+    if (_latestScrollController.position.extentAfter <= _loadMoreThreshold) {
+      unawaited(controller.loadMore());
     }
   }
 
   void _handleFeaturedScroll() {
     if (!_featuredScrollController.hasClients) return;
-    final remainingDistance =
-        _featuredScrollController.position.maxScrollExtent -
-        _featuredScrollController.position.pixels;
-    if (remainingDistance <= _loadMoreThreshold) {
-      controller.loadMoreFeaturedFeed();
+    if (_featuredScrollController.position.extentAfter <= _loadMoreThreshold) {
+      unawaited(controller.loadMoreFeaturedFeed());
     }
   }
 
   void _handleFollowingScroll() {
     if (!_followingScrollController.hasClients) return;
-    final remainingDistance =
-        _followingScrollController.position.maxScrollExtent -
-        _followingScrollController.position.pixels;
-    if (remainingDistance <= _loadMoreThreshold) {
-      controller.loadMoreFollowingFeed();
+    if (_followingScrollController.position.extentAfter <= _loadMoreThreshold) {
+      unawaited(controller.loadMoreFollowingFeed());
     }
   }
 
@@ -316,9 +307,12 @@ class _FeedScreenState extends State<FeedScreen>
               posts: controller.featuredPosts.toList(growable: false),
               status: controller.featuredStatus.value,
               isLoadingMore: controller.featuredIsLoadingMore.value,
+              hasMore: controller.featuredHasMore.value,
               errorMessage: controller.featuredErrorMessage.value,
               scrollController: _featuredScrollController,
+              storageKey: const PageStorageKey<String>('feed_featured_posts'),
               onRefresh: controller.refreshFeaturedFeed,
+              onLoadMore: controller.loadMoreFeaturedFeed,
               onRetry: controller.loadInitialFeaturedFeed,
               onPostTap: _openPostDetail,
               onLikeTap: (postId) => controller.toggleLike(postId),
@@ -340,9 +334,12 @@ class _FeedScreenState extends State<FeedScreen>
               posts: controller.posts.toList(growable: false),
               status: controller.status.value,
               isLoadingMore: controller.isLoadingMore.value,
+              hasMore: controller.hasMore.value,
               errorMessage: controller.errorMessage.value,
               scrollController: _latestScrollController,
+              storageKey: const PageStorageKey<String>('feed_latest_posts'),
               onRefresh: controller.refreshFeed,
+              onLoadMore: controller.loadMore,
               onRetry: controller.loadInitialFeed,
               onPostTap: _openPostDetail,
               onLikeTap: (postId) => controller.toggleLike(postId),
@@ -364,9 +361,12 @@ class _FeedScreenState extends State<FeedScreen>
               posts: controller.followingPosts.toList(growable: false),
               status: controller.followingStatus.value,
               isLoadingMore: controller.followingIsLoadingMore.value,
+              hasMore: controller.followingHasMore.value,
               errorMessage: controller.followingErrorMessage.value,
               scrollController: _followingScrollController,
+              storageKey: const PageStorageKey<String>('feed_following_posts'),
               onRefresh: controller.refreshFollowingFeed,
+              onLoadMore: controller.loadMoreFollowingFeed,
               onRetry: controller.loadInitialFollowingFeed,
               emptyTitle: 'Chua co bai viet tu nguoi ban theo doi.',
               emptyDescription:
@@ -391,15 +391,18 @@ class _FeedScreenState extends State<FeedScreen>
   }
 }
 
-class _FeedTimelineBody extends StatelessWidget {
+class _FeedTimelineBody extends StatefulWidget {
   const _FeedTimelineBody({
     required this.controller,
     required this.posts,
     required this.status,
     required this.isLoadingMore,
+    required this.hasMore,
     required this.errorMessage,
     required this.scrollController,
+    required this.storageKey,
     required this.onRefresh,
+    required this.onLoadMore,
     required this.onRetry,
     required this.onPostTap,
     required this.onLikeTap,
@@ -418,9 +421,12 @@ class _FeedTimelineBody extends StatelessWidget {
   final List<PostModel> posts;
   final FeedStatus status;
   final bool isLoadingMore;
+  final bool hasMore;
   final String? errorMessage;
   final ScrollController scrollController;
+  final PageStorageKey<String> storageKey;
   final Future<void> Function() onRefresh;
+  final Future<void> Function() onLoadMore;
   final Future<void> Function() onRetry;
   final ValueChanged<PostModel> onPostTap;
   final ValueChanged<String> onLikeTap;
@@ -435,34 +441,94 @@ class _FeedTimelineBody extends StatelessWidget {
   final ValueChanged<PostModel>? onReferenceTap;
 
   @override
+  State<_FeedTimelineBody> createState() => _FeedTimelineBodyState();
+}
+
+class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
+  static const double _loadMoreThreshold = 640;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleViewportLoadMoreCheck();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FeedTimelineBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.posts.length != widget.posts.length ||
+        oldWidget.status != widget.status ||
+        (oldWidget.isLoadingMore && !widget.isLoadingMore) ||
+        oldWidget.hasMore != widget.hasMore) {
+      _scheduleViewportLoadMoreCheck();
+    }
+  }
+
+  void _scheduleViewportLoadMoreCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeLoadMore();
+    });
+  }
+
+  void _maybeLoadMore({ScrollMetrics? metrics}) {
+    if (!mounted ||
+        !widget.hasMore ||
+        widget.isLoadingMore ||
+        widget.status != FeedStatus.success) {
+      return;
+    }
+
+    final extentAfter =
+        metrics?.extentAfter ??
+        (widget.scrollController.hasClients
+            ? widget.scrollController.position.extentAfter
+            : null);
+    if (extentAfter == null || extentAfter > _loadMoreThreshold) {
+      return;
+    }
+
+    unawaited(widget.onLoadMore());
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+
+    _maybeLoadMore(metrics: notification.metrics);
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if ((status == FeedStatus.initial || status == FeedStatus.loading) &&
-        posts.isEmpty) {
+    if ((widget.status == FeedStatus.initial ||
+            widget.status == FeedStatus.loading) &&
+        widget.posts.isEmpty) {
       return const FeedShimmer();
     }
 
-    if (status == FeedStatus.error && posts.isEmpty) {
+    if (widget.status == FeedStatus.error && widget.posts.isEmpty) {
       return _FeedStateScrollView(
-        onRefresh: onRefresh,
+        onRefresh: widget.onRefresh,
         children: [
           const SizedBox(height: 72),
           FeedErrorState(
-            message: errorMessage ?? 'Da xay ra loi khi tai bang tin.',
-            onRetry: onRetry,
+            message: widget.errorMessage ?? 'Da xay ra loi khi tai bang tin.',
+            onRetry: widget.onRetry,
           ),
         ],
       );
     }
 
-    if (status == FeedStatus.empty) {
+    if (widget.status == FeedStatus.empty) {
       return _FeedStateScrollView(
-        onRefresh: onRefresh,
+        onRefresh: widget.onRefresh,
         children: [
           const SizedBox(height: 72),
           FeedEmptyState(
-            onRefresh: onRefresh,
-            title: emptyTitle,
-            description: emptyDescription,
+            onRefresh: widget.onRefresh,
+            title: widget.emptyTitle,
+            description: widget.emptyDescription,
           ),
         ],
       );
@@ -470,52 +536,58 @@ class _FeedTimelineBody extends StatelessWidget {
 
     final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
-    final itemCount = posts.length + (isLoadingMore ? 1 : 0);
+    final itemCount = widget.posts.length + (widget.isLoadingMore ? 1 : 0);
 
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      color: theme.colorScheme.primary,
-      backgroundColor: palette.surface,
-      child: ListView.builder(
-        controller: scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
-        itemCount: itemCount,
-        itemBuilder: (context, index) {
-          if (index >= posts.length) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2.3),
+    return NotificationListener<ScrollNotification>(
+      onNotification: _handleScrollNotification,
+      child: RefreshIndicator(
+        onRefresh: widget.onRefresh,
+        color: theme.colorScheme.primary,
+        backgroundColor: palette.surface,
+        child: ListView.builder(
+          key: widget.storageKey,
+          controller: widget.scrollController,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
+          itemCount: itemCount,
+          itemBuilder: (context, index) {
+            if (index >= widget.posts.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18),
+                child: Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.3),
+                  ),
                 ),
-              ),
+              );
+            }
+
+            final post = widget.posts[index];
+
+            return _FeedRemovalAnimatedPostItem(
+              key: ValueKey('feed_post_${post.postId}'),
+              controller: widget.controller,
+              post: post,
+              showDivider: index > 0,
+              onTap: () => widget.onPostTap(post),
+              onLikeTap: () => widget.onLikeTap(post.postId),
+              onCommentTap: () => widget.onCommentTap(post),
+              onRepostTap: () => widget.onRepostTap(post),
+              onShareTap: widget.onShareTap,
+              onMoreTap: () => widget.onMoreTap(post),
+              onAuthorTap: widget.onAuthorTap,
+              onReferenceAuthorTap: widget.onReferenceAuthorTap,
+              onReferenceTap:
+                  widget.onReferenceTap == null
+                      ? null
+                      : () => widget.onReferenceTap!(post),
             );
-          }
-
-          final post = posts[index];
-
-          return _FeedRemovalAnimatedPostItem(
-            key: ValueKey('feed_post_${post.postId}'),
-            controller: controller,
-            post: post,
-            showDivider: index > 0,
-            onTap: () => onPostTap(post),
-            onLikeTap: () => onLikeTap(post.postId),
-            onCommentTap: () => onCommentTap(post),
-            onRepostTap: () => onRepostTap(post),
-            onShareTap: onShareTap,
-            onMoreTap: () => onMoreTap(post),
-            onAuthorTap: onAuthorTap,
-            onReferenceAuthorTap: onReferenceAuthorTap,
-            onReferenceTap:
-                onReferenceTap == null ? null : () => onReferenceTap!(post),
-          );
-        },
+          },
+        ),
       ),
     );
   }

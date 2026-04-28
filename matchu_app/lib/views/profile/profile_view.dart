@@ -116,36 +116,41 @@ class ProfileView extends StatelessWidget {
                           bottomRight: Radius.circular(30),
                         ),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          top: 0,
-                          left: 20,
-                          right: 20,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                Get.toNamed('/search-user');
-                              },
-                              icon: Icon(
-                                Iconsax.user_cirlce_add,
-                                color: colorScheme.onPrimary,
-                                size: 30,
+                      child: SafeArea(
+                        bottom: false,
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(
+                            height: kToolbarHeight,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      Get.toNamed('/search-user');
+                                    },
+                                    icon: Icon(
+                                      Iconsax.user_cirlce_add,
+                                      color: colorScheme.onPrimary,
+                                      size: 30,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      RightSideMenu.open(context);
+                                    },
+                                    icon: Icon(
+                                      Iconsax.more_circle,
+                                      color: colorScheme.onPrimary,
+                                      size: 30,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            IconButton(
-                              onPressed: () {
-                                RightSideMenu.open(context);
-                              },
-                              icon: Icon(
-                                Iconsax.more_circle,
-                                color: colorScheme.onPrimary,
-                                size: 30,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -309,40 +314,45 @@ class ProfileView extends StatelessWidget {
               const SizedBox(height: 25),
 
               // ---------------- STATS ----------------
-              Row(
-                children: [
-                  Expanded(
-                    child: statItem(
-                      c.followersCount.toString(),
-                      "Người theo dõi",
-                      textTheme,
-                      onTap: () {
-                        Get.to(
-                          () => FollowTabView(
-                            userId: c.user.value!.uid,
-                            initialIndex: 0, // Open Followers tab
-                          ),
-                        );
-                      },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: statItem(
+                        c.followersCount.toString(),
+                        "Theo dõi",
+                        textTheme,
+                        onTap: () {
+                          Get.to(
+                            () => FollowTabView(
+                              userId: c.user.value!.uid,
+                              initialIndex: 0, // Open Followers tab
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: statItem(
-                      c.followingCount.toString(),
-                      "Đang theo dõi",
-                      textTheme,
-                      onTap: () {
-                        Get.to(
-                          () => FollowTabView(
-                            userId: c.user.value!.uid,
-                            initialIndex: 1, // Open Following tab
-                          ),
-                        );
-                      },
+                    Expanded(
+                      child: statItem(
+                        c.followingCount.toString(),
+                        "Đã theo dõi",
+                        textTheme,
+                        onTap: () {
+                          Get.to(
+                            () => FollowTabView(
+                              userId: c.user.value!.uid,
+                              initialIndex: 1, // Open Following tab
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(child: statItem("Lv. ${c.rank}", "Rank", textTheme)),
-                ],
+                    Expanded(
+                      child: statItem("Lv. ${c.rank}", "Rank", textTheme),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 25),
 

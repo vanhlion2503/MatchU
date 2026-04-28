@@ -737,11 +737,26 @@ class AuthController extends GetxController {
   //                        LOGOUT
   // =============================================================
   Future<void> logoutC() async {
+    const redirectRoute = '/';
+    AuthGateController? authGateC;
+
     if (Get.isRegistered<AuthGateController>()) {
-      Get.find<AuthGateController>().reset();
+      authGateC = Get.find<AuthGateController>();
+      authGateC.beginLogout(redirectRoute: redirectRoute);
     }
 
-    await LogoutService.logout();
+    if (Get.currentRoute != redirectRoute) {
+      Get.offAllNamed(redirectRoute);
+    }
+
+    final loggedOut = await LogoutService.logout();
+    if (!loggedOut && FirebaseAuth.instance.currentUser != null) {
+      authGateC?.reset();
+      if (Get.currentRoute != '/main') {
+        Get.offAllNamed('/main');
+      }
+      Get.snackbar("Lỗi", "Đăng xuất thất bại. Vui lòng thử lại.");
+    }
   }
 
   // =============================================================

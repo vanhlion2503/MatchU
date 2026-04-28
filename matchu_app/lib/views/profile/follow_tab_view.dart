@@ -88,8 +88,8 @@ class _FollowTabViewState extends State<FollowTabView>
                   indicatorColor: theme.colorScheme.onSurface,
                   dividerColor: Colors.transparent, // Quan trọng
                   tabs: const [
-                    Tab(text: "Người theo dõi"),
-                    Tab(text: "Đang theo dõi"),
+                    Tab(text: "Theo dõi"),
+                    Tab(text: "Đã theo dõi"),
                   ],
                 );
               },

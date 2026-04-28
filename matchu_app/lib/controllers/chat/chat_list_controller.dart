@@ -6,11 +6,10 @@ import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
+import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
 
-class ChatListController extends GetxController
-    with WidgetsBindingObserver {
-
+class ChatListController extends GetxController with WidgetsBindingObserver {
   final ChatService _service = ChatService();
   String get uid => _service.uid;
 
@@ -19,7 +18,7 @@ class ChatListController extends GetxController
   final RxMap<String, String> lastMessagePreviewCache = <String, String>{}.obs;
   final Map<String, _PreviewMeta> _previewMeta = {};
   final Map<String, StreamSubscription<void>> _sessionKeySubs = {};
- 
+
   final RxString searchText = "".obs;
 
   final textController = TextEditingController();
@@ -35,7 +34,7 @@ class ChatListController extends GetxController
     super.onInit();
 
     // final presence = Get.put(PresenceController(), permanent: true);
-    
+
     WidgetsBinding.instance.addObserver(this);
     _sub = _service.listenChatRooms().listen(
       (incoming) {
@@ -56,7 +55,6 @@ class ChatListController extends GetxController
         isLoading.value = false;
       },
     );
-
 
     debounce(
       searchText,
@@ -84,9 +82,7 @@ class ChatListController extends GetxController
     final userCache = Get.find<ChatUserCacheController>();
     final presence = Get.find<PresenceController>();
 
-    final visible = incoming
-        .where((r) => !r.isDeletedFor(uid))
-        .toList();
+    final visible = incoming.where((r) => !r.isDeletedFor(uid)).toList();
 
     final aliveUids = <String>{};
     final visibleRoomIds = <String>{};
@@ -122,9 +118,8 @@ class ChatListController extends GetxController
   void _keepAliveVisibleUsers() {
     final userCache = Get.find<ChatUserCacheController>();
 
-    final aliveUids = rooms
-        .map((r) => r.participants.firstWhere((e) => e != uid))
-        .toSet();
+    final aliveUids =
+        rooms.map((r) => r.participants.firstWhere((e) => e != uid)).toSet();
 
     userCache.cleanupExcept(aliveUids);
   }
@@ -133,8 +128,7 @@ class ChatListController extends GetxController
     final userCache = Get.find<ChatUserCacheController>();
 
     for (final room in rooms) {
-      final otherUid =
-          room.participants.firstWhere((e) => e != uid);
+      final otherUid = room.participants.firstWhere((e) => e != uid);
       userCache.loadIfNeeded(otherUid);
     }
   }
@@ -160,8 +154,7 @@ class ChatListController extends GetxController
           return true;
         }
 
-        final otherUid =
-            room.participants.firstWhere((e) => e != uid);
+        final otherUid = room.participants.firstWhere((e) => e != uid);
 
         final user = userCache.getUser(otherUid);
         if (user == null) {
@@ -205,8 +198,9 @@ class ChatListController extends GetxController
   void _ensureSessionKeyListener(String roomId) {
     if (_sessionKeySubs.containsKey(roomId)) return;
 
-    _sessionKeySubs[roomId] =
-        SessionKeyService.onSessionKeyUpdated(roomId).listen((_) async {
+    _sessionKeySubs[roomId] = SessionKeyService.onSessionKeyUpdated(
+      roomId,
+    ).listen((_) async {
       ChatRoomModel? room;
       for (final r in rooms) {
         if (r.id == roomId) {
@@ -220,9 +214,10 @@ class ChatListController extends GetxController
   }
 
   void _cleanupSessionKeyListeners(Set<String> aliveRoomIds) {
-    final toRemove = _sessionKeySubs.keys
-        .where((roomId) => !aliveRoomIds.contains(roomId))
-        .toList();
+    final toRemove =
+        _sessionKeySubs.keys
+            .where((roomId) => !aliveRoomIds.contains(roomId))
+            .toList();
 
     for (final roomId in toRemove) {
       _sessionKeySubs[roomId]?.cancel();
@@ -237,9 +232,7 @@ class ChatListController extends GetxController
     final meta = _previewMeta[room.id];
     final isSame = meta?.matches(room) == true;
 
-    if (!force &&
-        isSame &&
-        lastMessagePreviewCache.containsKey(room.id)) {
+    if (!force && isSame && lastMessagePreviewCache.containsKey(room.id)) {
       return;
     }
 
@@ -253,11 +246,23 @@ class ChatListController extends GetxController
     }
 
     try {
+      final keyId = room.lastMessageKeyId;
+      final hasLocalKey = await SessionKeyService.hasLocalSessionKey(
+        room.id,
+        keyId: keyId,
+      );
+      if (!hasLocalKey && !(await PasscodeBackupService.isHistoryLocked())) {
+        await PasscodeBackupService.restoreSessionKeyForRoom(
+          room.id,
+          keyId: keyId,
+        );
+      }
+
       final text = await MessageCryptoService.decrypt(
         roomId: room.id,
         ciphertext: room.lastMessageCipher!,
         iv: room.lastMessageIv!,
-        keyId: room.lastMessageKeyId,
+        keyId: keyId,
       );
       lastMessagePreviewCache[room.id] = text;
     } catch (e) {

@@ -32,6 +32,37 @@ class OtherProfileView extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: Center(
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: colorScheme.onPrimary.withOpacity(0.8),
+                  width: 1,
+                ),
+              ),
+              child: IconButton(
+                onPressed: () => Get.back(),
+                icon: const Icon(Icons.arrow_back_ios_new),
+                color: colorScheme.onPrimary,
+                iconSize: 20,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: Obx(() {
         if (c.isLoadingFollowing.value || c.user.value == null) {
           return const Center(child: CircularProgressIndicator());
@@ -88,41 +119,22 @@ class OtherProfileView extends StatelessWidget {
                       ),
                       child: SizedBox(
                         height: 240,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            // ================= BACKGROUND =================
-                            Container(
-                              height: 180,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    colorScheme.primary,
-                                    colorScheme.secondary,
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(30),
-                                  bottomRight: Radius.circular(30),
-                                ),
-                              ),
+                        child: Container(
+                          height: 180,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                colorScheme.primary,
+                                colorScheme.secondary,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-
-                            // ================= BACK BUTTON (🔥 ĐÚNG CHỖ) =================
-                            Positioned(
-                              top:
-                                  MediaQuery.of(context).padding.top +
-                                  4, // 👈 sát status bar
-                              left: 8,
-                              child: IconButton(
-                                onPressed: () => Get.back(),
-                                icon: const Icon(Icons.arrow_back_ios_new),
-                                color: colorScheme.onPrimary,
-                              ),
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(30),
+                              bottomRight: Radius.circular(30),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -249,7 +261,7 @@ class OtherProfileView extends StatelessWidget {
                                       ),
                                     ),
                                     child: Text(
-                                      "Đang theo dõi",
+                                      "Đã theo dõi",
                                       style: Theme.of(
                                         context,
                                       ).textTheme.bodyMedium?.copyWith(
@@ -336,40 +348,45 @@ class OtherProfileView extends StatelessWidget {
               const SizedBox(height: 25),
 
               // ================= FOLLOW STATS =================
-              Row(
-                children: [
-                  Expanded(
-                    child: statItem(
-                      "${u.followers.length}",
-                      "Người theo dõi",
-                      textTheme,
-                      onTap: () {
-                        Get.to(
-                          () => FollowTabView(
-                            userId: c.user.value!.uid,
-                            initialIndex: 0,
-                          ),
-                        );
-                      },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: statItem(
+                        "${u.followers.length}",
+                        "Theo dõi",
+                        textTheme,
+                        onTap: () {
+                          Get.to(
+                            () => FollowTabView(
+                              userId: c.user.value!.uid,
+                              initialIndex: 0,
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: statItem(
-                      "${u.following.length}",
-                      "Đang theo dõi",
-                      textTheme,
-                      onTap: () {
-                        Get.to(
-                          () => FollowTabView(
-                            userId: c.user.value!.uid,
-                            initialIndex: 1,
-                          ),
-                        );
-                      },
+                    Expanded(
+                      child: statItem(
+                        "${u.following.length}",
+                        "Đã theo dõi",
+                        textTheme,
+                        onTap: () {
+                          Get.to(
+                            () => FollowTabView(
+                              userId: c.user.value!.uid,
+                              initialIndex: 1,
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  Expanded(child: statItem("Lv. ${u.rank}", "Rank", textTheme)),
-                ],
+                    Expanded(
+                      child: statItem("Lv. ${u.rank}", "Rank", textTheme),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 30),

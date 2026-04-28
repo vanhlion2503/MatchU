@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/auth/auth_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 
@@ -13,6 +14,8 @@ class AuthGateController extends GetxController {
 
   StreamSubscription<User?>? _sub;
   bool _navigated = false;
+  bool _isLoggingOut = false;
+  String? _signedOutRedirectRoute;
 
   @override
   void onReady() {
@@ -32,10 +35,19 @@ class AuthGateController extends GetxController {
     // ============================
     // 1️⃣ CHƯA LOGIN
     // ============================
+    if (_isLoggingOut && user != null) {
+      return;
+    }
+
     if (user == null) {
+      final redirectRoute = _signedOutRedirectRoute ?? AppRouter.welcome;
       _navigated = false;
+      _isLoggingOut = false;
+      _signedOutRedirectRoute = null;
       _box.remove('isRegistering');
-      Get.offAllNamed('/welcome');
+      if (Get.currentRoute != redirectRoute) {
+        Get.offAllNamed(redirectRoute);
+      }
       return;
     }
 
@@ -72,6 +84,10 @@ class AuthGateController extends GetxController {
     await user.getIdToken(true);
     await Future.delayed(const Duration(milliseconds: 300));
 
+    if (_isLoggingOut || FirebaseAuth.instance.currentUser?.uid != user.uid) {
+      return;
+    }
+
     // ============================
     // 2️⃣ ĐÃ LOGIN NHƯNG ĐÃ NAVIGATE
     // ============================
@@ -87,6 +103,10 @@ class AuthGateController extends GetxController {
     // 4️⃣ LOAD USER DOCUMENT
     // ============================
     final snap = await _loadUserDoc(user.uid);
+
+    if (_isLoggingOut || FirebaseAuth.instance.currentUser?.uid != user.uid) {
+      return;
+    }
 
     // ❌ CHƯA CÓ PROFILE → COMPLETE
     if (!snap.exists) {
@@ -138,8 +158,15 @@ class AuthGateController extends GetxController {
   /// ============================
   /// RESET KHI LOGOUT
   /// ============================
+  void beginLogout({String redirectRoute = AppRouter.splash}) {
+    _isLoggingOut = true;
+    _signedOutRedirectRoute = redirectRoute;
+  }
+
   void reset() {
     _navigated = false;
+    _isLoggingOut = false;
+    _signedOutRedirectRoute = null;
   }
 
   @override

@@ -98,6 +98,9 @@ class ChatController extends GetxController {
 
   static const String _encryptedPlaceholder = "Tin nhan duoc ma hoa";
   static const String _deletedPlaceholder = "Tin nhan da bi xoa";
+  static const String _decryptPendingPlaceholder = "🔐 Đang thiết lập mã hóa…";
+  static const String _decryptFailedPlaceholder =
+      "⚠️ Không thể giải mã tin nhắn";
   static const String _deletedType = "deleted";
   static const String viewOnceImageText = "Ảnh";
   static const String viewOnceDeletedText = "Ảnh đã bị xóa";
@@ -118,12 +121,7 @@ class ChatController extends GetxController {
     }
 
     _sessionKeySub = SessionKeyService.onSessionKeyUpdated(roomId).listen((_) {
-      decryptedCache.clear();
-      _decrypting.clear();
-
-      for (final doc in allMessages) {
-        getDecryptedText(doc.id, doc.data());
-      }
+      _retryPendingDecrypts();
     });
 
     ever<bool>(otherTyping, _onOtherTypingChanged);
@@ -1038,7 +1036,7 @@ class ChatController extends GetxController {
         keyId: keyId,
       );
       if (!hasKey) {
-        decryptedCache[messageId] = "🔐 Đang thiết lập mã hóa…";
+        decryptedCache[messageId] = _decryptPendingPlaceholder;
         return;
       }
 
@@ -1070,10 +1068,29 @@ class ChatController extends GetxController {
       if (fallbackText is String && fallbackText.isNotEmpty) {
         decryptedCache[messageId] = fallbackText;
       } else {
-        decryptedCache[messageId] = "⚠️ Không thể giải mã tin nhắn";
+        decryptedCache[messageId] = _decryptFailedPlaceholder;
       }
     } finally {
       _decrypting.remove(messageId);
+    }
+  }
+
+  void _retryPendingDecrypts() {
+    for (final doc in allMessages) {
+      final data = doc.data();
+      if (!data.containsKey("ciphertext") || !data.containsKey("iv")) {
+        continue;
+      }
+
+      final cached = decryptedCache[doc.id];
+      if (cached != null &&
+          cached != _decryptPendingPlaceholder &&
+          cached != _decryptFailedPlaceholder) {
+        continue;
+      }
+
+      decryptedCache.remove(doc.id);
+      getDecryptedText(doc.id, data);
     }
   }
 
@@ -1098,12 +1115,6 @@ class ChatController extends GetxController {
         roomId,
         keyId: _currentKeyId,
       )) {
-        await SessionKeyService.ensureDistributedToAllDevices(
-          roomId: roomId,
-          participantUids: participants,
-          keyId: _currentKeyId,
-        );
-        SessionKeyService.notifyUpdated(roomId);
         return;
       }
 
@@ -1130,10 +1141,14 @@ class ChatController extends GetxController {
               keyId: _currentKeyId,
             );
         if (restoredFromBackup) {
-          await SessionKeyService.ensureDistributedToAllDevices(
-            roomId: roomId,
-            participantUids: participants,
-            keyId: _currentKeyId,
+          unawaited(
+            SessionKeyService.ensureDistributedToAllDevices(
+              roomId: roomId,
+              participantUids: participants,
+              keyId: _currentKeyId,
+            ).catchError((e, st) {
+              debugPrint("Background session key distribution failed: $e");
+            }),
           );
           SessionKeyService.notifyUpdated(roomId);
           return;
@@ -1152,11 +1167,6 @@ class ChatController extends GetxController {
         keyId: _currentKeyId,
       );
       if (received) {
-        await SessionKeyService.ensureDistributedToAllDevices(
-          roomId: roomId,
-          participantUids: participants,
-          keyId: _currentKeyId,
-        );
         return;
       }
 
@@ -1184,12 +1194,6 @@ class ChatController extends GetxController {
               print("Session key received from realtime listener");
               _sessionKeyListenerSub?.cancel();
               _sessionKeyListenerSub = null;
-
-              await SessionKeyService.ensureDistributedToAllDevices(
-                roomId: roomId,
-                participantUids: participants,
-                keyId: _currentKeyId,
-              );
             }
           },
         );

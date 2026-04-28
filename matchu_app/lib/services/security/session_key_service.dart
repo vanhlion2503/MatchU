@@ -12,6 +12,7 @@ import 'package:pointycastle/asn1/primitives/asn1_sequence.dart';
 import 'package:pointycastle/export.dart';
 
 import 'identity_key_service.dart';
+import 'message_crypto_service.dart';
 import 'passcode_backup_service.dart';
 
 class SessionKeyService {
@@ -22,6 +23,7 @@ class SessionKeyService {
 
   static String get uid => _auth.currentUser!.uid;
   static final Map<String, StreamController<void>> _keyUpdateControllers = {};
+  static final Set<String> _distributionChecks = {};
 
   static Stream<void> onSessionKeyUpdated(String roomId) {
     return _keyUpdateControllers
@@ -57,6 +59,24 @@ class SessionKeyService {
   }) {
     if (keyId == 0) return deviceId;
     return "${deviceId}_$keyId";
+  }
+
+  static String _roomKeyToken(String roomId, int keyId) => "$roomId:$keyId";
+
+  static Future<void> _saveLocalSessionKey({
+    required String roomId,
+    required int keyId,
+    required Uint8List sessionKey,
+  }) async {
+    await _storage.write(
+      key: _localSessionKeyKey(roomId, keyId),
+      value: base64Encode(sessionKey),
+    );
+    MessageCryptoService.cacheSessionKey(
+      roomId: roomId,
+      keyId: keyId,
+      key: sessionKey,
+    );
   }
 
   /// ===============================
@@ -147,10 +167,12 @@ class SessionKeyService {
         participantUids: participantUids,
         keyId: keyId,
       );
+      _distributionChecks.add(_roomKeyToken(roomId, keyId));
 
-      await _storage.write(
-        key: _localSessionKeyKey(roomId, keyId),
-        value: base64Encode(sessionKey),
+      await _saveLocalSessionKey(
+        roomId: roomId,
+        keyId: keyId,
+        sessionKey: sessionKey,
       );
 
       try {
@@ -192,10 +214,12 @@ class SessionKeyService {
       participantUids: participantUids,
       keyId: newKeyId,
     );
+    _distributionChecks.add(_roomKeyToken(roomId, newKeyId));
 
-    await _storage.write(
-      key: _localSessionKeyKey(roomId, newKeyId),
-      value: base64Encode(sessionKey),
+    await _saveLocalSessionKey(
+      roomId: roomId,
+      keyId: newKeyId,
+      sessionKey: sessionKey,
     );
 
     try {
@@ -342,9 +366,10 @@ class SessionKeyService {
         return false;
       }
 
-      await _storage.write(
-        key: _localSessionKeyKey(roomId, keyId),
-        value: base64Encode(sessionKey),
+      await _saveLocalSessionKey(
+        roomId: roomId,
+        keyId: keyId,
+        sessionKey: sessionKey,
       );
 
       try {
@@ -466,7 +491,20 @@ class SessionKeyService {
   }
 
   static Future<bool> hasLocalSessionKey(String roomId, {int keyId = 0}) async {
+    if (MessageCryptoService.hasCachedSessionKey(roomId, keyId: keyId)) {
+      return true;
+    }
+
     final key = await _storage.read(key: _localSessionKeyKey(roomId, keyId));
+    if (key != null) {
+      try {
+        MessageCryptoService.cacheSessionKey(
+          roomId: roomId,
+          keyId: keyId,
+          key: base64Decode(key),
+        );
+      } catch (_) {}
+    }
     return key != null;
   }
 
@@ -502,21 +540,28 @@ class SessionKeyService {
     String userId, {
     int? keyId,
   }) async {
-    final snap =
-        await _db
-            .collection("chatRooms")
-            .doc(roomId)
-            .collection("sessionKeys")
-            .where("userId", isEqualTo: userId)
-            .limit(20)
-            .get();
+    Query<Map<String, dynamic>> query = _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("sessionKeys")
+        .where("userId", isEqualTo: userId);
 
-    if (keyId == null) return snap.docs.isNotEmpty;
+    if (keyId == null) {
+      final snap = await query.limit(1).get();
+      return snap.docs.isNotEmpty;
+    }
 
+    if (keyId > 0) {
+      query = query.where("keyId", isEqualTo: keyId);
+      final snap = await query.limit(1).get();
+      return snap.docs.isNotEmpty;
+    }
+
+    final snap = await query.get();
     for (final doc in snap.docs) {
       final data = doc.data();
-      final value = data["keyId"];
-      if (value is int && value == keyId) {
+      final existingKeyId = data["keyId"] is int ? data["keyId"] as int : 0;
+      if (existingKeyId == keyId) {
         return true;
       }
     }
@@ -618,7 +663,13 @@ class SessionKeyService {
   }) async {
     final key = await _storage.read(key: _localSessionKeyKey(roomId, keyId));
     if (key == null) return null;
-    return base64Decode(key);
+    final sessionKey = base64Decode(key);
+    MessageCryptoService.cacheSessionKey(
+      roomId: roomId,
+      keyId: keyId,
+      key: sessionKey,
+    );
+    return sessionKey;
   }
 
   /// Đảm bảo session key được phân phối cho tất cả thiết bị của participants
@@ -626,9 +677,15 @@ class SessionKeyService {
     required String roomId,
     required List<String> participantUids,
     int keyId = 0,
+    bool force = false,
   }) async {
     final sessionKey = await _readLocalSessionKey(roomId, keyId: keyId);
     if (sessionKey == null) return;
+
+    final token = _roomKeyToken(roomId, keyId);
+    if (!force && !_distributionChecks.add(token)) {
+      return;
+    }
 
     await _distributeSessionKeyToDevices(
       roomId: roomId,
@@ -648,6 +705,21 @@ class SessionKeyService {
     final uniqueParticipants = participantUids.toSet();
     int distributedCount = 0;
     int skippedCount = 0;
+    WriteBatch batch = _db.batch();
+    int pendingWrites = 0;
+
+    Future<void> commitPendingWrites() async {
+      if (pendingWrites == 0) return;
+
+      try {
+        await batch.commit();
+      } catch (e) {
+        print("🔒 sessionKey batch write error: $e");
+      } finally {
+        batch = _db.batch();
+        pendingWrites = 0;
+      }
+    }
 
     for (final participantUid in uniqueParticipants) {
       final devices = await _getDevices(participantUid);
@@ -683,7 +755,7 @@ class SessionKeyService {
         }
 
         try {
-          await docRef.set({
+          batch.set(docRef, {
             "userId": participantUid,
             "encryptedKey": base64Encode(
               _rsaEncrypt(sessionKey, _decodePublicKeyFromPem(publicKeyPem)),
@@ -691,16 +763,23 @@ class SessionKeyService {
             "keyId": keyId,
             "createdAt": FieldValue.serverTimestamp(),
           });
+          pendingWrites++;
           distributedCount++;
           print(
             "🔒 Distributed session key to device $deviceId (user: $participantUid)",
           );
+
+          if (pendingWrites >= 400) {
+            await commitPendingWrites();
+          }
         } catch (e) {
           // Log error nhưng không throw - tiếp tục với device khác
           print("🔒 sessionKey write error for $deviceId: $e");
         }
       }
     }
+
+    await commitPendingWrites();
 
     if (distributedCount > 0 || skippedCount > 0) {
       print(
@@ -744,14 +823,17 @@ class SessionKeyService {
     required String participantUid,
     required int keyId,
   }) async {
-    final snap =
-        await _db
-            .collection("chatRooms")
-            .doc(roomId)
-            .collection("sessionKeys")
-            .where("userId", isEqualTo: participantUid)
-            .get();
+    Query<Map<String, dynamic>> query = _db
+        .collection("chatRooms")
+        .doc(roomId)
+        .collection("sessionKeys")
+        .where("userId", isEqualTo: participantUid);
 
+    if (keyId > 0) {
+      query = query.where("keyId", isEqualTo: keyId);
+    }
+
+    final snap = await query.get();
     final existingDocIds = <String>{};
     for (final doc in snap.docs) {
       final data = doc.data();

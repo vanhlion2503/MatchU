@@ -12,7 +12,7 @@ class RightSideMenu {
       context: context,
       barrierLabel: "Menu",
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 280),
 
       pageBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -45,7 +45,6 @@ class RightSideMenu {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-
                                 const SizedBox(height: 10),
 
                                 // ==== HỒ SƠ ====
@@ -120,7 +119,6 @@ class RightSideMenu {
                                   text: "Đăng xuất",
                                   danger: true,
                                   onTap: () {
-                                    Navigator.pop(context);
                                     authC.logoutC();
                                   },
                                 ),
@@ -134,7 +132,6 @@ class RightSideMenu {
                     },
                   ),
                 ),
-
               ),
             ),
           ),
@@ -153,7 +150,6 @@ class RightSideMenu {
       },
     );
   }
-
 
   // ===== PHẦN HEADER =====
   static Widget sectionHeader(String title) {
@@ -201,9 +197,10 @@ class RightSideMenu {
                   child: Text(
                     text,
                     style: TextStyle(
-                      color: danger
-                          ? AppTheme.errorColor
-                          : theme.colorScheme.onSurface,
+                      color:
+                          danger
+                              ? AppTheme.errorColor
+                              : theme.colorScheme.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
