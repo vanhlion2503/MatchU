@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pinput/pinput.dart';
 
-enum PasscodePromptAction { submitted, skipped, reset }
+enum PasscodePromptAction { submitted, reset }
 
 class PasscodePromptResult {
   final PasscodePromptAction action;
@@ -228,7 +228,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                 children: [
                   Text(
                     'Nhập mã PIN để khôi phục tin nhắn cũ trên thiết bị này. '
-                    'Nếu không có mã PIN bạn vẫn có thể chat nhưng không có lịch sử',
+                    'Nếu quên mã PIN, bạn có thể đặt lại để bắt đầu khóa khôi phục mới.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 12),
@@ -247,23 +247,6 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                     ),
                   ],
                   const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop(
-                            const PasscodePromptResult(
-                              action: PasscodePromptAction.skipped,
-                            ),
-                          );
-                        },
-                        child: const Text('Bỏ qua lịch sử'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: Row(

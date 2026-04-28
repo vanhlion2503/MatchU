@@ -5,13 +5,18 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
+import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
+import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/list_chat/confirm_delete_chat.dart';
+import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/views/chat/list_chat/shimmer/chat_list_shimmer.dart';
 import 'package:matchu_app/views/chat/list_chat/swipe_chat_item.dart';
 import 'package:matchu_app/views/chat/list_chat/ui_item_chat.dart';
+
+const _chatListMainTabIndex = 3;
 
 class ChatListView extends StatefulWidget {
   final bool embedInMainNavigation;
@@ -22,16 +27,33 @@ class ChatListView extends StatefulWidget {
   State<ChatListView> createState() => _ChatListViewState();
 }
 
-class _ChatListViewState extends State<ChatListView> {
+class _ChatListViewState extends State<ChatListView>
+    with WidgetsBindingObserver {
   late final ChatListController controller;
+  Worker? _mainTabWorker;
+  bool _passcodeFlowRunning = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     controller =
         Get.isRegistered<ChatListController>()
             ? Get.find<ChatListController>()
             : Get.put(ChatListController());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensurePasscodeFlowIfVisible();
+    });
+
+    if (widget.embedInMainNavigation && Get.isRegistered<MainController>()) {
+      final mainController = Get.find<MainController>();
+      _mainTabWorker = ever<int>(mainController.currentIndex, (index) {
+        if (index == _chatListMainTabIndex) {
+          _ensurePasscodeFlowIfVisible();
+        }
+      });
+    }
 
     if (!widget.embedInMainNavigation &&
         Get.isRegistered<NotificationController>()) {
@@ -39,8 +61,94 @@ class _ChatListViewState extends State<ChatListView> {
     }
   }
 
+  bool get _isVisibleForPasscode {
+    if (!mounted) return false;
+    if (!widget.embedInMainNavigation) return true;
+    if (!Get.isRegistered<MainController>()) return false;
+
+    return Get.find<MainController>().currentIndex.value ==
+        _chatListMainTabIndex;
+  }
+
+  Future<void> _ensurePasscodeFlowIfVisible() async {
+    if (!_isVisibleForPasscode || _passcodeFlowRunning) return;
+    _passcodeFlowRunning = true;
+
+    try {
+      final historyLocked = await PasscodeBackupService.isHistoryLocked();
+      if (historyLocked || !_isVisibleForPasscode) return;
+
+      final hasLocal = await PasscodeBackupService.hasLocalBackupKey();
+      if (hasLocal || !_isVisibleForPasscode) return;
+
+      final hasBackup = await PasscodeBackupService.hasBackupOnServer();
+      if (!mounted) return;
+      if (!_isVisibleForPasscode) return;
+
+      if (!hasBackup) {
+        final passcode = await showPasscodeSetupDialog(context);
+        if (passcode == null || passcode.isEmpty) return;
+        await PasscodeBackupService.setPasscode(passcode);
+        return;
+      }
+
+      String? errorText;
+      while (mounted && _isVisibleForPasscode) {
+        if (!mounted) return;
+        if (!_isVisibleForPasscode) return;
+        final result = await showPasscodeUnlockDialog(
+          context,
+          errorText: errorText,
+        );
+
+        if (result == null) return;
+
+        if (result.action == PasscodePromptAction.reset) {
+          if (!mounted) return;
+          if (!_isVisibleForPasscode) return;
+          final confirm = await showPasscodeResetConfirmDialog(context);
+          if (!confirm) continue;
+
+          await PasscodeBackupService.resetPasscode();
+          controller.clearPreviewCache();
+
+          if (!mounted) return;
+          if (!_isVisibleForPasscode) return;
+          final newPasscode = await showPasscodeSetupDialog(context);
+          if (newPasscode == null || newPasscode.isEmpty) return;
+          await PasscodeBackupService.setPasscode(
+            newPasscode,
+            lockHistory: true,
+          );
+          return;
+        }
+
+        final passcode = result.passcode ?? '';
+        final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
+        if (!unlocked) {
+          errorText = 'Mã pin không đúng';
+          continue;
+        }
+
+        await controller.refreshLastMessagePreviews();
+        return;
+      }
+    } finally {
+      _passcodeFlowRunning = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _ensurePasscodeFlowIfVisible();
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _mainTabWorker?.dispose();
     if (!widget.embedInMainNavigation &&
         Get.isRegistered<NotificationController>()) {
       Get.find<NotificationController>().leaveChatList();
