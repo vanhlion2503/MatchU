@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:pinput/pinput.dart';
@@ -37,6 +39,11 @@ Widget _buildPasscodeInput({
   required TextEditingController controller,
   required Color primaryColor,
   required TextStyle? textStyle,
+  Color? errorColor,
+  bool readOnly = false,
+  bool hasError = false,
+  int shakeTrigger = 0,
+  ValueChanged<String>? onChanged,
 }) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -68,21 +75,43 @@ Widget _buildPasscodeInput({
         );
       }
 
+      final effectiveErrorColor = errorColor ?? primaryColor;
+      final pinput = Pinput(
+        length: _passcodeLength,
+        controller: controller,
+        readOnly: readOnly,
+        onChanged: onChanged,
+        forceErrorState: hasError,
+        errorPinTheme: buildPinTheme(effectiveErrorColor),
+        keyboardType: TextInputType.number,
+        separatorBuilder: (_) => const SizedBox(width: _pinSeparatorWidth),
+        defaultPinTheme: buildPinTheme(primaryColor.withValues(alpha: 0.4)),
+        focusedPinTheme: buildPinTheme(primaryColor),
+        submittedPinTheme: buildPinTheme(primaryColor),
+      );
+
+      final input =
+          shakeTrigger <= 0
+              ? pinput
+              : TweenAnimationBuilder<double>(
+                key: ValueKey(shakeTrigger),
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 420),
+                curve: Curves.easeOut,
+                child: pinput,
+                builder: (context, value, child) {
+                  final dx = math.sin(value * math.pi * 8) * (1 - value) * 8;
+                  return Transform.translate(
+                    offset: Offset(dx, 0),
+                    child: child,
+                  );
+                },
+              );
+
       return SizedBox(
         width: double.infinity,
         height: pinBoxHeight + 10,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Pinput(
-            length: _passcodeLength,
-            controller: controller,
-            keyboardType: TextInputType.number,
-            separatorBuilder: (_) => const SizedBox(width: _pinSeparatorWidth),
-            defaultPinTheme: buildPinTheme(primaryColor.withValues(alpha: 0.4)),
-            focusedPinTheme: buildPinTheme(primaryColor),
-            submittedPinTheme: buildPinTheme(primaryColor),
-          ),
-        ),
+        child: Align(alignment: Alignment.centerLeft, child: input),
       );
     },
   );
@@ -203,6 +232,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
   String? errorText,
   String? title,
   String? description,
+  Future<bool> Function(String passcode)? onUnlock,
 }) {
   final controller = TextEditingController();
 
@@ -213,24 +243,66 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
       final theme = Theme.of(context);
       final color = theme.colorScheme;
       String? localError = errorText;
+      bool isSubmitting = false;
+      int shakeTrigger = 0;
 
       return StatefulBuilder(
         builder: (context, setState) {
-          void submitPasscode() {
+          Future<void> submitPasscode() async {
+            if (isSubmitting) return;
+
             final pin = controller.text.trim();
             if (pin.length != 6) {
               setState(() {
+                shakeTrigger++;
                 localError = 'Mã PIN phải đủ 6 chữ số';
               });
               return;
             }
 
-            Navigator.of(context).pop(
-              PasscodePromptResult(
-                action: PasscodePromptAction.submitted,
-                passcode: pin,
-              ),
-            );
+            if (onUnlock == null) {
+              Navigator.of(context).pop(
+                PasscodePromptResult(
+                  action: PasscodePromptAction.submitted,
+                  passcode: pin,
+                ),
+              );
+              return;
+            }
+
+            setState(() {
+              isSubmitting = true;
+              localError = null;
+            });
+
+            try {
+              final unlocked = await onUnlock(pin);
+              if (!context.mounted) return;
+
+              if (unlocked) {
+                Navigator.of(context).pop(
+                  PasscodePromptResult(
+                    action: PasscodePromptAction.submitted,
+                    passcode: pin,
+                  ),
+                );
+                return;
+              }
+
+              setState(() {
+                isSubmitting = false;
+                shakeTrigger++;
+                localError = 'Bạn đã nhập sai mã PIN, vui lòng nhập lại';
+                controller.clear();
+              });
+            } catch (_) {
+              if (!context.mounted) return;
+
+              setState(() {
+                isSubmitting = false;
+                localError = 'Không thể kiểm tra mã PIN. Vui lòng thử lại.';
+              });
+            }
           }
 
           return PopScope(
@@ -250,6 +322,16 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                     controller: controller,
                     primaryColor: color.primary,
                     textStyle: theme.textTheme.headlineSmall,
+                    errorColor: color.error,
+                    readOnly: isSubmitting,
+                    hasError: localError != null,
+                    shakeTrigger: shakeTrigger,
+                    onChanged: (_) {
+                      if (localError == null) return;
+                      setState(() {
+                        localError = null;
+                      });
+                    },
                   ),
                   if (localError != null) ...[
                     const SizedBox(height: 8),
@@ -270,21 +352,33 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                           child: Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                Navigator.of(context).pop(
-                                  const PasscodePromptResult(
-                                    action: PasscodePromptAction.reset,
-                                  ),
-                                );
-                              },
+                              onPressed:
+                                  isSubmitting
+                                      ? null
+                                      : () {
+                                        Navigator.of(context).pop(
+                                          const PasscodePromptResult(
+                                            action: PasscodePromptAction.reset,
+                                          ),
+                                        );
+                                      },
                               child: const Text('Đặt lại'),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: submitPasscode,
-                          child: const Text('Mở khóa'),
+                          onPressed: isSubmitting ? null : submitPasscode,
+                          child:
+                              isSubmitting
+                                  ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Text('Mở khóa'),
                         ),
                       ],
                     ),
@@ -371,15 +465,14 @@ Future<bool> ensurePasscodeReady(
     return true;
   }
 
-  String? errorText;
   while (canContinue()) {
     if (!context.mounted) return false;
     if (shouldContinue != null && !shouldContinue()) return false;
     final result = await showPasscodeUnlockDialog(
       context,
-      errorText: errorText,
       title: unlockTitle,
       description: unlockDescription,
+      onUnlock: PasscodeBackupService.unlockPasscode,
     );
 
     if (result == null) return false;
@@ -403,13 +496,6 @@ Future<bool> ensurePasscodeReady(
       if (newPasscode == null || newPasscode.isEmpty) return false;
       await PasscodeBackupService.setPasscode(newPasscode, lockHistory: true);
       return true;
-    }
-
-    final passcode = result.passcode ?? '';
-    final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
-    if (!unlocked) {
-      errorText = 'Mã pin không đúng';
-      continue;
     }
 
     await onUnlocked?.call();
