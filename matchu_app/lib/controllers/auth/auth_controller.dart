@@ -737,16 +737,17 @@ class AuthController extends GetxController {
   //                        LOGOUT
   // =============================================================
   Future<void> logoutC() async {
-    const redirectRoute = '/';
+    const splashRoute = '/';
+    const signedOutRoute = '/welcome';
     AuthGateController? authGateC;
 
     if (Get.isRegistered<AuthGateController>()) {
       authGateC = Get.find<AuthGateController>();
-      authGateC.beginLogout(redirectRoute: redirectRoute);
+      authGateC.beginLogout(redirectRoute: signedOutRoute);
     }
 
-    if (Get.currentRoute != redirectRoute) {
-      Get.offAllNamed(redirectRoute);
+    if (Get.currentRoute != splashRoute) {
+      Get.offAllNamed(splashRoute);
     }
 
     final loggedOut = await LogoutService.logout();

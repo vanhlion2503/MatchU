@@ -21,12 +21,13 @@ class _SplashViewState extends State<SplashView>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 650),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.forward();
 
@@ -37,7 +38,6 @@ class _SplashViewState extends State<SplashView>
       }
     });
   }
-
 
   @override
   void dispose() {

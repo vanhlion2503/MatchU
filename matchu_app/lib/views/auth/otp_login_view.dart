@@ -12,7 +12,7 @@ class OtpLoginView extends StatelessWidget {
     if (value.isEmpty) return value;
     if (value.length <= 8) return value;
 
-    final prefixLength = value.startsWith('+') ? 5 : 4;
+    final prefixLength = value.startsWith('+') ? 3 : 2;
     final safePrefixLength = prefixLength.clamp(0, value.length - 4).toInt();
     final hiddenCount = value.length - safePrefixLength - 4;
     if (hiddenCount <= 0) return value;
@@ -90,7 +90,7 @@ class OtpLoginView extends StatelessWidget {
                       border: Border.all(
                         color: Theme.of(
                           context,
-                        ).colorScheme.primary.withOpacity(0.3),
+                        ).colorScheme.primary.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),

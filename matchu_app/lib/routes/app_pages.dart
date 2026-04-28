@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/bindings/feed/post_detail_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
@@ -45,7 +46,13 @@ class AppPages {
   static const initial = AppRouter.splash;
 
   static final routes = [
-    GetPage(name: AppRouter.splash, page: () => const SplashView()),
+    GetPage(
+      name: AppRouter.splash,
+      page: () => const SplashView(),
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    ),
     GetPage(name: AppRouter.register, page: () => const RegisterView()),
     GetPage(name: AppRouter.verifyEmail, page: () => const VerifyEmailView()),
     GetPage(name: AppRouter.enrollPhone, page: () => const EnrollPhoneView()),
@@ -57,7 +64,13 @@ class AppPages {
       name: AppRouter.completeProfile,
       page: () => const CompleteProfileView(),
     ),
-    GetPage(name: AppRouter.welcome, page: () => const WelcomeView()),
+    GetPage(
+      name: AppRouter.welcome,
+      page: () => const WelcomeView(),
+      transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    ),
 
     GetPage(
       name: AppRouter.forgotPassword,

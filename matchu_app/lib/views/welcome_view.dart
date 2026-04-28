@@ -22,18 +22,15 @@ class _WelcomeViewState extends State<WelcomeView>
 
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 700),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.elasticOut,
-      ),
+    _scaleAnimation = Tween<double>(begin: 0.97, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
     );
 
     _animationController.forward();
@@ -88,7 +85,10 @@ class _WelcomeViewState extends State<WelcomeView>
                                   TextSpan(
                                     text: "Match",
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                     ),
                                   ),
                                   const TextSpan(
@@ -107,13 +107,15 @@ class _WelcomeViewState extends State<WelcomeView>
                             Text(
                               "Khám phá những mối quan hệ mới.",
                               textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge!
-                                  .copyWith(
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodyLarge!.copyWith(
+                                color:
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
 
                             SizedBox(height: height * 0.08),
@@ -139,7 +141,10 @@ class _WelcomeViewState extends State<WelcomeView>
                                     Icon(
                                       Icons.arrow_forward,
                                       size: 21,
-                                      color: Theme.of(context).colorScheme.onPrimary,
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.onPrimary,
                                     ),
                                   ],
                                 ),
@@ -154,13 +159,15 @@ class _WelcomeViewState extends State<WelcomeView>
                               children: [
                                 Text(
                                   "Đã có tài khoản?",
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium!
-                                      .copyWith(
-                                        color: Theme.of(context).textTheme.bodySmall?.color,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium!.copyWith(
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall?.color,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 GestureDetector(
@@ -169,13 +176,12 @@ class _WelcomeViewState extends State<WelcomeView>
                                   },
                                   child: Text(
                                     "Đăng nhập",
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium!
-                                        .copyWith(
-                                          color: AppTheme.primaryColor,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium!.copyWith(
+                                      color: AppTheme.primaryColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -190,13 +196,12 @@ class _WelcomeViewState extends State<WelcomeView>
                         child: Text(
                           "Version 1.0.0",
                           textAlign: TextAlign.center,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyLarge!
-                              .copyWith(
-                                color: Theme.of(context).textTheme.bodySmall?.color,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyLarge!.copyWith(
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],

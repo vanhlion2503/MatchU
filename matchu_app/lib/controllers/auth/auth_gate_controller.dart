@@ -16,6 +16,9 @@ class AuthGateController extends GetxController {
   bool _navigated = false;
   bool _isLoggingOut = false;
   String? _signedOutRedirectRoute;
+  DateTime? _logoutSplashShownAt;
+
+  static const _minimumSplashDuration = Duration(milliseconds: 700);
 
   @override
   void onReady() {
@@ -41,9 +44,16 @@ class AuthGateController extends GetxController {
 
     if (user == null) {
       final redirectRoute = _signedOutRedirectRoute ?? AppRouter.welcome;
+      await _holdSplashBeforeSignedOutRedirect(redirectRoute);
+
+      if (FirebaseAuth.instance.currentUser != null) {
+        return;
+      }
+
       _navigated = false;
       _isLoggingOut = false;
       _signedOutRedirectRoute = null;
+      _logoutSplashShownAt = null;
       _box.remove('isRegistering');
       if (Get.currentRoute != redirectRoute) {
         Get.offAllNamed(redirectRoute);
@@ -142,6 +152,25 @@ class AuthGateController extends GetxController {
     }
   }
 
+  Future<void> _holdSplashBeforeSignedOutRedirect(String redirectRoute) async {
+    if (redirectRoute != AppRouter.welcome ||
+        Get.currentRoute != AppRouter.splash) {
+      return;
+    }
+
+    final shownAt = _logoutSplashShownAt;
+    if (shownAt == null) {
+      await Future.delayed(_minimumSplashDuration);
+      return;
+    }
+
+    final elapsed = DateTime.now().difference(shownAt);
+    final remaining = _minimumSplashDuration - elapsed;
+    if (remaining > Duration.zero) {
+      await Future.delayed(remaining);
+    }
+  }
+
   /// Retry load Firestore user doc (tránh race condition)
   Future<DocumentSnapshot<Map<String, dynamic>>> _loadUserDoc(
     String uid,
@@ -158,15 +187,17 @@ class AuthGateController extends GetxController {
   /// ============================
   /// RESET KHI LOGOUT
   /// ============================
-  void beginLogout({String redirectRoute = AppRouter.splash}) {
+  void beginLogout({String redirectRoute = AppRouter.welcome}) {
     _isLoggingOut = true;
     _signedOutRedirectRoute = redirectRoute;
+    _logoutSplashShownAt = DateTime.now();
   }
 
   void reset() {
     _navigated = false;
     _isLoggingOut = false;
     _signedOutRedirectRoute = null;
+    _logoutSplashShownAt = null;
   }
 
   @override

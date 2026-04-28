@@ -20,13 +20,13 @@ class MainView extends StatefulWidget {
   State<MainView> createState() => _MainViewState();
 }
 
-class _MainViewState extends State<MainView> {
+class _MainViewState extends State<MainView> with WidgetsBindingObserver {
   final MainController c = Get.find<MainController>();
   final UnreadController unreadController = Get.find<UnreadController>();
 
   Worker? _tabIndexWorker;
   Worker? _pageIndexWorker;
-  bool _passcodeChecked = false;
+  bool _passcodeFlowRunning = false;
   int _lastTabIndex = 0;
   final ValueNotifier<bool> _isHomeBottomNavigationVisible =
       ValueNotifier<bool>(true);
@@ -45,6 +45,7 @@ class _MainViewState extends State<MainView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lastTabIndex = c.currentIndex.value;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -68,68 +69,82 @@ class _MainViewState extends State<MainView> {
   }
 
   Future<void> _ensurePasscodeFlow() async {
-    if (_passcodeChecked) return;
-    _passcodeChecked = true;
+    if (_passcodeFlowRunning) return;
+    _passcodeFlowRunning = true;
 
-    final historyLocked = await PasscodeBackupService.isHistoryLocked();
-    if (historyLocked) return;
+    try {
+      final historyLocked = await PasscodeBackupService.isHistoryLocked();
+      if (historyLocked) return;
 
-    final hasLocal = await PasscodeBackupService.hasLocalBackupKey();
-    if (hasLocal) return;
+      final hasLocal = await PasscodeBackupService.hasLocalBackupKey();
+      if (hasLocal) return;
 
-    final hasBackup = await PasscodeBackupService.hasBackupOnServer();
-    if (!mounted) return;
-
-    if (!hasBackup) {
-      final passcode = await showPasscodeSetupDialog(context);
-      if (passcode == null || passcode.isEmpty) return;
-      await PasscodeBackupService.setPasscode(passcode);
-      return;
-    }
-
-    String? errorText;
-    while (mounted) {
+      final hasBackup = await PasscodeBackupService.hasBackupOnServer();
       if (!mounted) return;
-      final result = await showPasscodeUnlockDialog(
-        context,
-        errorText: errorText,
-      );
 
-      if (result == null) return;
-
-      if (result.action == PasscodePromptAction.skipped) {
-        await PasscodeBackupService.setHistoryLocked(true);
+      if (!hasBackup) {
+        final passcode = await showPasscodeSetupDialog(context);
+        if (passcode == null || passcode.isEmpty) return;
+        await PasscodeBackupService.setPasscode(passcode);
         return;
       }
 
-      if (result.action == PasscodePromptAction.reset) {
+      String? errorText;
+      while (mounted) {
         if (!mounted) return;
-        final confirm = await showPasscodeResetConfirmDialog(context);
-        if (!confirm) return;
+        final result = await showPasscodeUnlockDialog(
+          context,
+          errorText: errorText,
+        );
 
-        await PasscodeBackupService.resetPasscode();
-        if (Get.isRegistered<ChatListController>()) {
-          Get.find<ChatListController>().clearPreviewCache();
+        if (result == null) return;
+
+        if (result.action == PasscodePromptAction.skipped) {
+          await PasscodeBackupService.setHistoryLocked(true);
+          return;
         }
 
-        if (!mounted) return;
-        final newPasscode = await showPasscodeSetupDialog(context);
-        if (newPasscode == null || newPasscode.isEmpty) return;
-        await PasscodeBackupService.setPasscode(newPasscode, lockHistory: true);
+        if (result.action == PasscodePromptAction.reset) {
+          if (!mounted) return;
+          final confirm = await showPasscodeResetConfirmDialog(context);
+          if (!confirm) continue;
+
+          await PasscodeBackupService.resetPasscode();
+          if (Get.isRegistered<ChatListController>()) {
+            Get.find<ChatListController>().clearPreviewCache();
+          }
+
+          if (!mounted) return;
+          final newPasscode = await showPasscodeSetupDialog(context);
+          if (newPasscode == null || newPasscode.isEmpty) return;
+          await PasscodeBackupService.setPasscode(
+            newPasscode,
+            lockHistory: true,
+          );
+          return;
+        }
+
+        final passcode = result.passcode ?? '';
+        final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
+        if (!unlocked) {
+          errorText = 'Mã pin không đúng';
+          continue;
+        }
+
+        if (Get.isRegistered<ChatListController>()) {
+          await Get.find<ChatListController>().refreshLastMessagePreviews();
+        }
         return;
       }
+    } finally {
+      _passcodeFlowRunning = false;
+    }
+  }
 
-      final passcode = result.passcode ?? '';
-      final unlocked = await PasscodeBackupService.unlockPasscode(passcode);
-      if (!unlocked) {
-        errorText = 'Mã pin không đúng';
-        continue;
-      }
-
-      if (Get.isRegistered<ChatListController>()) {
-        await Get.find<ChatListController>().refreshLastMessagePreviews();
-      }
-      return;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _ensurePasscodeFlow();
     }
   }
 
@@ -151,6 +166,7 @@ class _MainViewState extends State<MainView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabIndexWorker?.dispose();
     _pageIndexWorker?.dispose();
     _isHomeBottomNavigationVisible.dispose();
