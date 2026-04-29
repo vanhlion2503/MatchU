@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
-import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/qr/my_qr_tab.dart';
 import 'package:matchu_app/views/qr/scan_qr_tab.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
@@ -65,13 +64,9 @@ class ProfileQrView extends GetView<ProfileQrController> {
         ],
       ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-              child: QrSegmentedTabs(controller: controller),
-            ),
-            Expanded(
+            Positioned.fill(
               child: Obx(() {
                 final selectedIndex = controller.selectedTabIndex.value;
                 return AnimatedSwitcher(
@@ -84,12 +79,19 @@ class ProfileQrView extends GetView<ProfileQrController> {
                             key: const ValueKey('scan-tab'),
                             controller: controller,
                           )
-                          : MyQrTab(
+                          : Padding(
                             key: const ValueKey('my-qr-tab'),
-                            controller: controller,
+                            padding: const EdgeInsets.only(top: 68),
+                            child: MyQrTab(controller: controller),
                           ),
                 );
               }),
+            ),
+            Positioned(
+              top: 16,
+              left: 40,
+              right: 40,
+              child: Center(child: QrSegmentedTabs(controller: controller)),
             ),
           ],
         ),
@@ -105,38 +107,45 @@ class QrSegmentedTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-    final backgroundColor = borderColor.withValues(alpha: isDark ? 0.64 : 0.62);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Obx(() {
-        return Row(
-          children: [
-            Expanded(
-              child: _QrSegmentButton(
-                label: 'Quét mã',
-                isSelected: controller.selectedTabIndex.value == 0,
-                onTap: () => controller.changeTab(0),
-              ),
-            ),
-            Expanded(
-              child: _QrSegmentButton(
-                label: 'Mã của tôi',
-                isSelected: controller.selectedTabIndex.value == 1,
-                onTap: () => controller.changeTab(1),
-              ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 300),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.22),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
-        );
-      }),
+        ),
+        child: Obx(() {
+          return Row(
+            children: [
+              Expanded(
+                child: _QrSegmentButton(
+                  label: 'Quét mã',
+                  isSelected: controller.selectedTabIndex.value == 0,
+                  onTap: () => controller.changeTab(0),
+                ),
+              ),
+              Expanded(
+                child: _QrSegmentButton(
+                  label: 'Mã của tôi',
+                  isSelected: controller.selectedTabIndex.value == 1,
+                  onTap: () => controller.changeTab(1),
+                ),
+              ),
+            ],
+          );
+        }),
+      ),
     );
   }
 }
@@ -158,9 +167,11 @@ class _QrSegmentButton extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
+      clipBehavior: Clip.antiAlias,
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(15),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
@@ -168,7 +179,7 @@ class _QrSegmentButton extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 isSelected ? theme.scaffoldBackgroundColor : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(15),
             boxShadow:
                 isSelected
                     ? [
@@ -185,11 +196,12 @@ class _QrSegmentButton extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color:
                   isSelected
                       ? theme.colorScheme.primary
-                      : theme.textTheme.bodySmall?.color,
+                      : Colors.white.withValues(alpha: 0.72),
             ),
           ),
         ),
