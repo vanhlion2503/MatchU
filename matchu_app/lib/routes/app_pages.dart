@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
+import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
 import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
@@ -25,6 +26,7 @@ import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/matching/matching_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
 import 'package:matchu_app/views/reputation/reputation_view.dart';
+import 'package:matchu_app/views/qr/profile_qr_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
@@ -117,6 +119,13 @@ class AppPages {
       page: () => SearchUserView(),
       binding: BindingsBuilder(() {
         Get.put(SearchUserController());
+      }),
+    ),
+    GetPage(
+      name: AppRouter.profileQr,
+      page: () => const ProfileQrView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<ProfileQrController>(() => ProfileQrController());
       }),
     ),
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
@@ -36,7 +37,7 @@ class SearchUserView extends StatelessWidget {
             padding: const EdgeInsets.only(right: 10),
             child: IconButton(
               onPressed: () {
-                // TODO: xử lý khi bấm icon
+                Get.toNamed(AppRouter.profileQr);
               },
               icon: const Icon(Iconsax.scan),
             ),
@@ -62,7 +63,7 @@ class SearchUserView extends StatelessWidget {
                             : (theme.brightness == Brightness.dark
                                     ? AppTheme.darkBorder
                                     : AppTheme.lightBorder)
-                                .withOpacity(0.5),
+                                .withValues(alpha: 0.5),
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: 8,
                       horizontal: 12,

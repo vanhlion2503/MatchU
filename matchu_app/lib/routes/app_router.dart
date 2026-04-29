@@ -18,6 +18,7 @@ class AppRouter {
   static const String settings = '/settings';
   static const String postDetail = '/post-detail';
   static const String searchUser = '/search-user';
+  static const String profileQr = '/profile-qr';
   static const String displayMode = '/display-mode';
   static const String editProfile = '/edit-profile';
 

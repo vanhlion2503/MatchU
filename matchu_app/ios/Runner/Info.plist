@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Cho phép chụp ảnh avatar</string>
+	<string>Cho phép dùng camera để chụp ảnh avatar, xác thực khuôn mặt và quét mã QR</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cho phép chọn ảnh avatar</string>
 	<key>CFBundleDevelopmentRegion</key>
