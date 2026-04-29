@@ -3,9 +3,9 @@ import 'package:flutter/rendering.dart';
 import 'package:matchu_app/views/feed/feed_screen.dart';
 
 class HomeView extends StatefulWidget {
-  const HomeView({super.key, this.onBottomNavigationVisibilityChanged});
+  const HomeView({super.key, this.bottomNavigationVisibility});
 
-  final ValueChanged<bool>? onBottomNavigationVisibilityChanged;
+  final ValueNotifier<bool>? bottomNavigationVisibility;
 
   @override
   State<HomeView> createState() => _HomeViewState();
@@ -14,9 +14,19 @@ class HomeView extends StatefulWidget {
 class _HomeViewState extends State<HomeView> {
   static const double _toggleScrollThreshold = 24;
 
-  bool _isBottomNavigationVisible = true;
+  late final ValueNotifier<bool> _fallbackBottomNavigationVisibility =
+      ValueNotifier<bool>(true);
   ScrollDirection _lastScrollDirection = ScrollDirection.idle;
   double _scrollDeltaSinceLastToggle = 0;
+
+  ValueNotifier<bool> get _bottomNavigationVisibility =>
+      widget.bottomNavigationVisibility ?? _fallbackBottomNavigationVisibility;
+
+  @override
+  void dispose() {
+    _fallbackBottomNavigationVisibility.dispose();
+    super.dispose();
+  }
 
   bool _handleScrollNotification(ScrollNotification notification) {
     // Feed list is wrapped by widgets like RefreshIndicator/TabBarView,
@@ -70,17 +80,18 @@ class _HomeViewState extends State<HomeView> {
   }
 
   void _updateBottomNavigationVisibility(bool isVisible) {
-    if (_isBottomNavigationVisible == isVisible) return;
+    if (_bottomNavigationVisibility.value == isVisible) return;
 
-    _isBottomNavigationVisible = isVisible;
-    widget.onBottomNavigationVisibilityChanged?.call(isVisible);
+    _bottomNavigationVisibility.value = isVisible;
   }
 
   @override
   Widget build(BuildContext context) {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
-      child: const FeedScreen(),
+      child: FeedScreen(
+        bottomNavigationVisibility: _bottomNavigationVisibility,
+      ),
     );
   }
 }

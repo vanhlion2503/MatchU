@@ -108,7 +108,7 @@ class ReputationView extends StatelessWidget {
                   Expanded(
                     child: Text(
                       "Nhiệm vụ hôm nay",
-                      style: textTheme.titleMedium?.copyWith(
+                      style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),

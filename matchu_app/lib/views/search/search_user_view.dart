@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
@@ -30,6 +31,17 @@ class SearchUserView extends StatelessWidget {
           ),
         ),
         title: Text("Tìm bạn bè", style: textTheme.headlineMedium),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: IconButton(
+              onPressed: () {
+                // TODO: xử lý khi bấm icon
+              },
+              icon: const Icon(Iconsax.scan),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -93,7 +105,7 @@ class SearchUserView extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.person_search,
+                          Iconsax.user_search,
                           size: 50,
                           color: theme.textTheme.bodySmall?.color,
                         ),

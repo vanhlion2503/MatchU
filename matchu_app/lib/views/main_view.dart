@@ -28,10 +28,7 @@ class _MainViewState extends State<MainView> {
       ValueNotifier<bool>(true);
 
   late final List<Widget> pages = [
-    HomeView(
-      onBottomNavigationVisibilityChanged:
-          _handleHomeBottomNavigationVisibilityChanged,
-    ),
+    HomeView(bottomNavigationVisibility: _isHomeBottomNavigationVisible),
     const NearbyView(),
     const RandomChatView(),
     const ChatListView(embedInMainNavigation: true),
@@ -66,13 +63,6 @@ class _MainViewState extends State<MainView> {
     if (_isHomeBottomNavigationVisible.value) return;
 
     _isHomeBottomNavigationVisible.value = true;
-  }
-
-  void _handleHomeBottomNavigationVisibilityChanged(bool isVisible) {
-    if (c.currentIndex.value != 0) return;
-    if (_isHomeBottomNavigationVisible.value == isVisible) return;
-
-    _isHomeBottomNavigationVisible.value = isVisible;
   }
 
   @override

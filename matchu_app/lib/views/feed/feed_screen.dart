@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -21,7 +22,9 @@ import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class FeedScreen extends StatefulWidget {
-  const FeedScreen({super.key});
+  const FeedScreen({super.key, this.bottomNavigationVisibility});
+
+  final ValueListenable<bool>? bottomNavigationVisibility;
 
   @override
   State<FeedScreen> createState() => _FeedScreenState();
@@ -286,16 +289,12 @@ class _FeedScreenState extends State<FeedScreen>
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset + 80),
-        child: FloatingActionButton(
-          heroTag: 'feed_create_post_fab',
-          tooltip: 'Tao bai viet',
-          backgroundColor: theme.colorScheme.primary,
-          foregroundColor: theme.colorScheme.onPrimary,
-          onPressed: () => _openCreatePostSheet(context),
-          child: const Icon(Iconsax.edit_2),
-        ),
+      floatingActionButton: _CreatePostFloatingButton(
+        bottomInset: bottomInset,
+        bottomNavigationVisibility: widget.bottomNavigationVisibility,
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        onPressed: () => _openCreatePostSheet(context),
       ),
       body: TabBarView(
         controller: _tabController,
@@ -386,6 +385,117 @@ class _FeedScreenState extends State<FeedScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CreatePostFloatingButton extends StatefulWidget {
+  const _CreatePostFloatingButton({
+    required this.bottomInset,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.onPressed,
+    this.bottomNavigationVisibility,
+  });
+
+  static const double _bottomPaddingWhenBottomBarVisible = 80;
+  static const double _bottomPaddingWhenBottomBarHidden = 24;
+  static const double _travelDistance =
+      _bottomPaddingWhenBottomBarVisible - _bottomPaddingWhenBottomBarHidden;
+
+  final double bottomInset;
+  final ValueListenable<bool>? bottomNavigationVisibility;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final VoidCallback onPressed;
+
+  @override
+  State<_CreatePostFloatingButton> createState() =>
+      _CreatePostFloatingButtonState();
+}
+
+class _CreatePostFloatingButtonState extends State<_CreatePostFloatingButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+    value: _isBottomNavigationVisible ? 1 : 0,
+  );
+  late final Animation<double> _animation = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeOutCubic,
+  );
+
+  bool get _isBottomNavigationVisible =>
+      widget.bottomNavigationVisibility?.value ?? true;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.bottomNavigationVisibility?.addListener(_syncVisibility);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CreatePostFloatingButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.bottomNavigationVisibility ==
+        widget.bottomNavigationVisibility) {
+      return;
+    }
+
+    oldWidget.bottomNavigationVisibility?.removeListener(_syncVisibility);
+    widget.bottomNavigationVisibility?.addListener(_syncVisibility);
+    _syncVisibility();
+  }
+
+  @override
+  void dispose() {
+    widget.bottomNavigationVisibility?.removeListener(_syncVisibility);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _syncVisibility() {
+    if (_isBottomNavigationVisible) {
+      _controller.forward();
+      return;
+    }
+
+    _controller.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom:
+            widget.bottomInset +
+            _CreatePostFloatingButton._bottomPaddingWhenBottomBarHidden,
+      ),
+      child: AnimatedBuilder(
+        animation: _animation,
+        child: RepaintBoundary(
+          child: FloatingActionButton(
+            heroTag: 'feed_create_post_fab',
+            tooltip: 'Tao bai viet',
+            backgroundColor: widget.backgroundColor,
+            foregroundColor: widget.foregroundColor,
+            onPressed: widget.onPressed,
+            child: const Icon(Iconsax.edit_2),
+          ),
+        ),
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(
+              0,
+              -_CreatePostFloatingButton._travelDistance * _animation.value,
+            ),
+            child: child,
+          );
+        },
       ),
     );
   }
