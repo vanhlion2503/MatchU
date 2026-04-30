@@ -16,12 +16,15 @@ import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 
-class ProfileQrController extends GetxController {
+class ProfileQrController extends GetxController with WidgetsBindingObserver {
   ProfileQrController();
 
   static const String _scheme = 'matchu';
   static const String _profileHost = 'profile';
   static const String _legacyPrefix = 'matchu:user:';
+  static const Duration _scannerStartDelay = Duration(milliseconds: 80);
+  static const Duration _scannerRetryDelay = Duration(milliseconds: 250);
+  static const int _scannerStartMaxRetries = 3;
 
   final UserService _userService = UserService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -33,12 +36,16 @@ class ProfileQrController extends GetxController {
   final GlobalKey qrBoundaryKey = GlobalKey();
 
   final MobileScannerController scannerController = MobileScannerController(
+    autoStart: false,
     formats: const [BarcodeFormat.qrCode],
     detectionSpeed: DetectionSpeed.noDuplicates,
     autoZoom: true,
   );
 
   final Rxn<UserModel> _fallbackUserRx = Rxn<UserModel>();
+  Timer? _scannerStartTimer;
+  int _scannerStartGeneration = 0;
+  bool _isClosed = false;
 
   Rxn<UserModel> get currentUserRx {
     if (Get.isRegistered<UserController>()) {
@@ -60,13 +67,33 @@ class ProfileQrController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     _loadFallbackUserIfNeeded();
   }
 
   @override
   void onClose() {
+    _isClosed = true;
+    _cancelPendingScannerStart();
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(scannerController.dispose());
     super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        requestScannerStart();
+        return;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _cancelPendingScannerStart();
+        unawaited(_stopScanner());
+        return;
+    }
   }
 
   static String buildProfileQrPayload(String uid) {
@@ -78,10 +105,34 @@ class ProfileQrController extends GetxController {
 
     selectedTabIndex.value = index;
     if (index == 0) {
-      _restartScannerIfNeeded();
+      requestScannerStart();
     } else {
-      unawaited(scannerController.stop());
+      _cancelPendingScannerStart();
+      unawaited(_stopScanner());
     }
+  }
+
+  void onScannerTabReady() {
+    requestScannerStart();
+  }
+
+  void requestScannerStart() {
+    if (!_shouldRunScanner) return;
+
+    final generation = ++_scannerStartGeneration;
+    _scannerStartTimer?.cancel();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (generation != _scannerStartGeneration || !_shouldRunScanner) {
+        return;
+      }
+
+      _scannerStartTimer?.cancel();
+      _scannerStartTimer = Timer(_scannerStartDelay, () {
+        if (generation != _scannerStartGeneration) return;
+        unawaited(_startScannerIfNeeded(generation));
+      });
+    });
   }
 
   Future<void> toggleTorch() async {
@@ -115,6 +166,8 @@ class ProfileQrController extends GetxController {
     if (pickedImage == null) return;
 
     isResolvingQr.value = true;
+    _cancelPendingScannerStart();
+    await _stopScanner();
     try {
       final capture = await scannerController.analyzeImage(
         pickedImage.path,
@@ -140,7 +193,7 @@ class ProfileQrController extends GetxController {
       );
     } finally {
       isResolvingQr.value = false;
-      _restartScannerIfNeeded();
+      requestScannerStart();
     }
   }
 
@@ -194,11 +247,12 @@ class ProfileQrController extends GetxController {
   Future<void> _resolveScannedValue(String rawValue) async {
     isResolvingQr.value = true;
     try {
-      await scannerController.stop();
+      _cancelPendingScannerStart();
+      await _stopScanner();
       await _openProfileFromRawValue(rawValue);
     } finally {
       isResolvingQr.value = false;
-      _restartScannerIfNeeded();
+      requestScannerStart();
     }
   }
 
@@ -271,13 +325,61 @@ class ProfileQrController extends GetxController {
     return null;
   }
 
-  Future<void> _restartScannerIfNeeded() async {
-    if (selectedTabIndex.value != 0 || isResolvingQr.value) return;
+  bool get _shouldRunScanner =>
+      !_isClosed && selectedTabIndex.value == 0 && !isResolvingQr.value;
+
+  void _cancelPendingScannerStart() {
+    _scannerStartGeneration++;
+    _scannerStartTimer?.cancel();
+    _scannerStartTimer = null;
+  }
+
+  Future<void> _startScannerIfNeeded(
+    int generation, {
+    int retryCount = 0,
+  }) async {
+    if (generation != _scannerStartGeneration || !_shouldRunScanner) return;
+
+    final scannerState = scannerController.value;
+    if (scannerState.isRunning || scannerState.isStarting) return;
 
     try {
       await scannerController.start();
+    } on MobileScannerException catch (error) {
+      if (error.errorCode == MobileScannerErrorCode.controllerInitializing ||
+          error.errorCode == MobileScannerErrorCode.controllerNotAttached) {
+        _retryScannerStart(generation, retryCount);
+      }
+      return;
     } catch (_) {
-      // MobileScanner may already be running or not attached yet.
+      _retryScannerStart(generation, retryCount);
+      return;
+    }
+
+    if (generation != _scannerStartGeneration || !_shouldRunScanner) {
+      await _stopScanner();
+    }
+  }
+
+  void _retryScannerStart(int generation, int retryCount) {
+    if (retryCount >= _scannerStartMaxRetries ||
+        generation != _scannerStartGeneration ||
+        !_shouldRunScanner) {
+      return;
+    }
+
+    _scannerStartTimer?.cancel();
+    _scannerStartTimer = Timer(_scannerRetryDelay, () {
+      if (generation != _scannerStartGeneration) return;
+      unawaited(_startScannerIfNeeded(generation, retryCount: retryCount + 1));
+    });
+  }
+
+  Future<void> _stopScanner() async {
+    try {
+      await scannerController.stop();
+    } catch (_) {
+      // The controller can be mid-start or already disposed during route pops.
     }
   }
 

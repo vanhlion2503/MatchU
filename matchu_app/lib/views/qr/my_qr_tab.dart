@@ -21,7 +21,7 @@ class MyQrTab extends StatelessWidget {
       }
 
       return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
           children: [
             _MyQrCard(controller: controller, user: user),
@@ -32,31 +32,6 @@ class MyQrTab extends StatelessWidget {
               onTap: controller.copyQrPayload,
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Obx(() {
-                    return _SecondaryQrActionButton(
-                      icon: Iconsax.document_download,
-                      label:
-                          controller.isSavingQr.value ? 'Đang lưu' : 'Lưu ảnh',
-                      onTap:
-                          controller.isSavingQr.value
-                              ? null
-                              : controller.saveQrImage,
-                    );
-                  }),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SecondaryQrActionButton(
-                    icon: Iconsax.copy,
-                    label: 'Sao chép',
-                    onTap: controller.copyQrPayload,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       );
@@ -81,8 +56,10 @@ class _MyQrCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(8),
+        color: theme.brightness == Brightness.dark
+                                            ? AppTheme.darkBorder
+                                            : AppTheme.lightBorder,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
@@ -182,7 +159,7 @@ class _QrCodeFrame extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     const outerSize = 226.0;
-    const qrSize = 172.0;
+    const qrSize = 200.0;
 
     return SizedBox(
       width: outerSize,
@@ -285,46 +262,6 @@ class _PrimaryQrActionButton extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SecondaryQrActionButton extends StatelessWidget {
-  const _SecondaryQrActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
-
-    return SizedBox(
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: theme.colorScheme.onSurface,
-          backgroundColor: theme.colorScheme.surface,
-          side: BorderSide(color: borderColor),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          textStyle: theme.textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w800,
           ),
         ),
       ),

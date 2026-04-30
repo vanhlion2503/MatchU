@@ -6,15 +6,35 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-class ScanQrTab extends StatelessWidget {
+class ScanQrTab extends StatefulWidget {
   const ScanQrTab({super.key, required this.controller});
 
   final ProfileQrController controller;
 
   @override
+  State<ScanQrTab> createState() => _ScanQrTabState();
+}
+
+class _ScanQrTabState extends State<ScanQrTab> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.onScannerTabReady();
+  }
+
+  @override
+  void didUpdateWidget(covariant ScanQrTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      widget.controller.onScannerTabReady();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final controller = widget.controller;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -44,6 +64,7 @@ class ScanQrTab extends StatelessWidget {
               MobileScanner(
                 controller: controller.scannerController,
                 fit: BoxFit.cover,
+                useAppLifecycleState: false,
                 scanWindow: scanWindow,
                 onDetect: controller.handleBarcodeCapture,
                 placeholderBuilder:

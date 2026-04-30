@@ -18,6 +18,8 @@ class ProfileQrView extends GetView<ProfileQrController> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        scrolledUnderElevation: 0,
+        elevation: 0,
         leadingWidth: 56,
         leading: const Align(
           alignment: Alignment.centerLeft,
@@ -57,7 +59,7 @@ class ProfileQrView extends GetView<ProfileQrController> {
 
             return IconButton(
               onPressed: controller.copyQrPayload,
-              icon: const Icon(Iconsax.copy),
+              icon: const Icon(Iconsax.document_download),
             );
           }),
           const SizedBox(width: 6),
@@ -81,14 +83,14 @@ class ProfileQrView extends GetView<ProfileQrController> {
                           )
                           : Padding(
                             key: const ValueKey('my-qr-tab'),
-                            padding: const EdgeInsets.only(top: 68),
+                            padding: const EdgeInsets.only(top: 55),
                             child: MyQrTab(controller: controller),
                           ),
                 );
               }),
             ),
             Positioned(
-              top: 16,
+              top: 10,
               left: 40,
               right: 40,
               child: Center(child: QrSegmentedTabs(controller: controller)),
