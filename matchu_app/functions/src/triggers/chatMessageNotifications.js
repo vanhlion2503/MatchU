@@ -318,18 +318,9 @@ function buildPushMessage(queueData, token, title, body) {
   return {
     token,
     data: buildDataPayload(queueData, title, body, DELIVERY_MODE_PUSH),
-    notification: {
-      title,
-      body,
-    },
     android: {
       priority: "high",
       collapseKey: `chat_${cleanString(queueData.roomId)}`,
-      notification: {
-        channelId: "chat_messages",
-        tag: cleanString(queueData.roomId),
-        clickAction: "FLUTTER_NOTIFICATION_CLICK",
-      },
     },
     apns: {
       headers: {
@@ -339,6 +330,10 @@ function buildPushMessage(queueData, token, title, body) {
       },
       payload: {
         aps: {
+          alert: {
+            title,
+            body,
+          },
           sound: "default",
         },
       },
@@ -381,7 +376,7 @@ function extractMessagePreview(messageData, messageType) {
   }
 
   if (messageType === "image") {
-    return "Da gui mot anh";
+    return "\u0110\u00E3 g\u1EEDi m\u1ED9t \u1EA3nh";
   }
 
   const plaintext = truncateNotificationText(cleanString(messageData.text));
@@ -389,7 +384,7 @@ function extractMessagePreview(messageData, messageType) {
     return plaintext;
   }
 
-  return "Da gui mot tin nhan moi";
+  return "\u0110\u00E3 g\u1EEDi m\u1ED9t tin nh\u1EAFn m\u1EDBi";
 }
 
 function resolveQueuedPreview(queueData) {
@@ -400,10 +395,10 @@ function resolveQueuedPreview(queueData) {
   }
 
   if (messageType === "image") {
-    return "Da gui mot anh";
+    return "\u0110\u00E3 g\u1EEDi m\u1ED9t \u1EA3nh";
   }
 
-  return "Da gui mot tin nhan moi";
+  return "\u0110\u00E3 g\u1EEDi m\u1ED9t tin nh\u1EAFn m\u1EDBi";
 }
 
 function truncateNotificationText(value) {

@@ -14,6 +14,7 @@ import 'package:matchu_app/services/user/user_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:share_plus/share_plus.dart' as share_plus;
 
 class ProfileQrController extends GetxController with WidgetsBindingObserver {
   ProfileQrController();
@@ -33,6 +34,7 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
   final selectedTabIndex = 0.obs;
   final isResolvingQr = false.obs;
   final isSavingQr = false.obs;
+  final isSharingQr = false.obs;
   final GlobalKey qrBoundaryKey = GlobalKey();
 
   final MobileScannerController scannerController = MobileScannerController(
@@ -249,6 +251,56 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
       );
     } finally {
       isSavingQr.value = false;
+    }
+  }
+
+  Future<void> shareQrImage({Rect? sharePositionOrigin}) async {
+    if (isSharingQr.value) return;
+    if (currentUid.isEmpty) {
+      _showSnack(
+        title: 'Chưa có dữ liệu',
+        message: 'Không tìm thấy tài khoản hiện tại.',
+        isError: true,
+      );
+      return;
+    }
+
+    isSharingQr.value = true;
+    try {
+      final bytes = await _captureQrImageBytes();
+      final fileName = _buildQrImageFileName();
+      final result = await share_plus.SharePlus.instance.share(
+        share_plus.ShareParams(
+          title: 'Chia sẻ mã QR MatchU',
+          subject: 'Mã QR MatchU của tôi',
+          text: 'Quét mã QR này để thêm tôi làm bạn trên MatchU.',
+          files: [
+            share_plus.XFile.fromData(
+              bytes,
+              mimeType: 'image/png',
+              name: fileName,
+            ),
+          ],
+          fileNameOverrides: [fileName],
+          sharePositionOrigin: sharePositionOrigin,
+        ),
+      );
+
+      if (result.status == share_plus.ShareResultStatus.unavailable) {
+        _showSnack(
+          title: 'Không mở được chia sẻ',
+          message: 'Thiết bị hiện không hỗ trợ chia sẻ ảnh QR.',
+          isError: true,
+        );
+      }
+    } catch (_) {
+      _showSnack(
+        title: 'Không chia sẻ được mã QR',
+        message: 'Vui lòng mở lại tab Mã của tôi rồi thử lại.',
+        isError: true,
+      );
+    } finally {
+      isSharingQr.value = false;
     }
   }
 

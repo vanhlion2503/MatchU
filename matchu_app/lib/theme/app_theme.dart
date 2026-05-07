@@ -46,6 +46,7 @@ class AppTheme {
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: lightTextPrimary,
+      outlineVariant: lightBorder
     ),
 
     scaffoldBackgroundColor: lightBackground,
@@ -232,6 +233,7 @@ class AppTheme {
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: darkTextPrimary,
+      outlineVariant: darkBorder
     ),
 
     scaffoldBackgroundColor: darkBackground,

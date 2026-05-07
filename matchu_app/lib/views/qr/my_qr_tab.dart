@@ -16,6 +16,7 @@ class MyQrTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final user = controller.currentUserRx.value;
+      final isSharing = controller.isSharingQr.value;
       if (user == null) {
         return const Center(child: CircularProgressIndicator());
       }
@@ -31,8 +32,13 @@ class MyQrTab extends StatelessWidget {
             const SizedBox(height: 18),
             _PrimaryQrActionButton(
               icon: Iconsax.share,
-              label: 'Chia sẻ mã',
-              onTap: controller.copyQrPayload,
+              label: isSharing ? 'Đang chia sẻ...' : 'Chia sẻ mã',
+              isLoading: isSharing,
+              onTap: (buttonContext) {
+                controller.shareQrImage(
+                  sharePositionOrigin: _sharePositionOrigin(buttonContext),
+                );
+              },
             ),
             const SizedBox(height: 14),
           ],
@@ -210,12 +216,14 @@ class _PrimaryQrActionButton extends StatelessWidget {
   const _PrimaryQrActionButton({
     required this.icon,
     required this.label,
+    required this.isLoading,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final bool isLoading;
+  final void Function(BuildContext context) onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -243,12 +251,22 @@ class _PrimaryQrActionButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: onTap,
+            onTap: isLoading ? null : () => onTap(context),
             borderRadius: BorderRadius.circular(26),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 20, color: Colors.white),
+                if (isLoading)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  Icon(icon, size: 20, color: Colors.white),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
@@ -268,6 +286,14 @@ class _PrimaryQrActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+Rect? _sharePositionOrigin(BuildContext context) {
+  final renderObject = context.findRenderObject();
+  if (renderObject is! RenderBox || !renderObject.hasSize) return null;
+
+  final topLeft = renderObject.localToGlobal(Offset.zero);
+  return topLeft & renderObject.size;
 }
 
 class _QrCornerFramePainter extends CustomPainter {
