@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
+import 'package:matchu_app/models/word_chain.dart';
 // import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/views/chat/chat_widget/gender_icon.dart';
 import 'package:matchu_app/views/chat/temp_chat/bottom_action_bar.dart';
@@ -13,24 +15,68 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
-class TempChatView extends StatelessWidget {
+class TempChatView extends StatefulWidget {
   const TempChatView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<TempChatView> createState() => _TempChatViewState();
+}
+
+class _TempChatViewState extends State<TempChatView> {
+  late final String roomId;
+  late final TempChatController controller;
+  Worker? _telepathyStatusWorker;
+  Worker? _wordChainStatusWorker;
+
+  @override
+  void initState() {
+    super.initState();
+
     final args = Get.arguments as Map<String, dynamic>;
-    final roomId = args["roomId"] as String;
+    roomId = args["roomId"] as String;
+    controller = Get.put(TempChatController(roomId), tag: roomId);
 
-    final controller = Get.put(TempChatController(roomId), tag: roomId);
+    _telepathyStatusWorker = ever<TelepathyStatus>(
+      controller.telepathy.status,
+      (status) {
+        if (status == TelepathyStatus.countdown ||
+            status == TelepathyStatus.playing ||
+            status == TelepathyStatus.revealing) {
+          controller.dismissComposerState();
+        }
+      },
+    );
 
-    // final matchController = Get.find<MatchingController>();
+    _wordChainStatusWorker = ever<WordChainStatus>(
+      controller.wordChain.status,
+      (status) {
+        if (status == WordChainStatus.countdown ||
+            status == WordChainStatus.playing ||
+            status == WordChainStatus.reward) {
+          controller.dismissComposerState();
+        }
+      },
+    );
 
     controller.onOtherLiked = () {
+      if (!mounted) return;
       HeartRainOverlay.show(
         context,
         count: 14, // số tim
       );
     };
+  }
+
+  @override
+  void dispose() {
+    controller.onOtherLiked = null;
+    _telepathyStatusWorker?.dispose();
+    _wordChainStatusWorker?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -82,7 +128,8 @@ class TempChatView extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 22,
-                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      backgroundColor:
+                          theme.colorScheme.surfaceContainerHighest,
                       backgroundImage:
                           key == null
                               ? const AssetImage(
@@ -234,22 +281,26 @@ class TempChatView extends StatelessWidget {
       ),
 
       body: SafeArea(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children: [
-                  TelepathyPinnedBanner(controller: controller),
-                  Expanded(child: MessagesList(roomId, controller)),
-                  BottomActionBar(controller),
-                ],
+        child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: controller.dismissComposerState,
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  children: [
+                    TelepathyPinnedBanner(controller: controller),
+                    Expanded(child: MessagesList(roomId, controller)),
+                    BottomActionBar(controller),
+                  ],
+                ),
               ),
-            ),
-            WordChainPlayingBar(controller: controller),
-            TelepathyGameOverlay(controller: controller),
-            TelepathyResultOverlay(controller: controller),
-          ],
+              WordChainPlayingBar(controller: controller),
+              TelepathyGameOverlay(controller: controller),
+              TelepathyResultOverlay(controller: controller),
+            ],
+          ),
         ),
       ),
     );

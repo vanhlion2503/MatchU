@@ -83,8 +83,9 @@ class AppNotificationService {
       await initialize(onTap: (_) async {});
     }
 
-    final title = payload.title ?? payload.senderName ?? 'Tin nhan moi';
-    final body = payload.body ?? 'Ban co tin nhan moi';
+    final title =
+        payload.title ?? payload.senderName ?? 'Tin nh\u1EAFn m\u1EDBi';
+    final body = payload.body ?? 'B\u1EA1n c\u00F3 tin nh\u1EAFn m\u1EDBi';
 
     await localNotifications.show(
       id: payload.roomId.hashCode,

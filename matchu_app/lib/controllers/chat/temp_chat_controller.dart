@@ -194,6 +194,15 @@ class TempChatController extends GetxController {
     showEmoji.value = false;
   }
 
+  void dismissComposerState({bool clearReply = false}) {
+    stopTyping();
+    hideEmoji();
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (clearReply) {
+      cancelReply();
+    }
+  }
+
   void scrollToMessage(String messageId) {
     final key = messageKeys[messageId];
     if (key == null) return;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,6 +19,8 @@ import 'package:matchu_app/services/user/presence_service.dart';
 enum NotificationScreenContext { other, chatList, chatRoom }
 
 class NotificationController extends GetxController {
+  static const String _appLogoAssetPath = 'assets/icon/Icon.png';
+
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -174,49 +177,207 @@ class NotificationController extends GetxController {
     final payload = ChatNotificationPayload.fromRemoteMessage(message);
     if (payload == null) return;
     if (_shouldSuppressNotification(payload.roomId)) return;
+    final sentAt = message.sentTime ?? DateTime.now();
 
     final resolvedPayload = payload.copyWith(
       title:
           payload.title ??
           message.notification?.title ??
           payload.senderName ??
-          'Tin nhan moi',
-      body: payload.body ?? message.notification?.body ?? 'Ban co tin nhan moi',
+          'Tin nh\u1EAFn m\u1EDBi',
+      body:
+          payload.body ??
+          message.notification?.body ??
+          'B\u1EA1n c\u00F3 tin nh\u1EAFn m\u1EDBi',
     );
 
-    _showForegroundSnackbar(resolvedPayload);
+    _showForegroundSnackbar(resolvedPayload, sentAt: sentAt);
   }
 
-  void _showForegroundSnackbar(ChatNotificationPayload payload) {
+  void _showForegroundSnackbar(
+    ChatNotificationPayload payload, {
+    required DateTime sentAt,
+  }) {
     final context = Get.context;
     if (context == null) {
       unawaited(AppNotificationService.showLocalChatNotification(payload));
       return;
     }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final title = _resolveNotificationTitle(payload);
+    final body = _resolveNotificationBody(payload);
+    final timeLabel = _formatNotificationElapsed(sentAt);
 
     Get.closeAllSnackbars();
-    Get.snackbar(
-      payload.title ?? 'Tin nhan moi',
-      payload.body ?? 'Ban co tin nhan moi',
-      snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 4),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      colorText: Theme.of(context).colorScheme.onSurface,
-      margin: const EdgeInsets.all(12),
-      borderRadius: 16,
-      onTap: (_) {
-        _enqueueNavigation(payload, allowImmediateRedirect: true);
-      },
-      mainButton: TextButton(
-        onPressed: () {
+    Get.showSnackbar(
+      GetSnackBar(
+        snackPosition: SnackPosition.TOP,
+        snackStyle: SnackStyle.FLOATING,
+        duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        borderRadius: 16,
+        isDismissible: true,
+        backgroundColor: colorScheme.surface,
+        padding: EdgeInsets.zero,
+        onTap: (_) {
           _enqueueNavigation(payload, allowImmediateRedirect: true);
         },
-        child: Text(
-          'Mo',
-          style: TextStyle(color: Theme.of(context).colorScheme.primary),
+        messageText: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  _appLogoAssetPath,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.78,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        timeLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.62),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  String _resolveNotificationTitle(ChatNotificationPayload payload) {
+    final senderName = _normalizeNotificationText(payload.senderName);
+    if (senderName != null && senderName.isNotEmpty) {
+      return senderName;
+    }
+
+    final title = _normalizeNotificationText(payload.title);
+    if (title != null && title.isNotEmpty) {
+      return title;
+    }
+
+    return 'Tin nh\u1EAFn m\u1EDBi';
+  }
+
+  String _resolveNotificationBody(ChatNotificationPayload payload) {
+    final body = _normalizeNotificationText(payload.body);
+    if (body != null && body.isNotEmpty) {
+      return body;
+    }
+
+    return 'B\u1EA1n c\u00F3 tin nh\u1EAFn m\u1EDBi';
+  }
+
+  String _formatNotificationElapsed(DateTime sentAt) {
+    final diff = DateTime.now().difference(sentAt.toLocal());
+    if (diff.isNegative || diff.inSeconds < 60) {
+      return 'V\u1EEBa xong';
+    }
+
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} ph\u00FAt';
+    }
+
+    if (diff.inHours < 24) {
+      return '${diff.inHours} gi\u1EDD';
+    }
+
+    if (diff.inDays < 7) {
+      return '${diff.inDays} ng\u00E0y';
+    }
+
+    final local = sentAt.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day/$month';
+  }
+
+  String? _normalizeNotificationText(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return _repairUtf8Mojibake(trimmed);
+  }
+
+  String _repairUtf8Mojibake(String input) {
+    var normalized = input;
+    for (var i = 0; i < 2; i++) {
+      if (!_looksLikeMojibake(normalized)) {
+        break;
+      }
+      try {
+        final repaired = utf8.decode(latin1.encode(normalized));
+        if (repaired == normalized) {
+          break;
+        }
+        normalized = repaired;
+      } catch (_) {
+        break;
+      }
+    }
+    return normalized;
+  }
+
+  bool _looksLikeMojibake(String text) {
+    return text.contains('Ã') ||
+        text.contains('Æ') ||
+        text.contains('Ð') ||
+        text.contains('â€') ||
+        text.contains('áº') ||
+        text.contains('á»') ||
+        text.contains('\uFFFD');
   }
 
   Future<void> _handleLocalTap(ChatNotificationPayload payload) async {

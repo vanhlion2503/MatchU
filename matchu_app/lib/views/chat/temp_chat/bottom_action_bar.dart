@@ -157,6 +157,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
         onTap: () {
           if (!canInvite) return;
           HapticFeedback.lightImpact();
+          controller.dismissComposerState();
           _showGameSheet(context);
         },
         backgroundColor:
@@ -596,6 +597,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
 
   void _showGameSheet(BuildContext context) {
     final theme = Theme.of(context);
+    controller.dismissComposerState();
 
     showModalBottomSheet(
       context: context,
@@ -635,6 +637,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
                   subtitle: "Luân phiên nối 2 từ, sai là chịu phạt",
                   onTap: () {
                     Get.back();
+                    controller.dismissComposerState();
                     controller.inviteWordChainManual();
                   },
                 ),
