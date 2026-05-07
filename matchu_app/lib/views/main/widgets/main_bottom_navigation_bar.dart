@@ -161,6 +161,9 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final borderColor = isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+    final bottomBarRedGlow = AppTheme.primaryColor.withValues(
+      alpha: isDark ? 0.18 : 0.18,
+    );
     final isCenterSelected = widget.currentIndex == 2;
 
     return SafeArea(
@@ -175,9 +178,15 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
           border: Border.all(color: borderColor, width: 1),
           boxShadow: [
             BoxShadow(
+              color: bottomBarRedGlow,
+              blurRadius: isDark ? 26 : 20,
+              spreadRadius: isDark ? 0.8 : 0.2,
+              offset: const Offset(0, 10),
+            ),
+            BoxShadow(
               color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.08),
-              blurRadius: 28,
-              offset: const Offset(0, 14),
+              blurRadius: isDark ? 24 : 20,
+              offset: const Offset(0, 10),
             ),
             BoxShadow(
               color: Colors.white.withValues(alpha: isDark ? 0.02 : 0.72),
