@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/qr/my_qr_tab.dart';
 import 'package:matchu_app/views/qr/scan_qr_tab.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
@@ -57,9 +58,21 @@ class ProfileQrView extends GetView<ProfileQrController> {
               );
             }
 
+            final isSaving = controller.isSavingQr.value;
             return IconButton(
-              onPressed: controller.copyQrPayload,
-              icon: const Icon(Iconsax.document_download),
+              tooltip: 'Tải ảnh QR',
+              onPressed: isSaving ? null : controller.saveQrImage,
+              icon:
+                  isSaving
+                      ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      )
+                      : const Icon(Iconsax.document_download),
             );
           }),
           const SizedBox(width: 6),
@@ -109,7 +122,14 @@ class QrSegmentedTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final tabBackgroundColor =
+        isDark
+            ? AppTheme.darkSurface.withValues(alpha: 0.96)
+            : Colors.black.withValues(alpha: 0.22);
+    final tabBorderColor =
+        isDark ? AppTheme.darkBorder : Colors.white.withValues(alpha: 0.14);
 
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 300),
@@ -117,11 +137,12 @@ class QrSegmentedTabs extends StatelessWidget {
         height: 42,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.22),
+          color: tabBackgroundColor,
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: tabBorderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.12),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -166,6 +187,13 @@ class _QrSegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final selectedBackgroundColor =
+        isDark ? AppTheme.darkBorder : theme.scaffoldBackgroundColor;
+    final unselectedTextColor =
+        isDark
+            ? AppTheme.darkTextSecondary
+            : Colors.white.withValues(alpha: 0.72);
 
     return Material(
       color: Colors.transparent,
@@ -179,14 +207,15 @@ class _QrSegmentButton extends StatelessWidget {
           curve: Curves.easeOutCubic,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color:
-                isSelected ? theme.scaffoldBackgroundColor : Colors.transparent,
+            color: isSelected ? selectedBackgroundColor : Colors.transparent,
             borderRadius: BorderRadius.circular(15),
             boxShadow:
                 isSelected
                     ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.18 : 0.08,
+                        ),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -201,9 +230,7 @@ class _QrSegmentButton extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w700,
               color:
-                  isSelected
-                      ? theme.colorScheme.primary
-                      : Colors.white.withValues(alpha: 0.72),
+                  isSelected ? theme.colorScheme.primary : unselectedTextColor,
             ),
           ),
         ),

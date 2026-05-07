@@ -17,6 +17,8 @@ const _passcodeLength = 6;
 const _pinBoxSize = 48.0;
 const _pinBoxHeightExtra = 8.0;
 const _pinSeparatorWidth = 4.0;
+const _dialogInsetHorizontal = 40.0;
+const _dialogContentHorizontalPadding = 24.0;
 
 class _PasscodeDialogContent extends StatelessWidget {
   final List<Widget> children;
@@ -45,17 +47,25 @@ Widget _buildPasscodeInput({
   int shakeTrigger = 0,
   ValueChanged<String>? onChanged,
 }) {
-  return LayoutBuilder(
-    builder: (context, constraints) {
+  return Builder(
+    builder: (context) {
       final fallbackWidth =
           (_pinBoxSize * _passcodeLength) +
           (_pinSeparatorWidth * (_passcodeLength - 1));
-      final maxWidth =
-          constraints.maxWidth.isFinite ? constraints.maxWidth : fallbackWidth;
       final totalSeparatorWidth = _pinSeparatorWidth * (_passcodeLength - 1);
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final estimatedMaxWidth =
+          screenWidth -
+          (_dialogInsetHorizontal * 2) -
+          (_dialogContentHorizontalPadding * 2);
+      final maxWidth =
+          estimatedMaxWidth.isFinite && estimatedMaxWidth > 0
+              ? math.min(estimatedMaxWidth, fallbackWidth)
+              : fallbackWidth;
       final computedSize = (maxWidth - totalSeparatorWidth) / _passcodeLength;
-      final pinBoxSize = computedSize.clamp(36.0, _pinBoxSize).toDouble();
+      final pinBoxSize = computedSize.clamp(12.0, _pinBoxSize).toDouble();
       final pinBoxHeight = pinBoxSize + _pinBoxHeightExtra;
+      final inputWidth = (pinBoxSize * _passcodeLength) + totalSeparatorWidth;
       final baseFontSize = textStyle?.fontSize ?? 24;
       final maxFontSize = pinBoxSize * 0.5;
       final effectiveTextStyle = (textStyle ?? const TextStyle()).copyWith(
@@ -109,7 +119,7 @@ Widget _buildPasscodeInput({
               );
 
       return SizedBox(
-        width: double.infinity,
+        width: inputWidth,
         height: pinBoxHeight + 10,
         child: Align(alignment: Alignment.centerLeft, child: input),
       );

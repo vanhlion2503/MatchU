@@ -24,7 +24,10 @@ class MyQrTab extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
           children: [
-            _MyQrCard(controller: controller, user: user),
+            RepaintBoundary(
+              key: controller.qrBoundaryKey,
+              child: _MyQrCard(controller: controller, user: user),
+            ),
             const SizedBox(height: 18),
             _PrimaryQrActionButton(
               icon: Iconsax.share,
@@ -56,9 +59,10 @@ class _MyQrCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-                                            ? AppTheme.darkBorder
-                                            : AppTheme.lightBorder,
+        color:
+            theme.brightness == Brightness.dark
+                ? AppTheme.darkBorder
+                : AppTheme.lightBorder,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
         boxShadow: [
@@ -93,10 +97,7 @@ class _MyQrCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-          RepaintBoundary(
-            key: controller.qrBoundaryKey,
-            child: _QrCodeFrame(data: qrData),
-          ),
+          _QrCodeFrame(data: qrData),
           const SizedBox(height: 18),
           Text(
             'Quét mã này để thêm tôi làm bạn',

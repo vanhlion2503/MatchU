@@ -403,7 +403,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
                           _collapseLeftActions();
                         },
                         decoration: InputDecoration(
-                          hintText: "Nhập tin nhắn...",
+                          hintText: "Tin nhắn...",
                           isDense: true,
                           prefixIcon: GestureDetector(
                             onTap: () {

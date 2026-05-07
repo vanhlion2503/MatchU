@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,11 +9,11 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/services/qr/qr_image_saver.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:path_provider/path_provider.dart';
 
 class ProfileQrController extends GetxController with WidgetsBindingObserver {
   ProfileQrController();
@@ -27,6 +26,7 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
   static const int _scannerStartMaxRetries = 3;
 
   final UserService _userService = UserService();
+  final QrImageSaver _qrImageSaver = const QrImageSaver();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -227,16 +227,24 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
 
     isSavingQr.value = true;
     try {
-      final path = await _writeQrImageToFile();
-      await Clipboard.setData(ClipboardData(text: path));
+      final bytes = await _captureQrImageBytes();
+      final savedImage = await _qrImageSaver.savePng(
+        bytes: bytes,
+        fileName: _buildQrImageFileName(),
+      );
+
       _showSnack(
         title: 'Đã lưu ảnh QR',
-        message: 'Đường dẫn ảnh đã được sao chép vào bộ nhớ tạm.',
+        message:
+            savedImage.savedToGallery
+                ? 'Ảnh QR đã được lưu vào thư viện ảnh của máy.'
+                : 'Ảnh QR đã được lưu tại ${savedImage.location}.',
       );
     } catch (_) {
       _showSnack(
         title: 'Không lưu được ảnh',
-        message: 'Vui lòng mở lại tab Mã của tôi rồi thử lại.',
+        message:
+            'Vui lòng mở lại tab Mã của tôi và cấp quyền lưu ảnh nếu được hỏi.',
         isError: true,
       );
     } finally {
@@ -394,7 +402,9 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  Future<String> _writeQrImageToFile() async {
+  Future<Uint8List> _captureQrImageBytes() async {
+    await WidgetsBinding.instance.endOfFrame;
+
     final boundaryContext = qrBoundaryKey.currentContext;
     final renderObject = boundaryContext?.findRenderObject();
     if (renderObject is! RenderRepaintBoundary) {
@@ -407,14 +417,17 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
       throw StateError('Unable to encode QR image.');
     }
 
-    final directory = await getApplicationDocumentsDirectory();
-    final safeUid = currentUid.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '');
-    final file = File(
-      '${directory.path}${Platform.pathSeparator}matchu_qr_$safeUid.png',
+    return byteData.buffer.asUint8List(
+      byteData.offsetInBytes,
+      byteData.lengthInBytes,
     );
+  }
 
-    await file.writeAsBytes(byteData.buffer.asUint8List());
-    return file.path;
+  String _buildQrImageFileName() {
+    final safeUid = currentUid.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '');
+    final suffix = safeUid.isEmpty ? 'profile' : safeUid;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return 'matchu_qr_${suffix}_$timestamp.png';
   }
 
   void _showSnack({

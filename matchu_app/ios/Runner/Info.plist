@@ -6,6 +6,8 @@
 	<string>Cho phép dùng camera để chụp ảnh avatar, xác thực khuôn mặt và quét mã QR</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cho phép chọn ảnh avatar</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Cho phép lưu ảnh QR của bạn vào thư viện ảnh</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
