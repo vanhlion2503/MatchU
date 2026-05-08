@@ -161,12 +161,14 @@ class _QrCodeFrame extends StatelessWidget {
   const _QrCodeFrame({required this.data});
 
   final String data;
+  static const String _appIconAsset = 'assets/icon/IconApp.png';
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     const outerSize = 226.0;
     const qrSize = 200.0;
+    const centerLogoSize = 45.0;
 
     return SizedBox(
       width: outerSize,
@@ -189,21 +191,47 @@ class _QrCodeFrame extends StatelessWidget {
               color: Colors.black,
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Container(
-              color: Colors.white,
-              child: QrImageView(
-                data: data,
-                padding: const EdgeInsets.all(10),
-                backgroundColor: Colors.white,
-                eyeStyle: const QrEyeStyle(
-                  eyeShape: QrEyeShape.square,
-                  color: Colors.black,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  color: Colors.white,
+                  child: QrImageView(
+                    data: data,
+                    padding: const EdgeInsets.all(10),
+                    backgroundColor: Colors.white,
+                    errorCorrectionLevel: QrErrorCorrectLevel.H,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Colors.black,
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Colors.black,
+                    ),
+                  ),
                 ),
-                dataModuleStyle: const QrDataModuleStyle(
-                  dataModuleShape: QrDataModuleShape.square,
-                  color: Colors.black,
+                Container(
+                  width: centerLogoSize,
+                  height: centerLogoSize,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.asset(_appIconAsset, fit: BoxFit.cover),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
