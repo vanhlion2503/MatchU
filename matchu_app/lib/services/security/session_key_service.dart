@@ -20,6 +20,12 @@ class SessionKeyService {
   static final _auth = FirebaseAuth.instance;
   static final _storage = FlutterSecureStorage();
   static const int _keyCreationLockTtlMs = 20000;
+  static const int _activeDeviceWindowDays = 60;
+  static const int _maxSessionKeyDevicesPerUser = 5;
+  static const String _activeDeviceStatus = 'active';
+  static const String _inactiveDeviceStatus = 'inactive';
+  static const String _revokedDeviceStatus = 'revoked';
+  static const String _staleDeviceStatus = 'stale';
 
   static String get uid => _auth.currentUser!.uid;
   static final Map<String, StreamController<void>> _keyUpdateControllers = {};
@@ -788,11 +794,23 @@ class SessionKeyService {
     }
   }
 
-  static Future<List<_SessionDeviceInfo>> _getDevices(String uid) async {
+  static Future<List<_SessionDeviceInfo>> _getDevices(
+    String participantUid,
+  ) async {
     final snap =
-        await _db.collection('users').doc(uid).collection('devices').get();
+        await _db
+            .collection('users')
+            .doc(participantUid)
+            .collection('devices')
+            .get();
 
-    final devices = <_SessionDeviceInfo>[];
+    final currentDeviceId =
+        participantUid == uid ? await DeviceService.getDeviceId() : null;
+    final activeCutoff = DateTime.now().subtract(
+      const Duration(days: _activeDeviceWindowDays),
+    );
+    final eligibleDevices = <_SessionDeviceInfo>[];
+    final fallbackDevices = <_SessionDeviceInfo>[];
     var skippedInvalid = 0;
 
     for (final doc in snap.docs) {
@@ -804,18 +822,105 @@ class SessionKeyService {
         continue;
       }
 
-      devices.add(
-        _SessionDeviceInfo(deviceId: doc.id, publicKeyPem: publicKey.trim()),
+      final status = data["e2eeStatus"];
+      final statusValue = status is String ? status.trim() : null;
+      if (_isDeviceStatusBlocked(statusValue)) {
+        continue;
+      }
+
+      final lastActiveAt = _readDeviceLastActiveAt(data);
+      final isFresh =
+          lastActiveAt != null && lastActiveAt.isAfter(activeCutoff);
+      final isCurrentDevice = doc.id == currentDeviceId;
+
+      final device = _SessionDeviceInfo(
+        deviceId: doc.id,
+        publicKeyPem: publicKey.trim(),
+        lastActiveAt: lastActiveAt,
+        isCurrentDevice: isCurrentDevice,
       );
+
+      final isActiveDevice = statusValue == _activeDeviceStatus;
+      final isLegacyDevice = statusValue == null || statusValue.isEmpty;
+
+      if (isCurrentDevice ||
+          (isActiveDevice && (isFresh || lastActiveAt == null)) ||
+          (isLegacyDevice && isFresh)) {
+        eligibleDevices.add(device);
+      } else {
+        fallbackDevices.add(device);
+      }
     }
 
     if (skippedInvalid > 0) {
       print(
-        "Skipping $skippedInvalid invalid device docs for user $uid because publicKey is missing",
+        "Skipping $skippedInvalid invalid device docs for user $participantUid because publicKey is missing",
       );
     }
 
-    return devices;
+    if (eligibleDevices.isNotEmpty) {
+      return _limitSessionKeyDevices(eligibleDevices);
+    }
+
+    // Transitional fallback for existing users whose device docs do not yet
+    // have lifecycle fields. Keep this narrow to avoid recreating the old fanout.
+    return _limitSessionKeyDevices(fallbackDevices, fallbackLimit: 1);
+  }
+
+  static bool _isDeviceStatusBlocked(String? status) {
+    return status == _inactiveDeviceStatus ||
+        status == _revokedDeviceStatus ||
+        status == _staleDeviceStatus;
+  }
+
+  static DateTime? _readDeviceLastActiveAt(Map<String, dynamic> data) {
+    return _readTimestamp(data["lastE2eeActiveAt"]) ??
+        _readTimestamp(data["lastActiveAt"]) ??
+        _readTimestamp(data["notificationUpdatedAt"]) ??
+        _readTimestamp(data["fcmTokenUpdatedAt"]);
+  }
+
+  static DateTime? _readTimestamp(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  static List<_SessionDeviceInfo> _limitSessionKeyDevices(
+    List<_SessionDeviceInfo> devices, {
+    int fallbackLimit = _maxSessionKeyDevicesPerUser,
+  }) {
+    if (devices.isEmpty) return const [];
+
+    final sorted = List<_SessionDeviceInfo>.from(devices)
+      ..sort(_compareDeviceRecency);
+    final limit = min(fallbackLimit, _maxSessionKeyDevicesPerUser).toInt();
+    if (sorted.length <= limit) return sorted;
+
+    final limited = sorted.take(limit).toList();
+    _SessionDeviceInfo? currentDevice;
+    for (final device in sorted) {
+      if (device.isCurrentDevice) {
+        currentDevice = device;
+        break;
+      }
+    }
+
+    if (currentDevice != null &&
+        !limited.any((device) => device.deviceId == currentDevice!.deviceId)) {
+      limited[limited.length - 1] = currentDevice;
+    }
+    return limited;
+  }
+
+  static int _compareDeviceRecency(_SessionDeviceInfo a, _SessionDeviceInfo b) {
+    if (a.isCurrentDevice != b.isCurrentDevice) {
+      return a.isCurrentDevice ? -1 : 1;
+    }
+
+    final aMs = a.lastActiveAt?.millisecondsSinceEpoch ?? 0;
+    final bMs = b.lastActiveAt?.millisecondsSinceEpoch ?? 0;
+    return bMs.compareTo(aMs);
   }
 
   static Future<Set<String>> _getExistingSessionKeyDocIds({
@@ -850,8 +955,12 @@ class _SessionDeviceInfo {
   const _SessionDeviceInfo({
     required this.deviceId,
     required this.publicKeyPem,
+    required this.lastActiveAt,
+    required this.isCurrentDevice,
   });
 
   final String deviceId;
   final String publicKeyPem;
+  final DateTime? lastActiveAt;
+  final bool isCurrentDevice;
 }

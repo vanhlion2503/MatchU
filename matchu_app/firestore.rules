@@ -157,6 +157,11 @@ service cloud.firestore {
             "platform",
             "createdAt",
             "lastActiveAt",
+            "e2eeStatus",
+            "lastE2eeActiveAt",
+            "e2eeUpdatedAt",
+            "signedOutAt",
+            "revokedAt",
             "fcmToken",
             "fcmTokenUpdatedAt",
             "pushEnabled",
@@ -186,6 +191,31 @@ service cloud.firestore {
           && (
             !("lastActiveAt" in request.resource.data)
             || request.resource.data.lastActiveAt is timestamp
+          )
+          && (
+            !("e2eeStatus" in request.resource.data)
+            || request.resource.data.e2eeStatus in [
+              "active",
+              "inactive",
+              "revoked",
+              "stale"
+            ]
+          )
+          && (
+            !("lastE2eeActiveAt" in request.resource.data)
+            || request.resource.data.lastE2eeActiveAt is timestamp
+          )
+          && (
+            !("e2eeUpdatedAt" in request.resource.data)
+            || request.resource.data.e2eeUpdatedAt is timestamp
+          )
+          && (
+            !("signedOutAt" in request.resource.data)
+            || request.resource.data.signedOutAt is timestamp
+          )
+          && (
+            !("revokedAt" in request.resource.data)
+            || request.resource.data.revokedAt is timestamp
           )
           && (
             !("fcmToken" in request.resource.data)

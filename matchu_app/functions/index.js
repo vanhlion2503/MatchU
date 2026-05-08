@@ -15,6 +15,9 @@ const {
   dispatchQueuedChatNotification,
 } = require("./src/triggers/chatMessageNotifications");
 const {
+  cleanupStaleUserDevices,
+} = require("./src/triggers/deviceMaintenance");
+const {
   generateTelepathyAiInsight,
 } = require("./src/triggers/telepathyInsight");
 const {
@@ -38,6 +41,7 @@ exports.getReputationDailyState = getReputationDailyState;
 exports.claimReputationTask = claimReputationTask;
 exports.queueChatMessageNotification = queueChatMessageNotification;
 exports.dispatchQueuedChatNotification = dispatchQueuedChatNotification;
+exports.cleanupStaleUserDevices = cleanupStaleUserDevices;
 exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;

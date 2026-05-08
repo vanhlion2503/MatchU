@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -107,7 +108,12 @@ class AuthGateController extends GetxController {
     // ============================
     // 3️⃣ INIT SECURITY (E2EE, IDENTITY KEY…)
     // ============================
-    await IdentityKeyService.generateIfNotExists();
+    try {
+      await IdentityKeyService.generateIfNotExists();
+    } catch (e, st) {
+      debugPrint('Identity key setup skipped during auth gate: $e');
+      debugPrintStack(stackTrace: st);
+    }
 
     // ============================
     // 4️⃣ LOAD USER DOCUMENT

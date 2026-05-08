@@ -226,6 +226,10 @@ async function sendNotificationForQueue(queueData) {
 
   for (const doc of devicesSnap.docs) {
     const deviceData = doc.data() || {};
+    if (isDeviceInactiveForDelivery(deviceData)) {
+      continue;
+    }
+
     const token = cleanString(deviceData.fcmToken);
     if (!token) continue;
 
@@ -407,6 +411,11 @@ function truncateNotificationText(value) {
     return value;
   }
   return `${value.slice(0, MAX_NOTIFICATION_PREVIEW_LENGTH).trimEnd()}...`;
+}
+
+function isDeviceInactiveForDelivery(deviceData) {
+  const status = cleanString(deviceData.e2eeStatus);
+  return status === "inactive" || status === "revoked" || status === "stale";
 }
 
 async function computeSenderDelayMs(senderUid, nowMs) {

@@ -722,7 +722,12 @@ class AuthController extends GetxController {
       final anonAvatarC = Get.find<AnonymousAvatarController>();
       await anonAvatarC.load();
 
-      await IdentityKeyService.generateIfNotExists();
+      try {
+        await IdentityKeyService.generateIfNotExists();
+      } catch (e, st) {
+        debugPrint('Identity key setup skipped after profile save: $e');
+        debugPrintStack(stackTrace: st);
+      }
 
       Get.offAllNamed('/main');
     } catch (e) {

@@ -13,6 +13,7 @@ import 'package:pointycastle/export.dart';
 class IdentityKeyService {
   static final _storage = FlutterSecureStorage();
   static final _db = FirebaseFirestore.instance;
+  static const String _activeE2eeStatus = 'active';
 
   static String _privateKeyKey(String uid, String deviceId) =>
       'identity_${uid}_$deviceId';
@@ -55,10 +56,62 @@ class IdentityKeyService {
       publicPem = _extractPublicKeyFromPrivatePem(privatePem);
     }
 
-    await _ensureDeviceDoc(uid: uid, deviceId: deviceId, publicPem: publicPem);
+    try {
+      await _ensureDeviceDoc(
+        uid: uid,
+        deviceId: deviceId,
+        publicPem: publicPem,
+      );
+    } on FirebaseException catch (e) {
+      if (e.code != 'permission-denied') rethrow;
+      await _ensureLegacyDeviceDoc(
+        uid: uid,
+        deviceId: deviceId,
+        publicPem: publicPem,
+      );
+    }
   }
 
   static Future<void> _ensureDeviceDoc({
+    required String uid,
+    required String deviceId,
+    required String publicPem,
+  }) async {
+    final docRef = _db
+        .collection('users')
+        .doc(uid)
+        .collection('devices')
+        .doc(deviceId);
+    final snap = await docRef.get();
+
+    if (snap.exists) {
+      await docRef.set({
+        'publicKey': publicPem,
+        'algorithm': 'RSA-2048',
+        'platform': _platformName(),
+        'e2eeStatus': _activeE2eeStatus,
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'lastE2eeActiveAt': FieldValue.serverTimestamp(),
+        'e2eeUpdatedAt': FieldValue.serverTimestamp(),
+        'signedOutAt': FieldValue.delete(),
+        'revokedAt': FieldValue.delete(),
+      }, SetOptions(merge: true));
+      return;
+    }
+
+    await docRef.set({
+      'publicKey': publicPem,
+      'algorithm': 'RSA-2048',
+      'platform': _platformName(),
+      'e2eeStatus': _activeE2eeStatus,
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastActiveAt': FieldValue.serverTimestamp(),
+      'lastE2eeActiveAt': FieldValue.serverTimestamp(),
+      'e2eeUpdatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> _ensureLegacyDeviceDoc({
     required String uid,
     required String deviceId,
     required String publicPem,

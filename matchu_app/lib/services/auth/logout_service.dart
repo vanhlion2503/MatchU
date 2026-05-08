@@ -15,6 +15,7 @@ import '../../controllers/chat/chat_list_controller.dart';
 import '../../controllers/profile/profile_controller.dart';
 import '../../controllers/auth/avatar_controller.dart';
 import '../../services/user/presence_service.dart';
+import '../../services/security/device_service.dart';
 import '../../services/security/message_crypto_service.dart';
 
 class LogoutService {
@@ -70,6 +71,8 @@ class LogoutService {
               // Ignore - đã cố gắng hết cách
             }
           }
+
+          await _markCurrentDeviceInactive(uid);
         } catch (e) {
           // Ignore errors - continue with logout
         }
@@ -200,5 +203,25 @@ class LogoutService {
       debugPrint('Logout error: $e');
       return false;
     }
+  }
+
+  static Future<void> _markCurrentDeviceInactive(String uid) async {
+    try {
+      final deviceId = await DeviceService.getDeviceId();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('devices')
+          .doc(deviceId)
+          .set({
+            'e2eeStatus': 'inactive',
+            'signedOutAt': FieldValue.serverTimestamp(),
+            'e2eeUpdatedAt': FieldValue.serverTimestamp(),
+            'lastActiveAt': FieldValue.serverTimestamp(),
+            'pushEnabled': false,
+            'fcmToken': FieldValue.delete(),
+            'fcmTokenUpdatedAt': FieldValue.delete(),
+          }, SetOptions(merge: true));
+    } catch (_) {}
   }
 }
