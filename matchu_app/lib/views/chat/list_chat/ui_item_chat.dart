@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
@@ -22,7 +24,7 @@ Widget chatItem({
   final otherUid = room.participants.firstWhere((e) => e != myUid);
   final userCache = Get.find<ChatUserCacheController>();
 
-  userCache.loadIfNeeded(otherUid);
+  unawaited(userCache.loadIfNeeded(otherUid));
 
   return Obx(() {
     // 🔥 BẮT BUỘC đọc RxMap để Obx biết cần rebuild

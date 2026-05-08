@@ -7,29 +7,47 @@ class ChatUserCacheController extends GetxController {
 
   /// uid → cached user
   final RxMap<String, _CachedUser> _cache = <String, _CachedUser>{}.obs;
+  final Map<String, Future<UserModel?>> _pendingLoads = {};
+  int _generation = 0;
 
   final RxInt version = 0.obs;
 
   /// TTL: 5 phút
   static const Duration ttl = Duration(minutes: 5);
 
-
   /// =========================
   /// LOAD USER
   /// =========================
-  void loadIfNeeded(String uid) {
-    final cached = _cache[uid];
+  Future<UserModel?> loadIfNeeded(String uid) {
+    final normalizedUid = uid.trim();
+    if (normalizedUid.isEmpty) return Future.value(null);
+
+    final cached = _cache[normalizedUid];
 
     if (cached != null && !_isExpired(cached)) {
-      return;
+      return Future.value(cached.user);
     }
 
-    _service.getUser(uid).then((user) {
-      if (user != null) {
-        _cache[uid] = _CachedUser(user);
-        version.value++;
-      }
-    });
+    final pending = _pendingLoads[normalizedUid];
+    if (pending != null) return pending;
+
+    final generation = _generation;
+    final future = _service
+        .getUser(normalizedUid)
+        .then<UserModel?>((user) {
+          if (user != null && generation == _generation) {
+            _cache[normalizedUid] = _CachedUser(user);
+            version.value++;
+          }
+          return user;
+        })
+        .catchError((_) => null)
+        .whenComplete(() {
+          _pendingLoads.remove(normalizedUid);
+        });
+
+    _pendingLoads[normalizedUid] = future;
+    return future;
   }
 
   /// =========================
@@ -47,15 +65,23 @@ class ChatUserCacheController extends GetxController {
   /// =========================
   void cleanupExcept(Set<String> aliveUids) {
     final now = DateTime.now();
+    final beforeLength = _cache.length;
 
     _cache.removeWhere((uid, cached) {
       if (aliveUids.contains(uid)) return false;
       return now.difference(cached.cachedAt) > ttl;
     });
+
+    if (_cache.length != beforeLength) {
+      version.value++;
+    }
   }
 
   void clearAll() {
+    _generation++;
     _cache.clear();
+    _pendingLoads.clear();
+    version.value++;
   }
 
   bool _isExpired(_CachedUser cached) {

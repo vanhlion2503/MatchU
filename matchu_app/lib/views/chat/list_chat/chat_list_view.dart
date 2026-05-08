@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
+import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/list_chat/confirm_delete_chat.dart';
@@ -304,8 +308,7 @@ Widget _buildChatList({
             myUid: myUid,
             searchQuery: controller.searchText.value,
             onTap: () async {
-              await ChatService().markAsRead(room.id);
-              Get.toNamed(AppRouter.chat, arguments: {"roomId": room.id});
+              await _openChatRoom(context, room, myUid);
             },
           ),
         );
@@ -335,11 +338,45 @@ Widget _buildChatList({
           myUid: myUid,
           searchQuery: controller.searchText.value,
           onTap: () async {
-            await ChatService().markAsRead(room.id);
-            Get.toNamed(AppRouter.chat, arguments: {"roomId": room.id});
+            await _openChatRoom(context, room, myUid);
           },
         ),
       );
     },
   );
+}
+
+Future<void> _openChatRoom(
+  BuildContext context,
+  ChatRoomModel room,
+  String myUid,
+) async {
+  final otherUid = room.participants.firstWhere(
+    (uid) => uid != myUid,
+    orElse: () => "",
+  );
+
+  if (otherUid.isNotEmpty && Get.isRegistered<ChatUserCacheController>()) {
+    final userCache = Get.find<ChatUserCacheController>();
+    unawaited(userCache.loadIfNeeded(otherUid));
+
+    final avatarUrl = userCache.getUser(otherUid)?.avatarUrl ?? "";
+    if (avatarUrl.isNotEmpty) {
+      unawaited(
+        precacheImage(
+          CachedNetworkImageProvider(avatarUrl),
+          context,
+        ).catchError((_) {}),
+      );
+    }
+  }
+
+  await ChatService().markAsRead(room.id);
+
+  final args = <String, dynamic>{"roomId": room.id};
+  if (otherUid.isNotEmpty) {
+    args["otherUid"] = otherUid;
+  }
+
+  Get.toNamed(AppRouter.chat, arguments: args);
 }

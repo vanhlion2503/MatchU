@@ -22,8 +22,12 @@ import 'package:matchu_app/controllers/user/presence_controller.dart';
 
 class ChatController extends GetxController {
   final String roomId;
-  ChatController(this.roomId, {String? initialMessageId})
-    : _pendingFocusMessageId = _normalizeMessageId(initialMessageId);
+  ChatController(
+    this.roomId, {
+    String? initialMessageId,
+    String? initialOtherUid,
+  }) : _pendingFocusMessageId = _normalizeMessageId(initialMessageId),
+       otherUid = RxnString(_normalizeUserId(initialOtherUid));
 
   final RxDouble bottomBarHeight = 0.0.obs;
   bool _justSentMessage = false;
@@ -46,7 +50,7 @@ class ChatController extends GetxController {
   final ImagePicker _picker = ImagePicker();
 
   // ================= STATE =================
-  final otherUid = RxnString();
+  final RxnString otherUid;
 
   final isTyping = false.obs;
   final otherTyping = false.obs;
@@ -106,6 +110,12 @@ class ChatController extends GetxController {
   static const String viewOnceDeletedText = "Ảnh đã bị xóa";
 
   static String? _normalizeMessageId(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static String? _normalizeUserId(String? value) {
     if (value == null) return null;
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
@@ -178,13 +188,15 @@ class ChatController extends GetxController {
     final participants = List<String>.from(data["participants"]);
     final uidOther = participants.firstWhere((e) => e != uid);
 
-    otherUid.value = uidOther;
+    if (otherUid.value != uidOther) {
+      otherUid.value = uidOther;
+    }
     _listeningUid = uidOther;
 
     // 🔥 LISTEN PRESENCE Ở ĐÂY (CHUẨN)
     _presence.listen(uidOther);
 
-    Get.find<ChatUserCacheController>().loadIfNeeded(uidOther);
+    unawaited(Get.find<ChatUserCacheController>().loadIfNeeded(uidOther));
 
     _listenRoomTyping();
   }

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
+import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -123,9 +126,12 @@ class ProfileView extends StatelessWidget {
                           child: SizedBox(
                             height: kToolbarHeight,
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   IconButton(
                                     onPressed: () {
@@ -161,70 +167,12 @@ class ProfileView extends StatelessWidget {
                       right: 0,
                       child: Center(
                         child: Obx(() {
-                          final user = avatarC.user.value;
-                          return GestureDetector(
+                          final avatarUser = avatarC.user.value ?? c.user.value;
+                          return _ProfileAvatarButton(
+                            user: avatarUser,
+                            isUploading: avatarC.isUploadingAvatar.value,
+                            backgroundColor: theme.scaffoldBackgroundColor,
                             onTap: () => showAvatarBottomSheet(context),
-                            child: Stack(
-                              children: [
-                                CircleAvatar(
-                                  radius: 55,
-                                  backgroundColor:
-                                      theme.scaffoldBackgroundColor,
-                                  child: CircleAvatar(
-                                    radius: 50,
-                                    backgroundColor: Colors.grey.shade200,
-                                    backgroundImage:
-                                        user != null &&
-                                                user.avatarUrl.isNotEmpty
-                                            ? CachedNetworkImageProvider(
-                                              user.avatarUrl ==
-                                                      AvatarController
-                                                          .defaultAvatarUrl
-                                                  ? user
-                                                      .avatarUrl // Default placeholder: no cache-busting
-                                                  : "${user.avatarUrl}?v=${user.updatedAt?.millisecondsSinceEpoch ?? 0}",
-                                            )
-                                            : const AssetImage(
-                                              "assets/avatas/avataMd.png",
-                                            ),
-                                  ),
-                                ),
-
-                                // ICON CAMERA
-                                Positioned(
-                                  bottom: 4,
-                                  right: 4,
-                                  child: CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: AppTheme.primaryColor,
-                                    child: const Icon(
-                                      Iconsax.camera,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-
-                                // LOADING OVERLAY
-                                if (avatarC.isUploadingAvatar.value)
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.3,
-                                        ),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
                           );
                         }),
                       ),
@@ -458,4 +406,185 @@ class ProfileView extends StatelessWidget {
       }),
     );
   }
+}
+
+const _profileAvatarAsset = "assets/avatas/avataMd.png";
+const _profileAvatarSize = 100.0;
+const _profileAvatarCacheSize = 220;
+
+class _ProfileAvatarButton extends StatelessWidget {
+  const _ProfileAvatarButton({
+    required this.user,
+    required this.isUploading,
+    required this.backgroundColor,
+    required this.onTap,
+  });
+
+  final UserModel? user;
+  final bool isUploading;
+  final Color backgroundColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 55,
+            backgroundColor: backgroundColor,
+            child: CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.grey.shade200,
+              child: ClipOval(
+                child: SizedBox.square(
+                  dimension: _profileAvatarSize,
+                  child: _ProfileAvatarImage(user: user),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 4,
+            right: 4,
+            child: CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.primaryColor,
+              child: const Icon(Iconsax.camera, size: 16, color: Colors.white),
+            ),
+          ),
+          if (isUploading)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileAvatarImage extends StatefulWidget {
+  const _ProfileAvatarImage({this.user});
+
+  final UserModel? user;
+
+  @override
+  State<_ProfileAvatarImage> createState() => _ProfileAvatarImageState();
+}
+
+class _ProfileAvatarImageState extends State<_ProfileAvatarImage> {
+  String? _lastPrecachedKey;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheAvatar();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileAvatarImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user?.avatarUrl == widget.user?.avatarUrl &&
+        oldWidget.user?.avatarUpdatedAt == widget.user?.avatarUpdatedAt) {
+      return;
+    }
+    _precacheAvatar();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = widget.user;
+    if (!_hasCustomAvatar(user)) {
+      return _avatarAssetImage();
+    }
+
+    final imageUrl = _profileAvatarUrl(user!);
+    final cacheKey = _profileAvatarCacheKey(user);
+
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      cacheKey: cacheKey,
+      width: _profileAvatarSize,
+      height: _profileAvatarSize,
+      fit: BoxFit.cover,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      placeholderFadeInDuration: Duration.zero,
+      useOldImageOnUrlChange: true,
+      memCacheWidth: _profileAvatarCacheSize,
+      memCacheHeight: _profileAvatarCacheSize,
+      maxWidthDiskCache: _profileAvatarCacheSize,
+      maxHeightDiskCache: _profileAvatarCacheSize,
+      placeholder: (_, __) => _avatarAssetImage(),
+      errorWidget: (_, __, ___) => _avatarAssetImage(),
+    );
+  }
+
+  void _precacheAvatar() {
+    final user = widget.user;
+    if (!_hasCustomAvatar(user)) return;
+
+    final imageUrl = _profileAvatarUrl(user!);
+    final cacheKey = _profileAvatarCacheKey(user);
+    if (_lastPrecachedKey == cacheKey) return;
+    _lastPrecachedKey = cacheKey;
+
+    final provider = CachedNetworkImageProvider(
+      imageUrl,
+      cacheKey: cacheKey,
+      maxWidth: _profileAvatarCacheSize,
+      maxHeight: _profileAvatarCacheSize,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(precacheImage(provider, context).catchError((_) {}));
+    });
+  }
+}
+
+bool _hasCustomAvatar(UserModel? user) {
+  final avatarUrl = user?.avatarUrl.trim() ?? "";
+  return avatarUrl.isNotEmpty && avatarUrl != AvatarController.defaultAvatarUrl;
+}
+
+String _profileAvatarUrl(UserModel user) {
+  final avatarUrl = user.avatarUrl.trim();
+  final version = user.avatarUpdatedAt?.millisecondsSinceEpoch;
+  if (version == null) return avatarUrl;
+
+  final uri = Uri.tryParse(avatarUrl);
+  if (uri == null || !uri.hasScheme) return avatarUrl;
+
+  final queryParameters = Map<String, String>.from(uri.queryParameters);
+  queryParameters["v"] = version.toString();
+  return uri.replace(queryParameters: queryParameters).toString();
+}
+
+String _profileAvatarCacheKey(UserModel user) {
+  final avatarUrl = user.avatarUrl.trim();
+  final version = user.avatarUpdatedAt?.millisecondsSinceEpoch;
+  if (version == null) return "profile-avatar:${user.uid}:$avatarUrl";
+  return "profile-avatar:${user.uid}:$version:$avatarUrl";
+}
+
+Widget _avatarAssetImage() {
+  return Image.asset(
+    _profileAvatarAsset,
+    width: _profileAvatarSize,
+    height: _profileAvatarSize,
+    fit: BoxFit.cover,
+  );
 }

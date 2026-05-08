@@ -12,6 +12,7 @@ class UserModel {
   final String? gender;
   final String bio;
   final String avatarUrl;
+  final DateTime? avatarUpdatedAt;
 
   final List<String> interests; // Sở thích
 
@@ -64,6 +65,7 @@ class UserModel {
     this.gender,
     this.bio = "",
     this.avatarUrl = "",
+    this.avatarUpdatedAt,
 
     this.interests = const [],
 
@@ -120,6 +122,7 @@ class UserModel {
       "gender": gender,
       "bio": bio,
       "avatarUrl": avatarUrl,
+      "avatarUpdatedAt": avatarUpdatedAt?.toIso8601String(),
 
       "interests": interests,
 
@@ -196,6 +199,7 @@ class UserModel {
       gender: json["gender"],
       bio: json["bio"] ?? "",
       avatarUrl: json["avatarUrl"] ?? "",
+      avatarUpdatedAt: parseDate(json["avatarUpdatedAt"]),
 
       interests: List<String>.from(json["interests"] ?? []),
 
@@ -258,6 +262,7 @@ class UserModel {
     String? gender,
     String? bio,
     String? avatarUrl,
+    DateTime? avatarUpdatedAt,
 
     List<String>? interests,
 
@@ -310,6 +315,7 @@ class UserModel {
       gender: gender ?? this.gender,
       bio: bio ?? this.bio,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUpdatedAt: avatarUpdatedAt ?? this.avatarUpdatedAt,
 
       interests: interests ?? this.interests,
 

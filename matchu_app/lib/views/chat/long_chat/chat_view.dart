@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -23,12 +24,14 @@ class ChatView extends StatelessWidget {
             : const <String, dynamic>{};
     final roomId = (args["roomId"] ?? "").toString();
     final messageId = (args["messageId"] ?? "").toString().trim();
+    final initialOtherUid = (args["otherUid"] ?? "").toString().trim();
 
     // ✅ Controller theo room (tagged)
     final ChatController controller = Get.put(
       ChatController(
         roomId,
         initialMessageId: messageId.isEmpty ? null : messageId,
+        initialOtherUid: initialOtherUid.isEmpty ? null : initialOtherUid,
       ),
       tag: roomId,
     );
@@ -71,6 +74,8 @@ class ChatView extends StatelessWidget {
             return const Text("Đang tải...");
           }
 
+          unawaited(userCache.loadIfNeeded(otherUid));
+          userCache.version.value;
           final otherUser = userCache.getUser(otherUid);
           final online = presence.isOnline(otherUid);
 
@@ -84,48 +89,10 @@ class ChatView extends StatelessWidget {
             child: Row(
               children: [
                 /// ===== AVATAR =====
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 23,
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
-                      child: ClipOval(
-                        child: FadeInImage(
-                          width: 46,
-                          height: 46,
-                          fit: BoxFit.cover,
-                          placeholder: const AssetImage(
-                            'assets/avatas/avataMd.png',
-                          ),
-                          image:
-                              otherUser != null &&
-                                      otherUser.avatarUrl.isNotEmpty
-                                  ? NetworkImage(otherUser.avatarUrl)
-                                  : const AssetImage(
-                                        'assets/avatas/avataMd.png',
-                                      )
-                                      as ImageProvider,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: online ? Colors.green : Colors.grey,
-                          border: Border.all(
-                            color: theme.scaffoldBackgroundColor,
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                _ChatHeaderAvatar(
+                  avatarUrl: otherUser?.avatarUrl ?? "",
+                  online: online,
+                  theme: theme,
                 ),
 
                 const SizedBox(width: 10),
@@ -249,6 +216,83 @@ class ChatView extends StatelessWidget {
       ),
 
       body: SafeArea(child: ChatBody(controller: controller)),
+    );
+  }
+}
+
+class _ChatHeaderAvatar extends StatelessWidget {
+  const _ChatHeaderAvatar({
+    required this.avatarUrl,
+    required this.online,
+    required this.theme,
+  });
+
+  final String avatarUrl;
+  final bool online;
+  final ThemeData theme;
+
+  static const String _fallbackAsset = 'assets/avatas/avataMd.png';
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        CircleAvatar(
+          radius: 23,
+          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          child: ClipOval(child: _buildImage()),
+        ),
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: online ? Colors.green : Colors.grey,
+              border: Border.all(
+                color: theme.scaffoldBackgroundColor,
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImage() {
+    if (avatarUrl.isEmpty) {
+      return Image.asset(
+        _fallbackAsset,
+        width: 46,
+        height: 46,
+        fit: BoxFit.cover,
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: avatarUrl,
+      width: 46,
+      height: 46,
+      fit: BoxFit.cover,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      placeholder:
+          (_, __) => Image.asset(
+            _fallbackAsset,
+            width: 46,
+            height: 46,
+            fit: BoxFit.cover,
+          ),
+      errorWidget:
+          (_, __, ___) => Image.asset(
+            _fallbackAsset,
+            width: 46,
+            height: 46,
+            fit: BoxFit.cover,
+          ),
     );
   }
 }

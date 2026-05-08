@@ -18,8 +18,8 @@ class AvatarController extends GetxController {
   final user = Rxn<UserModel>();
   final isUploadingAvatar = false.obs;
 
-  static const String defaultAvatarUrl = "https://firebasestorage.googleapis.com/v0/b/matchu-5bd75.firebasestorage.app/o/avatars%2Fplaceholder.png?alt=media";
-
+  static const String defaultAvatarUrl =
+      "https://firebasestorage.googleapis.com/v0/b/matchu-5bd75.firebasestorage.app/o/avatars%2Fplaceholder.png?alt=media";
 
   // ===== SERVICES =====
   final _db = FirebaseFirestore.instance;
@@ -27,57 +27,59 @@ class AvatarController extends GetxController {
   final _picker = ImagePicker();
 
   StreamSubscription<DocumentSnapshot>? _userSub;
+  StreamSubscription<User?>? _authSub;
   String? get _uid => _auth.currentUser?.uid;
 
   // ================= INIT =================
   @override
   void onInit() {
     super.onInit();
-    FirebaseAuth.instance.authStateChanges().listen((u) {
+    _authSub = _auth.authStateChanges().listen((u) {
       if (u != null) {
-        _listenUserRealtime();
+        _listenUserRealtime(u.uid);
+      } else {
+        cleanup();
       }
     });
+
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      _listenUserRealtime(currentUser.uid);
+    }
   }
 
   // ================= LOAD USER =================
-  void _listenUserRealtime() {
+  void _listenUserRealtime([String? uid]) {
     _userSub?.cancel();
 
-    if (_auth.currentUser == null) return;
+    final targetUid = uid ?? _uid;
+    if (targetUid == null) return;
 
     _userSub = _db
         .collection("users")
-        .doc(_uid)
+        .doc(targetUid)
         .snapshots()
         .listen(
-      (snap) {
-        if (!snap.exists) return;
+          (snap) {
+            if (!snap.exists) return;
 
-        user.value = UserModel.fromJson(
-          snap.data()!,
-          snap.id,
+            user.value = UserModel.fromJson(snap.data()!, snap.id);
+          },
+          onError: (error) {
+            // 🔒 Handle permission denied và các lỗi khác
+            _userSub?.cancel();
+            _userSub = null;
+            user.value = null;
+          },
+          cancelOnError: false,
         );
-      },
-      onError: (error) {
-        // 🔒 Handle permission denied và các lỗi khác
-        _userSub?.cancel();
-        _userSub = null;
-        user.value = null;
-      },
-      cancelOnError: false,
-    );
   }
-
 
   // ================= PICK AVATAR =================
   Future<void> pickAvatar(ImageSource source) async {
     if (_auth.currentUser == null) return;
 
-    final picked = await _picker.pickImage(
-      source: source,
-      imageQuality: 100,
-    );
+    final picked = await _picker.pickImage(source: source, imageQuality: 100);
     if (picked == null) return;
 
     final cropped = await _crop(File(picked.path));
@@ -96,15 +98,8 @@ class AvatarController extends GetxController {
       aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
       compressFormat: ImageCompressFormat.jpg,
       uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Cắt ảnh',
-          lockAspectRatio: true,
-
-        ),
-        IOSUiSettings(
-          title: 'Cắt ảnh',
-          aspectRatioLockEnabled: true,
-        ),
+        AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
+        IOSUiSettings(title: 'Cắt ảnh', aspectRatioLockEnabled: true),
       ],
     );
 
@@ -135,14 +130,23 @@ class AvatarController extends GetxController {
 
     try {
       // 1️⃣ Upload storage
+      final avatarUpdatedAt = DateTime.now().toUtc();
       final avatarUrl = await AvatarService.uploadAvatar(file);
 
       if (_uid == null) return;
       // 2️⃣ Update Firestore
       await _db.collection("users").doc(_uid).update({
         "avatarUrl": avatarUrl,
+        "avatarUpdatedAt": Timestamp.fromDate(avatarUpdatedAt),
         "updatedAt": FieldValue.serverTimestamp(),
       });
+
+      user.value = user.value?.copyWith(
+        avatarUrl: avatarUrl,
+        avatarUpdatedAt: avatarUpdatedAt,
+        updatedAt: avatarUpdatedAt,
+      );
+      user.refresh();
 
       Get.snackbar("Thành công", "Cập nhật avatar thành công");
     } catch (e) {
@@ -163,14 +167,18 @@ class AvatarController extends GetxController {
       await AvatarService.deleteAvatar();
 
       // ✅ SET avatar mặc định
+      final avatarUpdatedAt = DateTime.now().toUtc();
       await _db.collection("users").doc(_uid).update({
         "avatarUrl": defaultAvatarUrl,
+        "avatarUpdatedAt": Timestamp.fromDate(avatarUpdatedAt),
         "updatedAt": FieldValue.serverTimestamp(),
       });
 
       // ✅ Update local state
       user.value = user.value?.copyWith(
         avatarUrl: defaultAvatarUrl,
+        avatarUpdatedAt: avatarUpdatedAt,
+        updatedAt: avatarUpdatedAt,
       );
       user.refresh();
 
@@ -181,7 +189,6 @@ class AvatarController extends GetxController {
       isUploadingAvatar.value = false;
     }
   }
-
 
   // ====================================================
   // 🔥 CLEANUP FOR LOGOUT
@@ -203,6 +210,8 @@ class AvatarController extends GetxController {
 
   @override
   void onClose() {
+    _authSub?.cancel();
+    _authSub = null;
     cleanup();
     super.onClose();
   }

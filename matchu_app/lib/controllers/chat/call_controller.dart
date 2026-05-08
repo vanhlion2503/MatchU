@@ -1015,7 +1015,7 @@ class CallController extends GetxController {
         peerAvatarUrl.value = cached.avatarUrl;
         return;
       }
-      cache.loadIfNeeded(uid);
+      unawaited(cache.loadIfNeeded(uid));
     }
 
     final user = await _userService.getUser(uid);

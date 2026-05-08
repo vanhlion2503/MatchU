@@ -89,7 +89,8 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
 
     for (final room in visible) {
       final otherUid = room.participants.firstWhere((e) => e != uid);
-      userCache.loadIfNeeded(otherUid);
+      aliveUids.add(otherUid);
+      unawaited(userCache.loadIfNeeded(otherUid));
       presence.listen(otherUid);
       visibleRoomIds.add(room.id);
       _ensureSessionKeyListener(room.id);
@@ -129,7 +130,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
 
     for (final room in rooms) {
       final otherUid = room.participants.firstWhere((e) => e != uid);
-      userCache.loadIfNeeded(otherUid);
+      unawaited(userCache.loadIfNeeded(otherUid));
     }
   }
 
@@ -158,7 +159,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
 
         final user = userCache.getUser(otherUid);
         if (user == null) {
-          userCache.loadIfNeeded(otherUid);
+          unawaited(userCache.loadIfNeeded(otherUid));
           return false;
         }
 
