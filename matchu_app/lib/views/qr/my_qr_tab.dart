@@ -65,10 +65,9 @@ class _MyQrCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
       decoration: BoxDecoration(
-        color:
-            theme.brightness == Brightness.dark
-                ? AppTheme.darkBorder
-                : AppTheme.lightBorder,
+        color: (theme.brightness == Brightness.dark
+        ? AppTheme.darkBorder
+        : AppTheme.lightBorder).withOpacity(0.45),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
         boxShadow: [

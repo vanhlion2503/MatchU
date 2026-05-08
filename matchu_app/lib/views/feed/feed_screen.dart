@@ -469,34 +469,29 @@ class _CreatePostFloatingButtonState extends State<_CreatePostFloatingButton>
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom:
-            widget.bottomInset +
-            _CreatePostFloatingButton._bottomPaddingWhenBottomBarHidden,
-      ),
-      child: AnimatedBuilder(
-        animation: _animation,
-        child: RepaintBoundary(
-          child: FloatingActionButton(
-            heroTag: 'feed_create_post_fab',
-            tooltip: 'Tao bai viet',
-            backgroundColor: widget.backgroundColor,
-            foregroundColor: widget.foregroundColor,
-            onPressed: widget.onPressed,
-            child: const Icon(Iconsax.edit_2),
-          ),
+    return AnimatedBuilder(
+      animation: _animation,
+      child: RepaintBoundary(
+        child: FloatingActionButton(
+          heroTag: 'feed_create_post_fab',
+          tooltip: 'Tao bai viet',
+          backgroundColor: widget.backgroundColor,
+          foregroundColor: widget.foregroundColor,
+          onPressed: widget.onPressed,
+          child: const Icon(Iconsax.edit_2),
         ),
-        builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(
-              0,
-              -_CreatePostFloatingButton._travelDistance * _animation.value,
-            ),
-            child: child,
-          );
-        },
       ),
+      builder: (context, child) {
+        final bottomPadding =
+            widget.bottomInset +
+            _CreatePostFloatingButton._bottomPaddingWhenBottomBarHidden +
+            _CreatePostFloatingButton._travelDistance * _animation.value;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: child,
+        );
+      },
     );
   }
 }
