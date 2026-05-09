@@ -2,9 +2,55 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+
+class FaceVerificationResult {
+  const FaceVerificationResult({
+    required this.success,
+    this.reason,
+    this.similarity,
+    this.threshold,
+    this.sessionId,
+    this.expiresAt,
+  });
+
+  final bool success;
+  final String? reason;
+  final double? similarity;
+  final double? threshold;
+  final String? sessionId;
+  final DateTime? expiresAt;
+
+  factory FaceVerificationResult.fromPayload(Map<String, dynamic>? payload) {
+    DateTime? parseDate(dynamic value) {
+      if (value is String && value.trim().isNotEmpty) {
+        return DateTime.tryParse(value.trim());
+      }
+      return null;
+    }
+
+    double? parseDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    return FaceVerificationResult(
+      success: payload?['success'] == true,
+      reason: payload?['reason']?.toString(),
+      similarity: parseDouble(payload?['similarity']),
+      threshold: parseDouble(payload?['threshold']),
+      sessionId: payload?['sessionId']?.toString(),
+      expiresAt: parseDate(payload?['expiresAt']),
+    );
+  }
+
+  static const failed = FaceVerificationResult(success: false);
+}
 
 class FaceVerificationService {
   FaceVerificationService({http.Client? client, String? baseUrl})
@@ -34,34 +80,68 @@ class FaceVerificationService {
     return _cloudRunBaseUrl;
   }
 
-  Uri _verifyUri() => Uri.parse('$_baseUrl/v1/face/verify');
+  Uri _enrollUri() => Uri.parse('$_baseUrl/v1/face/enroll');
+  Uri _reauthUri() => Uri.parse('$_baseUrl/v1/face/reauth');
 
   Future<bool> uploadVerification({
     required File selfieFile,
     required File liveFrameFile,
   }) async {
+    final result = await enrollVerification(
+      selfieFile: selfieFile,
+      liveFrameFile: liveFrameFile,
+    );
+    return result.success;
+  }
+
+  Future<FaceVerificationResult> enrollVerification({
+    required File selfieFile,
+    required File liveFrameFile,
+  }) async {
     if (!await selfieFile.exists() || !await liveFrameFile.exists()) {
       debugPrint('uploadVerification: selfie/live frame file does not exist.');
-      return false;
+      return FaceVerificationResult.failed;
     }
 
-    final selfiePart = await http.MultipartFile.fromPath(
-      'selfie',
-      selfieFile.path,
-      contentType: MediaType('image', 'jpeg'),
-    );
-    final liveFramePart = await http.MultipartFile.fromPath(
-      'live_frame',
-      liveFrameFile.path,
-      contentType: MediaType('image', 'jpeg'),
-    );
+    final headers = await _buildAuthenticatedHeaders();
+    if (headers == null) {
+      return FaceVerificationResult.failed;
+    }
 
     final request =
-        http.MultipartRequest('POST', _verifyUri())
-          ..headers['Accept'] = 'application/json'
-          ..files.add(selfiePart)
-          ..files.add(liveFramePart);
+        http.MultipartRequest('POST', _enrollUri())
+          ..headers.addAll(headers)
+          ..files.add(await _buildImagePart('selfie', selfieFile))
+          ..files.add(await _buildImagePart('live_frame', liveFrameFile));
 
+    return _sendMultipart(request, operation: 'enrollVerification');
+  }
+
+  Future<FaceVerificationResult> reauthenticate({
+    required File liveFrameFile,
+  }) async {
+    if (!await liveFrameFile.exists()) {
+      debugPrint('reauthenticate: live frame file does not exist.');
+      return FaceVerificationResult.failed;
+    }
+
+    final headers = await _buildAuthenticatedHeaders();
+    if (headers == null) {
+      return FaceVerificationResult.failed;
+    }
+
+    final request =
+        http.MultipartRequest('POST', _reauthUri())
+          ..headers.addAll(headers)
+          ..files.add(await _buildImagePart('live_frame', liveFrameFile));
+
+    return _sendMultipart(request, operation: 'reauthenticate');
+  }
+
+  Future<FaceVerificationResult> _sendMultipart(
+    http.MultipartRequest request, {
+    required String operation,
+  }) async {
     try {
       final streamedResponse = await _client
           .send(request)
@@ -76,32 +156,63 @@ class FaceVerificationService {
         }
       }
 
-      final success = payload?['success'] == true;
-      if (response.statusCode == 200 && success) {
-        return true;
+      final result = FaceVerificationResult.fromPayload(payload);
+      if (response.statusCode == 200 && result.success) {
+        return result;
       }
 
-      final reason = payload?['reason']?.toString();
+      final reason = result.reason;
       final detail = payload?['detail']?.toString();
       debugPrint(
-        'uploadVerification failed: status=${response.statusCode}, reason=$reason, detail=$detail',
+        '$operation failed: status=${response.statusCode}, reason=$reason, detail=$detail',
       );
-      return false;
+      return result;
     } on TimeoutException {
-      debugPrint(
-        'uploadVerification timeout after ${_requestTimeout.inSeconds}s',
-      );
-      return false;
+      debugPrint('$operation timeout after ${_requestTimeout.inSeconds}s');
+      return FaceVerificationResult.failed;
     } on SocketException catch (e) {
-      debugPrint('uploadVerification network error: $e');
-      return false;
+      debugPrint('$operation network error: $e');
+      return FaceVerificationResult.failed;
     } on FormatException catch (e) {
-      debugPrint('uploadVerification invalid response JSON: $e');
-      return false;
+      debugPrint('$operation invalid response JSON: $e');
+      return FaceVerificationResult.failed;
     } catch (e) {
-      debugPrint('uploadVerification unexpected error: $e');
-      return false;
+      debugPrint('$operation unexpected error: $e');
+      return FaceVerificationResult.failed;
     }
+  }
+
+  Future<Map<String, String>?> _buildAuthenticatedHeaders() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final idToken = await user?.getIdToken();
+    if (idToken == null || idToken.isEmpty) {
+      debugPrint('Face verification requires an authenticated Firebase user.');
+      return null;
+    }
+
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    };
+
+    try {
+      final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      if (appCheckToken != null && appCheckToken.isNotEmpty) {
+        headers['X-Firebase-AppCheck'] = appCheckToken;
+      }
+    } catch (e) {
+      debugPrint('Firebase App Check token unavailable: $e');
+    }
+
+    return headers;
+  }
+
+  Future<http.MultipartFile> _buildImagePart(String fieldName, File file) {
+    return http.MultipartFile.fromPath(
+      fieldName,
+      file.path,
+      contentType: MediaType('image', 'jpeg'),
+    );
   }
 
   void dispose() {

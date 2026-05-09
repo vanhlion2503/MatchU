@@ -185,7 +185,6 @@ class AuthService {
 
       "role": "user",
       "isProfileCompleted": false,
-      "isFaceVerified": false,
       "anonymousAvatar": null,
 
       "lastActiveAt": FieldValue.serverTimestamp(),
@@ -201,6 +200,7 @@ class AuthService {
         "reputationTodayClaimed": 0,
         "reputationTodayCap": 10,
         "reputationLastClaimAt": null,
+        "isFaceVerified": false,
       });
     }
 

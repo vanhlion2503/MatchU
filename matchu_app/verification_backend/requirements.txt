@@ -5,3 +5,5 @@ opencv-python-headless
 onnxruntime
 insightface
 python-multipart
+firebase-admin
+cryptography

@@ -517,13 +517,13 @@ class FaceVerificationController extends GetxController
       state.value = VerificationState.processing;
       instructionText.value = "Đang xử lý dữ liệu khuôn mặt ...";
 
-      final isVerified = await _verificationService.uploadVerification(
+      final verificationResult = await _verificationService.enrollVerification(
         selfieFile: selfie,
         liveFrameFile: savedFrame,
       );
 
-      if (isVerified) {
-        await _markCurrentUserVerified();
+      if (verificationResult.success) {
+        await _syncCurrentUserVerifiedState();
         state.value = VerificationState.success;
         instructionText.value = "Xác thực thành công";
       } else {
@@ -541,6 +541,8 @@ class FaceVerificationController extends GetxController
       state.value = VerificationState.failed;
       errorText.value = "Xác thực khuôn mặt thất bại. Vui lòng thử lại.";
       instructionText.value = errorText.value;
+    } finally {
+      await _deleteTemporaryFaceFiles();
     }
   }
 
@@ -548,18 +550,11 @@ class FaceVerificationController extends GetxController
     await _stopImageStream();
     await _disposeCameraOnly();
     await _disposeDetectorOnly();
+    await _deleteTemporaryFaceFiles();
   }
 
   Future<void> retryVerification() async {
-    if (wasAlreadyVerifiedAtEntry.value) {
-      hasStartedVerificationFlow.value = false;
-      state.value = VerificationState.success;
-      instructionText.value = "Tài khoản đã xác thực khuôn mặt";
-      errorText.value = "";
-      return;
-    }
-    selfieFile = null;
-    liveFrameFile = null;
+    await _deleteTemporaryFaceFiles();
     hasStartedVerificationFlow.value = true;
     _resetLivenessSequence(updateInstruction: false);
     state.value = VerificationState.idle;
@@ -994,16 +989,42 @@ class FaceVerificationController extends GetxController
     }
   }
 
-  Future<void> _markCurrentUserVerified() async {
+  Future<void> _syncCurrentUserVerifiedState() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
       throw Exception("User chua dang nhap.");
     }
-    await _db.collection("users").doc(uid).set({
-      "isFaceVerified": true,
-      "updatedAt": FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+
+    try {
+      final snapshot = await _db.collection("users").doc(uid).get();
+      if (snapshot.data()?["isFaceVerified"] != true) {
+        debugPrint(
+          "Face enrollment succeeded but user document is not marked verified yet.",
+        );
+      }
+    } catch (e) {
+      debugPrint("Unable to refresh face verification state: $e");
+    }
     isAlreadyVerified.value = true;
+  }
+
+  Future<void> _deleteTemporaryFaceFiles() async {
+    final files = <File?>[selfieFile, liveFrameFile];
+    selfieFile = null;
+    liveFrameFile = null;
+
+    for (final file in files) {
+      if (file == null) {
+        continue;
+      }
+      try {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e) {
+        debugPrint("delete temporary face file error: $e");
+      }
+    }
   }
 
   Future<XFile> _safeTakePicture(CameraController camera) async {

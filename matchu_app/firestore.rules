@@ -90,6 +90,15 @@ service cloud.firestore {
         ]);
       }
 
+      function touchesServerManagedFaceVerificationFields() {
+        return request.resource.data.diff(resource.data).changedKeys().hasAny([
+          "isFaceVerified",
+          "faceVerifiedAt",
+          "faceVerificationVersion",
+          "faceEnrollmentId"
+        ]);
+      }
+
       function isValidReputationCreateDefaults() {
         return (
           !("reputation" in request.resource.data)
@@ -125,12 +134,35 @@ service cloud.firestore {
         );
       }
 
+      function isValidFaceVerificationCreateDefaults() {
+        return (
+          !("isFaceVerified" in request.resource.data)
+          || request.resource.data.isFaceVerified == false
+        )
+        && (
+          !("faceVerifiedAt" in request.resource.data)
+          || request.resource.data.faceVerifiedAt == null
+        )
+        && (
+          !("faceVerificationVersion" in request.resource.data)
+          || request.resource.data.faceVerificationVersion == null
+        )
+        && (
+          !("faceEnrollmentId" in request.resource.data)
+          || request.resource.data.faceEnrollmentId == null
+        );
+      }
+
       function isOwnerSafeCreate() {
-        return isOwner() && isValidReputationCreateDefaults();
+        return isOwner()
+          && isValidReputationCreateDefaults()
+          && isValidFaceVerificationCreateDefaults();
       }
 
       function isOwnerSafeUpdate() {
-        return isOwner() && !touchesServerManagedReputationFields();
+        return isOwner()
+          && !touchesServerManagedReputationFields()
+          && !touchesServerManagedFaceVerificationFields();
       }
 
       allow read: if isSignedIn();
@@ -299,6 +331,15 @@ service cloud.firestore {
 
     match /users/{userId}/sessionKeyBackups/{roomId}/keys/{keyId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Biometric templates and short-lived re-auth sessions are server-only.
+    match /faceEnrollments/{userId} {
+      allow read, write: if false;
+    }
+
+    match /faceReauthSessions/{sessionId} {
+      allow read, write: if false;
     }
 
     // ================= POSTS / SOCIAL FEED =================

@@ -101,7 +101,7 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 wasAlreadyVerifiedAtEntry
-                    ? 'Tài khoản của bạn đã xác thực trước đó. Bạn không cần xác thực lại.'
+                    ? 'Tài khoản của bạn đã xác thực. Bạn có thể cập nhật dữ liệu khuôn mặt bảo mật để dùng cho các bước xác thực lại sau này.'
                     : 'Hồ sơ của bạn đã được xác minh danh tính an toàn.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,
@@ -134,13 +134,15 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
                   child: const Text('Tiếp tục trải nghiệm'),
                 ),
               ),
-              if (!wasAlreadyVerifiedAtEntry) ...[
-                const SizedBox(height: 6),
-                TextButton(
-                  onPressed: onRetry,
-                  child: const Text('Xác thực lại'),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: onRetry,
+                child: Text(
+                  wasAlreadyVerifiedAtEntry
+                      ? 'Cập nhật dữ liệu xác thực'
+                      : 'Xác thực lại',
                 ),
-              ],
+              ),
               const SizedBox(height: 10),
             ],
           ),
@@ -179,10 +181,7 @@ class _BenefitTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: AppTheme.primaryColor,
-          ),
+          Icon(icon, color: AppTheme.primaryColor),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -200,7 +199,7 @@ class _BenefitTile extends StatelessWidget {
                   subtitle,
                   style: textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface.withOpacity(0.6),
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],

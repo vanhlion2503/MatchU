@@ -42,7 +42,10 @@ class Settings:
     app_name: str
     app_version: str
     similarity_threshold: float
+    reauth_similarity_threshold: float
+    reauth_session_ttl_minutes: int
     max_upload_size_mb: int
+    face_model_version: str
     insightface_model_name: str
     insightface_ctx_id: int
     insightface_det_size: int
@@ -60,7 +63,10 @@ def get_settings() -> Settings:
         app_name=os.getenv("APP_NAME", "MatchU Verification Backend"),
         app_version=os.getenv("APP_VERSION", "0.1.0"),
         similarity_threshold=_env_float("SIMILARITY_THRESHOLD", 0.65, min_value=0.0, max_value=1.0),
+        reauth_similarity_threshold=_env_float("REAUTH_SIMILARITY_THRESHOLD", 0.65, min_value=0.0, max_value=1.0),
+        reauth_session_ttl_minutes=_env_int("REAUTH_SESSION_TTL_MINUTES", 5, min_value=1),
         max_upload_size_mb=_env_int("MAX_UPLOAD_SIZE_MB", 10, min_value=1),
+        face_model_version=os.getenv("FACE_MODEL_VERSION", "insightface-buffalo_l-v1"),
         insightface_model_name=os.getenv("INSIGHTFACE_MODEL_NAME", "buffalo_l"),
         insightface_ctx_id=_env_int("INSIGHTFACE_CTX_ID", -1),
         insightface_det_size=_env_int("INSIGHTFACE_DET_SIZE", 640, min_value=64),
