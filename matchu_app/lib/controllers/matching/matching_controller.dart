@@ -20,6 +20,15 @@ class MatchingController extends GetxController {
   static const String _dailyMatchingCountField = 'dailyMatchingCount';
   static const String _dailyMatchingDateField = 'dailyMatchingDate';
   static const String _matchingRoute = '/matching';
+  static const Set<String> _verifiedStatuses = {
+    'verified',
+    'approved',
+    'passed',
+    'success',
+    'completed',
+    'complete',
+    'done',
+  };
 
   final isSearching = false.obs;
   final isMatched = false.obs;
@@ -124,9 +133,118 @@ class MatchingController extends GetxController {
     return fallback;
   }
 
+  Map<String, dynamic>? _asStringDynamicMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, item) => MapEntry(key.toString(), item));
+    }
+    return null;
+  }
+
+  String _normalizeStatus(dynamic value) {
+    return (value?.toString() ?? '').trim().toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
+  }
+
+  bool _isVerifiedStatus(dynamic value) {
+    final normalized = _normalizeStatus(value);
+    if (normalized.isEmpty) return false;
+    return _verifiedStatuses.contains(normalized);
+  }
+
+  bool _hasAnyTruthyFlag(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      if (_parseBool(data[key])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _hasAnyVerifiedStatus(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      if (_isVerifiedStatus(data[key])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _hasAnyNonNull(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      if (data[key] != null) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isAccountVerified(Map<String, dynamic> data) {
+    if (_hasAnyTruthyFlag(data, const [
+      'isFaceVerified',
+      'isVerified',
+      'verified',
+      'isAccountVerified',
+      'accountVerified',
+      'identityVerified',
+      'isIdentityVerified',
+      'kycVerified',
+      'isKycVerified',
+    ])) {
+      return true;
+    }
+
+    if (_hasAnyVerifiedStatus(data, const [
+      'verificationStatus',
+      'accountVerificationStatus',
+      'identityVerificationStatus',
+      'faceVerificationStatus',
+      'accountStatus',
+    ])) {
+      return true;
+    }
+
+    if (_hasAnyNonNull(data, const [
+      'faceVerifiedAt',
+      'verifiedAt',
+      'accountVerifiedAt',
+      'identityVerifiedAt',
+    ])) {
+      return true;
+    }
+
+    final verification = _asStringDynamicMap(data['verification']);
+    if (verification != null) {
+      if (_hasAnyTruthyFlag(verification, const [
+        'isVerified',
+        'verified',
+        'isFaceVerified',
+        'accountVerified',
+        'identityVerified',
+      ])) {
+        return true;
+      }
+
+      if (_hasAnyVerifiedStatus(verification, const ['status', 'state'])) {
+        return true;
+      }
+
+      if (_hasAnyNonNull(verification, const [
+        'verifiedAt',
+        'faceVerifiedAt',
+        'accountVerifiedAt',
+      ])) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   MatchingQuotaPreview _buildQuotaPreviewFromData(Map<String, dynamic> data) {
-    final isFaceVerified = _parseBool(data['isFaceVerified']);
-    if (isFaceVerified) {
+    if (_isAccountVerified(data)) {
       return const MatchingQuotaPreview(
         isUnlimited: true,
         used: 0,
