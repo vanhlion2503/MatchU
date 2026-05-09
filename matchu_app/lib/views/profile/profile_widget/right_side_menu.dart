@@ -4,6 +4,8 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart'; // nhớ import
 
+import 'package:matchu_app/routes/app_router.dart';
+
 class RightSideMenu {
   static void open(BuildContext context) {
     final authC = Get.find<AuthController>(); // ⬅️ THÊM DÒNG NÀY
@@ -62,6 +64,17 @@ class RightSideMenu {
                                   text: "Tài khoản & Bảo mật",
                                   onTap: () {
                                     Get.toNamed("/account-security");
+                                  },
+                                ),
+                                menuItem(
+                                  icon: Iconsax.scan,
+                                  text: "Mã của tôi",
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed(
+                                      AppRouter.profileQr,
+                                      arguments: {'initialTab': 1},
+                                    );
                                   },
                                 ),
                                 menuItem(

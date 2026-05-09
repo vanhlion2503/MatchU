@@ -6,9 +6,9 @@ import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:get/get.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/utils/highlight_text.dart';
+import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 Widget chatItem({
@@ -52,19 +52,7 @@ Widget chatItem({
                 children: [
                   Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundImage:
-                            otherUser != null && otherUser.avatarUrl.isNotEmpty
-                                ? CachedNetworkImageProvider(
-                                  otherUser.avatarUrl,
-                                )
-                                : null,
-                        child:
-                            otherUser == null || otherUser.avatarUrl.isEmpty
-                                ? const Icon(Icons.person)
-                                : null,
-                      ),
+                      UserAvatar(userId: otherUid, radius: 30),
                       Positioned(
                         bottom: 2,
                         right: 2,

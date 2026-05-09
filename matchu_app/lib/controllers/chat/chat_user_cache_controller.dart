@@ -29,21 +29,35 @@ class ChatUserCacheController extends GetxController {
     }
 
     final pending = _pendingLoads[normalizedUid];
-    if (pending != null) return pending;
+    if (pending != null) {
+      return pending.then((user) => user ?? cached?.user);
+    }
 
     final generation = _generation;
-    final future = _service
+    late final Future<UserModel?> future;
+    future = _service
         .getUser(normalizedUid)
         .then<UserModel?>((user) {
-          if (user != null && generation == _generation) {
+          if (generation != _generation) {
+            return null;
+          }
+
+          if (user != null) {
             _cache[normalizedUid] = _CachedUser(user);
             version.value++;
+            return user;
           }
-          return user;
+
+          return cached?.user;
         })
-        .catchError((_) => null)
+        .catchError((_) {
+          if (generation != _generation) return null;
+          return cached?.user;
+        })
         .whenComplete(() {
-          _pendingLoads.remove(normalizedUid);
+          if (identical(_pendingLoads[normalizedUid], future)) {
+            _pendingLoads.remove(normalizedUid);
+          }
         });
 
     _pendingLoads[normalizedUid] = future;
@@ -54,9 +68,11 @@ class ChatUserCacheController extends GetxController {
   /// GET USER
   /// =========================
   UserModel? getUser(String uid) {
-    final cached = _cache[uid];
+    final cached = _cache[uid.trim()];
     if (cached == null) return null;
-    if (_isExpired(cached)) return null;
+
+    // Keep showing the last known user while an expired entry refreshes.
+    // Otherwise every chat row loses its avatar at the same TTL boundary.
     return cached.user;
   }
 

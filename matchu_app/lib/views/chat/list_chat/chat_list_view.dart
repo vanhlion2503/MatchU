@@ -20,6 +20,34 @@ import 'package:matchu_app/views/chat/list_chat/swipe_chat_item.dart';
 import 'package:matchu_app/views/chat/list_chat/ui_item_chat.dart';
 
 const _chatListMainTabIndex = 3;
+const _currentUserAvatarSize = 48.0;
+
+Widget _currentUserAvatarImage(BuildContext context, String avatarUrl) {
+  final fallback = _currentUserAvatarFallback();
+
+  if (avatarUrl.isEmpty) {
+    return fallback;
+  }
+
+  return CachedNetworkImage(
+    imageUrl: avatarUrl,
+    width: _currentUserAvatarSize,
+    height: _currentUserAvatarSize,
+    fit: BoxFit.cover,
+    fadeInDuration: Duration.zero,
+    fadeOutDuration: Duration.zero,
+    placeholder: (_, __) => fallback,
+    errorWidget: (_, __, ___) => fallback,
+  );
+}
+
+Widget _currentUserAvatarFallback() {
+  return const SizedBox(
+    width: _currentUserAvatarSize,
+    height: _currentUserAvatarSize,
+    child: Center(child: Icon(Icons.person, size: 18)),
+  );
+}
 
 class ChatListView extends StatefulWidget {
   final bool embedInMainNavigation;
@@ -131,15 +159,10 @@ class _ChatListViewState extends State<ChatListView>
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                    backgroundImage:
-                        avatarU.isNotEmpty
-                            ? CachedNetworkImageProvider(avatarU)
-                            : null,
-                    child:
-                        avatarU.isEmpty
-                            ? const Icon(Icons.person, size: 18)
-                            : null,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    child: ClipOval(
+                      child: _currentUserAvatarImage(context, avatarU),
+                    ),
                   ),
                   Positioned(
                     bottom: 1,

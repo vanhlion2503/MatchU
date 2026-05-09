@@ -69,6 +69,7 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
   @override
   void onInit() {
     super.onInit();
+    selectedTabIndex.value = _resolveInitialTabIndex(Get.arguments);
     WidgetsBinding.instance.addObserver(this);
     _loadFallbackUserIfNeeded();
   }
@@ -100,6 +101,24 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
 
   static String buildProfileQrPayload(String uid) {
     return '$_scheme://$_profileHost/${Uri.encodeComponent(uid)}';
+  }
+
+  int _resolveInitialTabIndex(dynamic args) {
+    final rawIndex =
+        args is Map ? args['initialTab'] ?? args['tabIndex'] : args;
+
+    if (rawIndex is int && (rawIndex == 0 || rawIndex == 1)) {
+      return rawIndex;
+    }
+
+    if (rawIndex is String) {
+      final parsedIndex = int.tryParse(rawIndex);
+      if (parsedIndex != null && (parsedIndex == 0 || parsedIndex == 1)) {
+        return parsedIndex;
+      }
+    }
+
+    return 0;
   }
 
   void changeTab(int index) {
