@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
+import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/feed/widgets/comment_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
@@ -53,6 +55,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
     _controller = Get.put(
       PostCommentsController(
         postId: widget.post.postId,
+        postAuthorId: widget.post.authorId,
         onCommentCountChanged: widget.onCommentCountChanged,
         initialCommentCount: widget.post.stats.commentCount,
       ),
@@ -85,6 +88,27 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
     }
 
     _controller.loadMoreComments();
+  }
+
+  Future<void> _openCommentActionSheet(PostCommentModel comment) {
+    return CommentActionSheet.show(
+      context,
+      canEdit: _controller.canEditComment(comment),
+      onEditTap:
+          _controller.canEditComment(comment)
+              ? () async => _controller.startEdit(comment)
+              : null,
+      canDelete: _controller.canDeleteComment(comment),
+      onDeleteTap:
+          _controller.canDeleteComment(comment)
+              ? () => _controller.deleteComment(comment)
+              : null,
+      canHide: _controller.canHideComment(comment),
+      onHideTap:
+          _controller.canHideComment(comment)
+              ? () => _controller.hideComment(comment)
+              : null,
+    );
   }
 
   @override
@@ -246,6 +270,12 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                     () => _controller.toggleReplies(
                                       entry.comment,
                                     ),
+                                onMoreTap:
+                                    _controller.hasCommentActions(entry.comment)
+                                        ? () => _openCommentActionSheet(
+                                          entry.comment,
+                                        )
+                                        : null,
                               ),
                             );
                           },
@@ -258,11 +288,37 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
               const Divider(height: 1),
               Obx(() {
                 final replyingTo = _controller.replyingTo.value;
+                final editingComment = _controller.editingComment.value;
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (replyingTo != null)
+                    if (editingComment != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                        color: theme.colorScheme.surface.withValues(alpha: 0.8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Đang chỉnh sửa bình luận',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _controller.cancelEdit,
+                              icon: const Icon(Iconsax.close_circle),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (replyingTo != null)
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -316,8 +372,11 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                 maxLines: 4,
                                 onTapOutside:
                                     (_) => _controller.dismissComposer(),
-                                decoration: const InputDecoration(
-                                  hintText: 'Nhập bình luận...',
+                                decoration: InputDecoration(
+                                  hintText:
+                                      editingComment != null
+                                          ? 'Chỉnh sửa bình luận...'
+                                          : 'Nhập bình luận...',
                                 ),
                                 onSubmitted: (_) => _controller.submitComment(),
                               ),

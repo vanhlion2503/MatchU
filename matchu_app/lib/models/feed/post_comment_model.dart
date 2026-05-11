@@ -58,7 +58,11 @@ class PostCommentModel {
     required this.likeCount,
     required this.replyCount,
     this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+    this.deletedBy,
     this.author,
+    this.isEdited = false,
     this.isLiked = false,
     this.isLikePending = false,
     this.isSending = false,
@@ -71,7 +75,11 @@ class PostCommentModel {
   final int likeCount;
   final int replyCount;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  final String? deletedBy;
   final PostCommentAuthorModel? author;
+  final bool isEdited;
 
   // Local UI state, not stored in Firestore.
   final bool isLiked;
@@ -79,6 +87,7 @@ class PostCommentModel {
   final bool isSending;
 
   bool get isReply => parentId != null && parentId!.trim().isNotEmpty;
+  bool get isDeleted => deletedAt != null;
 
   factory PostCommentModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     return PostCommentModel.fromJson(doc.data() ?? <String, dynamic>{}, doc.id);
@@ -96,6 +105,10 @@ class PostCommentModel {
       likeCount: _parseInt(json['likeCount']),
       replyCount: _parseInt(json['replyCount']),
       createdAt: _parseDateTime(json['createdAt']),
+      updatedAt: _parseDateTime(json['updatedAt']),
+      deletedAt: _parseDateTime(json['deletedAt']),
+      deletedBy: _parseNullableString(json['deletedBy']),
+      isEdited: json['isEdited'] == true,
     );
   }
 
@@ -108,6 +121,10 @@ class PostCommentModel {
       'likeCount': likeCount,
       'replyCount': replyCount,
       'createdAt': createdAt,
+      'updatedAt': updatedAt,
+      'deletedAt': deletedAt,
+      'deletedBy': deletedBy,
+      'isEdited': isEdited,
     };
   }
 
@@ -119,7 +136,11 @@ class PostCommentModel {
     int? likeCount,
     int? replyCount,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+    String? deletedBy,
     PostCommentAuthorModel? author,
+    bool? isEdited,
     bool? isLiked,
     bool? isLikePending,
     bool? isSending,
@@ -132,7 +153,11 @@ class PostCommentModel {
       likeCount: likeCount ?? this.likeCount,
       replyCount: replyCount ?? this.replyCount,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deletedBy: deletedBy ?? this.deletedBy,
       author: author ?? this.author,
+      isEdited: isEdited ?? this.isEdited,
       isLiked: isLiked ?? this.isLiked,
       isLikePending: isLikePending ?? this.isLikePending,
       isSending: isSending ?? this.isSending,
@@ -148,6 +173,12 @@ class PostCommentModel {
   }
 
   static String? _parseParentId(dynamic value) {
+    if (value == null) return null;
+    final normalized = value.toString().trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static String? _parseNullableString(dynamic value) {
     if (value == null) return null;
     final normalized = value.toString().trim();
     return normalized.isEmpty ? null : normalized;

@@ -69,6 +69,7 @@ class PostDetailController extends GetxController {
     commentsController = Get.put(
       PostCommentsController(
         postId: args.post.postId,
+        postAuthorId: args.post.authorId,
         onCommentCountChanged: adjustCommentCount,
         initialCommentCount: args.post.stats.commentCount,
       ),

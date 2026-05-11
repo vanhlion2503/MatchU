@@ -16,6 +16,7 @@ class CommentTreeItem extends StatelessWidget {
     required this.onReplyTap,
     required this.onToggleRepliesTap,
     this.isReplyLoading = false,
+    this.onMoreTap,
   });
 
   final CommentThreadEntry entry;
@@ -23,18 +24,21 @@ class CommentTreeItem extends StatelessWidget {
   final VoidCallback onReplyTap;
   final VoidCallback onToggleRepliesTap;
   final bool isReplyLoading;
+  final VoidCallback? onMoreTap;
 
   @override
   Widget build(BuildContext context) {
     final comment = entry.comment;
     final author = comment.author;
     final theme = Theme.of(context);
+    final isDeleted = comment.isDeleted;
     final depth = math.min(entry.depth, 4);
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
-    final avatarUrl = author?.avatarUrl ?? '';
-    final displayName = author?.displayName ?? 'Người dùng';
-    final nickname = author?.nickname ?? '';
+    final avatarUrl = isDeleted ? '' : author?.avatarUrl ?? '';
+    final displayName =
+        isDeleted ? 'Bình luận đã xóa' : author?.displayName ?? 'Người dùng';
+    final nickname = isDeleted ? '' : author?.nickname ?? '';
     final lineInsets = <double>[
       18.0,
       for (var level = 1; level <= 4; level++) 28.0 + (level * 18.0),
@@ -48,14 +52,21 @@ class CommentTreeItem extends StatelessWidget {
             )
             : null;
     final isSending = comment.isSending;
+    final canInteract = !isSending && !isDeleted;
     final canToggleReplies =
         comment.replyCount > 0 && !isReplyLoading && !isSending;
     final timeLabel =
         isSending
             ? 'Đang gửi...'
+            : isDeleted
+            ? 'Đã xóa ${formatRelativeTime(comment.deletedAt, withSuffix: true).toLowerCase()}'
+            : comment.isEdited && comment.updatedAt != null
+            ? 'Chỉnh sửa ${formatRelativeTime(comment.updatedAt, withSuffix: true).toLowerCase()}'
             : formatRelativeTime(comment.createdAt, withSuffix: true);
     final subtitleLabel =
         nickname.isNotEmpty ? '@$nickname - $timeLabel' : timeLabel;
+    final contentLabel =
+        isDeleted ? 'Bình luận này đã bị xóa.' : comment.content;
 
     return CommentThreadGuides(
       depth: depth,
@@ -109,61 +120,88 @@ class CommentTreeItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      subtitleLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color:
-                            isSending
-                                ? theme.colorScheme.primary.withValues(
-                                  alpha: 0.9,
-                                )
-                                : null,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                subtitleLabel,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color:
+                                      isSending
+                                          ? theme.colorScheme.primary
+                                              .withValues(alpha: 0.9)
+                                          : null,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (onMoreTap != null) ...[
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: onMoreTap,
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Icon(
+                                Iconsax.more,
+                                size: 18,
+                                color: theme.textTheme.bodySmall?.color,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      comment.content,
+                      contentLabel,
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                     ),
                     const SizedBox(height: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 14,
-                          runSpacing: 6,
-                          children: [
-                            _CommentActionChip(
-                              icon:
-                                  comment.isLiked
-                                      ? Iconsax.heart5
-                                      : Iconsax.heart,
-                              label:
-                                  comment.likeCount > 0
-                                      ? formatCompactCount(comment.likeCount)
-                                      : null,
-                              color: likeColor,
-                              onTap: isSending ? null : onLikeTap,
-                            ),
-                            _CommentActionChip(
-                              icon: Iconsax.message_text,
-                              label:
-                                  comment.replyCount > 0
-                                      ? formatCompactCount(comment.replyCount)
-                                      : 'Trả lời',
-                              color: theme.colorScheme.primary,
-                              onTap: isSending ? null : onReplyTap,
-                            ),
-                          ],
-                        ),
+                        if (!isDeleted)
+                          Wrap(
+                            spacing: 14,
+                            runSpacing: 6,
+                            children: [
+                              _CommentActionChip(
+                                icon:
+                                    comment.isLiked
+                                        ? Iconsax.heart5
+                                        : Iconsax.heart,
+                                label:
+                                    comment.likeCount > 0
+                                        ? formatCompactCount(comment.likeCount)
+                                        : null,
+                                color: likeColor,
+                                onTap: canInteract ? onLikeTap : null,
+                              ),
+                              _CommentActionChip(
+                                icon: Iconsax.message_text,
+                                label:
+                                    comment.replyCount > 0
+                                        ? formatCompactCount(comment.replyCount)
+                                        : 'Trả lời',
+                                color: theme.colorScheme.primary,
+                                onTap: canInteract ? onReplyTap : null,
+                              ),
+                            ],
+                          ),
                         if (comment.replyCount > 0) ...[
                           const SizedBox(height: 8),
                           GestureDetector(

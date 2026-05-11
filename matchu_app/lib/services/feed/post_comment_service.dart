@@ -71,7 +71,9 @@ class PostCommentService {
 
       for (final doc in snapshot.docs) {
         scanCursor = doc;
-        if (!_isTopLevelComment(doc.data()['parentId'])) continue;
+        final data = doc.data();
+        if (!_isTopLevelComment(data['parentId'])) continue;
+        if (!_shouldIncludeCommentData(data)) continue;
 
         topLevelDocs.add(doc);
         if (topLevelDocs.length >= limit + 1) {
@@ -151,6 +153,10 @@ class PostCommentService {
           throw StateError('Không tìm thấy bình luận gốc để trả lời.');
         }
 
+        if (parentSnap.data()?['deletedAt'] != null) {
+          throw StateError('Không thể trả lời bình luận đã bị xóa.');
+        }
+
         final currentReplyCount =
             (parentSnap.data()?['replyCount'] as num?)?.toInt() ?? 0;
 
@@ -190,6 +196,149 @@ class PostCommentService {
       createdAt: DateTime.now(),
       author: author,
     );
+  }
+
+  Future<PostCommentModel> editComment({
+    required String postId,
+    required String commentId,
+    required String content,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError('Bạn cần đăng nhập để chỉnh sửa bình luận.');
+    }
+
+    final normalizedPostId = postId.trim();
+    final normalizedCommentId = commentId.trim();
+    final normalizedContent = content.trim();
+    if (normalizedPostId.isEmpty || normalizedCommentId.isEmpty) {
+      throw StateError('Không tìm thấy bình luận để chỉnh sửa.');
+    }
+    if (normalizedContent.isEmpty) {
+      throw StateError('Nội dung bình luận không được để trống.');
+    }
+    if (normalizedContent.length > maxCommentLength) {
+      throw StateError('Bình luận không được vượt quá 300 ký tự.');
+    }
+
+    final postRef = _postsRef.doc(normalizedPostId);
+    final commentRef = postRef.collection('comments').doc(normalizedCommentId);
+    final editedAt = DateTime.now();
+
+    return _firestore.runTransaction((transaction) async {
+      final postSnap = await transaction.get(postRef);
+      if (!postSnap.exists) {
+        throw StateError('Bài viết không còn tồn tại.');
+      }
+
+      final commentSnap = await transaction.get(commentRef);
+      if (!commentSnap.exists) {
+        throw StateError('Bình luận không còn tồn tại.');
+      }
+
+      final existingComment = PostCommentModel.fromDoc(commentSnap);
+      if (existingComment.deletedAt != null) {
+        throw StateError('Bình luận đã bị xóa.');
+      }
+      if (existingComment.userId != uid) {
+        throw StateError('Bạn chỉ có thể chỉnh sửa bình luận của mình.');
+      }
+
+      transaction.update(commentRef, {
+        'content': normalizedContent,
+        'isEdited': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return existingComment.copyWith(
+        content: normalizedContent,
+        isEdited: true,
+        updatedAt: editedAt,
+      );
+    });
+  }
+
+  Future<PostCommentModel> deleteComment({
+    required String postId,
+    required String commentId,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError('Bạn cần đăng nhập để xóa bình luận.');
+    }
+
+    final normalizedPostId = postId.trim();
+    final normalizedCommentId = commentId.trim();
+    if (normalizedPostId.isEmpty || normalizedCommentId.isEmpty) {
+      throw StateError('Không tìm thấy bình luận để xóa.');
+    }
+
+    final postRef = _postsRef.doc(normalizedPostId);
+    final commentRef = postRef.collection('comments').doc(normalizedCommentId);
+    final deletedAt = DateTime.now();
+
+    return _firestore.runTransaction((transaction) async {
+      final postSnap = await transaction.get(postRef);
+      if (!postSnap.exists) {
+        throw StateError('Bài viết không còn tồn tại.');
+      }
+
+      final commentSnap = await transaction.get(commentRef);
+      if (!commentSnap.exists) {
+        throw StateError('Bình luận không còn tồn tại.');
+      }
+
+      final postData = postSnap.data() ?? <String, dynamic>{};
+      final postAuthorId = (postData['authorId'] ?? '').toString();
+      final existingComment = PostCommentModel.fromDoc(commentSnap);
+      if (existingComment.deletedAt != null) {
+        throw StateError('Bình luận đã bị xóa.');
+      }
+      if (existingComment.userId != uid && postAuthorId != uid) {
+        throw StateError('Bạn không thể xóa bình luận này.');
+      }
+
+      DocumentReference<Map<String, dynamic>>? parentRef;
+      DocumentSnapshot<Map<String, dynamic>>? parentSnap;
+      final parentId = existingComment.parentId?.trim() ?? '';
+      if (parentId.isNotEmpty) {
+        parentRef = postRef.collection('comments').doc(parentId);
+        parentSnap = await transaction.get(parentRef);
+      }
+
+      final rawStats = postData['stats'];
+      final stats =
+          rawStats is Map
+              ? Map<String, dynamic>.from(rawStats)
+              : const <String, dynamic>{};
+      final currentCommentCount = (stats['commentCount'] as num?)?.toInt() ?? 0;
+
+      transaction.update(commentRef, {
+        'content': '',
+        'deletedAt': FieldValue.serverTimestamp(),
+        'deletedBy': uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.update(postRef, {
+        'stats.commentCount':
+            currentCommentCount > 0 ? currentCommentCount - 1 : 0,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (parentRef != null && parentSnap != null && parentSnap.exists) {
+        final currentReplyCount =
+            (parentSnap.data()?['replyCount'] as num?)?.toInt() ?? 0;
+        transaction.update(parentRef, {
+          'replyCount': currentReplyCount > 0 ? currentReplyCount - 1 : 0,
+        });
+      }
+
+      return existingComment.copyWith(
+        content: '',
+        deletedAt: deletedAt,
+        deletedBy: uid,
+        updatedAt: deletedAt,
+      );
+    });
   }
 
   Future<Map<String, bool>> getLikeStates(
@@ -281,7 +430,11 @@ class PostCommentService {
   ) async {
     final comments = docs
         .map(PostCommentModel.fromDoc)
-        .where((comment) => comment.content.trim().isNotEmpty)
+        .where(
+          (comment) =>
+              comment.content.trim().isNotEmpty ||
+              (comment.isDeleted && comment.replyCount > 0),
+        )
         .toList(growable: false);
 
     if (comments.isEmpty) {
@@ -327,5 +480,20 @@ class PostCommentService {
     if (parentId == null) return true;
     if (parentId is String) return parentId.trim().isEmpty;
     return parentId.toString().trim().isEmpty;
+  }
+
+  bool _shouldIncludeCommentData(Map<String, dynamic> data) {
+    final content = (data['content'] ?? '').toString().trim();
+    if (content.isNotEmpty) return true;
+
+    final isDeleted = data['deletedAt'] != null;
+    final replyCount = _parseInt(data['replyCount']);
+    return isDeleted && replyCount > 0;
+  }
+
+  int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
   }
 }

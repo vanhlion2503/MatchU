@@ -9,8 +9,10 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
+import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/views/feed/create_post_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/comment_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
@@ -162,11 +164,12 @@ class _PostDetailViewState extends State<PostDetailView> {
       appBar: const _PostDetailAppBar(),
       body: Obx(() {
         final post = controller.post.value;
-        final hasReplyTarget =
-            controller.commentsController.replyingTo.value != null;
+        final hasComposerContext =
+            controller.commentsController.replyingTo.value != null ||
+            controller.commentsController.editingComment.value != null;
         final listBottomPadding =
             MediaQuery.paddingOf(context).bottom +
-            (hasReplyTarget
+            (hasComposerContext
                 ? _kComposerListBottomPaddingWithReply
                 : _kComposerListBottomPadding);
 
@@ -214,6 +217,31 @@ class _CommentsSliverSection extends StatelessWidget {
   const _CommentsSliverSection({required this.controller});
 
   final PostDetailController controller;
+
+  Future<void> _openCommentActionSheet(
+    BuildContext context,
+    PostCommentModel comment,
+  ) {
+    final commentsController = controller.commentsController;
+    return CommentActionSheet.show(
+      context,
+      canEdit: commentsController.canEditComment(comment),
+      onEditTap:
+          commentsController.canEditComment(comment)
+              ? () async => commentsController.startEdit(comment)
+              : null,
+      canDelete: commentsController.canDeleteComment(comment),
+      onDeleteTap:
+          commentsController.canDeleteComment(comment)
+              ? () => commentsController.deleteComment(comment)
+              : null,
+      canHide: commentsController.canHideComment(comment),
+      onHideTap:
+          commentsController.canHideComment(comment)
+              ? () => commentsController.hideComment(comment)
+              : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -324,6 +352,11 @@ class _CommentsSliverSection extends StatelessWidget {
                         () => commentsController.startReply(entry.comment),
                     onToggleRepliesTap:
                         () => commentsController.toggleReplies(entry.comment),
+                    onMoreTap:
+                        commentsController.hasCommentActions(entry.comment)
+                            ? () =>
+                                _openCommentActionSheet(context, entry.comment)
+                            : null,
                   ),
                 ],
               );
@@ -461,14 +494,73 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
       ),
       child: Obx(() {
         final replyingTo = commentsController.replyingTo.value;
+        final editingComment = commentsController.editingComment.value;
         final isSubmitting = commentsController.isSubmitting.value;
         final hasInputText = commentsController.hasInputText.value;
+        final shouldShowSubmit = editingComment != null || hasInputText;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (replyingTo != null)
+            if (editingComment != null)
+              _ComposerSurface(
+                borderRadius: BorderRadius.circular(18),
+                backgroundColor: replySurface.withValues(
+                  alpha: isDark ? 0.92 : 0.96,
+                ),
+                borderColor: palette.border.withValues(alpha: 0.8),
+                shadowColor: palette.shadowColor.withValues(
+                  alpha: isDark ? 0.18 : 0.08,
+                ),
+                blurSigma: 0,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.7,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Đang chỉnh sửa bình luận',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: palette.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: commentsController.cancelEdit,
+                        visualDensity: VisualDensity.compact,
+                        style: const ButtonStyle(
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          overlayColor: WidgetStatePropertyAll(
+                            Colors.transparent,
+                          ),
+                          splashFactory: NoSplash.splashFactory,
+                        ),
+                        icon: Icon(
+                          Iconsax.close_circle,
+                          size: 18,
+                          color: palette.iconMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else if (replyingTo != null)
               _ComposerSurface(
                 borderRadius: BorderRadius.circular(18),
                 backgroundColor: replySurface.withValues(
@@ -543,7 +635,8 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                   ),
                 ),
               ),
-            if (replyingTo != null) const SizedBox(height: 8),
+            if (editingComment != null || replyingTo != null)
+              const SizedBox(height: 8),
             TextFieldTapRegion(
               child: _ComposerSurface(
                 borderRadius: BorderRadius.circular(999),
@@ -598,7 +691,10 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                               height: 1.15,
                             ),
                             decoration: InputDecoration(
-                              hintText: 'Bình luận...',
+                              hintText:
+                                  editingComment != null
+                                      ? 'Chỉnh sửa bình luận...'
+                                      : 'Bình luận...',
                               filled: false,
                               fillColor: Colors.transparent,
                               border: InputBorder.none,
@@ -639,14 +735,16 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                               );
                             },
                             child:
-                                hasInputText
+                                shouldShowSubmit
                                     ? _ComposerSubmitButton(
                                       key: const ValueKey(
                                         'composer_submit_button',
                                       ),
                                       isSubmitting: isSubmitting,
                                       onPressed:
-                                          commentsController.submitComment,
+                                          hasInputText
+                                              ? commentsController.submitComment
+                                              : null,
                                       backgroundColor:
                                           theme.colorScheme.primary,
                                       foregroundColor:
@@ -778,7 +876,7 @@ class _ComposerSubmitButton extends StatelessWidget {
   });
 
   final bool isSubmitting;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final Color backgroundColor;
   final Color foregroundColor;
 

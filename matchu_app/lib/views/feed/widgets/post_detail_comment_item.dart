@@ -16,6 +16,7 @@ class PostDetailCommentItem extends StatelessWidget {
     required this.onReplyTap,
     required this.onToggleRepliesTap,
     this.isReplyLoading = false,
+    this.onMoreTap,
   });
 
   final CommentThreadEntry entry;
@@ -23,6 +24,7 @@ class PostDetailCommentItem extends StatelessWidget {
   final VoidCallback onReplyTap;
   final VoidCallback onToggleRepliesTap;
   final bool isReplyLoading;
+  final VoidCallback? onMoreTap;
 
   @override
   Widget build(BuildContext context) {
@@ -30,8 +32,10 @@ class PostDetailCommentItem extends StatelessWidget {
     final palette = FeedPalette.of(context);
     final comment = entry.comment;
     final author = comment.author;
+    final isDeleted = comment.isDeleted;
     final isReply = entry.depth > 0;
-    final displayName = author?.displayName ?? 'Người dùng';
+    final displayName =
+        isDeleted ? 'Bình luận đã xóa' : author?.displayName ?? 'Người dùng';
     final depth = math.min(entry.depth, 4);
     final topPadding = isReply ? 10.0 : 14.0;
     const bottomPadding = 14.0;
@@ -46,16 +50,23 @@ class PostDetailCommentItem extends StatelessWidget {
     final ancestorBranchContinues =
         entry.ancestorBranchContinues.take(math.max(depth - 1, 0)).toList();
     final isSending = comment.isSending;
+    final canInteract = !isSending && !isDeleted;
     final canToggleReplies =
         comment.replyCount > 0 && !isReplyLoading && !isSending;
     final metaTimeLabel =
         isSending
             ? 'Đang gửi...'
+            : isDeleted
+            ? 'Đã xóa ${formatRelativeTime(comment.deletedAt, withSuffix: true).toLowerCase()}'
+            : comment.isEdited && comment.updatedAt != null
+            ? 'Chỉnh sửa ${formatRelativeTime(comment.updatedAt, withSuffix: true).toLowerCase()}'
             : formatRelativeTime(comment.createdAt, compact: true);
     final metaTimeColor =
         isSending
             ? theme.colorScheme.primary.withValues(alpha: 0.9)
             : palette.textTertiary;
+    final contentLabel =
+        isDeleted ? 'Bình luận này đã bị xóa.' : comment.content;
 
     return Padding(
       padding: const EdgeInsets.only(right: 16),
@@ -77,7 +88,7 @@ class PostDetailCommentItem extends StatelessWidget {
             SizedBox(
               width: avatarSize,
               child: FeedAvatar(
-                imageUrl: author?.avatarUrl ?? '',
+                imageUrl: isDeleted ? '' : author?.avatarUrl ?? '',
                 fallbackLabel: displayName,
                 size: avatarSize,
                 borderColor: palette.border,
@@ -99,7 +110,8 @@ class PostDetailCommentItem extends StatelessWidget {
                             children: [
                               Flexible(
                                 child: VerifiedNameRow(
-                                  isVerified: author?.isVerified == true,
+                                  isVerified:
+                                      !isDeleted && author?.isVerified == true,
                                   badgeSize: 14,
                                   badgePadding: const EdgeInsets.only(left: 4),
                                   child: Text(
@@ -129,21 +141,34 @@ class PostDetailCommentItem extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: Icon(
-                            Iconsax.more,
-                            size: 18,
-                            color: palette.iconMuted,
+                        if (onMoreTap != null) ...[
+                          const SizedBox(width: 8),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: onMoreTap,
+                              borderRadius: BorderRadius.circular(999),
+                              splashFactory: NoSplash.splashFactory,
+                              overlayColor: const WidgetStatePropertyAll(
+                                Colors.transparent,
+                              ),
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Icon(
+                                  Iconsax.more,
+                                  size: 18,
+                                  color: palette.iconMuted,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      comment.content,
+                      contentLabel,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontSize: 14,
                         height: 1.55,
@@ -154,48 +179,52 @@ class PostDetailCommentItem extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            _CommentMetaButton(
-                              icon:
-                                  comment.isLiked
-                                      ? Iconsax.heart5
-                                      : Iconsax.heart,
-                              label:
-                                  comment.likeCount > 0
-                                      ? formatCompactCount(comment.likeCount)
-                                      : null,
-                              palette: palette,
-                              iconColor:
-                                  comment.isLiked
-                                      ? palette.likeColor.withValues(
-                                        alpha: comment.isLikePending ? 0.58 : 1,
-                                      )
-                                      : palette.iconMuted.withValues(
-                                        alpha: comment.isLikePending ? 0.58 : 1,
-                                      ),
-                              labelColor:
-                                  comment.isLiked
-                                      ? palette.likeColor.withValues(
-                                        alpha: comment.isLikePending ? 0.58 : 1,
-                                      )
-                                      : null,
-                              onTap: isSending ? null : onLikeTap,
-                            ),
-                            _CommentMetaButton(
-                              icon: Iconsax.message_text,
-                              label:
-                                  comment.replyCount > 0
-                                      ? formatCompactCount(comment.replyCount)
-                                      : null,
-                              palette: palette,
-                              onTap: isSending ? null : onReplyTap,
-                            ),
-                          ],
-                        ),
+                        if (!isDeleted)
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _CommentMetaButton(
+                                icon:
+                                    comment.isLiked
+                                        ? Iconsax.heart5
+                                        : Iconsax.heart,
+                                label:
+                                    comment.likeCount > 0
+                                        ? formatCompactCount(comment.likeCount)
+                                        : null,
+                                palette: palette,
+                                iconColor:
+                                    comment.isLiked
+                                        ? palette.likeColor.withValues(
+                                          alpha:
+                                              comment.isLikePending ? 0.58 : 1,
+                                        )
+                                        : palette.iconMuted.withValues(
+                                          alpha:
+                                              comment.isLikePending ? 0.58 : 1,
+                                        ),
+                                labelColor:
+                                    comment.isLiked
+                                        ? palette.likeColor.withValues(
+                                          alpha:
+                                              comment.isLikePending ? 0.58 : 1,
+                                        )
+                                        : null,
+                                onTap: canInteract ? onLikeTap : null,
+                              ),
+                              _CommentMetaButton(
+                                icon: Iconsax.message_text,
+                                label:
+                                    comment.replyCount > 0
+                                        ? formatCompactCount(comment.replyCount)
+                                        : null,
+                                palette: palette,
+                                onTap: canInteract ? onReplyTap : null,
+                              ),
+                            ],
+                          ),
                         if (comment.replyCount > 0) ...[
                           const SizedBox(height: 8),
                           _CommentMetaButton(

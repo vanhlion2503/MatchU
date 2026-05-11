@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
@@ -25,6 +26,7 @@ extension CommentSortModeLabel on CommentSortMode {
 class PostCommentsController extends GetxController {
   PostCommentsController({
     required this.postId,
+    required this.postAuthorId,
     this.onCommentCountChanged,
     this.initialCommentCount = 0,
     this.pageSize = PostCommentService.defaultTopLevelPageSize,
@@ -32,10 +34,12 @@ class PostCommentsController extends GetxController {
   }) : _service = service ?? PostCommentService();
 
   final String postId;
+  final String postAuthorId;
   final ValueChanged<int>? onCommentCountChanged;
   final int initialCommentCount;
   final int pageSize;
   final PostCommentService _service;
+  final GetStorage _storage = GetStorage();
 
   final TextEditingController inputController = TextEditingController();
   final FocusNode inputFocusNode = FocusNode();
@@ -49,8 +53,11 @@ class PostCommentsController extends GetxController {
   final RxBool hasMoreComments = true.obs;
   final RxnString errorMessage = RxnString();
   final Rxn<PostCommentModel> replyingTo = Rxn<PostCommentModel>();
+  final Rxn<PostCommentModel> editingComment = Rxn<PostCommentModel>();
   final RxSet<String> expandedCommentIds = <String>{}.obs;
   final RxSet<String> loadingReplyParentIds = <String>{}.obs;
+  final RxSet<String> hiddenCommentIds = <String>{}.obs;
+  final RxSet<String> actioningCommentIds = <String>{}.obs;
   final RxInt totalCommentCount = 0.obs;
   final Rx<CommentSortMode> sortMode = CommentSortMode.featured.obs;
 
@@ -67,7 +74,8 @@ class PostCommentsController extends GetxController {
   void _rebuildThreadEntries() {
     final expandedIds = Set<String>.from(expandedCommentIds);
     final currentSortMode = sortMode.value;
-    final currentComments = comments.toList(growable: false);
+    final allComments = comments.toList(growable: false);
+    final currentComments = _visibleCommentsForThread(allComments);
     final existingIds =
         currentComments.map((comment) => comment.commentId).toSet();
     final groupedByParent = <String?, List<PostCommentModel>>{};
@@ -142,9 +150,64 @@ class PostCommentsController extends GetxController {
     threadEntries.assignAll(flattened);
   }
 
+  List<PostCommentModel> _visibleCommentsForThread(
+    List<PostCommentModel> source,
+  ) {
+    if (source.isEmpty) return const <PostCommentModel>[];
+
+    final commentById = <String, PostCommentModel>{
+      for (final comment in source) comment.commentId: comment,
+    };
+    final hiddenIds = Set<String>.from(hiddenCommentIds);
+    final suppressedCache = <String, bool>{};
+
+    bool isSuppressed(PostCommentModel comment) {
+      final cached = suppressedCache[comment.commentId];
+      if (cached != null) return cached;
+
+      if (hiddenIds.contains(comment.commentId)) {
+        suppressedCache[comment.commentId] = true;
+        return true;
+      }
+
+      final parentId = comment.parentId;
+      if (parentId == null || parentId.isEmpty) {
+        suppressedCache[comment.commentId] = false;
+        return false;
+      }
+
+      final parent = commentById[parentId];
+      final isParentSuppressed = parent != null && isSuppressed(parent);
+      suppressedCache[comment.commentId] = isParentSuppressed;
+      return isParentSuppressed;
+    }
+
+    bool hasVisibleLoadedChild(PostCommentModel comment) {
+      return source.any(
+        (candidate) =>
+            candidate.parentId == comment.commentId &&
+            !isSuppressed(candidate) &&
+            (!candidate.isDeleted ||
+                candidate.replyCount > 0 ||
+                hasVisibleLoadedChild(candidate)),
+      );
+    }
+
+    return source
+        .where((comment) => !isSuppressed(comment))
+        .where(
+          (comment) =>
+              !comment.isDeleted ||
+              comment.replyCount > 0 ||
+              hasVisibleLoadedChild(comment),
+        )
+        .toList(growable: false);
+  }
+
   @override
   void onInit() {
     super.onInit();
+    _loadHiddenCommentIds();
     totalCommentCount.value = initialCommentCount;
     inputController.addListener(_handleInputChanged);
     _handleInputChanged();
@@ -153,6 +216,37 @@ class PostCommentsController extends GetxController {
 
   bool isReplyLoading(String commentId) {
     return loadingReplyParentIds.contains(commentId);
+  }
+
+  bool isCommentActioning(String commentId) {
+    return actioningCommentIds.contains(commentId);
+  }
+
+  String get currentUserId => _service.uid.trim();
+
+  bool canEditComment(PostCommentModel comment) {
+    final uid = currentUserId;
+    if (uid.isEmpty || comment.isSending || comment.isDeleted) return false;
+    return comment.userId.trim() == uid;
+  }
+
+  bool canDeleteComment(PostCommentModel comment) {
+    final uid = currentUserId;
+    if (uid.isEmpty || comment.isSending || comment.isDeleted) return false;
+    return comment.userId.trim() == uid || postAuthorId.trim() == uid;
+  }
+
+  bool canHideComment(PostCommentModel comment) {
+    final uid = currentUserId;
+    if (comment.isSending || comment.isDeleted) return false;
+    if (hiddenCommentIds.contains(comment.commentId)) return false;
+    return comment.userId.trim() != uid && postAuthorId.trim() != uid;
+  }
+
+  bool hasCommentActions(PostCommentModel comment) {
+    return canEditComment(comment) ||
+        canDeleteComment(comment) ||
+        canHideComment(comment);
   }
 
   Future<void> loadComments() async {
@@ -195,8 +289,26 @@ class PostCommentsController extends GetxController {
   }
 
   void startReply(PostCommentModel comment) {
+    if (comment.isDeleted || comment.isSending) return;
+    if (editingComment.value != null) {
+      editingComment.value = null;
+      inputController.clear();
+    }
     replyingTo.value = comment;
     _expandThreadPath(comment.commentId);
+    inputFocusNode.requestFocus();
+  }
+
+  void startEdit(PostCommentModel comment) {
+    final currentComment = _findComment(comment.commentId);
+    if (currentComment == null || !canEditComment(currentComment)) return;
+
+    replyingTo.value = null;
+    editingComment.value = currentComment;
+    inputController.text = currentComment.content;
+    inputController.selection = TextSelection.collapsed(
+      offset: inputController.text.length,
+    );
     inputFocusNode.requestFocus();
   }
 
@@ -209,6 +321,11 @@ class PostCommentsController extends GetxController {
 
   void cancelReply() {
     replyingTo.value = null;
+  }
+
+  void cancelEdit() {
+    editingComment.value = null;
+    inputController.clear();
   }
 
   void toggleReplies(PostCommentModel comment) {
@@ -256,6 +373,12 @@ class PostCommentsController extends GetxController {
   Future<void> submitComment() async {
     if (isSubmitting.value) return;
 
+    final commentBeingEdited = editingComment.value;
+    if (commentBeingEdited != null) {
+      await _submitEditedComment(commentBeingEdited);
+      return;
+    }
+
     final currentUid = _service.uid.trim();
     if (currentUid.isEmpty) {
       _showError('Bạn cần đăng nhập để bình luận.');
@@ -297,6 +420,163 @@ class PostCommentsController extends GetxController {
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  Future<void> _submitEditedComment(PostCommentModel editingTarget) async {
+    final currentUid = _service.uid.trim();
+    if (currentUid.isEmpty) {
+      _showError('Bạn cần đăng nhập để chỉnh sửa bình luận.');
+      return;
+    }
+
+    final currentComment = _findComment(editingTarget.commentId);
+    if (currentComment == null || !canEditComment(currentComment)) {
+      editingComment.value = null;
+      inputController.clear();
+      return;
+    }
+
+    final content = inputController.text.trim();
+    if (content.isEmpty) return;
+
+    if (content == currentComment.content.trim()) {
+      cancelEdit();
+      return;
+    }
+
+    final editedAt = DateTime.now();
+    final optimisticComment = currentComment.copyWith(
+      content: content,
+      isEdited: true,
+      updatedAt: editedAt,
+    );
+
+    isSubmitting.value = true;
+    _replaceComment(optimisticComment);
+    editingComment.value = null;
+    inputController.clear();
+
+    try {
+      final updatedComment = await _service.editComment(
+        postId: postId,
+        commentId: currentComment.commentId,
+        content: content,
+      );
+      final latestComment = _findComment(currentComment.commentId);
+      _replaceComment(
+        updatedComment.copyWith(
+          author: latestComment?.author ?? currentComment.author,
+          likeCount: latestComment?.likeCount ?? currentComment.likeCount,
+          replyCount: latestComment?.replyCount ?? currentComment.replyCount,
+          isLiked: latestComment?.isLiked ?? currentComment.isLiked,
+          isLikePending:
+              latestComment?.isLikePending ?? currentComment.isLikePending,
+          isSending: false,
+        ),
+      );
+    } catch (error) {
+      _replaceComment(currentComment);
+      editingComment.value = currentComment;
+      inputController.text = content;
+      inputController.selection = TextSelection.collapsed(
+        offset: inputController.text.length,
+      );
+      inputFocusNode.requestFocus();
+      _showError(_mapError(error));
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
+  Future<void> deleteComment(PostCommentModel comment) async {
+    final currentComment = _findComment(comment.commentId);
+    if (currentComment == null || !canDeleteComment(currentComment)) return;
+    if (actioningCommentIds.contains(currentComment.commentId)) return;
+
+    final commentId = currentComment.commentId;
+    final previousRank = _topLevelOrderRanks[commentId];
+    final shouldKeepPlaceholder =
+        currentComment.replyCount > 0 || _hasLoadedChildren(commentId);
+    final deletedAt = DateTime.now();
+    final deletedComment = currentComment.copyWith(
+      content: '',
+      deletedAt: deletedAt,
+      deletedBy: currentUserId,
+      updatedAt: deletedAt,
+    );
+
+    actioningCommentIds.add(commentId);
+    actioningCommentIds.refresh();
+    _clearComposerTarget(commentId);
+
+    if (shouldKeepPlaceholder) {
+      _replaceComment(deletedComment, rebuildThreadEntries: false);
+    } else {
+      _removeCommentById(commentId);
+      _topLevelOrderRanks.remove(commentId);
+      _clearLikeCachesForComment(commentId);
+      _removeExpandedCommentAndDescendants(commentId);
+    }
+
+    _adjustLoadedParentReplyCount(currentComment.parentId, -1);
+    totalCommentCount.value = max(0, totalCommentCount.value - 1);
+    onCommentCountChanged?.call(-1);
+    _rebuildThreadEntries();
+
+    try {
+      final serverComment = await _service.deleteComment(
+        postId: postId,
+        commentId: commentId,
+      );
+      if (shouldKeepPlaceholder) {
+        final latestComment = _findComment(commentId);
+        if (latestComment != null) {
+          _replaceComment(
+            serverComment.copyWith(
+              author: latestComment.author ?? currentComment.author,
+              likeCount: latestComment.likeCount,
+              replyCount: latestComment.replyCount,
+              isLiked: latestComment.isLiked,
+              isLikePending: latestComment.isLikePending,
+              isSending: false,
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      _upsertComments(<PostCommentModel>[
+        currentComment,
+      ], rebuildThreadEntries: false);
+      if (previousRank != null) {
+        _topLevelOrderRanks[commentId] = previousRank;
+      }
+      _adjustLoadedParentReplyCount(currentComment.parentId, 1);
+      totalCommentCount.value += 1;
+      onCommentCountChanged?.call(1);
+      _rebuildThreadEntries();
+      _showError(_mapError(error));
+    } finally {
+      actioningCommentIds.remove(commentId);
+      actioningCommentIds.refresh();
+    }
+  }
+
+  Future<void> hideComment(PostCommentModel comment) async {
+    final currentComment = _findComment(comment.commentId);
+    if (currentComment == null || !canHideComment(currentComment)) return;
+
+    hiddenCommentIds.add(currentComment.commentId);
+    hiddenCommentIds.refresh();
+    await _persistHiddenCommentIds();
+    _clearComposerTarget(currentComment.commentId);
+    _rebuildThreadEntries();
+
+    Get.snackbar(
+      'Thông báo',
+      'Đã ẩn bình luận này khỏi thiết bị của bạn.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
   }
 
   PostCommentModel _createOptimisticComment({
@@ -392,6 +672,43 @@ class PostCommentsController extends GetxController {
     }
 
     _rebuildThreadEntries();
+  }
+
+  void _adjustLoadedParentReplyCount(String? parentId, int delta) {
+    final normalizedParentId = parentId?.trim();
+    if (normalizedParentId == null || normalizedParentId.isEmpty) return;
+
+    final parent = _findComment(normalizedParentId);
+    if (parent == null) return;
+
+    final nextReplyCount = max(0, parent.replyCount + delta);
+    _replaceComment(
+      parent.copyWith(replyCount: nextReplyCount),
+      rebuildThreadEntries: false,
+    );
+  }
+
+  void _clearComposerTarget(String commentId) {
+    if (replyingTo.value?.commentId == commentId) {
+      replyingTo.value = null;
+    }
+    if (editingComment.value?.commentId == commentId) {
+      editingComment.value = null;
+      inputController.clear();
+    }
+  }
+
+  void _removeExpandedCommentAndDescendants(String commentId) {
+    if (!expandedCommentIds.contains(commentId)) return;
+
+    final nextExpanded =
+        Set<String>.from(expandedCommentIds)
+          ..remove(commentId)
+          ..removeAll(_descendantIdsOf(commentId));
+    expandedCommentIds
+      ..clear()
+      ..addAll(nextExpanded);
+    expandedCommentIds.refresh();
   }
 
   PostCommentModel? _removeCommentById(String commentId) {
@@ -601,6 +918,34 @@ class PostCommentsController extends GetxController {
     _confirmedLikeStates.clear();
     _queuedLikeStates.clear();
     _likeSyncingCommentIds.clear();
+  }
+
+  String get _hiddenCommentsStorageKey {
+    final uidPart = currentUserId.isEmpty ? 'anonymous' : currentUserId;
+    final postPart = postId.trim().isEmpty ? 'unknown_post' : postId.trim();
+    return 'post_hidden_comments_${uidPart}_$postPart';
+  }
+
+  void _loadHiddenCommentIds() {
+    final storedValue = _storage.read(_hiddenCommentsStorageKey);
+    if (storedValue is! List) {
+      hiddenCommentIds.clear();
+      return;
+    }
+
+    hiddenCommentIds
+      ..clear()
+      ..addAll(
+        storedValue
+            .map((value) => value.toString().trim())
+            .where((value) => value.isNotEmpty),
+      );
+    hiddenCommentIds.refresh();
+  }
+
+  Future<void> _persistHiddenCommentIds() {
+    final values = hiddenCommentIds.toList(growable: false);
+    return _storage.write(_hiddenCommentsStorageKey, values);
   }
 
   void _expandThreadPath(String commentId) {

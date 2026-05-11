@@ -500,25 +500,73 @@ service cloud.firestore {
             : 0;
         }
 
-        allow update: if request.auth != null
-          && canAccessParentPost()
-          && (
-            request.resource.data.diff(resource.data).changedKeys()
-              .hasOnly(["replyCount"])
+        function affectedCommentKeys() {
+          return request.resource.data.diff(resource.data).affectedKeys();
+        }
+
+        function isCommentOwner() {
+          return request.auth != null
+            && request.auth.uid == resource.data.userId;
+        }
+
+        function isParentPostAuthor() {
+          return request.auth != null
+            && request.auth.uid == parentPost().authorId;
+        }
+
+        function isDeletedComment() {
+          return resource.data.keys().hasAny(["deletedAt"])
+            && resource.data.deletedAt != null;
+        }
+
+        function isCommentCounterUpdate() {
+          return (
+            affectedCommentKeys().hasOnly(["replyCount"])
             && newReplyCount() >= 0
             && (
               newReplyCount() == oldReplyCount() + 1
               || newReplyCount() == oldReplyCount() - 1
             )
-            || (
-              request.resource.data.diff(resource.data).changedKeys()
-                .hasOnly(["likeCount"])
-              && newLikeCount() >= 0
-              && (
-                newLikeCount() == oldLikeCount() + 1
-                || newLikeCount() == oldLikeCount() - 1
-              )
+          ) || (
+            affectedCommentKeys().hasOnly(["likeCount"])
+            && newLikeCount() >= 0
+            && (
+              newLikeCount() == oldLikeCount() + 1
+              || newLikeCount() == oldLikeCount() - 1
             )
+          );
+        }
+
+        function isCommentContentEdit() {
+          return isCommentOwner()
+            && !isDeletedComment()
+            && affectedCommentKeys().hasOnly(["content", "isEdited", "updatedAt"])
+            && request.resource.data.content is string
+            && request.resource.data.content.size() > 0
+            && request.resource.data.content.size() <= 300
+            && request.resource.data.isEdited == true;
+        }
+
+        function isCommentSoftDelete() {
+          return (isCommentOwner() || isParentPostAuthor())
+            && !isDeletedComment()
+            && affectedCommentKeys().hasOnly([
+              "content",
+              "deletedAt",
+              "deletedBy",
+              "updatedAt",
+            ])
+            && request.resource.data.content == ""
+            && request.resource.data.deletedBy == request.auth.uid
+            && request.resource.data.deletedAt is timestamp;
+        }
+
+        allow update: if request.auth != null
+          && canAccessParentPost()
+          && (
+            isCommentCounterUpdate()
+            || isCommentContentEdit()
+            || isCommentSoftDelete()
           );
 
         allow delete: if false;
