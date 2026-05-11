@@ -27,14 +27,18 @@ class ChatView extends StatelessWidget {
     final initialOtherUid = (args["otherUid"] ?? "").toString().trim();
 
     // ✅ Controller theo room (tagged)
-    final ChatController controller = Get.put(
-      ChatController(
-        roomId,
-        initialMessageId: messageId.isEmpty ? null : messageId,
-        initialOtherUid: initialOtherUid.isEmpty ? null : initialOtherUid,
-      ),
-      tag: roomId,
-    );
+    final ChatController controller =
+        Get.isRegistered<ChatController>(tag: roomId)
+            ? Get.find<ChatController>(tag: roomId)
+            : Get.put(
+              ChatController(
+                roomId,
+                initialMessageId: messageId.isEmpty ? null : messageId,
+                initialOtherUid:
+                    initialOtherUid.isEmpty ? null : initialOtherUid,
+              ),
+              tag: roomId,
+            );
     if (messageId.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!controller.isClosed) {
@@ -74,7 +78,6 @@ class ChatView extends StatelessWidget {
             return const Text("Đang tải...");
           }
 
-          unawaited(userCache.loadIfNeeded(otherUid));
           userCache.version.value;
           final otherUser = userCache.getUser(otherUid);
           final online = presence.isOnline(otherUid);

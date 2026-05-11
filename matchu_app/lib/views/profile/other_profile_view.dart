@@ -47,7 +47,7 @@ class OtherProfileView extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: colorScheme.onPrimary.withOpacity(0.8),
+                  color: colorScheme.onPrimary.withValues(alpha: 0.8),
                   width: 1,
                 ),
               ),
@@ -419,7 +419,7 @@ class OtherProfileView extends StatelessWidget {
 
     Get.to(
       () => const ChatView(),
-      arguments: {"roomId": roomId},
+      arguments: {"roomId": roomId, "otherUid": otherUid},
       transition: Transition.cupertino,
     );
   }

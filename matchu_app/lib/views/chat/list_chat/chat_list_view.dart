@@ -330,9 +330,7 @@ Widget _buildChatList({
             room: room,
             myUid: myUid,
             searchQuery: controller.searchText.value,
-            onTap: () async {
-              await _openChatRoom(context, room, myUid);
-            },
+            onTap: () => _openChatRoom(context, room, myUid),
           ),
         );
       },
@@ -360,20 +358,14 @@ Widget _buildChatList({
           room: room,
           myUid: myUid,
           searchQuery: controller.searchText.value,
-          onTap: () async {
-            await _openChatRoom(context, room, myUid);
-          },
+          onTap: () => _openChatRoom(context, room, myUid),
         ),
       );
     },
   );
 }
 
-Future<void> _openChatRoom(
-  BuildContext context,
-  ChatRoomModel room,
-  String myUid,
-) async {
+void _openChatRoom(BuildContext context, ChatRoomModel room, String myUid) {
   final otherUid = room.participants.firstWhere(
     (uid) => uid != myUid,
     orElse: () => "",
@@ -394,12 +386,11 @@ Future<void> _openChatRoom(
     }
   }
 
-  await ChatService().markAsRead(room.id);
-
   final args = <String, dynamic>{"roomId": room.id};
   if (otherUid.isNotEmpty) {
     args["otherUid"] = otherUid;
   }
 
+  FocusManager.instance.primaryFocus?.unfocus();
   Get.toNamed(AppRouter.chat, arguments: args);
 }

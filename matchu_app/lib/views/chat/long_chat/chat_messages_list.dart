@@ -51,340 +51,354 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     final callController = Get.find<CallController>();
     final theme = Theme.of(context);
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: widget.controller.listenMessages(),
-      builder: (context, snap) {
-        // Listen stream để detect messages mới
-        if (snap.connectionState == ConnectionState.active && snap.hasData) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            widget.controller.onNewMessages(
-              snap.data!.docs.length,
-              snap.data!.docs,
-            );
-          });
-        }
+    return Obx(() {
+      final stream = widget.controller.messagesStream.value;
+      if (stream == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-        // Sử dụng allMessages từ controller
-        return Obx(() {
-          final docs = widget.controller.allMessages;
-          final pending = widget.controller.pendingImageMessages;
-          final pendingCount = pending.length;
-          const bottomPadding = 10.0;
-
-          if (docs.isEmpty && !snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
+      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: stream,
+        builder: (context, snap) {
+          // Listen stream để detect messages mới
+          if (snap.connectionState == ConnectionState.active && snap.hasData) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              widget.controller.onNewMessages(
+                snap.data!.docs.length,
+                snap.data!.docs,
+              );
+            });
           }
 
-          // ✅ Đảm bảo itemCount hợp lệ
-          // +1 cho typing slot, +1 cho loading indicator nếu đang load more
-          final itemCount =
-              docs.length +
-              pendingCount +
-              1 +
-              (widget.controller.isLoadingMore ? 1 : 0);
+          // Sử dụng allMessages từ controller
+          return Obx(() {
+            final docs = widget.controller.allMessages;
+            final pending = widget.controller.pendingImageMessages;
+            final pendingCount = pending.length;
+            const bottomPadding = 10.0;
 
-          return ScrollablePositionedList.builder(
-            reverse: true, // ✅ Tin mới ở index 0, hiển thị ở đáy
-            itemScrollController: widget.controller.itemScrollController,
-            itemPositionsListener: widget.controller.itemPositionsListener,
-            padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
-            itemCount: itemCount,
-            itemBuilder: (_, i) {
-              /// ================= TYPING SLOT (Ở ĐÁY - index 0) =================
-              if (i == 0) {
-                return Obx(() {
-                  final otherUid = widget.controller.otherUid.value;
-                  if (otherUid == null) return const SizedBox();
+            if (docs.isEmpty && !snap.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-                  return MessengerTypingBubble(
-                    show: widget.controller.otherTyping.value,
-                    senderId: otherUid,
-                  );
-                });
-              }
+            // ✅ Đảm bảo itemCount hợp lệ
+            // +1 cho typing slot, +1 cho loading indicator nếu đang load more
+            final itemCount =
+                docs.length +
+                pendingCount +
+                1 +
+                (widget.controller.isLoadingMore ? 1 : 0);
 
-              if (pendingCount > 0 && i <= pendingCount) {
-                if (i - 1 < 0 || i - 1 >= pending.length) {
-                  return const SizedBox.shrink();
+            return ScrollablePositionedList.builder(
+              reverse: true, // ✅ Tin mới ở index 0, hiển thị ở đáy
+              itemScrollController: widget.controller.itemScrollController,
+              itemPositionsListener: widget.controller.itemPositionsListener,
+              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding),
+              itemCount: itemCount,
+              itemBuilder: (_, i) {
+                /// ================= TYPING SLOT (Ở ĐÁY - index 0) =================
+                if (i == 0) {
+                  return Obx(() {
+                    final otherUid = widget.controller.otherUid.value;
+                    if (otherUid == null) return const SizedBox();
+
+                    return MessengerTypingBubble(
+                      show: widget.controller.otherTyping.value,
+                      senderId: otherUid,
+                    );
+                  });
                 }
-                final pendingItem = pending[i - 1];
-                return _buildPendingImageBubble(context, pendingItem);
-              }
 
-              /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
-              if (widget.controller.isLoadingMore && i == itemCount - 1) {
-                return Obx(() {
-                  if (!widget.controller.isLoadingMore) return const SizedBox();
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16.0),
-                    child: Center(
-                      child: CircularProgressIndicator(strokeWidth: 2.0),
-                    ),
-                  );
-                });
-              }
+                if (pendingCount > 0 && i <= pendingCount) {
+                  if (i - 1 < 0 || i - 1 >= pending.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final pendingItem = pending[i - 1];
+                  return _buildPendingImageBubble(context, pendingItem);
+                }
 
-              /// ================= MESSAGE =================
-              // Với reverse: true, index 0 là typing, index 1+ là messages
-              // docs[0] là tin mới nhất
-              final messageIndex = i - 1 - pendingCount;
+                /// ================= LOADING INDICATOR (Ở ĐẦU - index cao nhất) =================
+                if (widget.controller.isLoadingMore && i == itemCount - 1) {
+                  return Obx(() {
+                    if (!widget.controller.isLoadingMore) {
+                      return const SizedBox();
+                    }
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2.0),
+                      ),
+                    );
+                  });
+                }
 
-              // ✅ Kiểm tra bounds để tránh RangeError
-              if (messageIndex < 0 || messageIndex >= docs.length) {
-                return const SizedBox();
-              }
+                /// ================= MESSAGE =================
+                // Với reverse: true, index 0 là typing, index 1+ là messages
+                // docs[0] là tin mới nhất
+                final messageIndex = i - 1 - pendingCount;
 
-              final doc = docs[messageIndex];
-              final data = doc.data();
-              final isMe = data["senderId"] == uid;
-              final isLastInGroup = _isLastInGroup(docs, messageIndex);
-              final createdAt = _getTime(data["createdAt"]);
-              final isNewestMessage = messageIndex == 0;
-              final messageType = data["type"] ?? "text";
-              final callDataRaw = data["callData"];
-              final callData =
-                  callDataRaw is Map
-                      ? Map<String, dynamic>.from(callDataRaw)
-                      : null;
-              final callStatus = callData?["status"] as String?;
-              final callType = callData?["callType"] as String?;
-              final normalizedRecallCallType =
-                  callType == "video" ? "video" : "audio";
-              final callDurationRaw = callData?["durationSeconds"];
-              final int? callDurationSeconds =
-                  callDurationRaw is int
-                      ? callDurationRaw
-                      : (callDurationRaw is num
-                          ? callDurationRaw.toInt()
-                          : null);
-              final viewedByRaw = data["viewedBy"];
-              final viewedBy =
-                  viewedByRaw is Map
-                      ? Map<String, dynamic>.from(viewedByRaw)
-                      : <String, dynamic>{};
-              final hasViewed = viewedBy.containsKey(uid);
-              final isViewOnce = data["viewOnce"] == true;
-              final isViewOnceImage = isViewOnce && messageType == "image";
-              final imagePath =
-                  data["imagePath"] is String
-                      ? data["imagePath"] as String
-                      : "";
-              final isMissingImage = isViewOnceImage && imagePath.isEmpty;
-              final isConsumedByRecipient =
-                  isViewOnceImage && hasViewed && data["senderId"] != uid;
-              final effectiveType =
-                  (messageType == "deleted" ||
-                          widget.controller.deletedMessageIds.contains(
-                            doc.id,
-                          ) ||
-                          isConsumedByRecipient ||
-                          isMissingImage)
-                      ? "deleted"
-                      : messageType;
-              final isDeleted = effectiveType == "deleted";
+                // ✅ Kiểm tra bounds để tránh RangeError
+                if (messageIndex < 0 || messageIndex >= docs.length) {
+                  return const SizedBox();
+                }
 
-              // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
-              final bubbleKey = _bubbleKeys.putIfAbsent(
-                doc.id,
-                () => GlobalKey(),
-              );
+                final doc = docs[messageIndex];
+                final data = doc.data();
+                final isMe = data["senderId"] == uid;
+                final isLastInGroup = _isLastInGroup(docs, messageIndex);
+                final createdAt = _getTime(data["createdAt"]);
+                final isNewestMessage = messageIndex == 0;
+                final messageType = data["type"] ?? "text";
+                final callDataRaw = data["callData"];
+                final callData =
+                    callDataRaw is Map
+                        ? Map<String, dynamic>.from(callDataRaw)
+                        : null;
+                final callStatus = callData?["status"] as String?;
+                final callType = callData?["callType"] as String?;
+                final normalizedRecallCallType =
+                    callType == "video" ? "video" : "audio";
+                final callDurationRaw = callData?["durationSeconds"];
+                final int? callDurationSeconds =
+                    callDurationRaw is int
+                        ? callDurationRaw
+                        : (callDurationRaw is num
+                            ? callDurationRaw.toInt()
+                            : null);
+                final viewedByRaw = data["viewedBy"];
+                final viewedBy =
+                    viewedByRaw is Map
+                        ? Map<String, dynamic>.from(viewedByRaw)
+                        : <String, dynamic>{};
+                final hasViewed = viewedBy.containsKey(uid);
+                final isViewOnce = data["viewOnce"] == true;
+                final isViewOnceImage = isViewOnce && messageType == "image";
+                final imagePath =
+                    data["imagePath"] is String
+                        ? data["imagePath"] as String
+                        : "";
+                final isMissingImage = isViewOnceImage && imagePath.isEmpty;
+                final isConsumedByRecipient =
+                    isViewOnceImage && hasViewed && data["senderId"] != uid;
+                final effectiveType =
+                    (messageType == "deleted" ||
+                            widget.controller.deletedMessageIds.contains(
+                              doc.id,
+                            ) ||
+                            isConsumedByRecipient ||
+                            isMissingImage)
+                        ? "deleted"
+                        : messageType;
+                final isDeleted = effectiveType == "deleted";
 
-              double dragDx = 0;
+                // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
+                final bubbleKey = _bubbleKeys.putIfAbsent(
+                  doc.id,
+                  () => GlobalKey(),
+                );
 
-              final bubbleContent = StatefulBuilder(
-                builder: (context, setState) {
-                  return Listener(
-                    onPointerMove: (event) {
-                      if (isMe) return;
+                double dragDx = 0;
 
-                      final dx = event.delta.dx;
-                      final dy = event.delta.dy;
+                final bubbleContent = StatefulBuilder(
+                  builder: (context, setState) {
+                    return Listener(
+                      onPointerMove: (event) {
+                        if (isMe) return;
 
-                      if (dx <= 0) return;
-                      if (dx.abs() < dy.abs()) return;
+                        final dx = event.delta.dx;
+                        final dy = event.delta.dy;
 
-                      dragDx += dx;
-                      dragDx = dragDx.clamp(0, 80);
-                      setState(() {});
-                    },
-                    onPointerUp: (_) {
-                      if (dragDx > 32) {
-                        HapticFeedback.lightImpact();
-                        widget.controller.startReply({
-                          "id": doc.id,
-                          "text":
-                              widget.controller.decryptedCache[doc.id] ?? "…",
-                        });
-                      }
-                      setState(() => dragDx = 0);
-                    },
-                    child: Stack(
-                      alignment: Alignment.centerLeft,
-                      children: [
-                        Positioned(
-                          left: 12 + dragDx * 0.5,
-                          child: Opacity(
-                            opacity: (dragDx / 40).clamp(0, 1),
-                            child: Icon(
-                              Iconsax.rotate_right,
-                              color: theme.colorScheme.primary,
-                              size: 26,
+                        if (dx <= 0) return;
+                        if (dx.abs() < dy.abs()) return;
+
+                        dragDx += dx;
+                        dragDx = dragDx.clamp(0, 80);
+                        setState(() {});
+                      },
+                      onPointerUp: (_) {
+                        if (dragDx > 32) {
+                          HapticFeedback.lightImpact();
+                          widget.controller.startReply({
+                            "id": doc.id,
+                            "text":
+                                widget.controller.decryptedCache[doc.id] ?? "…",
+                          });
+                        }
+                        setState(() => dragDx = 0);
+                      },
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          Positioned(
+                            left: 12 + dragDx * 0.5,
+                            child: Opacity(
+                              opacity: (dragDx / 40).clamp(0, 1),
+                              child: Icon(
+                                Iconsax.rotate_right,
+                                color: theme.colorScheme.primary,
+                                size: 26,
+                              ),
                             ),
                           ),
-                        ),
-                        Transform.translate(
-                          offset: Offset(dragDx, 0),
-                          child: Opacity(
-                            opacity: (1 - dragDx / 120).clamp(0.7, 1),
-                            child: Obx(() {
-                              final unread =
-                                  widget.controller.otherUnread.value;
-                              final otherUid = widget.controller.otherUid.value;
-                              final isMyLastMessage = isMe && messageIndex == 0;
+                          Transform.translate(
+                            offset: Offset(dragDx, 0),
+                            child: Opacity(
+                              opacity: (1 - dragDx / 120).clamp(0.7, 1),
+                              child: Obx(() {
+                                final unread =
+                                    widget.controller.otherUnread.value;
+                                final otherUid =
+                                    widget.controller.otherUid.value;
+                                final isMyLastMessage =
+                                    isMe && messageIndex == 0;
 
-                              final rawText = data["text"];
-                              final fallbackText =
-                                  rawText is String ? rawText : "...";
-                              final decryptedText =
-                                  widget.controller.decryptedCache[doc.id] ??
-                                  fallbackText;
-                              final displayText =
-                                  isDeleted
-                                      ? (isViewOnce
-                                          ? ChatController.viewOnceDeletedText
-                                          : (rawText is String &&
-                                                  rawText.isNotEmpty
-                                              ? rawText
-                                              : decryptedText))
-                                      : decryptedText;
-                              final isPressed =
-                                  _activeReactionMessageId == doc.id;
-                              final reactions = Map<String, String>.from(
-                                data["reactions"] ?? {},
-                              );
-                              final canOpenImage =
-                                  isViewOnceImage && !isDeleted;
+                                final rawText = data["text"];
+                                final fallbackText =
+                                    rawText is String ? rawText : "...";
+                                final decryptedText =
+                                    widget.controller.decryptedCache[doc.id] ??
+                                    fallbackText;
+                                final displayText =
+                                    isDeleted
+                                        ? (isViewOnce
+                                            ? ChatController.viewOnceDeletedText
+                                            : (rawText is String &&
+                                                    rawText.isNotEmpty
+                                                ? rawText
+                                                : decryptedText))
+                                        : decryptedText;
+                                final isPressed =
+                                    _activeReactionMessageId == doc.id;
+                                final reactions = Map<String, String>.from(
+                                  data["reactions"] ?? {},
+                                );
+                                final canOpenImage =
+                                    isViewOnceImage && !isDeleted;
 
-                              return ChatRowPermanent(
-                                key: ValueKey(doc.id), // 🔥 BẮT BUỘC
-                                messageId: doc.id,
-                                senderId: data["senderId"],
-                                text: displayText,
-                                type: effectiveType,
-                                isMe: isMe,
-                                showAvatar: !isMe && isLastInGroup,
-                                status:
-                                    isMyLastMessage
-                                        ? unread == 0
-                                            ? MessageStatus.seen
-                                            : MessageStatus.sent
-                                        : null,
-                                seenByUid:
-                                    isMyLastMessage &&
-                                            unread == 0 &&
-                                            otherUid != null
-                                        ? otherUid
-                                        : null,
-                                smallMargin: _shouldGroup(docs, messageIndex),
-                                showTime: isLastInGroup && messageIndex != 0,
-                                time: _formatTime(data["createdAt"]),
-                                replyText: data["replyText"],
-                                replyToId: data["replyToId"],
-                                highlighted:
-                                    widget
-                                        .controller
-                                        .highlightedMessageId
-                                        .value ==
-                                    doc.id,
-                                isPressed: isPressed,
-                                onTapReply:
-                                    data["replyToId"] != null
-                                        ? () =>
-                                            widget.controller.scrollToMessage(
-                                              docs: docs,
-                                              messageId: data["replyToId"],
-                                            )
-                                        : null,
-                                onTapMessage:
-                                    canOpenImage
-                                        ? () =>
-                                            widget.controller.openViewOnceImage(
-                                              messageId: doc.id,
-                                              senderId: data["senderId"],
-                                              imagePath: imagePath,
-                                              isLatest: isNewestMessage,
-                                            )
-                                        : null,
-                                reactions: isDeleted ? null : reactions,
-                                callStatus: callStatus,
-                                callType: callType,
-                                callDurationSeconds: callDurationSeconds,
-                                onRecallPressed:
-                                    effectiveType == "call"
-                                        ? () {
-                                          final otherUidForCall =
-                                              widget.controller.otherUid.value;
-                                          if (otherUidForCall == null ||
-                                              otherUidForCall.isEmpty) {
-                                            return;
+                                return ChatRowPermanent(
+                                  key: ValueKey(doc.id), // 🔥 BẮT BUỘC
+                                  messageId: doc.id,
+                                  senderId: data["senderId"],
+                                  text: displayText,
+                                  type: effectiveType,
+                                  isMe: isMe,
+                                  showAvatar: !isMe && isLastInGroup,
+                                  status:
+                                      isMyLastMessage
+                                          ? unread == 0
+                                              ? MessageStatus.seen
+                                              : MessageStatus.sent
+                                          : null,
+                                  seenByUid:
+                                      isMyLastMessage &&
+                                              unread == 0 &&
+                                              otherUid != null
+                                          ? otherUid
+                                          : null,
+                                  smallMargin: _shouldGroup(docs, messageIndex),
+                                  showTime: isLastInGroup && messageIndex != 0,
+                                  time: _formatTime(data["createdAt"]),
+                                  replyText: data["replyText"],
+                                  replyToId: data["replyToId"],
+                                  highlighted:
+                                      widget
+                                          .controller
+                                          .highlightedMessageId
+                                          .value ==
+                                      doc.id,
+                                  isPressed: isPressed,
+                                  onTapReply:
+                                      data["replyToId"] != null
+                                          ? () =>
+                                              widget.controller.scrollToMessage(
+                                                docs: docs,
+                                                messageId: data["replyToId"],
+                                              )
+                                          : null,
+                                  onTapMessage:
+                                      canOpenImage
+                                          ? () => widget.controller
+                                              .openViewOnceImage(
+                                                messageId: doc.id,
+                                                senderId: data["senderId"],
+                                                imagePath: imagePath,
+                                                isLatest: isNewestMessage,
+                                              )
+                                          : null,
+                                  reactions: isDeleted ? null : reactions,
+                                  callStatus: callStatus,
+                                  callType: callType,
+                                  callDurationSeconds: callDurationSeconds,
+                                  onRecallPressed:
+                                      effectiveType == "call"
+                                          ? () {
+                                            final otherUidForCall =
+                                                widget
+                                                    .controller
+                                                    .otherUid
+                                                    .value;
+                                            if (otherUidForCall == null ||
+                                                otherUidForCall.isEmpty) {
+                                              return;
+                                            }
+                                            callController.startCall(
+                                              widget.controller.roomId,
+                                              otherUidForCall,
+                                              normalizedRecallCallType,
+                                            );
                                           }
-                                          callController.startCall(
-                                            widget.controller.roomId,
-                                            otherUidForCall,
-                                            normalizedRecallCallType,
-                                          );
-                                        }
-                                        : null,
-                                bubbleKey: bubbleKey,
-                                // ❤️ DOUBLE TAP = LOVE
-                                onDoubleTap: () {
-                                  if (isDeleted) return;
-                                  if (reactions[uid] == "love") return;
+                                          : null,
+                                  bubbleKey: bubbleKey,
+                                  // ❤️ DOUBLE TAP = LOVE
+                                  onDoubleTap: () {
+                                    if (isDeleted) return;
+                                    if (reactions[uid] == "love") return;
 
-                                  widget.controller.onReactMessage(
-                                    messageId: doc.id,
-                                    reactionId: "love",
-                                  );
-                                },
-                                onLongPress: () {
-                                  _showMessageActions(
-                                    context: context,
-                                    controller: widget.controller,
-                                    messageId: doc.id,
-                                    messageText: decryptedText,
-                                    bubbleKey: bubbleKey,
-                                    isMe: isMe,
-                                    messageType: messageType,
-                                    isDeleted: isDeleted,
-                                  );
-                                },
-                              );
-                            }),
+                                    widget.controller.onReactMessage(
+                                      messageId: doc.id,
+                                      reactionId: "love",
+                                    );
+                                  },
+                                  onLongPress: () {
+                                    _showMessageActions(
+                                      context: context,
+                                      controller: widget.controller,
+                                      messageId: doc.id,
+                                      messageText: decryptedText,
+                                      bubbleKey: bubbleKey,
+                                      isMe: isMe,
+                                      messageType: messageType,
+                                      isDeleted: isDeleted,
+                                    );
+                                  },
+                                );
+                              }),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (createdAt != null &&
-                      _shouldShowDateSeparator(docs, messageIndex))
-                    DateSeparator(text: formatDateLabel(createdAt)),
+                        ],
+                      ),
+                    );
+                  },
+                );
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (createdAt != null &&
+                        _shouldShowDateSeparator(docs, messageIndex))
+                      DateSeparator(text: formatDateLabel(createdAt)),
 
-                  isNewestMessage
-                      ? AnimatedMessageBubble(child: bubbleContent)
-                      : bubbleContent,
-                ],
-              );
-            },
-          );
-        });
-      },
-    );
+                    isNewestMessage
+                        ? AnimatedMessageBubble(child: bubbleContent)
+                        : bubbleContent,
+                  ],
+                );
+              },
+            );
+          });
+        },
+      );
+    });
   }
 
   Widget _buildPendingImageBubble(

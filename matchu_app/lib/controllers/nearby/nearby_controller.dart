@@ -12,7 +12,10 @@ import 'package:matchu_app/utils/location_utils.dart';
 class NearbyController extends GetxController {
   final NearbyService _nearbyService = NearbyService();
   final UserService _userService = UserService();
-  final PresenceController _presence = Get.put(PresenceController());
+  final PresenceController _presence =
+      Get.isRegistered<PresenceController>()
+          ? Get.find<PresenceController>()
+          : Get.put(PresenceController());
   final FirebaseAuth _auth = FirebaseAuth.instance;
   StreamSubscription<User?>? _authSub;
 

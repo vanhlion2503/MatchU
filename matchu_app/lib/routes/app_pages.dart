@@ -165,9 +165,16 @@ class AppPages {
 
     GetPage(
       name: AppRouter.chat,
-      page: () => ChatView(),
+      page: () => const ChatView(),
+      transition: Transition.cupertino,
+      transitionDuration: const Duration(milliseconds: 260),
       binding: BindingsBuilder(() {
-        Get.put(PresenceController());
+        if (!Get.isRegistered<PresenceController>()) {
+          Get.put(PresenceController());
+        }
+        if (!Get.isRegistered<ChatUserCacheController>()) {
+          Get.put(ChatUserCacheController());
+        }
       }),
     ),
     GetPage(name: AppRouter.incomingCall, page: () => const IncomingCallView()),

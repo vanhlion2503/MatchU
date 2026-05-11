@@ -36,8 +36,6 @@ Widget chatItem({
     final listC = Get.find<ChatListController>();
     final preview = listC.lastMessagePreviewCache[room.id] ?? room.lastMessage;
 
-    presence.listen(otherUid);
-
     final online = presence.isOnline(otherUid);
 
     return Container(

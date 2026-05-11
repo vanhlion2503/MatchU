@@ -69,6 +69,8 @@ class ChatController extends GetxController {
   /// 👉 Pagination state - lưu tất cả messages đã load
   final RxList<QueryDocumentSnapshot<Map<String, dynamic>>> allMessages =
       <QueryDocumentSnapshot<Map<String, dynamic>>>[].obs;
+  final Rxn<Stream<QuerySnapshot<Map<String, dynamic>>>> messagesStream =
+      Rxn<Stream<QuerySnapshot<Map<String, dynamic>>>>();
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
   bool _initialLoadComplete = false;
@@ -88,7 +90,6 @@ class ChatController extends GetxController {
   Timer? _typingTimer;
   String? tempRoomId;
   late final PresenceController _presence;
-  String? _listeningUid;
 
   final Map<String, int> _messageIndexMap = {};
 
@@ -99,6 +100,10 @@ class ChatController extends GetxController {
   _sessionKeyListenerSub; // Realtime listener cho session key
   int _currentKeyId = 0;
   bool _isEnsuringKey = false;
+  List<String> _roomParticipants = const [];
+  final Map<int, Future<bool>> _localSessionKeyChecks = {};
+  final Map<String, Map<String, dynamic>> _pendingDecryptQueue = {};
+  bool _decryptQueueScheduled = false;
 
   static const String _encryptedPlaceholder = "Tin nhan duoc ma hoa";
   static const String _deletedPlaceholder = "Tin nhan da bi xoa";
@@ -137,12 +142,23 @@ class ChatController extends GetxController {
     ever<bool>(otherTyping, _onOtherTypingChanged);
     _listenScroll();
 
-    _bootstrap();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isClosed) return;
+      unawaited(_bootstrap());
+    });
   }
 
   Future<void> _bootstrap() async {
-    await _initRoom(); // ⬅️ đảm bảo có otherUid
-    await _ensureSessionKey(); // ⬅️ đảm bảo có AES key
+    await _initRoom();
+    if (isClosed) return;
+
+    unawaited(
+      _ensureSessionKey().then((_) {
+        if (!isClosed) {
+          _retryPendingDecrypts();
+        }
+      }),
+    );
     await loadInitialMessages();
   }
 
@@ -172,31 +188,47 @@ class ChatController extends GetxController {
     bottomBarHeight.value = box.size.height;
   }
 
+  void _markAsRead() {
+    unawaited(_service.markAsRead(roomId).catchError((_) {}));
+  }
+
   // ================= INIT ROOM =================
   Future<void> _initRoom() async {
     final roomSnap = await _service.getRoom(roomId);
     final data = roomSnap.data();
     if (data == null) return;
 
-    await _service.markAsRead(roomId);
+    _markAsRead();
 
     final fromTempRoom = data["fromTempRoom"];
     if (fromTempRoom is String && fromTempRoom.isNotEmpty) {
       tempRoomId = fromTempRoom;
     }
 
-    final participants = List<String>.from(data["participants"]);
-    final uidOther = participants.firstWhere((e) => e != uid);
+    final participants = List<String>.from(data["participants"] ?? const []);
+    _roomParticipants = participants;
 
-    if (otherUid.value != uidOther) {
+    final roomKeyId = data["currentKeyId"];
+    if (roomKeyId is int) {
+      _currentKeyId = roomKeyId;
+    }
+
+    final uidOther = participants.firstWhere(
+      (e) => e != uid,
+      orElse: () => otherUid.value ?? "",
+    );
+
+    if (uidOther.isNotEmpty && otherUid.value != uidOther) {
       otherUid.value = uidOther;
     }
-    _listeningUid = uidOther;
-
     // 🔥 LISTEN PRESENCE Ở ĐÂY (CHUẨN)
-    _presence.listen(uidOther);
+    if (uidOther.isNotEmpty) {
+      _presence.listen(uidOther);
 
-    unawaited(Get.find<ChatUserCacheController>().loadIfNeeded(uidOther));
+      unawaited(Get.find<ChatUserCacheController>().loadIfNeeded(uidOther));
+    }
+
+    _ensureMessagesStreamReady();
 
     _listenRoomTyping();
   }
@@ -210,6 +242,7 @@ class ChatController extends GetxController {
       final roomKeyId = data["currentKeyId"];
       if (roomKeyId is int && roomKeyId != _currentKeyId) {
         _currentKeyId = roomKeyId;
+        _localSessionKeyChecks.remove(roomKeyId);
         _ensureSessionKey();
       }
       final typing = data["typing"] ?? {};
@@ -243,13 +276,23 @@ class ChatController extends GetxController {
   }
 
   // Load messages ban đầu
+  void _ensureMessagesStreamReady() {
+    if (messagesStream.value != null) return;
+
+    messagesStream.value =
+        _service
+            .listenMessagesWithFallback(roomId, tempRoomId, limit: _pageSize)
+            .asBroadcastStream();
+  }
+
   Future<void> loadInitialMessages() async {
     if (_initialLoadComplete) return;
     try {
-      final snapshot =
-          await _service
-              .listenMessagesWithFallback(roomId, tempRoomId, limit: _pageSize)
-              .first;
+      _ensureMessagesStreamReady();
+      final stream = messagesStream.value;
+      if (stream == null) return;
+
+      final snapshot = await stream.first;
 
       if (_initialLoadComplete) return;
 
@@ -263,7 +306,7 @@ class ChatController extends GetxController {
 
       _applySnapshotAsBaseline(docs, _resolveSourceRoot(docs.first));
     } catch (e) {
-      print('Error loading initial messages: $e');
+      debugPrint('Error loading initial messages: $e');
     }
   }
 
@@ -282,6 +325,62 @@ class ChatController extends GetxController {
     }
   }
 
+  void _prepareMessage(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc, {
+    bool deferEncrypted = false,
+  }) {
+    final data = doc.data();
+    _updateDeletedFlag(doc.id, data);
+
+    final isEncrypted =
+        data.containsKey("ciphertext") && data.containsKey("iv");
+    if (deferEncrypted && isEncrypted) {
+      _queueDecrypt(doc.id, data);
+      return;
+    }
+
+    unawaited(getDecryptedText(doc.id, data));
+  }
+
+  void _queueDecrypt(String messageId, Map<String, dynamic> data) {
+    if (decryptedCache.containsKey(messageId) ||
+        _decrypting.contains(messageId)) {
+      return;
+    }
+
+    _pendingDecryptQueue[messageId] = Map<String, dynamic>.from(data);
+    if (_decryptQueueScheduled) return;
+
+    _decryptQueueScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isClosed) {
+        _pendingDecryptQueue.clear();
+        _decryptQueueScheduled = false;
+        return;
+      }
+
+      unawaited(_drainDecryptQueue());
+    });
+  }
+
+  Future<void> _drainDecryptQueue() async {
+    _decryptQueueScheduled = false;
+
+    var processed = 0;
+    while (_pendingDecryptQueue.isNotEmpty && !isClosed) {
+      final messageId = _pendingDecryptQueue.keys.first;
+      final data = _pendingDecryptQueue.remove(messageId);
+      if (data == null) continue;
+
+      await getDecryptedText(messageId, data);
+      processed++;
+
+      if (processed % 4 == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 12));
+      }
+    }
+  }
+
   String _resolveSourceRoot(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final segments = doc.reference.path.split('/');
     return segments.isNotEmpty ? segments.first : "";
@@ -297,8 +396,7 @@ class ChatController extends GetxController {
     _rebuildIndexMap();
 
     for (final doc in docs) {
-      getDecryptedText(doc.id, doc.data());
-      _updateDeletedFlag(doc.id, doc.data());
+      _prepareMessage(doc, deferEncrypted: true);
     }
     _oldestDocument = docs.isNotEmpty ? docs.last : null;
     lastMessageCount = docs.length;
@@ -408,7 +506,7 @@ class ChatController extends GetxController {
     }
 
     if (!userScrolledUp.value) {
-      _service.markAsRead(roomId);
+      _markAsRead();
     }
 
     // ===============================
@@ -516,8 +614,7 @@ class ChatController extends GetxController {
       allMessages.addAll(newDocs);
 
       for (final doc in newDocs) {
-        getDecryptedText(doc.id, doc.data());
-        _updateDeletedFlag(doc.id, doc.data());
+        _prepareMessage(doc, deferEncrypted: true);
       }
 
       final startIndex = allMessages.length - newDocs.length;
@@ -533,7 +630,7 @@ class ChatController extends GetxController {
       }
       _schedulePendingFocusResolution();
     } catch (e) {
-      print('Error loading more messages: $e');
+      debugPrint('Error loading more messages: $e');
     } finally {
       _isLoadingMore = false;
     }
@@ -946,7 +1043,7 @@ class ChatController extends GetxController {
           userScrolledUp.value = false;
           showNewMessageBtn.value = false;
           _scrollToListIndex(listIndex, messageId: targetMessageId);
-          unawaited(_service.markAsRead(roomId));
+          _markAsRead();
           return;
         }
 
@@ -1024,6 +1121,13 @@ class ChatController extends GetxController {
     );
   }
 
+  Future<bool> _hasLocalSessionKey(int keyId) {
+    return _localSessionKeyChecks.putIfAbsent(
+      keyId,
+      () => SessionKeyService.hasLocalSessionKey(roomId, keyId: keyId),
+    );
+  }
+
   Future<void> getDecryptedText(
     String messageId,
     Map<String, dynamic> data,
@@ -1043,10 +1147,7 @@ class ChatController extends GetxController {
     final keyId = data["keyId"] is int ? data["keyId"] as int : 0;
 
     try {
-      final hasKey = await SessionKeyService.hasLocalSessionKey(
-        roomId,
-        keyId: keyId,
-      );
+      final hasKey = await _hasLocalSessionKey(keyId);
       if (!hasKey) {
         decryptedCache[messageId] = _decryptPendingPlaceholder;
         return;
@@ -1088,6 +1189,8 @@ class ChatController extends GetxController {
   }
 
   void _retryPendingDecrypts() {
+    _localSessionKeyChecks.clear();
+
     for (final doc in allMessages) {
       final data = doc.data();
       if (!data.containsKey("ciphertext") || !data.containsKey("iv")) {
@@ -1102,7 +1205,7 @@ class ChatController extends GetxController {
       }
 
       decryptedCache.remove(doc.id);
-      getDecryptedText(doc.id, data);
+      _queueDecrypt(doc.id, data);
     }
   }
 
@@ -1115,13 +1218,18 @@ class ChatController extends GetxController {
     try {
       await IdentityKeyService.generateIfNotExists();
 
-      final roomSnap = await _service.getRoom(roomId);
-      final data = roomSnap.data();
-      if (data == null) return;
+      var participants = _roomParticipants;
+      if (participants.isEmpty) {
+        final roomSnap = await _service.getRoom(roomId);
+        final data = roomSnap.data();
+        if (data == null) return;
 
-      final participants = List<String>.from(data["participants"] ?? []);
-      final roomKeyId = data["currentKeyId"];
-      _currentKeyId = roomKeyId is int ? roomKeyId : 0;
+        participants = List<String>.from(data["participants"] ?? []);
+        _roomParticipants = participants;
+
+        final roomKeyId = data["currentKeyId"];
+        _currentKeyId = roomKeyId is int ? roomKeyId : 0;
+      }
 
       if (await SessionKeyService.hasLocalSessionKey(
         roomId,
@@ -1184,7 +1292,7 @@ class ChatController extends GetxController {
 
       if (hasAnyKeys) {
         if (allowRotateIfUnrecoverable && !hasKeyForCurrentDevice) {
-          print(
+          debugPrint(
             "Room $roomId has existing session keys but this device cannot recover them, rotating to a new key",
           );
           final newKeyId = await SessionKeyService.rotateSessionKey(
@@ -1195,7 +1303,7 @@ class ChatController extends GetxController {
           return;
         }
 
-        print("Room has keys, listening for session key...");
+        debugPrint("Room has keys, listening for session key...");
         _sessionKeyListenerSub?.cancel();
 
         _sessionKeyListenerSub = await SessionKeyService.listenForSessionKey(
@@ -1203,14 +1311,14 @@ class ChatController extends GetxController {
           keyId: _currentKeyId,
           onKeyReceived: (success) async {
             if (success) {
-              print("Session key received from realtime listener");
+              debugPrint("Session key received from realtime listener");
               _sessionKeyListenerSub?.cancel();
               _sessionKeyListenerSub = null;
             }
           },
         );
 
-        print("Waiting for another device to distribute key...");
+        debugPrint("Waiting for another device to distribute key...");
         return;
       }
 
@@ -1223,6 +1331,7 @@ class ChatController extends GetxController {
       debugPrint("Session key setup failed for room $roomId: $e");
       debugPrintStack(stackTrace: st);
     } finally {
+      _localSessionKeyChecks.clear();
       _isEnsuringKey = false;
     }
   }
@@ -1234,12 +1343,13 @@ class ChatController extends GetxController {
     _roomSub?.cancel();
     inputController.dispose();
     inputFocusNode.dispose();
-    _service.setTyping(roomId: roomId, isTyping: false);
-    if (_listeningUid != null) {
-      _presence.unlistenExcept({});
-    }
+    unawaited(
+      _service.setTyping(roomId: roomId, isTyping: false).catchError((_) {}),
+    );
     _sessionKeySub?.cancel();
     _sessionKeyListenerSub?.cancel();
+    _localSessionKeyChecks.clear();
+    _pendingDecryptQueue.clear();
     decryptedCache.clear();
     _decrypting.clear();
     deletedMessageIds.clear();

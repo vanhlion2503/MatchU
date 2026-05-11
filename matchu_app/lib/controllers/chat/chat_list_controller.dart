@@ -94,7 +94,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
       presence.listen(otherUid);
       visibleRoomIds.add(room.id);
       _ensureSessionKeyListener(room.id);
-      _loadLastMessagePreview(room);
+      unawaited(_loadLastMessagePreview(room));
     }
 
     presence.unlistenExcept(aliveUids);
