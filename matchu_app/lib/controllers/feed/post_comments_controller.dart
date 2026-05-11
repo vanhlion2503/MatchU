@@ -401,6 +401,7 @@ class PostCommentsController extends GetxController {
     onCommentCountChanged?.call(1);
     inputController.clear();
     replyingTo.value = null;
+    inputFocusNode.unfocus();
 
     try {
       final created = await _service.addComment(
@@ -455,6 +456,7 @@ class PostCommentsController extends GetxController {
     _replaceComment(optimisticComment);
     editingComment.value = null;
     inputController.clear();
+    inputFocusNode.unfocus();
 
     try {
       final updatedComment = await _service.editComment(
