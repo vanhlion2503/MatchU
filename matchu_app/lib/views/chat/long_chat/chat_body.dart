@@ -30,32 +30,36 @@ class _ChatBodyState extends State<ChatBody> {
       children: [
         /// ================= MESSAGES =================
         Expanded(
-          child: Stack(
-            children: [
-              ChatMessagesList(controller: controller),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: controller.dismissFocusedInputUi,
+            child: Stack(
+              children: [
+                ChatMessagesList(controller: controller),
 
-              Obx(() {
-                if (!controller.showNewMessageBtn.value) {
-                  return const SizedBox();
-                }
+                Obx(() {
+                  if (!controller.showNewMessageBtn.value) {
+                    return const SizedBox();
+                  }
 
-                return Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: FloatingActionButton(
-                    mini: true,
-                    onPressed: controller.onTapScrollToBottom,
-                    child: const Icon(Icons.arrow_downward),
-                  ),
-                );
-              }),
-            ],
+                  return Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: FloatingActionButton(
+                      mini: true,
+                      onPressed: controller.onTapScrollToBottom,
+                      child: const Icon(Icons.arrow_downward),
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ),
 
         /// ================= INPUT =================
         ChatBottomBar(controller: controller),
-        const SizedBox(height: 8,),
+        const SizedBox(height: 8),
       ],
     );
   }

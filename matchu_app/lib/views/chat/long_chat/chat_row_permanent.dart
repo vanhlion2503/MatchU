@@ -87,7 +87,9 @@ class ChatRowPermanent extends StatelessWidget {
         isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
     final isDeleted = type == "deleted";
     final resolvedTextColor =
-        isDeleted ? theme.colorScheme.onSurface.withOpacity(0.6) : textColor;
+        isDeleted
+            ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
+            : textColor;
 
     // ================= EMOJI ONLY =================
     final isEmojiOnly = _isEmojiOnly(text);
@@ -113,7 +115,7 @@ class ChatRowPermanent extends StatelessWidget {
             GestureDetector(
               onLongPress: onLongPress,
               onDoubleTap: onDoubleTap,
-              onTap: onTapMessage,
+              onTap: onTapMessage ?? () {},
               child: Container(
                 key: bubbleKey,
                 child: AnimatedEmoji(
@@ -187,7 +189,7 @@ class ChatRowPermanent extends StatelessWidget {
                                       ? const Color.fromARGB(255, 77, 76, 76)
                                       : const Color(
                                         0xFFF4F6F8,
-                                      ).withOpacity(0.8),
+                                      ).withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(10),
                               border: Border(
                                 left: BorderSide(
@@ -212,7 +214,7 @@ class ChatRowPermanent extends StatelessWidget {
                           GestureDetector(
                             onLongPress: onLongPress,
                             onDoubleTap: onDoubleTap,
-                            onTap: onTapMessage,
+                            onTap: onTapMessage ?? () {},
                             child: Container(
                               key: bubbleKey,
                               child: AnimatedBubble(
@@ -359,7 +361,7 @@ class ChatRowPermanent extends StatelessWidget {
                           GestureDetector(
                             onLongPress: onLongPress,
                             onDoubleTap: onDoubleTap,
-                            onTap: onTapMessage ?? onRecallPressed,
+                            onTap: onTapMessage ?? onRecallPressed ?? () {},
                             child: Container(
                               key: bubbleKey,
                               child: AnimatedBubble(
@@ -472,7 +474,7 @@ class ChatRowPermanent extends StatelessWidget {
                                       ? const Color.fromARGB(255, 77, 76, 76)
                                       : const Color(
                                         0xFFF4F6F8,
-                                      ).withOpacity(0.8),
+                                      ).withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(10),
                               border: Border(
                                 left: BorderSide(
@@ -495,7 +497,7 @@ class ChatRowPermanent extends StatelessWidget {
                           GestureDetector(
                             onLongPress: onLongPress,
                             onDoubleTap: onDoubleTap,
-                            onTap: onTapMessage,
+                            onTap: onTapMessage ?? () {},
                             child: Container(
                               key: bubbleKey,
                               child: AnimatedBubble(
@@ -536,7 +538,9 @@ class ChatRowPermanent extends StatelessWidget {
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                               fontWeight: FontWeight.w600,
-                                              color: textColor.withOpacity(0.8),
+                                              color: textColor.withValues(
+                                                alpha: 0.8,
+                                              ),
                                             ),
                                       ),
                                     ],
@@ -661,7 +665,7 @@ class _MessengerReactionBadge extends StatelessWidget {
                   boxShadow: [
                     BoxShadow(
                       blurRadius: 4,
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                     ),
                   ],
                 ),

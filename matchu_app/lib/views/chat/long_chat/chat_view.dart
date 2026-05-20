@@ -13,8 +13,32 @@ import 'package:matchu_app/views/chat/long_chat/chat_body.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
-class ChatView extends StatelessWidget {
+class ChatView extends StatefulWidget {
   const ChatView({super.key});
+
+  @override
+  State<ChatView> createState() => _ChatViewState();
+}
+
+class _ChatViewState extends State<ChatView> {
+  bool _allowPop = false;
+  bool _isPreparingExit = false;
+
+  Future<void> _handleExit(ChatController controller) async {
+    if (_isPreparingExit) return;
+    _isPreparingExit = true;
+
+    await controller.prepareForRouteExit();
+    if (!mounted) return;
+
+    if (!_allowPop) {
+      setState(() {
+        _allowPop = true;
+      });
+    }
+
+    Get.back();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,171 +78,178 @@ class ChatView extends StatelessWidget {
 
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        toolbarHeight: 58,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _handleExit(controller);
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          toolbarHeight: 58,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+          backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
 
-        leading: GestureDetector(
-          onTap: () => Get.back(),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(Icons.arrow_back_ios_new, size: 20),
+          leading: GestureDetector(
+            onTap: () => _handleExit(controller),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Icon(Icons.arrow_back_ios_new, size: 20),
+            ),
           ),
-        ),
 
-        titleSpacing: 0,
-        title: Obx(() {
-          final otherUid = controller.otherUid.value;
-          if (otherUid == null) {
-            return const Text("Đang tải...");
-          }
+          titleSpacing: 0,
+          title: Obx(() {
+            final otherUid = controller.otherUid.value;
+            if (otherUid == null) {
+              return const Text("Đang tải...");
+            }
 
-          userCache.version.value;
-          final otherUser = userCache.getUser(otherUid);
-          final online = presence.isOnline(otherUid);
+            userCache.version.value;
+            final otherUser = userCache.getUser(otherUid);
+            final online = presence.isOnline(otherUid);
 
-          return GestureDetector(
-            onTap: () {
-              Get.to(
-                () => OtherProfileView(userId: otherUid),
-                transition: Transition.cupertino,
-              );
-            },
-            child: Row(
-              children: [
-                /// ===== AVATAR =====
-                _ChatHeaderAvatar(
-                  avatarUrl: otherUser?.avatarUrl ?? "",
-                  online: online,
-                  theme: theme,
-                ),
+            return GestureDetector(
+              onTap: () {
+                Get.to(
+                  () => OtherProfileView(userId: otherUid),
+                  transition: Transition.cupertino,
+                );
+              },
+              child: Row(
+                children: [
+                  /// ===== AVATAR =====
+                  _ChatHeaderAvatar(
+                    avatarUrl: otherUser?.avatarUrl ?? "",
+                    online: online,
+                    theme: theme,
+                  ),
 
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
 
-                /// ===== NAME + STATUS =====
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      VerifiedNameRow(
-                        isVerified: otherUser?.isFaceVerified == true,
-                        badgeSize: 16,
-                        child: Text(
-                          otherUser?.fullname ?? "Người dùng",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                  /// ===== NAME + STATUS =====
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VerifiedNameRow(
+                          isVerified: otherUser?.isFaceVerified == true,
+                          badgeSize: 16,
+                          child: Text(
+                            otherUser?.fullname ?? "Người dùng",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      Text(
-                        online
-                            ? "Đang hoạt động"
-                            : formatLastActive(otherUser?.lastActiveAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                        Text(
+                          online
+                              ? "Đang hoạt động"
+                              : formatLastActive(otherUser?.lastActiveAt),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-
-        actions: [
-          PopupMenuButton<ChatMenuAction>(
-            icon: const Icon(Iconsax.more, size: 26),
-            offset: const Offset(0, 46),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            elevation: 6,
-            color: theme.colorScheme.surface,
-            onSelected: (action) async {
-              final otherUid = controller.otherUid.value;
-              switch (action) {
-                case ChatMenuAction.call:
-                  if (otherUid == null || otherUid.isEmpty) {
-                    Get.snackbar("Call", "Unable to find receiver.");
-                    return;
-                  }
-                  unawaited(
-                    callController.startCall(roomId, otherUid, 'audio'),
-                  );
-                  break;
-
-                case ChatMenuAction.video:
-                  if (otherUid == null || otherUid.isEmpty) {
-                    Get.snackbar("Call", "Unable to find receiver.");
-                    return;
-                  }
-                  unawaited(
-                    callController.startCall(roomId, otherUid, 'video'),
-                  );
-                  break;
-
-                case ChatMenuAction.report:
-                  _showReportDialog(context);
-                  break;
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  _menuItem(
-                    value: ChatMenuAction.call,
-                    icon: Iconsax.call,
-                    label: "Gọi điện",
-                    theme: theme,
-                  ),
-                  _menuItem(
-                    value: ChatMenuAction.video,
-                    icon: Iconsax.video,
-                    label: "Video call",
-                    theme: theme,
-                  ),
-
-                  /// Divider
-                  PopupMenuItem(
-                    enabled: false,
-                    height: 8,
-                    child: Divider(
-                      thickness: 0.5,
-                      color: theme.dividerColor.withValues(alpha: 0.4),
+                      ],
                     ),
                   ),
-
-                  _menuItem(
-                    value: ChatMenuAction.report,
-                    icon: Iconsax.warning_2,
-                    label: "Báo cáo",
-                    theme: theme,
-                    danger: true,
-                  ),
                 ],
-          ),
-        ],
+              ),
+            );
+          }),
 
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(0.5),
-          child: Divider(
-            height: 0.5,
-            thickness: 0.5,
-            color: theme.dividerColor.withValues(alpha: 0.4),
+          actions: [
+            PopupMenuButton<ChatMenuAction>(
+              icon: const Icon(Iconsax.more, size: 26),
+              offset: const Offset(0, 46),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 6,
+              color: theme.colorScheme.surface,
+              onSelected: (action) async {
+                final otherUid = controller.otherUid.value;
+                switch (action) {
+                  case ChatMenuAction.call:
+                    if (otherUid == null || otherUid.isEmpty) {
+                      Get.snackbar("Call", "Unable to find receiver.");
+                      return;
+                    }
+                    unawaited(
+                      callController.startCall(roomId, otherUid, 'audio'),
+                    );
+                    break;
+
+                  case ChatMenuAction.video:
+                    if (otherUid == null || otherUid.isEmpty) {
+                      Get.snackbar("Call", "Unable to find receiver.");
+                      return;
+                    }
+                    unawaited(
+                      callController.startCall(roomId, otherUid, 'video'),
+                    );
+                    break;
+
+                  case ChatMenuAction.report:
+                    _showReportDialog(context);
+                    break;
+                }
+              },
+              itemBuilder:
+                  (context) => [
+                    _menuItem(
+                      value: ChatMenuAction.call,
+                      icon: Iconsax.call,
+                      label: "Gọi điện",
+                      theme: theme,
+                    ),
+                    _menuItem(
+                      value: ChatMenuAction.video,
+                      icon: Iconsax.video,
+                      label: "Video call",
+                      theme: theme,
+                    ),
+
+                    /// Divider
+                    PopupMenuItem(
+                      enabled: false,
+                      height: 8,
+                      child: Divider(
+                        thickness: 0.5,
+                        color: theme.dividerColor.withValues(alpha: 0.4),
+                      ),
+                    ),
+
+                    _menuItem(
+                      value: ChatMenuAction.report,
+                      icon: Iconsax.warning_2,
+                      label: "Báo cáo",
+                      theme: theme,
+                      danger: true,
+                    ),
+                  ],
+            ),
+          ],
+
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(0.5),
+            child: Divider(
+              height: 0.5,
+              thickness: 0.5,
+              color: theme.dividerColor.withValues(alpha: 0.4),
+            ),
           ),
         ),
-      ),
 
-      body: SafeArea(child: ChatBody(controller: controller)),
+        body: SafeArea(child: ChatBody(controller: controller)),
+      ),
     );
   }
 }

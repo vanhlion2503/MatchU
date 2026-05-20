@@ -1002,6 +1002,19 @@ class ChatController extends GetxController {
   void toggleEmoji() => showEmoji.toggle();
   void hideEmoji() => showEmoji.value = false;
 
+  void dismissFocusedInputUi() {
+    hideEmoji();
+    if (inputFocusNode.hasFocus) {
+      inputFocusNode.unfocus();
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  Future<void> prepareForRouteExit() async {
+    dismissFocusedInputUi();
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+  }
+
   // ================= FAB ACTION =================
   void onTapScrollToBottom() {
     userScrolledUp.value = false;
@@ -1341,6 +1354,7 @@ class ChatController extends GetxController {
   void onClose() {
     _typingTimer?.cancel();
     _roomSub?.cancel();
+    dismissFocusedInputUi();
     inputController.dispose();
     inputFocusNode.dispose();
     unawaited(
