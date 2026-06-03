@@ -10,18 +10,23 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:matchu_app/models/verification/verification_state.dart';
+import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/verification/face_verification_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+enum FaceVerificationMode { enrollment, reauthentication }
+
 class FaceVerificationController extends GetxController
     with WidgetsBindingObserver {
   FaceVerificationController({FaceVerificationService? verificationService})
-    : _verificationService = verificationService ?? FaceVerificationService();
+    : _verificationService = verificationService ?? FaceVerificationService(),
+      mode = _readMode(Get.arguments);
 
   final FaceVerificationService _verificationService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FaceVerificationMode mode;
 
   final Rx<VerificationState> state = VerificationState.idle.obs;
   final RxBool blinkDetected = false.obs;
@@ -42,6 +47,7 @@ class FaceVerificationController extends GetxController
 
   File? selfieFile;
   File? liveFrameFile;
+  FaceVerificationResult? _successfulResult;
 
   CameraController? cameraController;
 
@@ -76,6 +82,26 @@ class FaceVerificationController extends GetxController
     "Quay trái",
     "Quay phải",
   ];
+
+  static FaceVerificationMode _readMode(dynamic arguments) {
+    if (arguments is Map && arguments["mode"] == "reauth") {
+      return FaceVerificationMode.reauthentication;
+    }
+    return FaceVerificationMode.enrollment;
+  }
+
+  bool get isReauthentication => mode == FaceVerificationMode.reauthentication;
+
+  Map<String, dynamic> get successResultPayload {
+    final result = _successfulResult;
+    return <String, dynamic>{
+      "success": state.value == VerificationState.success,
+      "mode": isReauthentication ? "reauth" : "enroll",
+      if (result?.sessionId != null) "sessionId": result!.sessionId,
+      if (result?.expiresAt != null)
+        "expiresAt": result!.expiresAt!.toIso8601String(),
+    };
+  }
 
   @override
   void onInit() {
@@ -123,7 +149,21 @@ class FaceVerificationController extends GetxController
       isAlreadyVerified.value = isVerified;
       wasAlreadyVerifiedAtEntry.value = isVerified;
 
-      if (isVerified) {
+      if (isReauthentication) {
+        if (!isVerified) {
+          state.value = VerificationState.failed;
+          errorText.value =
+              "Tài khoản này chưa xác thực khuôn mặt. Vui lòng nhập mã PIN.";
+          instructionText.value = errorText.value;
+          return;
+        }
+
+        hasStartedVerificationFlow.value = false;
+        state.value = VerificationState.idle;
+        errorText.value = "";
+        instructionText.value =
+            "Quét khuôn mặt để mở khóa tin nhắn trên thiết bị này";
+      } else if (isVerified) {
         hasStartedVerificationFlow.value = false;
         await _shutdownCameraForPreviewExit();
         state.value = VerificationState.success;
@@ -147,6 +187,21 @@ class FaceVerificationController extends GetxController
 
   void startVerificationFlow() {
     if (isCheckingVerificationStatus.value) {
+      return;
+    }
+    if (isReauthentication) {
+      if (!isAlreadyVerified.value) {
+        state.value = VerificationState.failed;
+        errorText.value =
+            "Tài khoản này chưa xác thực khuôn mặt. Vui lòng nhập mã PIN.";
+        instructionText.value = errorText.value;
+        return;
+      }
+      if (hasStartedVerificationFlow.value) {
+        return;
+      }
+      hasStartedVerificationFlow.value = true;
+      unawaited(initCamera());
       return;
     }
     if (isAlreadyVerified.value) {
@@ -240,6 +295,13 @@ class FaceVerificationController extends GetxController
       await _initFrontCamera();
 
       _resetLivenessSequence(updateInstruction: false);
+      if (isReauthentication) {
+        state.value = VerificationState.liveness;
+        instructionText.value = "Bắt đầu kiểm tra liveness...";
+        await startLiveness();
+        return;
+      }
+
       state.value = VerificationState.capturingSelfie;
       instructionText.value = "Đặt khuôn mặt vào khung và chụp ảnh";
     } catch (e, stackTrace) {
@@ -509,21 +571,30 @@ class FaceVerificationController extends GetxController
 
       await _shutdownCameraForPreviewExit();
 
-      final selfie = selfieFile;
-      if (selfie == null) {
-        throw Exception("Selfie file is missing.");
-      }
-
       state.value = VerificationState.processing;
       instructionText.value = "Đang xử lý dữ liệu khuôn mặt ...";
 
-      final verificationResult = await _verificationService.enrollVerification(
-        selfieFile: selfie,
-        liveFrameFile: savedFrame,
-      );
+      final verificationResult =
+          isReauthentication
+              ? await _verificationService.reauthenticate(
+                liveFrameFile: savedFrame,
+              )
+              : await _verificationService.enrollVerification(
+                selfieFile:
+                    selfieFile ?? (throw Exception("Selfie file is missing.")),
+                liveFrameFile: savedFrame,
+              );
 
-      if (verificationResult.success) {
-        await _syncCurrentUserVerifiedState();
+      final hasRequiredReauthSession =
+          !isReauthentication ||
+          ((verificationResult.sessionId ?? "").trim().isNotEmpty);
+
+      if (verificationResult.success && hasRequiredReauthSession) {
+        _successfulResult = verificationResult;
+        if (!isReauthentication) {
+          await _syncCurrentUserVerifiedState();
+          await PasscodeBackupService.syncFaceRecoveryBackupIfEligible();
+        }
         state.value = VerificationState.success;
         instructionText.value = "Xác thực thành công";
       } else {
@@ -555,6 +626,7 @@ class FaceVerificationController extends GetxController
 
   Future<void> retryVerification() async {
     await _deleteTemporaryFaceFiles();
+    _successfulResult = null;
     hasStartedVerificationFlow.value = true;
     _resetLivenessSequence(updateInstruction: false);
     state.value = VerificationState.idle;

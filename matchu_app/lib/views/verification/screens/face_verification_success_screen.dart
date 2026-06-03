@@ -5,11 +5,21 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
   const FaceVerificationSuccessScreen({
     super.key,
     required this.wasAlreadyVerifiedAtEntry,
+    this.title,
+    this.description,
+    this.primaryButtonLabel,
+    this.showRetryAction = true,
+    this.showBenefits = true,
     required this.onContinue,
     required this.onRetry,
   });
 
   final bool wasAlreadyVerifiedAtEntry;
+  final String? title;
+  final String? description;
+  final String? primaryButtonLabel;
+  final bool showRetryAction;
+  final bool showBenefits;
   final VoidCallback onContinue;
   final VoidCallback onRetry;
 
@@ -93,31 +103,34 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                'Xác thực thành công!',
+                title ?? 'Xác thực thành công!',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                wasAlreadyVerifiedAtEntry
-                    ? 'Tài khoản của bạn đã xác thực. Bạn có thể cập nhật dữ liệu khuôn mặt bảo mật để dùng cho các bước xác thực lại sau này.'
-                    : 'Hồ sơ của bạn đã được xác minh danh tính an toàn.',
+                description ??
+                    (wasAlreadyVerifiedAtEntry
+                        ? 'Tài khoản của bạn đã xác thực. Bạn có thể cập nhật dữ liệu khuôn mặt bảo mật để dùng cho các bước xác thực lại sau này.'
+                        : 'Hồ sơ của bạn đã được xác minh danh tính an toàn.'),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,
               ),
-              const SizedBox(height: 26),
-              const _BenefitTile(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'Không giới hạn chat',
-                subtitle: 'Kết nối với mọi người không rào cản',
-              ),
-              const SizedBox(height: 10),
-              const _BenefitTile(
-                icon: Icons.workspace_premium_outlined,
-                title: 'Huy hiệu tin cậy',
-                subtitle: 'Hồ sơ hiển thị trạng thái đã xác minh',
-              ),
+              if (showBenefits) ...[
+                const SizedBox(height: 26),
+                const _BenefitTile(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: 'Không giới hạn chat',
+                  subtitle: 'Kết nối với mọi người không rào cản',
+                ),
+                const SizedBox(height: 10),
+                const _BenefitTile(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Huy hiệu tin cậy',
+                  subtitle: 'Hồ sơ hiển thị trạng thái đã xác minh',
+                ),
+              ],
               const Spacer(),
               SizedBox(
                 width: double.infinity,
@@ -131,18 +144,20 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: const Text('Tiếp tục trải nghiệm'),
+                  child: Text(primaryButtonLabel ?? 'Tiếp tục trải nghiệm'),
                 ),
               ),
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: onRetry,
-                child: Text(
-                  wasAlreadyVerifiedAtEntry
-                      ? 'Cập nhật dữ liệu xác thực'
-                      : 'Xác thực lại',
+              if (showRetryAction) ...[
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: onRetry,
+                  child: Text(
+                    wasAlreadyVerifiedAtEntry
+                        ? 'Cập nhật dữ liệu xác thực'
+                        : 'Xác thực lại',
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 10),
             ],
           ),

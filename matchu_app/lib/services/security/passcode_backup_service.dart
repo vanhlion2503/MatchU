@@ -3,15 +3,33 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
+
+class FaceRecoveryBackupStatus {
+  const FaceRecoveryBackupStatus({
+    required this.faceVerified,
+    required this.backupAvailable,
+  });
+
+  final bool faceVerified;
+  final bool backupAvailable;
+
+  static const unavailable = FaceRecoveryBackupStatus(
+    faceVerified: false,
+    backupAvailable: false,
+  );
+}
 
 class PasscodeBackupService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
   static final _storage = FlutterSecureStorage();
+  static final _functions = FirebaseFunctions.instance;
   static final _aesGcm = AesGcm.with256bits();
 
   static const int _backupKeyLength = 32;
@@ -112,6 +130,7 @@ class PasscodeBackupService {
 
     await setHistoryLocked(lockHistory);
     await backupAllLocalSessionKeys();
+    await syncFaceRecoveryBackupIfEligible();
   }
 
   static Future<bool> unlockPasscode(String passcode) async {
@@ -159,9 +178,76 @@ class PasscodeBackupService {
       );
 
       await setHistoryLocked(false);
+      await _storeFaceRecoveryBackupIfEligible(Uint8List.fromList(backupKey));
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  static Future<FaceRecoveryBackupStatus> getFaceRecoveryBackupStatus() async {
+    try {
+      final callable = _functions.httpsCallable('getFaceRecoveryBackupStatus');
+      final result = await callable.call();
+      final data = result.data;
+      if (data is Map) {
+        return FaceRecoveryBackupStatus(
+          faceVerified: data['faceVerified'] == true,
+          backupAvailable: data['available'] == true,
+        );
+      }
+    } catch (e) {
+      debugPrint('getFaceRecoveryBackupStatus failed: $e');
+    }
+    return FaceRecoveryBackupStatus.unavailable;
+  }
+
+  static Future<bool> hasFaceRecoveryBackupOnServer() async {
+    final status = await getFaceRecoveryBackupStatus();
+    return status.faceVerified && status.backupAvailable;
+  }
+
+  static Future<bool> unlockWithFaceSession(String sessionId) async {
+    final trimmedSessionId = sessionId.trim();
+    if (trimmedSessionId.isEmpty) {
+      return false;
+    }
+
+    try {
+      final callable = _functions.httpsCallable('recoverBackupKeyWithFace');
+      final result = await callable.call(<String, dynamic>{
+        'sessionId': trimmedSessionId,
+      });
+
+      final data = result.data;
+      if (data is! Map || data['backupKey'] is! String) {
+        return false;
+      }
+
+      final backupKey = base64Decode(data['backupKey'] as String);
+      if (backupKey.length != _backupKeyLength) {
+        return false;
+      }
+
+      await _storage.write(
+        key: _backupStorageKey(uid),
+        value: base64Encode(backupKey),
+      );
+      await setHistoryLocked(false);
+      return true;
+    } catch (e) {
+      debugPrint('recoverBackupKeyWithFace failed: $e');
+      return false;
+    }
+  }
+
+  static Future<void> syncFaceRecoveryBackupIfEligible() async {
+    try {
+      final backupKey = await _loadBackupKey();
+      if (backupKey == null) return;
+      await _storeFaceRecoveryBackupIfEligible(backupKey);
+    } catch (e) {
+      debugPrint('syncFaceRecoveryBackupIfEligible failed: $e');
     }
   }
 
@@ -298,6 +384,8 @@ class PasscodeBackupService {
       await _backupDoc().delete();
     } catch (_) {}
 
+    await _deleteFaceRecoveryBackup();
+
     final snap = await _backupKeysCollection().get();
     if (snap.docs.isNotEmpty) {
       WriteBatch batch = _db.batch();
@@ -340,6 +428,41 @@ class PasscodeBackupService {
     final b64 = await _storage.read(key: _backupStorageKey(uid));
     if (b64 == null) return null;
     return base64Decode(b64);
+  }
+
+  static Future<bool> _isCurrentUserFaceVerified() async {
+    try {
+      final snap = await _db.collection('users').doc(uid).get();
+      return snap.data()?['isFaceVerified'] == true;
+    } catch (e) {
+      debugPrint('read face verification state failed: $e');
+      return false;
+    }
+  }
+
+  static Future<void> _storeFaceRecoveryBackupIfEligible(
+    Uint8List backupKey,
+  ) async {
+    if (backupKey.length != _backupKeyLength) return;
+    if (!await _isCurrentUserFaceVerified()) return;
+
+    try {
+      final callable = _functions.httpsCallable('storeFaceRecoveryBackup');
+      await callable.call(<String, dynamic>{
+        'backupKey': base64Encode(backupKey),
+      });
+    } catch (e) {
+      debugPrint('storeFaceRecoveryBackup failed: $e');
+    }
+  }
+
+  static Future<void> _deleteFaceRecoveryBackup() async {
+    try {
+      final callable = _functions.httpsCallable('deleteFaceRecoveryBackup');
+      await callable.call();
+    } catch (e) {
+      debugPrint('deleteFaceRecoveryBackup failed: $e');
+    }
   }
 
   static DocumentReference<Map<String, dynamic>> _backupKeyDoc(

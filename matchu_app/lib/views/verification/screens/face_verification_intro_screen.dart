@@ -5,10 +5,16 @@ import 'package:matchu_app/views/verification/widgets/verification_common_widget
 class FaceVerificationIntroScreen extends StatelessWidget {
   const FaceVerificationIntroScreen({
     super.key,
+    this.title,
+    this.description,
+    this.primaryButtonLabel,
     required this.onBack,
     required this.onStart,
   });
 
+  final String? title;
+  final String? description;
+  final String? primaryButtonLabel;
   final VoidCallback onBack;
   final VoidCallback onStart;
 
@@ -104,14 +110,15 @@ class FaceVerificationIntroScreen extends StatelessWidget {
               ),
               const SizedBox(height: 26),
               Text(
-                'Xác thực khuôn mặt',
+                title ?? 'Xác thực khuôn mặt',
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Giúp cộng đồng an toàn và đáng tin cậy hơn. Quá trình này hoàn toàn riêng tư.',
+                description ??
+                    'Giúp cộng đồng an toàn và đáng tin cậy hơn. Quá trình này hoàn toàn riêng tư.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
               ),
@@ -144,7 +151,7 @@ class FaceVerificationIntroScreen extends StatelessWidget {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text('Bắt đầu xác thực'),
+                  child: Text(primaryButtonLabel ?? 'Bắt đầu xác thực'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -173,10 +180,7 @@ class FaceVerificationIntroScreen extends StatelessWidget {
 }
 
 class _IntroStepTile extends StatelessWidget {
-  const _IntroStepTile({
-    required this.icon,
-    required this.label,
-  });
+  const _IntroStepTile({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -193,9 +197,7 @@ class _IntroStepTile extends StatelessWidget {
         color: colorScheme.surface, // 👈 lightSurface / darkSurface
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark
-              ? AppTheme.darkBorder
-              : AppTheme.lightBorder,
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
         ),
       ),
       child: Row(
@@ -204,25 +206,20 @@ class _IntroStepTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isDark
-                  ? AppTheme.darkBackground
-                  : Colors.white,
+              color: isDark ? AppTheme.darkBackground : Colors.white,
               shape: BoxShape.circle,
-              boxShadow: isDark
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+              boxShadow:
+                  isDark
+                      ? null
+                      : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
             ),
-            child: Icon(
-              icon,
-              color: AppTheme.primaryColor,
-              size: 20,
-            ),
+            child: Icon(icon, color: AppTheme.primaryColor, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -239,4 +236,3 @@ class _IntroStepTile extends StatelessWidget {
     );
   }
 }
-

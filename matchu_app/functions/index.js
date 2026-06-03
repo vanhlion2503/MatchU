@@ -2,6 +2,12 @@ require("./src/shared/firebase");
 
 const { getTurnCredentials } = require("./src/callables/getTurnCredentials");
 const {
+  storeFaceRecoveryBackup,
+  getFaceRecoveryBackupStatus,
+  recoverBackupKeyWithFace,
+  deleteFaceRecoveryBackup,
+} = require("./src/callables/faceRecoveryBackup");
+const {
   touchReputationDailyOnAppOpen,
   getReputationDailyState,
   claimReputationTask,
@@ -36,6 +42,10 @@ const {
 } = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
+exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
+exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;
+exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;
+exports.deleteFaceRecoveryBackup = deleteFaceRecoveryBackup;
 exports.touchReputationDailyOnAppOpen = touchReputationDailyOnAppOpen;
 exports.getReputationDailyState = getReputationDailyState;
 exports.claimReputationTask = claimReputationTask;

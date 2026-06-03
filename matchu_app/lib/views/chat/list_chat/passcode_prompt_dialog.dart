@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:pinput/pinput.dart';
 
-enum PasscodePromptAction { submitted, reset }
+enum PasscodePromptAction { submitted, reset, faceUnlocked }
 
 class PasscodePromptResult {
   final PasscodePromptAction action;
@@ -243,6 +246,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
   String? title,
   String? description,
   Future<bool> Function(String passcode)? onUnlock,
+  Future<bool> Function()? onFaceUnlock,
 }) {
   final controller = TextEditingController();
 
@@ -254,6 +258,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
       final color = theme.colorScheme;
       String? localError = errorText;
       bool isSubmitting = false;
+      bool isFaceSubmitting = false;
       int shakeTrigger = 0;
 
       return StatefulBuilder(
@@ -315,6 +320,45 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
             }
           }
 
+          Future<void> submitFaceUnlock() async {
+            if (isSubmitting || isFaceSubmitting || onFaceUnlock == null) {
+              return;
+            }
+
+            setState(() {
+              isFaceSubmitting = true;
+              localError = null;
+            });
+
+            try {
+              final unlocked = await onFaceUnlock();
+              if (!context.mounted) return;
+
+              if (unlocked) {
+                Navigator.of(context).pop(
+                  const PasscodePromptResult(
+                    action: PasscodePromptAction.faceUnlocked,
+                  ),
+                );
+                return;
+              }
+
+              setState(() {
+                isFaceSubmitting = false;
+                localError =
+                    'Không thể mở khóa bằng khuôn mặt. Vui lòng thử lại hoặc nhập mã PIN.';
+              });
+            } catch (_) {
+              if (!context.mounted) return;
+
+              setState(() {
+                isFaceSubmitting = false;
+                localError =
+                    'Không thể mở khóa bằng khuôn mặt. Vui lòng thử lại.';
+              });
+            }
+          }
+
           return PopScope(
             canPop: false,
             child: AlertDialog(
@@ -333,7 +377,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                     primaryColor: color.primary,
                     textStyle: theme.textTheme.headlineSmall,
                     errorColor: color.error,
-                    readOnly: isSubmitting,
+                    readOnly: isSubmitting || isFaceSubmitting,
                     hasError: localError != null,
                     shakeTrigger: shakeTrigger,
                     onChanged: (_) {
@@ -352,6 +396,29 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                       ),
                     ),
                   ],
+                  if (onFaceUnlock != null) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed:
+                            isSubmitting || isFaceSubmitting
+                                ? null
+                                : submitFaceUnlock,
+                        icon:
+                            isFaceSubmitting
+                                ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : const Icon(Icons.face_retouching_natural),
+                        label: const Text('Quét khuôn mặt'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -363,7 +430,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                             alignment: Alignment.centerRight,
                             child: TextButton(
                               onPressed:
-                                  isSubmitting
+                                  isSubmitting || isFaceSubmitting
                                       ? null
                                       : () {
                                         Navigator.of(context).pop(
@@ -378,7 +445,10 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
-                          onPressed: isSubmitting ? null : submitPasscode,
+                          onPressed:
+                              isSubmitting || isFaceSubmitting
+                                  ? null
+                                  : submitPasscode,
                           child:
                               isSubmitting
                                   ? const SizedBox(
@@ -450,7 +520,10 @@ Future<bool> ensurePasscodeReady(
 
   final hasLocal = await PasscodeBackupService.hasLocalBackupKey();
   if (!context.mounted) return false;
-  if (hasLocal) return true;
+  if (hasLocal) {
+    unawaited(PasscodeBackupService.syncFaceRecoveryBackupIfEligible());
+    return true;
+  }
   if (!canContinue()) return false;
 
   if (allowHistoryLockedBypass) {
@@ -476,6 +549,8 @@ Future<bool> ensurePasscodeReady(
   }
 
   while (canContinue()) {
+    final faceRecoveryStatus =
+        await PasscodeBackupService.getFaceRecoveryBackupStatus();
     if (!context.mounted) return false;
     if (shouldContinue != null && !shouldContinue()) return false;
     final result = await showPasscodeUnlockDialog(
@@ -483,6 +558,8 @@ Future<bool> ensurePasscodeReady(
       title: unlockTitle,
       description: unlockDescription,
       onUnlock: PasscodeBackupService.unlockPasscode,
+      onFaceUnlock:
+          faceRecoveryStatus.faceVerified ? _unlockPasscodeWithFace : null,
     );
 
     if (result == null) return false;
@@ -508,9 +585,35 @@ Future<bool> ensurePasscodeReady(
       return true;
     }
 
+    if (result.action == PasscodePromptAction.faceUnlocked) {
+      await onUnlocked?.call();
+      return true;
+    }
+
     await onUnlocked?.call();
     return true;
   }
 
   return false;
+}
+
+Future<bool> _unlockPasscodeWithFace() async {
+  final result = await Get.toNamed(
+    AppRouter.faceVerification,
+    arguments: const <String, dynamic>{'mode': 'reauth'},
+  );
+
+  String? sessionId;
+  if (result is Map) {
+    final raw = result['sessionId'];
+    if (raw is String && raw.trim().isNotEmpty) {
+      sessionId = raw.trim();
+    }
+  }
+
+  if (sessionId == null) {
+    return false;
+  }
+
+  return PasscodeBackupService.unlockWithFaceSession(sessionId);
 }

@@ -29,9 +29,21 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
         return Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: SafeArea(
-            top: false,   // 👈 QUAN TRỌNG
+            top: false, // 👈 QUAN TRỌNG
             bottom: false,
             child: FaceVerificationIntroScreen(
+              title:
+                  controller.isReauthentication
+                      ? 'Mở khóa bằng khuôn mặt'
+                      : null,
+              description:
+                  controller.isReauthentication
+                      ? 'Quét khuôn mặt đã xác thực để khôi phục khóa giải mã tin nhắn trên thiết bị này.'
+                      : null,
+              primaryButtonLabel:
+                  controller.isReauthentication
+                      ? 'Bắt đầu quét khuôn mặt'
+                      : null,
               onBack: Get.back,
               onStart: controller.startVerificationFlow,
             ),
@@ -45,7 +57,7 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
                 ? Colors.black
                 : Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
-          top: false,   // 👈 QUAN TRỌNG
+          top: false, // 👈 QUAN TRỌNG
           bottom: false,
           child: switch (currentState) {
             VerificationState.idle ||
@@ -128,7 +140,16 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
   Widget _buildSuccessStage() {
     return FaceVerificationSuccessScreen(
       wasAlreadyVerifiedAtEntry: controller.wasAlreadyVerifiedAtEntry.value,
-      onContinue: Get.back,
+      title: controller.isReauthentication ? 'Mở khóa thành công!' : null,
+      description:
+          controller.isReauthentication
+              ? 'Khuôn mặt đã được xác nhận. MatchU sẽ khôi phục khóa giải mã tin nhắn trên thiết bị này.'
+              : null,
+      primaryButtonLabel:
+          controller.isReauthentication ? 'Tiếp tục mở khóa' : null,
+      showRetryAction: !controller.isReauthentication,
+      showBenefits: !controller.isReauthentication,
+      onContinue: () => Get.back(result: controller.successResultPayload),
       onRetry: () {
         controller.hasStartedVerificationFlow.value = true;
         controller.retryVerification();
