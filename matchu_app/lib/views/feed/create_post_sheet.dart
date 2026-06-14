@@ -813,30 +813,40 @@ class _PrivacySelector extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Obx(
-      () => PopupMenuButton<bool>(
+      () => PopupMenuButton<PostVisibility>(
         padding: EdgeInsets.zero,
-        offset: const Offset(0, -140),
+        offset: const Offset(0, -194),
         color: palette.sheetBackground,
         surfaceTintColor: Colors.transparent,
-        onSelected: (value) => controller.isPublic.value = value,
+        onSelected: controller.setVisibility,
         itemBuilder:
             (context) => [
-              PopupMenuItem<bool>(
-                value: true,
+              PopupMenuItem<PostVisibility>(
+                value: PostVisibility.public,
                 child: _PrivacyMenuItem(
                   title: 'Công khai',
                   subtitle: 'Hiển thị trong bảng tin công khai',
                   icon: Iconsax.global,
-                  selected: controller.isPublic.value,
+                  selected: controller.visibility.value.isPublic,
                 ),
               ),
-              PopupMenuItem<bool>(
-                value: false,
+              PopupMenuItem<PostVisibility>(
+                value: PostVisibility.followers,
+                child: _PrivacyMenuItem(
+                  title: 'Ng\u01B0\u1EDDi theo d\u00F5i',
+                  subtitle:
+                      'Ch\u1EC9 ng\u01B0\u1EDDi theo d\u00F5i b\u1EA1n m\u1EDBi xem',
+                  icon: Iconsax.profile_2user,
+                  selected: controller.visibility.value.isFollowersOnly,
+                ),
+              ),
+              PopupMenuItem<PostVisibility>(
+                value: PostVisibility.private,
                 child: _PrivacyMenuItem(
                   title: 'Riêng tư',
                   subtitle: 'Chỉ lưu cho bạn, không lên bảng tin công khai',
                   icon: Iconsax.lock,
-                  selected: !controller.isPublic.value,
+                  selected: controller.visibility.value.isPrivate,
                 ),
               ),
             ],
@@ -851,13 +861,13 @@ class _PrivacySelector extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                controller.isPublic.value ? Iconsax.global : Iconsax.lock,
+                _privacyIcon(controller.visibility.value),
                 size: 18,
                 color: palette.iconMuted,
               ),
               const SizedBox(width: 6),
               Text(
-                controller.isPublic.value ? 'Công khai' : 'Riêng tư',
+                _privacyLabel(controller.visibility.value),
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: palette.textSecondary,
@@ -870,6 +880,28 @@ class _PrivacySelector extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+IconData _privacyIcon(PostVisibility visibility) {
+  switch (visibility) {
+    case PostVisibility.public:
+      return Iconsax.global;
+    case PostVisibility.followers:
+      return Iconsax.profile_2user;
+    case PostVisibility.private:
+      return Iconsax.lock;
+  }
+}
+
+String _privacyLabel(PostVisibility visibility) {
+  switch (visibility) {
+    case PostVisibility.public:
+      return 'C\u00F4ng khai';
+    case PostVisibility.followers:
+      return 'Theo d\u00F5i';
+    case PostVisibility.private:
+      return 'Ri\u00EAng t\u01B0';
   }
 }
 

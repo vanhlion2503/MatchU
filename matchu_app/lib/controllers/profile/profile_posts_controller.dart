@@ -15,6 +15,7 @@ class ProfilePostsController extends GetxController {
   ProfilePostsController({
     required this.userId,
     required this.includePrivate,
+    this.includeFollowersOnly = false,
     this.source = ProfilePostsSource.authored,
     PostService? postService,
   }) : _service = postService ?? PostService();
@@ -29,7 +30,16 @@ class ProfilePostsController extends GetxController {
   static String otherProfileTag(
     String userId, {
     required bool includePrivate,
-  }) => 'other_profile_posts_${userId}_${includePrivate ? 'self' : 'public'}';
+    bool includeFollowersOnly = false,
+  }) {
+    final scope =
+        includePrivate
+            ? 'self'
+            : includeFollowersOnly
+            ? 'followers'
+            : 'public';
+    return 'other_profile_posts_${userId}_$scope';
+  }
 
   static List<String> selfProfileTags(String userId) => <String>[
     ownerProfileTag(userId),
@@ -40,6 +50,7 @@ class ProfilePostsController extends GetxController {
 
   final String userId;
   final bool includePrivate;
+  final bool includeFollowersOnly;
   final ProfilePostsSource source;
   final PostService _service;
 
@@ -68,6 +79,8 @@ class ProfilePostsController extends GetxController {
   final Set<String> _fetchedRepostReferenceIds = <String>{};
   final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
+  final Map<String, DocumentSnapshot<Map<String, dynamic>>>
+  _lastDocumentsByScope = <String, DocumentSnapshot<Map<String, dynamic>>>{};
   String get currentUserId => _service.uid;
   Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
 
@@ -104,7 +117,7 @@ class ProfilePostsController extends GetxController {
   void prependPost(PostModel post) {
     if (source == ProfilePostsSource.saved) return;
     if (post.authorId != userId) return;
-    if (!includePrivate && !post.isPublic) return;
+    if (!_canIncludeAuthoredPost(post)) return;
 
     final targetPostId = _repostTargetPostIdOf(post);
     if (targetPostId.isNotEmpty && !_repostCache.containsKey(targetPostId)) {
@@ -459,6 +472,8 @@ class ProfilePostsController extends GetxController {
         status.value = ProfilePostsStatus.loading;
       }
       errorMessage.value = null;
+      _lastDocument = null;
+      _lastDocumentsByScope.clear();
     } else {
       if (isLoadingMore.value || !hasMore.value) return;
       isLoadingMore.value = true;
@@ -475,8 +490,10 @@ class ProfilePostsController extends GetxController {
               : await _service.fetchPostsByAuthor(
                 authorId: userId,
                 startAfter: reset ? null : _lastDocument,
+                startAfterByScope: reset ? null : Map.of(_lastDocumentsByScope),
                 limit: _pageSize,
                 publicOnly: !includePrivate,
+                includeFollowersOnly: includeFollowersOnly,
               );
 
       if (reset) {
@@ -509,6 +526,13 @@ class ProfilePostsController extends GetxController {
       _ensureRepostReferencesLoaded(posts);
 
       _lastDocument = page.lastDocument;
+      if (reset) {
+        _lastDocumentsByScope
+          ..clear()
+          ..addAll(page.lastDocumentsByScope);
+      } else {
+        _lastDocumentsByScope.addAll(page.lastDocumentsByScope);
+      }
       hasMore.value = page.hasMore;
 
       if (posts.isEmpty) {
@@ -695,11 +719,17 @@ class ProfilePostsController extends GetxController {
 
     final localPosts = _locallyPrependedPosts.values
         .where((post) => post.authorId == userId)
-        .where((post) => includePrivate || post.isPublic)
+        .where(_canIncludeAuthoredPost)
         .toList(growable: false);
 
     if (localPosts.isEmpty) return incoming;
     return _mergePosts(incoming, localPosts);
+  }
+
+  bool _canIncludeAuthoredPost(PostModel post) {
+    if (includePrivate) return true;
+    if (post.isPublic) return true;
+    return includeFollowersOnly && post.isFollowersOnly;
   }
 
   Future<void> _removePostByIdWithAnimation(String postId) async {
@@ -1085,7 +1115,7 @@ class ProfilePostsController extends GetxController {
       content: reference.content,
       media: reference.media,
       tags: reference.tags,
-      isPublic: reference.isPublic,
+      visibility: reference.visibility,
       stats: repostPost.stats,
       trendScore: repostPost.trendScore,
       trendBucket: repostPost.trendBucket,

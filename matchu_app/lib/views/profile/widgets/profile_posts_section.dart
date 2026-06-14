@@ -335,8 +335,10 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                   sourcePost: posts[index],
                   isRepostTab: isRepostTab,
                   showDivider: index > 0,
-                  showPrivateBanner:
-                      widget.isOwnerView && !posts[index].isPublic,
+                  visibilityBanner:
+                      widget.isOwnerView && !posts[index].isPublic
+                          ? posts[index].visibility
+                          : null,
                 ),
               ],
             ],
@@ -366,7 +368,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     required PostModel sourcePost,
     required bool isRepostTab,
     required bool showDivider,
-    required bool showPrivateBanner,
+    required PostVisibility? visibilityBanner,
   }) {
     final displayPost = _resolveDisplayPost(
       controller: controller,
@@ -382,7 +384,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       listPostId: sourcePost.postId,
       displayPost: displayPost,
       showDivider: showDivider,
-      showPrivateBanner: showPrivateBanner,
+      visibilityBanner: visibilityBanner,
       onTap: () => _openPostDetail(displayPost, controllerTag: controllerTag),
       onLikeTap: () => controller.toggleLike(displayPost.postId),
       onCommentTap:
@@ -495,7 +497,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       content: reference.content,
       media: reference.media,
       tags: reference.tags,
-      isPublic: reference.isPublic,
+      visibility: reference.visibility,
       stats: const StatsModel(),
       trendScore: 0,
       trendBucket: 0,
@@ -599,7 +601,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
 
     Get.snackbar(
       'Thông báo',
-      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
+      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -630,7 +632,7 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
     required this.listPostId,
     required this.displayPost,
     required this.showDivider,
-    required this.showPrivateBanner,
+    required this.visibilityBanner,
     required this.onTap,
     required this.onLikeTap,
     required this.onCommentTap,
@@ -646,7 +648,7 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
   final String listPostId;
   final PostModel displayPost;
   final bool showDivider;
-  final bool showPrivateBanner;
+  final PostVisibility? visibilityBanner;
   final VoidCallback onTap;
   final VoidCallback onLikeTap;
   final VoidCallback onCommentTap;
@@ -683,7 +685,11 @@ class _ProfileRemovalAnimatedPostItem extends StatelessWidget {
                   children: [
                     if (showDivider)
                       Divider(height: 1, thickness: 1, color: palette.border),
-                    if (showPrivateBanner) _PrivatePostBanner(palette: palette),
+                    if (visibilityBanner != null)
+                      _PrivatePostBanner(
+                        palette: palette,
+                        visibility: visibilityBanner!,
+                      ),
                     PostItem(
                       key: ValueKey('profile_post_item_$listPostId'),
                       post: displayPost,
@@ -736,9 +742,10 @@ class _ProfilePostsTabBar extends StatelessWidget {
 }
 
 class _PrivatePostBanner extends StatelessWidget {
-  const _PrivatePostBanner({required this.palette});
+  const _PrivatePostBanner({required this.palette, required this.visibility});
 
   final FeedPalette palette;
+  final PostVisibility visibility;
 
   @override
   Widget build(BuildContext context) {
@@ -749,10 +756,18 @@ class _PrivatePostBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
         children: [
-          Icon(Icons.lock_outline_rounded, size: 16, color: palette.iconMuted),
+          Icon(
+            visibility.isFollowersOnly
+                ? Icons.group_outlined
+                : Icons.lock_outline_rounded,
+            size: 16,
+            color: palette.iconMuted,
+          ),
           const SizedBox(width: 6),
           Text(
-            'Bài viết riêng tư',
+            visibility.isFollowersOnly
+                ? 'B\u00E0i vi\u1EBFt cho ng\u01B0\u1EDDi theo d\u00F5i'
+                : 'B\u00E0i vi\u1EBFt ri\u00EAng t\u01B0',
             style: theme.textTheme.bodySmall?.copyWith(
               color: palette.textSecondary,
               fontWeight: FontWeight.w700,

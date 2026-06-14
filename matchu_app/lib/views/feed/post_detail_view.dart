@@ -144,7 +144,7 @@ class _PostDetailViewState extends State<PostDetailView> {
 
     Get.snackbar(
       'Thông báo',
-      'Bài viết ở chế độ riêng tư sẽ không hiển thị trong bảng tin công khai.',
+      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

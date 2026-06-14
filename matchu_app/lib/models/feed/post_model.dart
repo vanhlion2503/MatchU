@@ -34,6 +34,54 @@ enum PostType {
   }
 }
 
+enum PostVisibility {
+  public,
+  followers,
+  private;
+
+  String get firestoreValue {
+    switch (this) {
+      case PostVisibility.public:
+        return 'public';
+      case PostVisibility.followers:
+        return 'followers';
+      case PostVisibility.private:
+        return 'private';
+    }
+  }
+
+  bool get isPublic => this == PostVisibility.public;
+  bool get isFollowersOnly => this == PostVisibility.followers;
+  bool get isPrivate => this == PostVisibility.private;
+
+  static PostVisibility fromFirestoreValue(
+    dynamic value, {
+    dynamic legacyIsPublic,
+  }) {
+    final normalized = value?.toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'public':
+        return PostVisibility.public;
+      case 'followers':
+      case 'followers_only':
+      case 'followersonly':
+        return PostVisibility.followers;
+      case 'private':
+        return PostVisibility.private;
+    }
+
+    if (legacyIsPublic == false) {
+      return PostVisibility.private;
+    }
+
+    return PostVisibility.public;
+  }
+
+  static PostVisibility fromLegacyIsPublic(bool isPublic) {
+    return isPublic ? PostVisibility.public : PostVisibility.private;
+  }
+}
+
 class PostAuthorModel {
   const PostAuthorModel({
     required this.id,
@@ -94,11 +142,14 @@ class PostReferenceModel {
     required this.content,
     required this.media,
     required this.tags,
-    required this.isPublic,
     required this.author,
+    PostVisibility? visibility,
+    bool? isPublic,
     this.createdAt,
     this.deletedAt,
-  });
+  }) : visibility =
+           visibility ??
+           (isPublic == false ? PostVisibility.private : PostVisibility.public);
 
   final String postId;
   final String authorId;
@@ -106,11 +157,14 @@ class PostReferenceModel {
   final String content;
   final List<MediaModel> media;
   final List<String> tags;
-  final bool isPublic;
+  final PostVisibility visibility;
   final PostAuthorModel author;
   final DateTime? createdAt;
   final DateTime? deletedAt;
 
+  bool get isPublic => visibility.isPublic;
+  bool get isFollowersOnly => visibility.isFollowersOnly;
+  bool get isPrivate => visibility.isPrivate;
   bool get hasContent => content.trim().isNotEmpty;
   bool get hasMedia => media.isNotEmpty;
   bool get isUnavailable => deletedAt != null;
@@ -123,7 +177,7 @@ class PostReferenceModel {
       content: post.content,
       media: post.media,
       tags: post.tags,
-      isPublic: post.isPublic,
+      visibility: post.visibility,
       author: post.author,
       createdAt: post.createdAt,
       deletedAt: post.deletedAt,
@@ -139,7 +193,7 @@ class PostReferenceModel {
         content: '',
         media: <MediaModel>[],
         tags: <String>[],
-        isPublic: true,
+        visibility: PostVisibility.public,
         author: PostAuthorModel(
           id: '',
           name: '',
@@ -165,7 +219,10 @@ class PostReferenceModel {
           .map((tag) => tag.toString().trim())
           .where((tag) => tag.isNotEmpty)
           .toList(growable: false),
-      isPublic: json['isPublic'] != false,
+      visibility: PostVisibility.fromFirestoreValue(
+        json['visibility'],
+        legacyIsPublic: json['isPublic'],
+      ),
       author: PostAuthorModel.fromJson(_asMap(json['author'])),
       createdAt: _parseDateTime(json['createdAt']),
       deletedAt: _parseDateTime(json['deletedAt']),
@@ -180,6 +237,7 @@ class PostReferenceModel {
       'content': content,
       'media': media.map((item) => item.toJson()).toList(growable: false),
       'tags': tags,
+      'visibility': visibility.firestoreValue,
       'isPublic': isPublic,
       'author': author.toJson(),
       'createdAt': createdAt,
@@ -194,6 +252,7 @@ class PostReferenceModel {
     String? content,
     List<MediaModel>? media,
     List<String>? tags,
+    PostVisibility? visibility,
     bool? isPublic,
     PostAuthorModel? author,
     DateTime? createdAt,
@@ -206,7 +265,11 @@ class PostReferenceModel {
       content: content ?? this.content,
       media: media ?? this.media,
       tags: tags ?? this.tags,
-      isPublic: isPublic ?? this.isPublic,
+      visibility:
+          visibility ??
+          (isPublic == null
+              ? this.visibility
+              : PostVisibility.fromLegacyIsPublic(isPublic)),
       author: author ?? this.author,
       createdAt: createdAt ?? this.createdAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -237,11 +300,12 @@ class PostModel {
     required this.content,
     required this.media,
     required this.tags,
-    required this.isPublic,
     required this.stats,
     required this.trendScore,
     required this.trendBucket,
     required this.author,
+    PostVisibility? visibility,
+    bool? isPublic,
     this.referencePostId,
     this.referencePost,
     this.createdAt,
@@ -253,7 +317,9 @@ class PostModel {
     this.isRepostPending = false,
     this.isSaved = false,
     this.isSavePending = false,
-  });
+  }) : visibility =
+           visibility ??
+           (isPublic == false ? PostVisibility.private : PostVisibility.public);
 
   final String postId;
   final String authorId;
@@ -261,7 +327,7 @@ class PostModel {
   final String content;
   final List<MediaModel> media;
   final List<String> tags;
-  final bool isPublic;
+  final PostVisibility visibility;
   final StatsModel stats;
   final double trendScore;
   final int trendBucket;
@@ -280,6 +346,9 @@ class PostModel {
   final bool isSaved;
   final bool isSavePending;
 
+  bool get isPublic => visibility.isPublic;
+  bool get isFollowersOnly => visibility.isFollowersOnly;
+  bool get isPrivate => visibility.isPrivate;
   bool get hasContent => content.trim().isNotEmpty;
   bool get hasMedia => media.isNotEmpty;
   bool get hasReferencePost => referencePost != null;
@@ -313,7 +382,10 @@ class PostModel {
           .map((tag) => tag.toString().trim())
           .where((tag) => tag.isNotEmpty)
           .toList(growable: false),
-      isPublic: json['isPublic'] == true,
+      visibility: PostVisibility.fromFirestoreValue(
+        json['visibility'],
+        legacyIsPublic: json['isPublic'],
+      ),
       stats: StatsModel.fromJson(_asMap(json['stats'])),
       trendScore: _parseDouble(json['trendScore']),
       trendBucket: _parseInt(json['trendBucket']),
@@ -334,6 +406,7 @@ class PostModel {
       'content': content,
       'media': media.map((item) => item.toJson()).toList(growable: false),
       'tags': tags,
+      'visibility': visibility.firestoreValue,
       'isPublic': isPublic,
       'stats': stats.toJson(),
       'trendScore': trendScore,
@@ -354,6 +427,7 @@ class PostModel {
     String? content,
     List<MediaModel>? media,
     List<String>? tags,
+    PostVisibility? visibility,
     bool? isPublic,
     StatsModel? stats,
     double? trendScore,
@@ -378,7 +452,11 @@ class PostModel {
       content: content ?? this.content,
       media: media ?? this.media,
       tags: tags ?? this.tags,
-      isPublic: isPublic ?? this.isPublic,
+      visibility:
+          visibility ??
+          (isPublic == null
+              ? this.visibility
+              : PostVisibility.fromLegacyIsPublic(isPublic)),
       stats: stats ?? this.stats,
       trendScore: trendScore ?? this.trendScore,
       trendBucket: trendBucket ?? this.trendBucket,

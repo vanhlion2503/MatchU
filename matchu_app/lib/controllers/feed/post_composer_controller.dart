@@ -26,7 +26,7 @@ class PostComposerController extends GetxController {
   final RxInt contentLength = 0.obs;
   final RxBool isSubmitting = false.obs;
   final RxBool isPickingMedia = false.obs;
-  final RxBool isPublic = true.obs;
+  final Rx<PostVisibility> visibility = PostVisibility.public.obs;
   final RxBool isTagEditorVisible = false.obs;
 
   bool get isQuoteComposer => quotedPost != null;
@@ -45,6 +45,7 @@ class PostComposerController extends GetxController {
     contentController.addListener(_handleContentChanged);
     tagInputController.addListener(_handleTagInputChanged);
     _handleContentChanged();
+    _setSafeDefaultVisibilityForQuote();
   }
 
   Future<void> pickImages() async {
@@ -111,6 +112,10 @@ class PostComposerController extends GetxController {
     isTagEditorVisible.value = true;
   }
 
+  void setVisibility(PostVisibility nextVisibility) {
+    visibility.value = nextVisibility;
+  }
+
   Future<PostModel?> submit() async {
     if (isSubmitting.value) return null;
 
@@ -135,13 +140,13 @@ class PostComposerController extends GetxController {
                 mediaDrafts: mediaDrafts.toList(growable: false),
                 tags: tags.toList(growable: false),
                 sourcePost: quotedPost!,
-                isPublic: isPublic.value,
+                visibility: visibility.value,
               )
               : await _service.createPost(
                 content: content,
                 mediaDrafts: mediaDrafts.toList(growable: false),
                 tags: tags.toList(growable: false),
-                isPublic: isPublic.value,
+                visibility: visibility.value,
               );
 
       return post;
@@ -234,5 +239,12 @@ class PostComposerController extends GetxController {
 
   void _handleContentChanged() {
     contentLength.value = contentController.text.trim().length;
+  }
+
+  void _setSafeDefaultVisibilityForQuote() {
+    final sourcePost = quotedPost;
+    if (sourcePost == null || sourcePost.isPublic) return;
+    if (sourcePost.authorId.trim() == _service.uid.trim()) return;
+    visibility.value = PostVisibility.private;
   }
 }

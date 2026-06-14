@@ -149,7 +149,7 @@ class _FeedScreenState extends State<FeedScreen>
 
     Get.snackbar(
       'Thong bao',
-      'Bai viet o che do rieng tu se khong hien thi trong bang tin cong khai.',
+      'Bai viet khong cong khai se khong hien thi trong bang tin cong khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -226,7 +226,7 @@ class _FeedScreenState extends State<FeedScreen>
       content: reference.content,
       media: reference.media,
       tags: reference.tags,
-      isPublic: reference.isPublic,
+      visibility: reference.visibility,
       stats: const StatsModel(),
       trendScore: 0,
       trendBucket: 0,

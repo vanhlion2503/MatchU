@@ -71,15 +71,21 @@ class OtherProfileView extends StatelessWidget {
         final UserModel u = c.user.value!;
         final String currentUid = c.currentUid;
         final bool isMe = currentUid == u.uid;
+        final bool canSeeFollowersOnly = isMe || c.isFollowing.value;
         final postsTag = ProfilePostsController.otherProfileTag(
           u.uid,
           includePrivate: isMe,
+          includeFollowersOnly: canSeeFollowersOnly,
         );
         final savedPostsTag =
             isMe ? ProfilePostsController.ownerSavedTag(u.uid) : null;
         if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
           Get.put(
-            ProfilePostsController(userId: u.uid, includePrivate: isMe),
+            ProfilePostsController(
+              userId: u.uid,
+              includePrivate: isMe,
+              includeFollowersOnly: canSeeFollowersOnly,
+            ),
             tag: postsTag,
           );
         }

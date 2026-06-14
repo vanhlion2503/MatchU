@@ -73,6 +73,10 @@ class FeedController extends GetxController {
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   DocumentSnapshot<Map<String, dynamic>>? _featuredLastDocument;
   DocumentSnapshot<Map<String, dynamic>>? _followingLastDocument;
+  final Map<String, DocumentSnapshot<Map<String, dynamic>>>
+  _followingFollowersOnlyLastDocuments =
+      <String, DocumentSnapshot<Map<String, dynamic>>>{};
+  final Set<String> _followingFollowersOnlyExhaustedAuthorIds = <String>{};
   final List<PostModel> _featuredBufferedPosts = <PostModel>[];
   final List<PostModel> _followingBufferedPosts = <PostModel>[];
   Set<String> _followingAuthorIds = <String>{};
@@ -755,6 +759,8 @@ class FeedController extends GetxController {
       }
       followingErrorMessage.value = null;
       _followingLastDocument = null;
+      _followingFollowersOnlyLastDocuments.clear();
+      _followingFollowersOnlyExhaustedAuthorIds.clear();
       _followingBufferedPosts.clear();
       _followingSourceHasMore = true;
       followingHasMore.value = true;
@@ -772,6 +778,8 @@ class FeedController extends GetxController {
           followingPosts.clear();
         }
         _followingLastDocument = null;
+        _followingFollowersOnlyLastDocuments.clear();
+        _followingFollowersOnlyExhaustedAuthorIds.clear();
         _followingBufferedPosts.clear();
         _followingSourceHasMore = false;
         followingHasMore.value = false;
@@ -796,6 +804,60 @@ class FeedController extends GetxController {
         );
         loadedPosts.addAll(bufferedPosts);
         loadedPostIds.addAll(bufferedPosts.map((post) => post.postId.trim()));
+      }
+
+      void acceptFollowingPosts(List<PostModel> acceptedBatch) {
+        if (acceptedBatch.isEmpty) return;
+
+        final remaining = _pageSize - loadedPosts.length;
+        if (remaining > 0) {
+          final visiblePosts = acceptedBatch
+              .take(remaining)
+              .toList(growable: false);
+          loadedPosts.addAll(visiblePosts);
+          existingIds.addAll(visiblePosts.map((post) => post.postId.trim()));
+        }
+
+        final bufferedPosts = acceptedBatch
+            .skip(remaining > 0 ? remaining : 0)
+            .where((post) => post.postId.trim().isNotEmpty)
+            .toList(growable: false);
+        _followingBufferedPosts.addAll(bufferedPosts);
+      }
+
+      if (loadedPosts.length < _pageSize) {
+        final followersOnlyPage = await _service
+            .fetchFollowersOnlyPostsByAuthors(
+              authorIds: followingAuthorIds,
+              startAfterByAuthor: Map.of(_followingFollowersOnlyLastDocuments),
+              exhaustedAuthorIds: Set.of(
+                _followingFollowersOnlyExhaustedAuthorIds,
+              ),
+              limitPerAuthor: reset ? 2 : 1,
+            );
+        _followingFollowersOnlyLastDocuments.addAll(
+          followersOnlyPage.lastDocumentsByAuthor,
+        );
+        _followingFollowersOnlyExhaustedAuthorIds.addAll(
+          followersOnlyPage.exhaustedAuthorIds,
+        );
+
+        final hydratedFollowersOnlyPosts = await _hydrateFeedPosts(
+          followersOnlyPage.posts,
+          reset: false,
+        );
+        final acceptedFollowersOnlyPosts = <PostModel>[];
+        for (final post in hydratedFollowersOnlyPosts) {
+          final postId = post.postId.trim();
+          if (postId.isEmpty ||
+              existingIds.contains(postId) ||
+              loadedPostIds.contains(postId)) {
+            continue;
+          }
+          acceptedFollowersOnlyPosts.add(post);
+          loadedPostIds.add(postId);
+        }
+        acceptFollowingPosts(acceptedFollowersOnlyPosts);
       }
 
       while (loadedPosts.length < _pageSize &&
@@ -834,22 +896,17 @@ class FeedController extends GetxController {
           loadedPostIds.add(postId);
         }
 
-        final remaining = _pageSize - loadedPosts.length;
-        if (remaining > 0 && acceptedBatch.isNotEmpty) {
-          final visiblePosts = acceptedBatch
-              .take(remaining)
-              .toList(growable: false);
-          loadedPosts.addAll(visiblePosts);
-          existingIds.addAll(visiblePosts.map((post) => post.postId.trim()));
-
-          final bufferedPosts = acceptedBatch
-              .skip(remaining)
-              .where((post) => post.postId.trim().isNotEmpty)
-              .toList(growable: false);
-          _followingBufferedPosts.addAll(bufferedPosts);
-        }
+        acceptFollowingPosts(acceptedBatch);
         scanPass++;
       }
+
+      loadedPosts.sort((a, b) {
+        final aCreatedAt =
+            a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bCreatedAt =
+            b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bCreatedAt.compareTo(aCreatedAt);
+      });
 
       if (reset) {
         followingPosts.assignAll(loadedPosts);
@@ -860,7 +917,10 @@ class FeedController extends GetxController {
       _followingLastDocument = cursor;
       _followingSourceHasMore = sourceHasMore;
       followingHasMore.value =
-          _followingBufferedPosts.isNotEmpty || _followingSourceHasMore;
+          _followingBufferedPosts.isNotEmpty ||
+          _followingSourceHasMore ||
+          _followingFollowersOnlyExhaustedAuthorIds.length <
+              followingAuthorIds.length;
 
       if (followingPosts.isEmpty) {
         followingStatus.value = FeedStatus.empty;

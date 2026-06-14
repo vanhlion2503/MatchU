@@ -7,6 +7,60 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    function postVisibility(data) {
+      return data.visibility is string
+        ? data.visibility
+        : (data.isPublic == true ? "public" : "private");
+    }
+
+    function isValidPostVisibilityValue(value) {
+      return value in ["public", "followers", "private"];
+    }
+
+    function hasValidPostVisibilityForWrite(data) {
+      return (
+        !("visibility" in data)
+        && data.isPublic is bool
+      ) || (
+        data.visibility is string
+        && isValidPostVisibilityValue(data.visibility)
+        && data.isPublic is bool
+        && (
+          (data.visibility == "public" && data.isPublic == true)
+          || (data.visibility != "public" && data.isPublic == false)
+        )
+      );
+    }
+
+    function isPostPublic(data) {
+      return postVisibility(data) == "public";
+    }
+
+    function isPostFollowersOnly(data) {
+      return postVisibility(data) == "followers";
+    }
+
+    function isFollowerOf(authorId) {
+      return request.auth != null
+        && authorId is string
+        && exists(/databases/$(database)/documents/users/$(authorId))
+        && get(/databases/$(database)/documents/users/$(authorId)).data.followers is list
+        && request.auth.uid in
+          get(/databases/$(database)/documents/users/$(authorId)).data.followers;
+    }
+
+    function canAccessPostData(data) {
+      return isPostPublic(data)
+        || (
+          request.auth != null
+          && data.authorId == request.auth.uid
+        )
+        || (
+          isPostFollowersOnly(data)
+          && isFollowerOf(data.authorId)
+        );
+    }
+
     // ================= USERS =================
     match /users/{userId} {
       function isSignedIn() {
@@ -303,10 +357,7 @@ service cloud.firestore {
 
       function canAccessTargetPost() {
         return targetPostExists()
-          && (
-            targetPost().isPublic == true
-            || targetPost().authorId == request.auth.uid
-          );
+          && canAccessPostData(targetPost());
       }
 
       allow read: if isOwner();
@@ -372,7 +423,7 @@ service cloud.firestore {
       }
 
       function canReadPost() {
-        return resource.data.isPublic == true
+        return canAccessPostData(resource.data)
           || isAuthor()
           || canProbeOwnRepostDoc();
       }
@@ -401,6 +452,7 @@ service cloud.firestore {
 
       function isStatsCounterOnlyUpdate() {
         return isSignedIn()
+          && canAccessPostData(resource.data)
           && request.resource.data.stats is map
           && resource.data.stats is map
           && request.resource.data.diff(resource.data).changedKeys()
@@ -426,8 +478,12 @@ service cloud.firestore {
       }
 
       allow read: if canReadPost();
-      allow create: if isAuthorCreate();
-      allow update: if isAuthor() || isStatsCounterOnlyUpdate();
+      allow create: if isAuthorCreate()
+        && hasValidPostVisibilityForWrite(request.resource.data);
+      allow update: if (
+          isAuthor()
+          && hasValidPostVisibilityForWrite(request.resource.data)
+        ) || isStatsCounterOnlyUpdate();
       allow delete: if isAuthor();
 
       match /likes/{userId} {
@@ -437,11 +493,7 @@ service cloud.firestore {
         }
 
         function canAccessParentPost() {
-          return parentPost().isPublic == true
-            || (
-              request.auth != null
-              && request.auth.uid == parentPost().authorId
-            );
+          return canAccessPostData(parentPost());
         }
 
         allow read: if request.auth != null
@@ -467,11 +519,7 @@ service cloud.firestore {
         }
 
         function canAccessParentPost() {
-          return parentPost().isPublic == true
-            || (
-              request.auth != null
-              && request.auth.uid == parentPost().authorId
-            );
+          return canAccessPostData(parentPost());
         }
 
         allow read: if canAccessParentPost();

@@ -28,6 +28,8 @@ class PostService {
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
   static const int _whereInLimit = 30;
+  static const String _authorPublicScope = 'public';
+  static const String _authorFollowersScope = 'followers';
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
@@ -118,7 +120,10 @@ class PostService {
 
     while (collectedPosts.length < limit && canLoadMore) {
       Query<Map<String, dynamic>> query = _postsRef
-          .where('isPublic', isEqualTo: true)
+          .where(
+            'visibility',
+            isEqualTo: PostVisibility.public.firestoreValue,
+          )
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
@@ -159,17 +164,119 @@ class PostService {
     );
   }
 
+  Future<
+    ({
+      List<PostModel> posts,
+      Map<String, DocumentSnapshot<Map<String, dynamic>>> lastDocumentsByAuthor,
+      Set<String> exhaustedAuthorIds,
+    })
+  >
+  fetchFollowersOnlyPostsByAuthors({
+    required Iterable<String> authorIds,
+    required Map<String, DocumentSnapshot<Map<String, dynamic>>>
+    startAfterByAuthor,
+    required Set<String> exhaustedAuthorIds,
+    int limitPerAuthor = 2,
+  }) async {
+    final normalizedAuthorIds = authorIds
+        .map((authorId) => authorId.trim())
+        .where((authorId) => authorId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (normalizedAuthorIds.isEmpty || limitPerAuthor <= 0) {
+      return (
+        posts: const <PostModel>[],
+        lastDocumentsByAuthor:
+            const <String, DocumentSnapshot<Map<String, dynamic>>>{},
+        exhaustedAuthorIds: const <String>{},
+      );
+    }
+
+    final collectedPosts = <PostModel>[];
+    final nextCursors = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    final newlyExhaustedAuthorIds = <String>{};
+
+    for (final authorId in normalizedAuthorIds) {
+      if (exhaustedAuthorIds.contains(authorId)) continue;
+
+      var query = _postsRef
+          .where('authorId', isEqualTo: authorId)
+          .where(
+            'visibility',
+            isEqualTo: PostVisibility.followers.firestoreValue,
+          )
+          .orderBy('createdAt', descending: true)
+          .limit(limitPerAuthor);
+
+      final cursor = startAfterByAuthor[authorId];
+      if (cursor != null) {
+        query = query.startAfterDocument(cursor);
+      }
+
+      try {
+        final snapshot = await query.get();
+        final docs = snapshot.docs;
+        if (docs.isEmpty) {
+          newlyExhaustedAuthorIds.add(authorId);
+          continue;
+        }
+
+        nextCursors[authorId] = docs.last;
+        if (docs.length < limitPerAuthor) {
+          newlyExhaustedAuthorIds.add(authorId);
+        }
+
+        for (final doc in docs) {
+          final post = PostModel.fromDoc(doc);
+          if (post.deletedAt != null || post.postType.isRepostOnly) {
+            continue;
+          }
+          collectedPosts.add(post);
+        }
+      } on FirebaseException catch (error) {
+        if (error.code == 'permission-denied') {
+          newlyExhaustedAuthorIds.add(authorId);
+          continue;
+        }
+        rethrow;
+      }
+    }
+
+    collectedPosts.sort((a, b) {
+      final aCreatedAt = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bCreatedAt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bCreatedAt.compareTo(aCreatedAt);
+    });
+
+    return (
+      posts: collectedPosts,
+      lastDocumentsByAuthor: nextCursors,
+      exhaustedAuthorIds: newlyExhaustedAuthorIds,
+    );
+  }
+
   Future<PostPageResult> fetchPostsByAuthor({
     required String authorId,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
+    Map<String, DocumentSnapshot<Map<String, dynamic>>>? startAfterByScope,
     int limit = defaultPageSize,
     bool publicOnly = false,
+    bool includeFollowersOnly = false,
   }) async {
     if (authorId.trim().isEmpty) {
       return const PostPageResult(
         posts: <PostModel>[],
         lastDocument: null,
         hasMore: false,
+      );
+    }
+
+    if (publicOnly && includeFollowersOnly) {
+      return _fetchPublicAndFollowersPostsByAuthor(
+        authorId: authorId,
+        startAfterByScope: startAfterByScope ?? const {},
+        limit: limit,
       );
     }
 
@@ -184,7 +291,10 @@ class PostService {
       );
 
       if (publicOnly) {
-        query = query.where('isPublic', isEqualTo: true);
+        query = query.where(
+          'visibility',
+          isEqualTo: PostVisibility.public.firestoreValue,
+        );
       }
 
       query = query.orderBy('createdAt', descending: true).limit(limit);
@@ -224,6 +334,79 @@ class PostService {
       lastDocument: cursor,
       hasMore: canLoadMore,
     );
+  }
+
+  Future<PostPageResult> _fetchPublicAndFollowersPostsByAuthor({
+    required String authorId,
+    required Map<String, DocumentSnapshot<Map<String, dynamic>>>
+    startAfterByScope,
+    required int limit,
+  }) async {
+    final publicQuery = _postsRef
+        .where('authorId', isEqualTo: authorId)
+        .where(
+          'visibility',
+          isEqualTo: PostVisibility.public.firestoreValue,
+        )
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    final followersQuery = _postsRef
+        .where('authorId', isEqualTo: authorId)
+        .where('visibility', isEqualTo: PostVisibility.followers.firestoreValue)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    final publicSnapshot =
+        await _queryWithOptionalCursor(
+          publicQuery,
+          startAfterByScope[_authorPublicScope],
+        ).get();
+    final followersSnapshot =
+        await _queryWithOptionalCursor(
+          followersQuery,
+          startAfterByScope[_authorFollowersScope],
+        ).get();
+
+    final lastDocumentsByScope =
+        <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    if (publicSnapshot.docs.isNotEmpty) {
+      lastDocumentsByScope[_authorPublicScope] = publicSnapshot.docs.last;
+    }
+    if (followersSnapshot.docs.isNotEmpty) {
+      lastDocumentsByScope[_authorFollowersScope] = followersSnapshot.docs.last;
+    }
+
+    final mergedPosts = <String, PostModel>{};
+    for (final doc in [...publicSnapshot.docs, ...followersSnapshot.docs]) {
+      final post = PostModel.fromDoc(doc);
+      if (post.deletedAt != null) continue;
+      mergedPosts[post.postId] = post;
+    }
+
+    final sortedPosts = mergedPosts.values.toList(growable: false);
+    sortedPosts.sort((a, b) {
+      final aCreatedAt = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bCreatedAt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bCreatedAt.compareTo(aCreatedAt);
+    });
+
+    return PostPageResult(
+      posts: sortedPosts,
+      lastDocument: null,
+      hasMore:
+          publicSnapshot.docs.length == limit ||
+          followersSnapshot.docs.length == limit,
+      lastDocumentsByScope: lastDocumentsByScope,
+    );
+  }
+
+  Query<Map<String, dynamic>> _queryWithOptionalCursor(
+    Query<Map<String, dynamic>> query,
+    DocumentSnapshot<Map<String, dynamic>>? cursor,
+  ) {
+    if (cursor == null) return query;
+    return query.startAfterDocument(cursor);
   }
 
   Future<PostModel?> fetchPostById(String postId) async {
@@ -295,9 +478,6 @@ class PostService {
 
               final post = PostModel.fromDoc(postSnap);
               if (post.deletedAt != null) continue;
-              if (!post.isPublic && post.authorId.trim() != authenticatedUid) {
-                continue;
-              }
 
               final isDuplicated = collectedPosts.any(
                 (item) => item.postId == post.postId,
@@ -342,14 +522,18 @@ class PostService {
     required String content,
     required List<PostMediaDraft> mediaDrafts,
     required List<String> tags,
-    bool isPublic = true,
+    PostVisibility? visibility,
+    bool? isPublic,
   }) {
     return _createPost(
       postType: PostType.post,
       content: content,
       mediaDrafts: mediaDrafts,
       tags: tags,
-      isPublic: isPublic,
+      visibility: _resolveVisibility(
+        visibility: visibility,
+        isPublic: isPublic,
+      ),
     );
   }
 
@@ -358,21 +542,32 @@ class PostService {
     required List<PostMediaDraft> mediaDrafts,
     required List<String> tags,
     required PostModel sourcePost,
-    bool isPublic = true,
+    PostVisibility? visibility,
+    bool? isPublic,
   }) {
+    final resolvedVisibility = _resolveVisibility(
+      visibility: visibility,
+      isPublic: isPublic,
+    );
+    _ensureReferencePostCanBeShared(
+      sourcePost: sourcePost,
+      requestedVisibility: resolvedVisibility,
+    );
+
     return _createPost(
       postType: PostType.quote,
       content: content,
       mediaDrafts: mediaDrafts,
       tags: tags,
-      isPublic: isPublic,
+      visibility: resolvedVisibility,
       referencePost: _resolveReferencePost(sourcePost),
     );
   }
 
   Future<PostModel> createRepost({
     required PostModel sourcePost,
-    bool isPublic = true,
+    PostVisibility? visibility,
+    bool? isPublic,
   }) async {
     if (uid.isEmpty) {
       throw StateError('Bạn cần đăng nhập để đăng lại bài viết.');
@@ -392,12 +587,22 @@ class PostService {
       }
     }
 
+    final resolvedVisibility =
+        visibility ??
+        (isPublic == null
+            ? sourcePost.visibility
+            : PostVisibility.fromLegacyIsPublic(isPublic));
+    _ensureReferencePostCanBeShared(
+      sourcePost: sourcePost,
+      requestedVisibility: resolvedVisibility,
+    );
+
     return _createPost(
       postType: PostType.repost,
       content: '',
       mediaDrafts: const <PostMediaDraft>[],
       tags: const <String>[],
-      isPublic: isPublic,
+      visibility: resolvedVisibility,
       referencePost: referencePost,
       explicitPostRef: repostRef,
     );
@@ -582,7 +787,7 @@ class PostService {
     required String content,
     required List<PostMediaDraft> mediaDrafts,
     required List<String> tags,
-    required bool isPublic,
+    required PostVisibility visibility,
     PostReferenceModel? referencePost,
     DocumentReference<Map<String, dynamic>>? explicitPostRef,
   }) async {
@@ -631,7 +836,8 @@ class PostService {
             .map((item) => item.toJson())
             .toList(growable: false),
         'tags': normalizedTags,
-        'isPublic': isPublic,
+        'visibility': visibility.firestoreValue,
+        'isPublic': visibility.isPublic,
         'stats': const StatsModel().toJson(),
         'trendScore': 0,
         'trendBucket': 0,
@@ -667,7 +873,7 @@ class PostService {
         content: normalizedContent,
         media: uploadedMedia,
         tags: normalizedTags,
-        isPublic: isPublic,
+        visibility: visibility,
         stats: const StatsModel(),
         trendScore: 0,
         trendBucket: 0,
@@ -870,9 +1076,12 @@ class PostService {
         throw StateError('Bài viết này không còn khả dụng.');
       }
 
-      final isPublic = postData['isPublic'] == true;
+      final visibility = PostVisibility.fromFirestoreValue(
+        postData['visibility'],
+        legacyIsPublic: postData['isPublic'],
+      );
       final authorId = (postData['authorId'] ?? '').toString().trim();
-      if (!isPublic && authorId != uid) {
+      if (visibility.isPrivate && authorId != uid) {
         throw StateError('Bạn không thể lưu bài viết riêng tư này.');
       }
 
@@ -999,6 +1208,30 @@ class PostService {
     }
 
     return PostReferenceModel.fromPost(sourcePost);
+  }
+
+  PostVisibility _resolveVisibility({
+    required PostVisibility? visibility,
+    required bool? isPublic,
+  }) {
+    if (visibility != null) return visibility;
+    if (isPublic != null) {
+      return PostVisibility.fromLegacyIsPublic(isPublic);
+    }
+    return PostVisibility.public;
+  }
+
+  void _ensureReferencePostCanBeShared({
+    required PostModel sourcePost,
+    required PostVisibility requestedVisibility,
+  }) {
+    if (sourcePost.isPublic) return;
+    if (requestedVisibility.isPrivate) return;
+    if (sourcePost.authorId.trim() == uid.trim()) return;
+
+    throw StateError(
+      'Không thể đăng lại hoặc trích dẫn bài viết không công khai của người khác.',
+    );
   }
 
   String _repostDocId(String sourcePostId) {

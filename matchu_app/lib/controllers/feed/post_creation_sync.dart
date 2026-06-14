@@ -59,6 +59,11 @@ class PostCreationSync {
       ),
       ProfilePostsController.otherProfileTag(
         post.authorId,
+        includePrivate: false,
+        includeFollowersOnly: true,
+      ),
+      ProfilePostsController.otherProfileTag(
+        post.authorId,
         includePrivate: true,
       ),
     };
@@ -80,6 +85,11 @@ class PostCreationSync {
       ProfilePostsController.otherProfileTag(
         repostPost.authorId,
         includePrivate: false,
+      ),
+      ProfilePostsController.otherProfileTag(
+        repostPost.authorId,
+        includePrivate: false,
+        includeFollowersOnly: true,
       ),
     };
 
@@ -112,6 +122,11 @@ class PostCreationSync {
         ProfilePostsController.otherProfileTag(
           referenceAuthorId,
           includePrivate: false,
+        ),
+        ProfilePostsController.otherProfileTag(
+          referenceAuthorId,
+          includePrivate: false,
+          includeFollowersOnly: true,
         ),
         ProfilePostsController.otherProfileTag(
           referenceAuthorId,
@@ -155,6 +170,11 @@ class PostCreationSync {
         ProfilePostsController.otherProfileTag(
           referenceAuthorId,
           includePrivate: false,
+        ),
+        ProfilePostsController.otherProfileTag(
+          referenceAuthorId,
+          includePrivate: false,
+          includeFollowersOnly: true,
         ),
         ProfilePostsController.otherProfileTag(
           referenceAuthorId,
