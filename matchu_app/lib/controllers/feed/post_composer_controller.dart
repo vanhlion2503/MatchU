@@ -93,7 +93,7 @@ class PostComposerController extends GetxController {
 
       _appendMedia(drafts);
     } catch (error) {
-      _showError('Khong the chon anh luc nay: $error');
+      _showError('Không thể chọn ảnh lúc này: $error');
     } finally {
       isPickingMedia.value = false;
     }
@@ -115,7 +115,7 @@ class PostComposerController extends GetxController {
         ),
       ]);
     } catch (error) {
-      _showError('Khong the chon video luc nay: $error');
+      _showError('Không thể chọn video lúc này: $error');
     } finally {
       isPickingMedia.value = false;
     }
@@ -158,12 +158,12 @@ class PostComposerController extends GetxController {
         isQuoteComposer || editingPost?.postType.requiresReference == true;
 
     if (!canSubmitEmptyBody && !hasEditableBody) {
-      _showError('Bai viet can co noi dung hoac tep dinh kem.');
+      _showError('Bài viết cần có nội dung hoặc tệp đính kèm.');
       return null;
     }
 
     if (content.length > PostService.maxContentLength) {
-      _showError('Noi dung bai viet khong duoc vuot qua 300 ky tu.');
+      _showError('Nội dung bài viết không được vượt quá 300 ký tự.');
       return null;
     }
 
@@ -280,8 +280,8 @@ class PostComposerController extends GetxController {
 
   void _showMaxMediaNotice() {
     Get.snackbar(
-      'Thong bao',
-      'Chi co the dang toi da $maxMediaItems tep dinh kem cho moi bai viet.',
+      'Thông báo',
+      'Chỉ có thể đăng tối đa $maxMediaItems tệp đính kèm cho mỗi bài viết.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -296,7 +296,7 @@ class PostComposerController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'Loi',
+      'Lỗi',
       message,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),

@@ -159,8 +159,8 @@ class _FeedScreenState extends State<FeedScreen>
     if (createdPost.isPublic) return;
 
     Get.snackbar(
-      'Thong bao',
-      'Bai viet khong cong khai se khong hien thi trong bang tin cong khai.',
+      'Thông báo',
+      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -390,9 +390,9 @@ class _FeedScreenState extends State<FeedScreen>
               onRefresh: controller.refreshFollowingFeed,
               onLoadMore: controller.loadMoreFollowingFeed,
               onRetry: controller.loadInitialFollowingFeed,
-              emptyTitle: 'Chua co bai viet tu nguoi ban theo doi.',
+              emptyTitle: 'Chưa có bài viết từ người bạn theo dõi.',
               emptyDescription:
-                  'Hay theo doi them nguoi dung hoac keo xuong de lam moi bang tin.',
+                  'Hãy theo dõi thêm người dùng hoặc kéo xuống để làm mới bảng tin.',
               onPostTap: _openPostDetail,
               onLikeTap: (postId) => controller.toggleLike(postId),
               onCommentTap: _openPostDetail,
@@ -497,7 +497,7 @@ class _CreatePostFloatingButtonState extends State<_CreatePostFloatingButton>
       child: RepaintBoundary(
         child: FloatingActionButton(
           heroTag: 'feed_create_post_fab',
-          tooltip: 'Tao bai viet',
+          tooltip: 'Tạo bài viết',
           backgroundColor: widget.backgroundColor,
           foregroundColor: widget.foregroundColor,
           onPressed: widget.onPressed,
@@ -641,7 +641,7 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
         children: [
           const SizedBox(height: 72),
           FeedErrorState(
-            message: widget.errorMessage ?? 'Da xay ra loi khi tai bang tin.',
+            message: widget.errorMessage ?? 'Đã xảy ra lỗi khi tải bảng tin.',
             onRetry: widget.onRetry,
           ),
         ],

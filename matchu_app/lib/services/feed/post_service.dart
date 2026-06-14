@@ -568,29 +568,29 @@ class PostService {
     required PostVisibility visibility,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de chinh sua bai viet.');
+      throw StateError('Bạn cần đăng nhập để chỉnh sửa bài viết.');
     }
 
     final normalizedPostId = post.postId.trim();
     if (normalizedPostId.isEmpty) {
-      throw StateError('Khong tim thay bai viet de chinh sua.');
+      throw StateError('Không tìm thấy bài viết để chỉnh sửa.');
     }
 
     final normalizedContent = content.trim();
     if (normalizedContent.length > maxContentLength) {
-      throw StateError('Noi dung bai viet khong duoc vuot qua 300 ky tu.');
+      throw StateError('Nội dung bài viết không được vượt quá 300 ký tự.');
     }
 
     final postRef = _postsRef.doc(normalizedPostId);
     final postSnap = await postRef.get();
     if (!postSnap.exists) {
-      throw StateError('Bai viet khong con ton tai.');
+      throw StateError('Bài viết không còn tồn tại.');
     }
 
     final existingPost = PostModel.fromDoc(postSnap);
-    _ensurePostCanBeMutated(existingPost, actionLabel: 'chinh sua');
+    _ensurePostCanBeMutated(existingPost, actionLabel: 'chỉnh sửa');
     if (existingPost.postType.isRepostOnly) {
-      throw StateError('Bai dang lai chi co the chinh sua quyen rieng tu.');
+      throw StateError('Bài đăng lại chỉ có thể chỉnh sửa quyền riêng tư.');
     }
     _ensureExistingReferenceCanUseVisibility(
       existingPost: existingPost,
@@ -605,13 +605,13 @@ class PostService {
         normalizedRetainedMedia.length + newMediaDrafts.length;
     if (nextMediaCount > maxMediaItems) {
       throw StateError(
-        'Moi bai viet chi co the co toi da $maxMediaItems tep dinh kem.',
+        'Mỗi bài viết chỉ có thể có tối đa $maxMediaItems tệp đính kèm.',
       );
     }
 
     final hasBody = normalizedContent.isNotEmpty || nextMediaCount > 0;
     if (!existingPost.postType.requiresReference && !hasBody) {
-      throw StateError('Bai viet can co noi dung hoac media.');
+      throw StateError('Bài viết cần có nội dung hoặc media.');
     }
 
     final uploadedRefs = <Reference>[];
@@ -632,13 +632,13 @@ class PostService {
       await _firestore.runTransaction((transaction) async {
         final latestSnap = await transaction.get(postRef);
         if (!latestSnap.exists) {
-          throw StateError('Bai viet khong con ton tai.');
+          throw StateError('Bài viết không còn tồn tại.');
         }
 
         final latestPost = PostModel.fromDoc(latestSnap);
-        _ensurePostCanBeMutated(latestPost, actionLabel: 'chinh sua');
+        _ensurePostCanBeMutated(latestPost, actionLabel: 'chỉnh sửa');
         if (latestPost.postType.isRepostOnly) {
-          throw StateError('Bai dang lai chi co the chinh sua quyen rieng tu.');
+          throw StateError('Bài đăng lại chỉ có thể chỉnh sửa quyền riêng tư.');
         }
         _ensureExistingReferenceCanUseVisibility(
           existingPost: latestPost,
@@ -682,12 +682,12 @@ class PostService {
     required PostVisibility visibility,
   }) async {
     if (uid.isEmpty) {
-      throw StateError('Ban can dang nhap de chinh sua quyen rieng tu.');
+      throw StateError('Bạn cần đăng nhập để chỉnh sửa quyền riêng tư.');
     }
 
     final normalizedPostId = post.postId.trim();
     if (normalizedPostId.isEmpty) {
-      throw StateError('Khong tim thay bai viet de chinh sua quyen rieng tu.');
+      throw StateError('Không tìm thấy bài viết để chỉnh sửa quyền riêng tư.');
     }
 
     final postRef = _postsRef.doc(normalizedPostId);
@@ -695,11 +695,11 @@ class PostService {
     return _firestore.runTransaction((transaction) async {
       final postSnap = await transaction.get(postRef);
       if (!postSnap.exists) {
-        throw StateError('Bai viet khong con ton tai.');
+        throw StateError('Bài viết không còn tồn tại.');
       }
 
       final existingPost = PostModel.fromDoc(postSnap);
-      _ensurePostCanBeMutated(existingPost, actionLabel: 'chinh sua');
+      _ensurePostCanBeMutated(existingPost, actionLabel: 'chỉnh sửa');
       _ensureExistingReferenceCanUseVisibility(
         existingPost: existingPost,
         requestedVisibility: visibility,
@@ -1413,11 +1413,11 @@ class PostService {
 
   void _ensurePostCanBeMutated(PostModel post, {required String actionLabel}) {
     if (post.deletedAt != null) {
-      throw StateError('Bai viet da bi xoa truoc do.');
+      throw StateError('Bài viết đã bị xóa trước đó.');
     }
 
     if (post.authorId.trim() != uid.trim()) {
-      throw StateError('Ban khong the $actionLabel bai viet nay.');
+      throw StateError('Bạn không thể $actionLabel bài viết này.');
     }
   }
 
@@ -1434,7 +1434,7 @@ class PostService {
     if (referencePost.authorId.trim() == uid.trim()) return;
 
     throw StateError(
-      'Khong the cong khai bai viet trich dan tu bai viet khong cong khai cua nguoi khac.',
+      'Không thể công khai bài viết trích dẫn từ bài viết không công khai của người khác.',
     );
   }
 
@@ -1455,7 +1455,7 @@ class PostService {
 
       final existing = existingByUrl[url];
       if (existing == null) {
-        throw StateError('Tep dinh kem khong hop le.');
+        throw StateError('Tệp đính kèm không hợp lệ.');
       }
 
       resolved.add(existing);
