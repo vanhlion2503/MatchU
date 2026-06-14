@@ -12,6 +12,8 @@ class PostActionSheet extends StatelessWidget {
     this.onSaveTap,
     this.canHidePost = false,
     this.onHidePostTap,
+    this.canHideAuthorPosts = false,
+    this.onHideAuthorPostsTap,
     this.canEditPost = false,
     this.onEditPostTap,
     this.canEditPrivacy = false,
@@ -25,6 +27,8 @@ class PostActionSheet extends StatelessWidget {
   final Future<void> Function()? onSaveTap;
   final bool canHidePost;
   final Future<void> Function()? onHidePostTap;
+  final bool canHideAuthorPosts;
+  final Future<void> Function()? onHideAuthorPostsTap;
   final bool canEditPost;
   final Future<void> Function()? onEditPostTap;
   final bool canEditPrivacy;
@@ -40,6 +44,8 @@ class PostActionSheet extends StatelessWidget {
     Future<void> Function()? onSaveTap,
     bool canHidePost = false,
     Future<void> Function()? onHidePostTap,
+    bool canHideAuthorPosts = false,
+    Future<void> Function()? onHideAuthorPostsTap,
     bool canEditPost = false,
     Future<void> Function()? onEditPostTap,
     bool canEditPrivacy = false,
@@ -58,6 +64,8 @@ class PostActionSheet extends StatelessWidget {
             onSaveTap: onSaveTap,
             canHidePost: canHidePost,
             onHidePostTap: onHidePostTap,
+            canHideAuthorPosts: canHideAuthorPosts,
+            onHideAuthorPostsTap: onHideAuthorPostsTap,
             canEditPost: canEditPost,
             onEditPostTap: onEditPostTap,
             canEditPrivacy: canEditPrivacy,
@@ -166,8 +174,9 @@ class PostActionSheet extends StatelessWidget {
                     if (canHidePost) ...[
                       _PostActionTile(
                         icon: Iconsax.eye_slash,
-                        title: 'Ẩn bài viết',
-                        subtitle: 'Ẩn bài viết này khỏi trang tin.',
+                        title: '\u1EA8n b\u00E0i vi\u1EBFt',
+                        subtitle:
+                            '\u1EA8n b\u00E0i vi\u1EBFt n\u00E0y kh\u1ECFi trang tin.',
                         palette: palette,
                         onTap: () => _onHidePostTap(context),
                       ),
@@ -194,17 +203,20 @@ class PostActionSheet extends StatelessWidget {
                       palette: palette,
                       onTap: () => Navigator.of(context).pop(),
                     ),
-                    const SizedBox(height: 12),
-                    _PostActionTile(
-                      icon: Iconsax.user_remove,
-                      title:
-                          authorHandle.isNotEmpty
-                              ? 'Ẩn bài viết từ @$authorHandle'
-                              : 'Ẩn bài viết từ tác giả này',
-                      subtitle: 'Ẩn bớt bài viết từ người này trong feed.',
-                      palette: palette,
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
+                    if (canHideAuthorPosts) ...[
+                      const SizedBox(height: 12),
+                      _PostActionTile(
+                        icon: Iconsax.user_remove,
+                        title:
+                            authorHandle.isNotEmpty
+                                ? '\u1EA8n b\u00E0i vi\u1EBFt t\u1EEB @$authorHandle'
+                                : '\u1EA8n b\u00E0i vi\u1EBFt t\u1EEB t\u00E1c gi\u1EA3 n\u00E0y',
+                        subtitle:
+                            '\u1EA8n to\u00E0n b\u1ED9 b\u00E0i vi\u1EBFt t\u1EEB ng\u01B0\u1EDDi n\u00E0y trong feed.',
+                        palette: palette,
+                        onTap: () => _onHideAuthorPostsTap(context),
+                      ),
+                    ],
                     if (canDeletePost) ...[
                       const SizedBox(height: 12),
                       _PostActionTile(
@@ -244,6 +256,18 @@ class PostActionSheet extends StatelessWidget {
 
     await Future<void>.delayed(_sheetExitDelay);
     await onHidePostTap!();
+  }
+
+  Future<void> _onHideAuthorPostsTap(BuildContext context) async {
+    final shouldHide = await _confirmHideAuthorPosts(context);
+    if (!shouldHide) return;
+    if (!context.mounted) return;
+
+    Navigator.of(context).pop();
+    if (onHideAuthorPostsTap == null) return;
+
+    await Future<void>.delayed(_sheetExitDelay);
+    await onHideAuthorPostsTap!();
   }
 
   Future<void> _onEditPostTap(BuildContext context) async {
@@ -345,6 +369,88 @@ class PostActionSheet extends StatelessWidget {
                     Expanded(
                       child: _DeleteDialogButton(
                         label: 'Có',
+                        onTap: () => Navigator.of(dialogContext).pop(true),
+                        backgroundColor: theme.colorScheme.error,
+                        borderColor: theme.colorScheme.error,
+                        textColor: theme.colorScheme.onError,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  Future<bool> _confirmHideAuthorPosts(BuildContext context) async {
+    final authorName = _authorDisplayName(post);
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final palette = FeedPalette.of(dialogContext);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkSurface : palette.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: palette.border),
+              boxShadow: [
+                BoxShadow(
+                  color: palette.shadowColor,
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '\u1EA8n b\u00E0i vi\u1EBFt t\u1EEB $authorName?',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'T\u1EA5t c\u1EA3 b\u00E0i vi\u1EBFt c\u1EE7a ng\u01B0\u1EDDi n\u00E0y s\u1EBD b\u1ECB \u1EA9n kh\u1ECFi feed. B\u1EA1n c\u00F3 th\u1EC3 b\u1ECF \u1EA9n trong Danh s\u00E1ch h\u1EA1n ch\u1EBF.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: palette.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DeleteDialogButton(
+                        label: 'Kh\u00F4ng',
+                        onTap: () => Navigator.of(dialogContext).pop(false),
+                        backgroundColor: palette.surfaceMuted,
+                        borderColor: palette.border,
+                        textColor: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _DeleteDialogButton(
+                        label: 'C\u00F3',
                         onTap: () => Navigator.of(dialogContext).pop(true),
                         backgroundColor: theme.colorScheme.error,
                         borderColor: theme.colorScheme.error,
@@ -497,4 +603,14 @@ String _authorHandle(PostModel post) {
   if (displayName.isNotEmpty) return displayName;
 
   return '';
+}
+
+String _authorDisplayName(PostModel post) {
+  final name = post.author.name.trim();
+  if (name.isNotEmpty) return name;
+
+  final handle = _authorHandle(post);
+  if (handle.isNotEmpty) return '@$handle';
+
+  return 'ng\u01B0\u1EDDi n\u00E0y';
 }

@@ -105,6 +105,14 @@ class RightSideMenu {
                                   text: "Danh sách bạn đang theo dõi",
                                   onTap: () => Get.toNamed("/following-list"),
                                 ),
+                                menuItem(
+                                  icon: Iconsax.user_remove,
+                                  text: "Danh s\u00E1ch h\u1EA1n ch\u1EBF",
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed(AppRouter.restrictionList);
+                                  },
+                                ),
 
                                 divider(),
 

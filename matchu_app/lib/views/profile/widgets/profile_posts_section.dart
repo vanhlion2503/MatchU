@@ -530,6 +530,9 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       onSaveTap: () => controller.toggleSave(post.postId),
       canHidePost: canHidePost,
       onHidePostTap: canHidePost ? () => _hidePostFromFeed(post) : null,
+      canHideAuthorPosts: canHidePost,
+      onHideAuthorPostsTap:
+          canHidePost ? () => _hidePostAuthorFromFeed(post) : null,
       canEditPost: canEditPost,
       onEditPostTap: canEditPost ? () => _editPost(context, post) : null,
       canEditPrivacy: canEditPrivacy,
@@ -549,6 +552,14 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     }
 
     await Get.find<FeedController>().hidePostFromFeed(post);
+  }
+
+  Future<void> _hidePostAuthorFromFeed(PostModel post) async {
+    if (!Get.isRegistered<FeedController>()) {
+      return;
+    }
+
+    await Get.find<FeedController>().hidePostAuthorFromFeed(post);
   }
 
   Future<void> _openRepostSheet(

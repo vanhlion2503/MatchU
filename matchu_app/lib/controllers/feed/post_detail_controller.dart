@@ -62,6 +62,15 @@ class PostDetailController extends GetxController {
     _syncPostFromSources();
   }
 
+  Future<void> hidePostAuthorFromFeed(PostModel targetPost) async {
+    if (!canHidePostFromFeed(targetPost)) return;
+    final feedController = _feedController;
+    if (feedController == null) return;
+
+    await feedController.hidePostAuthorFromFeed(targetPost);
+    _syncPostFromSources();
+  }
+
   @override
   void onInit() {
     super.onInit();

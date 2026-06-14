@@ -372,6 +372,38 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    match /users/{userId}/hiddenPostAuthors/{authorId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function hasValidHiddenPostAuthorData() {
+        return request.resource.data.keys().hasOnly([
+          "userId",
+          "authorId",
+          "displayName",
+          "nickname",
+          "avatarUrl",
+          "sourcePostId",
+          "hiddenAt",
+          "updatedAt"
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.authorId == authorId
+        && request.resource.data.authorId != userId
+        && request.resource.data.displayName is string
+        && request.resource.data.nickname is string
+        && request.resource.data.avatarUrl is string
+        && request.resource.data.sourcePostId is string
+        && request.resource.data.hiddenAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      }
+
+      allow read: if isOwner();
+      allow create, update: if isOwner() && hasValidHiddenPostAuthorData();
+      allow delete: if isOwner();
+    }
+
     match /users/{userId}/security/backup {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }

@@ -21,6 +21,7 @@ class AppRouter {
   static const String profileQr = '/profile-qr';
   static const String displayMode = '/display-mode';
   static const String editProfile = '/edit-profile';
+  static const String restrictionList = '/restriction-list';
 
   static const String matching = '/matching';
   static const String tempChat = '/tempChat';

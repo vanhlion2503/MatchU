@@ -7,6 +7,7 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
 import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
@@ -30,6 +31,7 @@ import 'package:matchu_app/views/qr/profile_qr_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
+import 'package:matchu_app/views/setting/restriction_list_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
 import 'package:matchu_app/views/verification/face_verification_view.dart';
 import 'package:matchu_app/views/auth/login_view.dart';
@@ -130,6 +132,16 @@ class AppPages {
     ),
 
     GetPage(name: AppRouter.displayMode, page: () => DisplayModeView()),
+
+    GetPage(
+      name: AppRouter.restrictionList,
+      page: () => const RestrictionListView(),
+      binding: BindingsBuilder(() {
+        Get.lazyPut<PostRestrictionsController>(
+          () => PostRestrictionsController(),
+        );
+      }),
+    ),
 
     GetPage(
       name: AppRouter.faceVerification,

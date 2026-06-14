@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
@@ -31,6 +32,7 @@ class FeedController extends GetxController {
   );
 
   final PostService _service = PostService();
+  final PostRestrictionService _restrictionService = PostRestrictionService();
   final GetStorage _storage = GetStorage();
 
   final RxList<PostModel> posts = <PostModel>[].obs;
@@ -69,6 +71,7 @@ class FeedController extends GetxController {
   final Map<String, bool> _repostCache = <String, bool>{};
   final Set<String> _repostPendingTargetIds = <String>{};
   final Set<String> _hiddenPostIds = <String>{};
+  final Set<String> _hiddenAuthorIds = <String>{};
   final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   DocumentSnapshot<Map<String, dynamic>>? _featuredLastDocument;
@@ -166,7 +169,13 @@ class FeedController extends GetxController {
     super.onInit();
     _loadHiddenPostIds();
     scrollController.addListener(_handleScroll);
-    loadInitialFeaturedFeed();
+    unawaited(_loadRestrictionsAndInitialFeed());
+  }
+
+  Future<void> _loadRestrictionsAndInitialFeed() async {
+    await _loadHiddenAuthorIds();
+    if (isClosed) return;
+    await loadInitialFeaturedFeed();
   }
 
   bool canHidePostFromFeed(PostModel post) {
@@ -202,6 +211,55 @@ class FeedController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  Future<void> hidePostAuthorFromFeed(PostModel post) async {
+    if (!canHidePostFromFeed(post)) {
+      return;
+    }
+
+    final authorId = post.authorId.trim();
+    if (authorId.isEmpty) {
+      return;
+    }
+
+    try {
+      await _restrictionService.hidePostAuthorFromPost(post);
+      _hiddenAuthorIds.add(authorId);
+      await _removePostsByAuthorWithAnimation(authorId);
+
+      if (visiblePosts.isEmpty && visibleHasMore) {
+        unawaited(loadMoreActiveFeed());
+      }
+
+      Get.snackbar(
+        'Th\u00F4ng b\u00E1o',
+        '\u0110\u00E3 \u1EA9n b\u00E0i vi\u1EBFt t\u1EEB ${_authorNameOf(post)}.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+    } catch (error) {
+      _showError(_mapError(error));
+    }
+  }
+
+  void applyHiddenPostAuthorRemoved(String authorId) {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) return;
+
+    final wasRemoved = _hiddenAuthorIds.remove(normalizedAuthorId);
+    if (!wasRemoved) return;
+
+    _featuredBufferedPosts.removeWhere(
+      (post) => post.authorId.trim() == normalizedAuthorId,
+    );
+    _followingBufferedPosts.removeWhere(
+      (post) => post.authorId.trim() == normalizedAuthorId,
+    );
+
+    if (visibleStatus != FeedStatus.initial) {
+      unawaited(refreshActiveFeed());
+    }
   }
 
   Future<void> loadInitialFeed() async {
@@ -305,7 +363,7 @@ class FeedController extends GetxController {
 
   void prependPost(PostModel post) {
     if (!post.isPublic || post.postType.isRepostOnly) return;
-    if (_isPostHidden(post.postId)) return;
+    if (_shouldHidePost(post)) return;
 
     final targetPostId = _repostTargetPostIdOf(post);
     if (targetPostId.isNotEmpty && !_repostCache.containsKey(targetPostId)) {
@@ -534,7 +592,7 @@ class FeedController extends GetxController {
     final wasInLatestFeed = posts.any(
       (post) => post.postId == normalizedPostId,
     );
-    final isHidden = _isPostHidden(normalizedPostId);
+    final isHidden = _shouldHidePost(hydratedPost);
     final isFeedEligible =
         hydratedPost.isPublic &&
         !hydratedPost.postType.isRepostOnly &&
@@ -595,6 +653,10 @@ class FeedController extends GetxController {
     }
 
     try {
+      if (reset) {
+        await _loadHiddenAuthorIds();
+      }
+
       final page = await _loadVisibleLatestFeedPage(
         startAfter: reset ? null : _lastDocument,
         reset: reset,
@@ -703,6 +765,10 @@ class FeedController extends GetxController {
     }
 
     try {
+      if (reset) {
+        await _loadHiddenAuthorIds();
+      }
+
       final loadedPosts = <PostModel>[];
       var cursor = reset ? null : _featuredLastDocument;
       var sourceHasMore = reset ? true : _featuredSourceHasMore;
@@ -818,6 +884,10 @@ class FeedController extends GetxController {
     }
 
     try {
+      if (reset) {
+        await _loadHiddenAuthorIds();
+      }
+
       final followingAuthorIds = await _resolveFollowingAuthorIds(
         forceRefresh: reset,
       );
@@ -1041,7 +1111,7 @@ class FeedController extends GetxController {
         final postId = candidate.postId.trim();
         if (postId.isEmpty ||
             excludedIds.contains(postId) ||
-            _isPostHidden(postId)) {
+            _shouldHidePost(candidate)) {
           continue;
         }
 
@@ -1367,11 +1437,11 @@ class FeedController extends GetxController {
   ) {
     final merged = <String, PostModel>{
       for (final post in current)
-        if (!_isPostHidden(post.postId)) post.postId: post,
+        if (!_shouldHidePost(post)) post.postId: post,
     };
 
     for (final post in incoming) {
-      if (_isPostHidden(post.postId)) {
+      if (_shouldHidePost(post)) {
         continue;
       }
       merged[post.postId] = post;
@@ -1391,9 +1461,13 @@ class FeedController extends GetxController {
     List<PostModel> incoming,
   ) {
     final merged = <String, PostModel>{
-      for (final post in current) post.postId: post,
+      for (final post in current)
+        if (!_shouldHidePost(post)) post.postId: post,
     };
     for (final post in incoming) {
+      if (_shouldHidePost(post)) {
+        continue;
+      }
       merged[post.postId] = post;
     }
     return merged.values.toList(growable: false);
@@ -1403,7 +1477,7 @@ class FeedController extends GetxController {
     if (_locallyPrependedPosts.isEmpty) return incoming;
 
     final visibleLocalPosts = _locallyPrependedPosts.values
-        .where((post) => !_isPostHidden(post.postId))
+        .where((post) => !_shouldHidePost(post))
         .toList(growable: false);
 
     if (visibleLocalPosts.isEmpty) return incoming;
@@ -1547,19 +1621,42 @@ class FeedController extends GetxController {
     return _storage.write(_hiddenPostsStorageKey, values);
   }
 
+  Future<void> _loadHiddenAuthorIds() async {
+    try {
+      final hiddenAuthorIds =
+          await _restrictionService.fetchHiddenPostAuthorIds();
+      _hiddenAuthorIds
+        ..clear()
+        ..addAll(hiddenAuthorIds);
+    } catch (error) {
+      debugPrint('Failed to load hidden post authors: $error');
+    }
+  }
+
   bool _isPostHidden(String postId) {
     final normalizedPostId = postId.trim();
     if (normalizedPostId.isEmpty) return false;
     return _hiddenPostIds.contains(normalizedPostId);
   }
 
+  bool _isAuthorHidden(String authorId) {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) return false;
+    return _hiddenAuthorIds.contains(normalizedAuthorId);
+  }
+
+  bool _shouldHidePost(PostModel post) {
+    return _isPostHidden(post.postId) || _isAuthorHidden(post.authorId);
+  }
+
   List<PostModel> _filterHiddenPosts(List<PostModel> incoming) {
-    if (_hiddenPostIds.isEmpty || incoming.isEmpty) {
+    if ((_hiddenPostIds.isEmpty && _hiddenAuthorIds.isEmpty) ||
+        incoming.isEmpty) {
       return incoming;
     }
 
     return incoming
-        .where((post) => !_hiddenPostIds.contains(post.postId.trim()))
+        .where((post) => !_shouldHidePost(post))
         .toList(growable: false);
   }
 
@@ -1596,6 +1693,33 @@ class FeedController extends GetxController {
     _removingPostIds.remove(normalizedPostId);
   }
 
+  Future<void> _removePostsByAuthorWithAnimation(String authorId) async {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) return;
+
+    final visiblePostIds = <String>{
+      ...posts
+          .where((post) => post.authorId.trim() == normalizedAuthorId)
+          .map((post) => post.postId.trim()),
+      ...featuredPosts
+          .where((post) => post.authorId.trim() == normalizedAuthorId)
+          .map((post) => post.postId.trim()),
+      ...followingPosts
+          .where((post) => post.authorId.trim() == normalizedAuthorId)
+          .map((post) => post.postId.trim()),
+    }..removeWhere((postId) => postId.isEmpty);
+
+    if (visiblePostIds.isEmpty) {
+      _removePostsByAuthorImmediate(normalizedAuthorId);
+      return;
+    }
+
+    _removingPostIds.addAll(visiblePostIds);
+    await Future<void>.delayed(_postRemovalAnimationDuration);
+    _removePostsByAuthorImmediate(normalizedAuthorId);
+    _removingPostIds.removeAll(visiblePostIds);
+  }
+
   void _removePostByIdImmediate(String postId) {
     final postIndex = posts.indexWhere((post) => post.postId == postId);
     if (postIndex != -1) {
@@ -1615,6 +1739,44 @@ class FeedController extends GetxController {
     }
 
     _clearPostCaches(postId);
+    _updateStatusAfterPostMutation();
+  }
+
+  void _removePostsByAuthorImmediate(String authorId) {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) return;
+
+    final removedPostIds = <String>{};
+
+    bool removeIfHiddenAuthor(PostModel post) {
+      final shouldRemove = post.authorId.trim() == normalizedAuthorId;
+      if (shouldRemove) {
+        final postId = post.postId.trim();
+        if (postId.isNotEmpty) {
+          removedPostIds.add(postId);
+        }
+      }
+      return shouldRemove;
+    }
+
+    posts.removeWhere(removeIfHiddenAuthor);
+    featuredPosts.removeWhere(removeIfHiddenAuthor);
+    followingPosts.removeWhere(removeIfHiddenAuthor);
+    _featuredBufferedPosts.removeWhere(removeIfHiddenAuthor);
+    _followingBufferedPosts.removeWhere(removeIfHiddenAuthor);
+
+    final localPostIds = _locallyPrependedPosts.entries
+        .where((entry) => entry.value.authorId.trim() == normalizedAuthorId)
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    for (final postId in localPostIds) {
+      removedPostIds.add(postId);
+    }
+
+    for (final postId in removedPostIds) {
+      _clearPostCaches(postId);
+    }
+
     _updateStatusAfterPostMutation();
   }
 
@@ -1656,6 +1818,16 @@ class FeedController extends GetxController {
         followingStatus.value = FeedStatus.success;
       }
     }
+  }
+
+  String _authorNameOf(PostModel post) {
+    final name = post.author.name.trim();
+    if (name.isNotEmpty) return name;
+
+    final nickname = post.author.nickname.trim();
+    if (nickname.isNotEmpty) return '@$nickname';
+
+    return 'ng\u01B0\u1EDDi n\u00E0y';
   }
 
   String _repostTargetPostIdOf(PostModel post) {

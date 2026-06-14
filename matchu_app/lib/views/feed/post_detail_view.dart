@@ -88,6 +88,9 @@ class _PostDetailViewState extends State<PostDetailView> {
       canHidePost: canHidePost,
       onHidePostTap:
           canHidePost ? () => controller.hidePostFromFeed(post) : null,
+      canHideAuthorPosts: canHidePost,
+      onHideAuthorPostsTap:
+          canHidePost ? () => controller.hidePostAuthorFromFeed(post) : null,
       canEditPost: canEditPost,
       onEditPostTap: canEditPost ? () => _editPost(context, post) : null,
       canEditPrivacy: canEditPrivacy,
