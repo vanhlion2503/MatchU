@@ -526,6 +526,54 @@ class FeedController extends GetxController {
     _removingPostIds.remove(normalizedPostId);
   }
 
+  void applyPostUpdate(PostModel updatedPost) {
+    final normalizedPostId = updatedPost.postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    final hydratedPost = _withLocalInteractionState(updatedPost);
+    final wasInLatestFeed = posts.any(
+      (post) => post.postId == normalizedPostId,
+    );
+    final isHidden = _isPostHidden(normalizedPostId);
+    final isFeedEligible =
+        hydratedPost.isPublic &&
+        !hydratedPost.postType.isRepostOnly &&
+        !isHidden;
+    final authorId = hydratedPost.authorId.trim();
+    final isFollowingEligible =
+        !hydratedPost.postType.isRepostOnly &&
+        !isHidden &&
+        (hydratedPost.isPublic ||
+            (hydratedPost.isFollowersOnly &&
+                _followingAuthorIds.contains(authorId)));
+
+    _upsertPostInList(
+      posts,
+      hydratedPost,
+      shouldInclude: isFeedEligible,
+      allowInsert: isFeedEligible && !wasInLatestFeed,
+    );
+    _upsertPostInList(
+      featuredPosts,
+      hydratedPost,
+      shouldInclude: isFeedEligible,
+    );
+    _upsertPostInList(
+      followingPosts,
+      hydratedPost,
+      shouldInclude: isFollowingEligible,
+    );
+
+    if (_locallyPrependedPosts.containsKey(normalizedPostId) ||
+        (isFeedEligible && !wasInLatestFeed)) {
+      _locallyPrependedPosts[normalizedPostId] = hydratedPost;
+    } else {
+      _locallyPrependedPosts.remove(normalizedPostId);
+    }
+
+    _updateStatusAfterPostMutation();
+  }
+
   Future<void> _loadFeed({
     required bool reset,
     bool isManualRefresh = false,
@@ -1415,6 +1463,64 @@ class FeedController extends GetxController {
     if (_locallyPrependedPosts.containsKey(updatedPost.postId)) {
       _locallyPrependedPosts[updatedPost.postId] = updatedPost;
     }
+  }
+
+  void _upsertPostInList(
+    RxList<PostModel> target,
+    PostModel updatedPost, {
+    required bool shouldInclude,
+    bool allowInsert = false,
+  }) {
+    final index = target.indexWhere(
+      (post) => post.postId == updatedPost.postId,
+    );
+
+    if (!shouldInclude) {
+      if (index != -1) {
+        target.removeAt(index);
+      }
+      return;
+    }
+
+    if (index == -1) {
+      if (allowInsert) {
+        target.assignAll(_mergePosts(target, <PostModel>[updatedPost]));
+      }
+      return;
+    }
+
+    final updatedPosts = target.toList(growable: false);
+    updatedPosts[index] = updatedPost;
+    target.assignAll(updatedPosts);
+  }
+
+  PostModel _withLocalInteractionState(PostModel updatedPost) {
+    final currentPost = _findPost(updatedPost.postId);
+    final repostTargetPostId = _repostTargetPostIdOf(updatedPost);
+
+    return updatedPost.copyWith(
+      isLiked:
+          currentPost?.isLiked ??
+          _likeCache[updatedPost.postId] ??
+          _confirmedLikeStates[updatedPost.postId] ??
+          updatedPost.isLiked,
+      isLikePending: _isLikeSyncPending(updatedPost.postId),
+      isSaved:
+          currentPost?.isSaved ??
+          _savedCache[updatedPost.postId] ??
+          _confirmedSavedStates[updatedPost.postId] ??
+          updatedPost.isSaved,
+      isSavePending: _isSaveSyncPending(updatedPost.postId),
+      isReposted:
+          currentPost?.isReposted ??
+          (repostTargetPostId.isNotEmpty
+              ? _repostCache[repostTargetPostId] ?? updatedPost.isReposted
+              : updatedPost.isReposted),
+      isRepostPending:
+          repostTargetPostId.isNotEmpty
+              ? _repostPendingTargetIds.contains(repostTargetPostId)
+              : updatedPost.isRepostPending,
+    );
   }
 
   String get _hiddenPostsStorageKey =>

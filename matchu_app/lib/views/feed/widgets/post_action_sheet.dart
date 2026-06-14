@@ -12,6 +12,10 @@ class PostActionSheet extends StatelessWidget {
     this.onSaveTap,
     this.canHidePost = false,
     this.onHidePostTap,
+    this.canEditPost = false,
+    this.onEditPostTap,
+    this.canEditPrivacy = false,
+    this.onEditPrivacyTap,
     this.canDeletePost = false,
     this.onDeleteTap,
   });
@@ -21,6 +25,10 @@ class PostActionSheet extends StatelessWidget {
   final Future<void> Function()? onSaveTap;
   final bool canHidePost;
   final Future<void> Function()? onHidePostTap;
+  final bool canEditPost;
+  final Future<void> Function()? onEditPostTap;
+  final bool canEditPrivacy;
+  final Future<void> Function()? onEditPrivacyTap;
   final bool canDeletePost;
   final Future<void> Function()? onDeleteTap;
   static const Duration _sheetExitDelay = Duration(milliseconds: 220);
@@ -32,6 +40,10 @@ class PostActionSheet extends StatelessWidget {
     Future<void> Function()? onSaveTap,
     bool canHidePost = false,
     Future<void> Function()? onHidePostTap,
+    bool canEditPost = false,
+    Future<void> Function()? onEditPostTap,
+    bool canEditPrivacy = false,
+    Future<void> Function()? onEditPrivacyTap,
     bool canDeletePost = false,
     Future<void> Function()? onDeleteTap,
   }) {
@@ -46,6 +58,10 @@ class PostActionSheet extends StatelessWidget {
             onSaveTap: onSaveTap,
             canHidePost: canHidePost,
             onHidePostTap: onHidePostTap,
+            canEditPost: canEditPost,
+            onEditPostTap: onEditPostTap,
+            canEditPrivacy: canEditPrivacy,
+            onEditPrivacyTap: onEditPrivacyTap,
             canDeletePost: canDeletePost,
             onDeleteTap: onDeleteTap,
           ),
@@ -124,6 +140,29 @@ class PostActionSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (canEditPost) ...[
+                      _PostActionTile(
+                        icon: Iconsax.edit_2,
+                        title: 'Ch\u1EC9nh s\u1EEDa b\u00E0i vi\u1EBFt',
+                        subtitle:
+                            'C\u1EADp nh\u1EADt n\u1ED9i dung, th\u1EBB v\u00E0 t\u1EC7p \u0111\u00EDnh k\u00E8m.',
+                        palette: palette,
+                        onTap: () => _onEditPostTap(context),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (canEditPrivacy) ...[
+                      _PostActionTile(
+                        icon: Iconsax.lock,
+                        title:
+                            'Ch\u1EC9nh s\u1EEDa quy\u1EC1n ri\u00EAng t\u01B0',
+                        subtitle:
+                            'Thay \u0111\u1ED5i ai c\u00F3 th\u1EC3 xem b\u00E0i vi\u1EBFt n\u00E0y.',
+                        palette: palette,
+                        onTap: () => _onEditPrivacyTap(context),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     if (canHidePost) ...[
                       _PostActionTile(
                         icon: Iconsax.eye_slash,
@@ -205,6 +244,22 @@ class PostActionSheet extends StatelessWidget {
 
     await Future<void>.delayed(_sheetExitDelay);
     await onHidePostTap!();
+  }
+
+  Future<void> _onEditPostTap(BuildContext context) async {
+    Navigator.of(context).pop();
+    if (onEditPostTap == null) return;
+
+    await Future<void>.delayed(_sheetExitDelay);
+    await onEditPostTap!();
+  }
+
+  Future<void> _onEditPrivacyTap(BuildContext context) async {
+    Navigator.of(context).pop();
+    if (onEditPrivacyTap == null) return;
+
+    await Future<void>.delayed(_sheetExitDelay);
+    await onEditPrivacyTap!();
   }
 
   Future<void> _onSavePostTap(BuildContext context) async {

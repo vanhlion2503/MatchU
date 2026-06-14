@@ -312,6 +312,39 @@ class ProfilePostsController extends GetxController {
     _replacePost(existingPost.copyWith(isSaved: isSaved, isSavePending: false));
   }
 
+  void applyPostUpdate(PostModel updatedPost) {
+    final normalizedPostId = updatedPost.postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    final hydratedPost = _withLocalInteractionState(updatedPost);
+
+    if (source == ProfilePostsSource.saved) {
+      final existingPost = findPostById(normalizedPostId);
+      if (existingPost == null) return;
+
+      _replacePost(
+        hydratedPost.copyWith(
+          isSaved: existingPost.isSaved,
+          isSavePending: existingPost.isSavePending,
+        ),
+      );
+      return;
+    }
+
+    final shouldInclude =
+        hydratedPost.authorId.trim() == userId.trim() &&
+        _canIncludeAuthoredPost(hydratedPost);
+    final wasInList = posts.any((post) => post.postId == normalizedPostId);
+
+    _upsertPostInList(
+      hydratedPost,
+      shouldInclude: shouldInclude,
+      allowInsert: shouldInclude && !wasInList,
+    );
+    _ensureRepostReferencesLoaded(posts);
+    _updateStatusAfterPostMutation();
+  }
+
   Future<void> toggleLike(String postId) async {
     final currentPost = findPostById(postId);
     if (currentPost == null) return;
@@ -972,6 +1005,66 @@ class ProfilePostsController extends GetxController {
     if (_resolvedRepostPostsByReferenceId.containsKey(updatedPost.postId)) {
       _resolvedRepostPostsByReferenceId[updatedPost.postId] = updatedPost;
     }
+  }
+
+  void _upsertPostInList(
+    PostModel updatedPost, {
+    required bool shouldInclude,
+    bool allowInsert = false,
+  }) {
+    final index = posts.indexWhere((post) => post.postId == updatedPost.postId);
+
+    if (!shouldInclude) {
+      if (index != -1) {
+        posts.removeAt(index);
+      }
+      _locallyPrependedPosts.remove(updatedPost.postId);
+      return;
+    }
+
+    if (_locallyPrependedPosts.containsKey(updatedPost.postId) || allowInsert) {
+      _locallyPrependedPosts[updatedPost.postId] = updatedPost;
+    }
+
+    if (index == -1) {
+      if (allowInsert) {
+        posts.assignAll(_mergePosts(posts, <PostModel>[updatedPost]));
+      }
+      return;
+    }
+
+    final updatedPosts = posts.toList(growable: false);
+    updatedPosts[index] = updatedPost;
+    posts.assignAll(updatedPosts);
+  }
+
+  PostModel _withLocalInteractionState(PostModel updatedPost) {
+    final currentPost = findPostById(updatedPost.postId);
+    final repostTargetPostId = _repostTargetPostIdOf(updatedPost);
+
+    return updatedPost.copyWith(
+      isLiked:
+          currentPost?.isLiked ??
+          _likeCache[updatedPost.postId] ??
+          _confirmedLikeStates[updatedPost.postId] ??
+          updatedPost.isLiked,
+      isLikePending: _isLikeSyncPending(updatedPost.postId),
+      isSaved:
+          currentPost?.isSaved ??
+          _savedCache[updatedPost.postId] ??
+          _confirmedSavedStates[updatedPost.postId] ??
+          updatedPost.isSaved,
+      isSavePending: _isSaveSyncPending(updatedPost.postId),
+      isReposted:
+          currentPost?.isReposted ??
+          (repostTargetPostId.isNotEmpty
+              ? _repostCache[repostTargetPostId] ?? updatedPost.isReposted
+              : updatedPost.isReposted),
+      isRepostPending:
+          repostTargetPostId.isNotEmpty
+              ? _repostPendingTargetIds.contains(repostTargetPostId)
+              : updatedPost.isRepostPending,
+    );
   }
 
   String _repostTargetPostIdOf(PostModel post) {

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_composer_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
+import 'package:matchu_app/models/feed/media_model.dart';
 import 'package:matchu_app/models/feed/post_media_draft.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
@@ -12,19 +13,24 @@ import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CreatePostSheet extends StatefulWidget {
-  const CreatePostSheet({super.key, this.quotedPost});
+  const CreatePostSheet({super.key, this.quotedPost, this.editingPost})
+    : assert(quotedPost == null || editingPost == null);
 
   final PostModel? quotedPost;
+  final PostModel? editingPost;
 
   static Future<PostModel?> show(
     BuildContext context, {
     PostModel? quotedPost,
+    PostModel? editingPost,
   }) {
     return showModalBottomSheet<PostModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CreatePostSheet(quotedPost: quotedPost),
+      builder:
+          (_) =>
+              CreatePostSheet(quotedPost: quotedPost, editingPost: editingPost),
     );
   }
 
@@ -43,7 +49,10 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
     super.initState();
     _tag = 'post_composer_${DateTime.now().microsecondsSinceEpoch}';
     _controller = Get.put(
-      PostComposerController(quotedPost: widget.quotedPost),
+      PostComposerController(
+        quotedPost: widget.quotedPost,
+        editingPost: widget.editingPost,
+      ),
       tag: _tag,
     );
 
@@ -197,7 +206,9 @@ class _SheetHeader extends StatelessWidget {
             Expanded(
               child: Center(
                 child: Text(
-                  controller.isQuoteComposer
+                  controller.isEditComposer
+                      ? 'Ch\u1EC9nh s\u1EEDa b\u00E0i vi\u1EBFt'
+                      : controller.isQuoteComposer
                       ? 'Trích dẫn bài viết'
                       : 'Tạo bài viết',
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -239,7 +250,11 @@ class _SheetHeader extends StatelessWidget {
                           color: palette.publishButtonForeground,
                         ),
                       )
-                      : const Text('Đăng'),
+                      : Text(
+                        controller.isEditComposer
+                            ? 'L\u01B0u'
+                            : '\u0110\u0103ng',
+                      ),
             ),
           ],
         ),
@@ -386,7 +401,9 @@ class _ComposerLayout extends StatelessWidget {
                 cursorColor: theme.colorScheme.primary,
                 decoration: _borderlessInputDecoration(
                   hintText:
-                      controller.isQuoteComposer
+                      controller.isEditComposer
+                          ? 'Ch\u1EC9nh s\u1EEDa b\u00E0i vi\u1EBFt...'
+                          : controller.isQuoteComposer
                           ? 'Thêm nhận xét của bạn...'
                           : 'Có gì mới?',
                   fillColor: palette.sheetBackground,
@@ -429,7 +446,12 @@ class _ComposerLayout extends StatelessWidget {
                 ),
               ),
               Obx(() {
-                if (controller.mediaDrafts.isEmpty) {
+                final existingMedia = controller.existingMedia;
+                final mediaDrafts = controller.mediaDrafts;
+                final totalMediaCount =
+                    existingMedia.length + mediaDrafts.length;
+
+                if (totalMediaCount == 0) {
                   return const SizedBox(height: 8);
                 }
 
@@ -439,10 +461,20 @@ class _ComposerLayout extends StatelessWidget {
                     height: 208,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: controller.mediaDrafts.length,
+                      itemCount: totalMediaCount,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (_, index) {
-                        final draft = controller.mediaDrafts[index];
+                        if (index < existingMedia.length) {
+                          final media = existingMedia[index];
+                          return _ExistingMediaPreviewCard(
+                            media: media,
+                            palette: palette,
+                            onRemove:
+                                () => controller.removeExistingMedia(media),
+                          );
+                        }
+
+                        final draft = mediaDrafts[index - existingMedia.length];
                         return _DraftMediaPreviewCard(
                           draft: draft,
                           palette: palette,
@@ -453,10 +485,10 @@ class _ComposerLayout extends StatelessWidget {
                   ),
                 );
               }),
-              if (controller.quotedPost != null) ...[
+              if (controller.previewReferencePost != null) ...[
                 const SizedBox(height: 14),
                 _QuotedPostPreview(
-                  post: controller.quotedPost!,
+                  post: controller.previewReferencePost!,
                   palette: palette,
                 ),
               ],
@@ -960,6 +992,78 @@ class _PrivacyMenuItem extends StatelessWidget {
   }
 }
 
+class _ExistingMediaPreviewCard extends StatelessWidget {
+  const _ExistingMediaPreviewCard({
+    required this.media,
+    required this.palette,
+    required this.onRemove,
+  });
+
+  final MediaModel media;
+  final _CreatePostPalette palette;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 160,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AspectRatio(
+            aspectRatio: 4 / 5,
+            child: Container(
+              decoration: BoxDecoration(
+                color: palette.surfaceMuted,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: palette.border),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child:
+                    media.isImage
+                        ? CachedNetworkImage(
+                          imageUrl: media.url,
+                          fit: BoxFit.cover,
+                          errorWidget:
+                              (_, __, ___) => Icon(
+                                Iconsax.gallery_slash,
+                                color: palette.iconMuted,
+                              ),
+                        )
+                        : DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF0F172A),
+                                palette.surfaceMuted,
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Iconsax.play_circle,
+                              color: Colors.white,
+                              size: 34,
+                            ),
+                          ),
+                        ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            right: 10,
+            child: _RemoveMediaButton(onTap: onRemove),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DraftMediaPreviewCard extends StatelessWidget {
   const _DraftMediaPreviewCard({
     required this.draft,
@@ -1042,28 +1146,39 @@ class _DraftMediaPreviewCard extends StatelessWidget {
           Positioned(
             top: 10,
             right: 10,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: onRemove,
-                borderRadius: BorderRadius.circular(999),
-                child: Ink(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.52),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Iconsax.close_circle,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
+            child: _RemoveMediaButton(onTap: onRemove),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RemoveMediaButton extends StatelessWidget {
+  const _RemoveMediaButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.52),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Iconsax.close_circle,
+            size: 16,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }

@@ -316,6 +316,11 @@ class PostDetailController extends GetxController {
     _updateLocalRepostState(isReposted: isReposted, isPending: false);
   }
 
+  void applyPostUpdate(PostModel updatedPost) {
+    if (updatedPost.postId.trim() != postId.trim()) return;
+    post.value = _withLocalInteractionState(updatedPost);
+  }
+
   void _syncPostFromSources() {
     final latestProfilePost = _profilePostsController?.findPostById(postId);
     if (latestProfilePost != null) {
@@ -335,6 +340,23 @@ class PostDetailController extends GetxController {
     post.value = post.value.copyWith(
       isReposted: isReposted,
       isRepostPending: isPending,
+    );
+  }
+
+  PostModel _withLocalInteractionState(PostModel updatedPost) {
+    final currentPost = post.value;
+    final targetPostId = _postService.resolveRepostTargetPostId(updatedPost);
+
+    return updatedPost.copyWith(
+      isLiked: currentPost.isLiked,
+      isLikePending: currentPost.isLikePending,
+      isSaved: currentPost.isSaved,
+      isSavePending: currentPost.isSavePending,
+      isReposted: currentPost.isReposted,
+      isRepostPending:
+          targetPostId.isNotEmpty
+              ? currentPost.isRepostPending
+              : updatedPost.isRepostPending,
     );
   }
 

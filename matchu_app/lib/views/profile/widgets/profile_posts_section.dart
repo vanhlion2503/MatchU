@@ -11,6 +11,7 @@ import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
+import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
@@ -517,6 +518,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     final currentUserId = controller.currentUserId.trim();
     final canDeletePost =
         currentUserId.isNotEmpty && post.authorId.trim() == currentUserId;
+    final canEditPost = canDeletePost && !post.postType.isRepostOnly;
+    final canEditPrivacy = canDeletePost;
     final canHidePost =
         currentUserId.isNotEmpty && post.authorId.trim() != currentUserId;
 
@@ -527,6 +530,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       onSaveTap: () => controller.toggleSave(post.postId),
       canHidePost: canHidePost,
       onHidePostTap: canHidePost ? () => _hidePostFromFeed(post) : null,
+      canEditPost: canEditPost,
+      onEditPostTap: canEditPost ? () => _editPost(context, post) : null,
+      canEditPrivacy: canEditPrivacy,
+      onEditPrivacyTap:
+          canEditPrivacy ? () => _editPostPrivacy(context, post) : null,
       canDeletePost: canDeletePost,
       onDeleteTap:
           canDeletePost
@@ -564,6 +572,16 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       quotedPost: sourcePost,
     );
     _handlePostCreated(createdPost);
+  }
+
+  Future<void> _editPost(BuildContext context, PostModel post) async {
+    final updatedPost = await CreatePostSheet.show(context, editingPost: post);
+    _handlePostUpdated(updatedPost);
+  }
+
+  Future<void> _editPostPrivacy(BuildContext context, PostModel post) async {
+    final updatedPost = await EditPostPrivacySheet.show(context, post: post);
+    _handlePostUpdated(updatedPost);
   }
 
   Future<void> _repostPost(
@@ -615,6 +633,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   void _handlePostDeleted(PostModel? deletedPost) {
     if (deletedPost == null) return;
     PostCreationSync.syncPostDeleted(deletedPost);
+  }
+
+  void _handlePostUpdated(PostModel? updatedPost) {
+    if (updatedPost == null) return;
+    PostCreationSync.syncPostUpdated(updatedPost);
   }
 
   void _openAuthorProfile(String rawUserId) {

@@ -43,6 +43,42 @@ class PostCreationSync {
     }
   }
 
+  static void syncPostUpdated(PostModel post) {
+    if (Get.isRegistered<FeedController>()) {
+      Get.find<FeedController>().applyPostUpdate(post);
+    }
+
+    final candidateTags = <String>{
+      ...ProfilePostsController.selfProfileTags(post.authorId),
+      ProfilePostsController.ownerSavedTag(post.authorId),
+      ProfilePostsController.otherProfileTag(
+        post.authorId,
+        includePrivate: false,
+      ),
+      ProfilePostsController.otherProfileTag(
+        post.authorId,
+        includePrivate: false,
+        includeFollowersOnly: true,
+      ),
+      ProfilePostsController.otherProfileTag(
+        post.authorId,
+        includePrivate: true,
+      ),
+    };
+
+    for (final tag in candidateTags) {
+      if (!Get.isRegistered<ProfilePostsController>(tag: tag)) {
+        continue;
+      }
+
+      Get.find<ProfilePostsController>(tag: tag).applyPostUpdate(post);
+    }
+
+    if (Get.isRegistered<PostDetailController>()) {
+      Get.find<PostDetailController>().applyPostUpdate(post);
+    }
+  }
+
   static void _removePostFromFeedAndProfiles(PostModel post) {
     if (Get.isRegistered<FeedController>()) {
       final feedController = Get.find<FeedController>();

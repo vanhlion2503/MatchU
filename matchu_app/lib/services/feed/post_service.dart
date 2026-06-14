@@ -27,6 +27,7 @@ class PostService {
 
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
+  static const int maxMediaItems = 6;
   static const int _whereInLimit = 30;
   static const String _authorPublicScope = 'public';
   static const String _authorFollowersScope = 'followers';
@@ -120,10 +121,7 @@ class PostService {
 
     while (collectedPosts.length < limit && canLoadMore) {
       Query<Map<String, dynamic>> query = _postsRef
-          .where(
-            'visibility',
-            isEqualTo: PostVisibility.public.firestoreValue,
-          )
+          .where('visibility', isEqualTo: PostVisibility.public.firestoreValue)
           .orderBy('createdAt', descending: true)
           .limit(limit);
 
@@ -344,10 +342,7 @@ class PostService {
   }) async {
     final publicQuery = _postsRef
         .where('authorId', isEqualTo: authorId)
-        .where(
-          'visibility',
-          isEqualTo: PostVisibility.public.firestoreValue,
-        )
+        .where('visibility', isEqualTo: PostVisibility.public.firestoreValue)
         .orderBy('createdAt', descending: true)
         .limit(limit);
 
@@ -562,6 +557,165 @@ class PostService {
       visibility: resolvedVisibility,
       referencePost: _resolveReferencePost(sourcePost),
     );
+  }
+
+  Future<PostModel> updatePost({
+    required PostModel post,
+    required String content,
+    required List<MediaModel> retainedMedia,
+    required List<PostMediaDraft> newMediaDrafts,
+    required List<String> tags,
+    required PostVisibility visibility,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError('Ban can dang nhap de chinh sua bai viet.');
+    }
+
+    final normalizedPostId = post.postId.trim();
+    if (normalizedPostId.isEmpty) {
+      throw StateError('Khong tim thay bai viet de chinh sua.');
+    }
+
+    final normalizedContent = content.trim();
+    if (normalizedContent.length > maxContentLength) {
+      throw StateError('Noi dung bai viet khong duoc vuot qua 300 ky tu.');
+    }
+
+    final postRef = _postsRef.doc(normalizedPostId);
+    final postSnap = await postRef.get();
+    if (!postSnap.exists) {
+      throw StateError('Bai viet khong con ton tai.');
+    }
+
+    final existingPost = PostModel.fromDoc(postSnap);
+    _ensurePostCanBeMutated(existingPost, actionLabel: 'chinh sua');
+    if (existingPost.postType.isRepostOnly) {
+      throw StateError('Bai dang lai chi co the chinh sua quyen rieng tu.');
+    }
+    _ensureExistingReferenceCanUseVisibility(
+      existingPost: existingPost,
+      requestedVisibility: visibility,
+    );
+
+    final normalizedRetainedMedia = _resolveRetainedMedia(
+      retainedMedia: retainedMedia,
+      existingMedia: existingPost.media,
+    );
+    final nextMediaCount =
+        normalizedRetainedMedia.length + newMediaDrafts.length;
+    if (nextMediaCount > maxMediaItems) {
+      throw StateError(
+        'Moi bai viet chi co the co toi da $maxMediaItems tep dinh kem.',
+      );
+    }
+
+    final hasBody = normalizedContent.isNotEmpty || nextMediaCount > 0;
+    if (!existingPost.postType.requiresReference && !hasBody) {
+      throw StateError('Bai viet can co noi dung hoac media.');
+    }
+
+    final uploadedRefs = <Reference>[];
+
+    try {
+      final uploadedMedia = await _uploadMedia(
+        postId: normalizedPostId,
+        mediaDrafts: newMediaDrafts,
+        uploadedRefs: uploadedRefs,
+        startIndex: existingPost.media.length,
+      );
+      final nextMedia = <MediaModel>[
+        ...normalizedRetainedMedia,
+        ...uploadedMedia,
+      ];
+      final normalizedTags = _normalizeTags(tags);
+
+      await _firestore.runTransaction((transaction) async {
+        final latestSnap = await transaction.get(postRef);
+        if (!latestSnap.exists) {
+          throw StateError('Bai viet khong con ton tai.');
+        }
+
+        final latestPost = PostModel.fromDoc(latestSnap);
+        _ensurePostCanBeMutated(latestPost, actionLabel: 'chinh sua');
+        if (latestPost.postType.isRepostOnly) {
+          throw StateError('Bai dang lai chi co the chinh sua quyen rieng tu.');
+        }
+        _ensureExistingReferenceCanUseVisibility(
+          existingPost: latestPost,
+          requestedVisibility: visibility,
+        );
+
+        transaction.update(postRef, {
+          'content': normalizedContent,
+          'media': nextMedia
+              .map((item) => item.toJson())
+              .toList(growable: false),
+          'tags': normalizedTags,
+          'visibility': visibility.firestoreValue,
+          'isPublic': visibility.isPublic,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      await _deleteRemovedMediaFiles(
+        _removedMediaFiles(
+          previousMedia: existingPost.media,
+          retainedMedia: normalizedRetainedMedia,
+        ),
+      );
+
+      return existingPost.copyWith(
+        content: normalizedContent,
+        media: nextMedia,
+        tags: normalizedTags,
+        visibility: visibility,
+        updatedAt: DateTime.now(),
+      );
+    } catch (_) {
+      await _deleteUploadedRefs(uploadedRefs);
+      rethrow;
+    }
+  }
+
+  Future<PostModel> updatePostVisibility({
+    required PostModel post,
+    required PostVisibility visibility,
+  }) async {
+    if (uid.isEmpty) {
+      throw StateError('Ban can dang nhap de chinh sua quyen rieng tu.');
+    }
+
+    final normalizedPostId = post.postId.trim();
+    if (normalizedPostId.isEmpty) {
+      throw StateError('Khong tim thay bai viet de chinh sua quyen rieng tu.');
+    }
+
+    final postRef = _postsRef.doc(normalizedPostId);
+
+    return _firestore.runTransaction((transaction) async {
+      final postSnap = await transaction.get(postRef);
+      if (!postSnap.exists) {
+        throw StateError('Bai viet khong con ton tai.');
+      }
+
+      final existingPost = PostModel.fromDoc(postSnap);
+      _ensurePostCanBeMutated(existingPost, actionLabel: 'chinh sua');
+      _ensureExistingReferenceCanUseVisibility(
+        existingPost: existingPost,
+        requestedVisibility: visibility,
+      );
+
+      transaction.update(postRef, {
+        'visibility': visibility.firestoreValue,
+        'isPublic': visibility.isPublic,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return existingPost.copyWith(
+        visibility: visibility,
+        updatedAt: DateTime.now(),
+      );
+    });
   }
 
   Future<PostModel> createRepost({
@@ -1117,15 +1271,19 @@ class PostService {
     required String postId,
     required List<PostMediaDraft> mediaDrafts,
     required List<Reference> uploadedRefs,
+    int startIndex = 0,
   }) async {
     final uploaded = <MediaModel>[];
 
     for (var index = 0; index < mediaDrafts.length; index++) {
       final draft = mediaDrafts[index];
-      final ref = _storage.ref(_storagePathForDraft(postId, draft, index));
+      final storageIndex = startIndex + index;
+      final ref = _storage.ref(
+        _storagePathForDraft(postId, draft, storageIndex),
+      );
       final uploadFile =
           draft.isImage
-              ? await _prepareImageFile(postId, draft.file, index)
+              ? await _prepareImageFile(postId, draft.file, storageIndex)
               : draft.file;
 
       await ref.putFile(
@@ -1139,6 +1297,25 @@ class PostService {
     }
 
     return uploaded;
+  }
+
+  Future<void> _deleteUploadedRefs(List<Reference> refs) async {
+    for (final ref in refs) {
+      try {
+        await ref.delete();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _deleteRemovedMediaFiles(List<MediaModel> removedMedia) async {
+    for (final media in removedMedia) {
+      final url = media.url.trim();
+      if (url.isEmpty) continue;
+
+      try {
+        await _storage.refFromURL(url).delete();
+      } catch (_) {}
+    }
   }
 
   Future<File> _prepareImageFile(String postId, File source, int index) async {
@@ -1232,6 +1409,74 @@ class PostService {
     throw StateError(
       'Không thể đăng lại hoặc trích dẫn bài viết không công khai của người khác.',
     );
+  }
+
+  void _ensurePostCanBeMutated(PostModel post, {required String actionLabel}) {
+    if (post.deletedAt != null) {
+      throw StateError('Bai viet da bi xoa truoc do.');
+    }
+
+    if (post.authorId.trim() != uid.trim()) {
+      throw StateError('Ban khong the $actionLabel bai viet nay.');
+    }
+  }
+
+  void _ensureExistingReferenceCanUseVisibility({
+    required PostModel existingPost,
+    required PostVisibility requestedVisibility,
+  }) {
+    if (!existingPost.postType.requiresReference) return;
+    if (requestedVisibility.isPrivate) return;
+
+    final referencePost = existingPost.referencePost;
+    if (referencePost == null) return;
+    if (referencePost.isPublic) return;
+    if (referencePost.authorId.trim() == uid.trim()) return;
+
+    throw StateError(
+      'Khong the cong khai bai viet trich dan tu bai viet khong cong khai cua nguoi khac.',
+    );
+  }
+
+  List<MediaModel> _resolveRetainedMedia({
+    required List<MediaModel> retainedMedia,
+    required List<MediaModel> existingMedia,
+  }) {
+    final existingByUrl = <String, MediaModel>{
+      for (final item in existingMedia)
+        if (item.url.trim().isNotEmpty) item.url.trim(): item,
+    };
+    final seenUrls = <String>{};
+    final resolved = <MediaModel>[];
+
+    for (final media in retainedMedia) {
+      final url = media.url.trim();
+      if (url.isEmpty || !seenUrls.add(url)) continue;
+
+      final existing = existingByUrl[url];
+      if (existing == null) {
+        throw StateError('Tep dinh kem khong hop le.');
+      }
+
+      resolved.add(existing);
+    }
+
+    return resolved;
+  }
+
+  List<MediaModel> _removedMediaFiles({
+    required List<MediaModel> previousMedia,
+    required List<MediaModel> retainedMedia,
+  }) {
+    final retainedUrls =
+        retainedMedia
+            .map((media) => media.url.trim())
+            .where((url) => url.isNotEmpty)
+            .toSet();
+
+    return previousMedia
+        .where((media) => !retainedUrls.contains(media.url.trim()))
+        .toList(growable: false);
   }
 
   String _repostDocId(String sourcePostId) {
