@@ -87,6 +87,10 @@ class AppPages {
       page: () => const HomeView(),
       binding: BindingsBuilder(() {
         Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
+        Get.lazyPut<PostRestrictionsController>(
+          () => PostRestrictionsController(),
+          fenix: true,
+        );
       }),
     ),
     GetPage(
@@ -137,9 +141,11 @@ class AppPages {
       name: AppRouter.restrictionList,
       page: () => const RestrictionListView(),
       binding: BindingsBuilder(() {
-        Get.lazyPut<PostRestrictionsController>(
-          () => PostRestrictionsController(),
-        );
+        if (!Get.isRegistered<PostRestrictionsController>()) {
+          Get.lazyPut<PostRestrictionsController>(
+            () => PostRestrictionsController(),
+          );
+        }
       }),
     ),
 

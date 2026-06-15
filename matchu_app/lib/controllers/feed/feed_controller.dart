@@ -72,6 +72,7 @@ class FeedController extends GetxController {
   final Set<String> _repostPendingTargetIds = <String>{};
   final Set<String> _hiddenPostIds = <String>{};
   final Set<String> _hiddenAuthorIds = <String>{};
+  final Set<String> _blockedUserIds = <String>{};
   final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   DocumentSnapshot<Map<String, dynamic>>? _featuredLastDocument;
@@ -173,7 +174,7 @@ class FeedController extends GetxController {
   }
 
   Future<void> _loadRestrictionsAndInitialFeed() async {
-    await _loadHiddenAuthorIds();
+    await _loadRestrictedAuthorIds();
     if (isClosed) return;
     await loadInitialFeaturedFeed();
   }
@@ -255,6 +256,38 @@ class FeedController extends GetxController {
     );
     _followingBufferedPosts.removeWhere(
       (post) => post.authorId.trim() == normalizedAuthorId,
+    );
+
+    if (visibleStatus != FeedStatus.initial) {
+      unawaited(refreshActiveFeed());
+    }
+  }
+
+  Future<void> applyUserBlocked(String userId) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return;
+
+    _blockedUserIds.add(normalizedUserId);
+    _followingAuthorIds.remove(normalizedUserId);
+    await _removePostsByAuthorWithAnimation(normalizedUserId);
+
+    if (visiblePosts.isEmpty && visibleHasMore) {
+      unawaited(loadMoreActiveFeed());
+    }
+  }
+
+  void applyBlockedUserRemoved(String userId) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return;
+
+    final wasRemoved = _blockedUserIds.remove(normalizedUserId);
+    if (!wasRemoved) return;
+
+    _featuredBufferedPosts.removeWhere(
+      (post) => _hasRestrictedAuthor(post, normalizedUserId),
+    );
+    _followingBufferedPosts.removeWhere(
+      (post) => _hasRestrictedAuthor(post, normalizedUserId),
     );
 
     if (visibleStatus != FeedStatus.initial) {
@@ -654,7 +687,7 @@ class FeedController extends GetxController {
 
     try {
       if (reset) {
-        await _loadHiddenAuthorIds();
+        await _loadRestrictedAuthorIds();
       }
 
       final page = await _loadVisibleLatestFeedPage(
@@ -766,7 +799,7 @@ class FeedController extends GetxController {
 
     try {
       if (reset) {
-        await _loadHiddenAuthorIds();
+        await _loadRestrictedAuthorIds();
       }
 
       final loadedPosts = <PostModel>[];
@@ -885,7 +918,7 @@ class FeedController extends GetxController {
 
     try {
       if (reset) {
-        await _loadHiddenAuthorIds();
+        await _loadRestrictedAuthorIds();
       }
 
       final followingAuthorIds = await _resolveFollowingAuthorIds(
@@ -1071,7 +1104,14 @@ class FeedController extends GetxController {
     }
 
     final followingIds = await _service.fetchFollowingUserIds();
-    _followingAuthorIds = followingIds.toSet();
+    _followingAuthorIds =
+        followingIds
+            .map((userId) => userId.trim())
+            .where(
+              (userId) =>
+                  userId.isNotEmpty && !_blockedUserIds.contains(userId),
+            )
+            .toSet();
     return _followingAuthorIds;
   }
 
@@ -1621,7 +1661,7 @@ class FeedController extends GetxController {
     return _storage.write(_hiddenPostsStorageKey, values);
   }
 
-  Future<void> _loadHiddenAuthorIds() async {
+  Future<void> _loadRestrictedAuthorIds() async {
     try {
       final hiddenAuthorIds =
           await _restrictionService.fetchHiddenPostAuthorIds();
@@ -1630,6 +1670,16 @@ class FeedController extends GetxController {
         ..addAll(hiddenAuthorIds);
     } catch (error) {
       debugPrint('Failed to load hidden post authors: $error');
+    }
+
+    try {
+      final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
+      _blockedUserIds
+        ..clear()
+        ..addAll(blockedUserIds);
+      _followingAuthorIds.removeWhere(_blockedUserIds.contains);
+    } catch (error) {
+      debugPrint('Failed to load blocked users: $error');
     }
   }
 
@@ -1642,15 +1692,20 @@ class FeedController extends GetxController {
   bool _isAuthorHidden(String authorId) {
     final normalizedAuthorId = authorId.trim();
     if (normalizedAuthorId.isEmpty) return false;
-    return _hiddenAuthorIds.contains(normalizedAuthorId);
+    return _hiddenAuthorIds.contains(normalizedAuthorId) ||
+        _blockedUserIds.contains(normalizedAuthorId);
   }
 
   bool _shouldHidePost(PostModel post) {
-    return _isPostHidden(post.postId) || _isAuthorHidden(post.authorId);
+    return _isPostHidden(post.postId) ||
+        _isAuthorHidden(post.authorId) ||
+        _isAuthorHidden(post.referencePost?.authorId ?? '');
   }
 
   List<PostModel> _filterHiddenPosts(List<PostModel> incoming) {
-    if ((_hiddenPostIds.isEmpty && _hiddenAuthorIds.isEmpty) ||
+    if ((_hiddenPostIds.isEmpty &&
+            _hiddenAuthorIds.isEmpty &&
+            _blockedUserIds.isEmpty) ||
         incoming.isEmpty) {
       return incoming;
     }
@@ -1749,7 +1804,7 @@ class FeedController extends GetxController {
     final removedPostIds = <String>{};
 
     bool removeIfHiddenAuthor(PostModel post) {
-      final shouldRemove = post.authorId.trim() == normalizedAuthorId;
+      final shouldRemove = _hasRestrictedAuthor(post, normalizedAuthorId);
       if (shouldRemove) {
         final postId = post.postId.trim();
         if (postId.isNotEmpty) {
@@ -1778,6 +1833,14 @@ class FeedController extends GetxController {
     }
 
     _updateStatusAfterPostMutation();
+  }
+
+  bool _hasRestrictedAuthor(PostModel post, String authorId) {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) return false;
+
+    return post.authorId.trim() == normalizedAuthorId ||
+        (post.referencePost?.authorId.trim() ?? '') == normalizedAuthorId;
   }
 
   void _clearPostCaches(String postId) {

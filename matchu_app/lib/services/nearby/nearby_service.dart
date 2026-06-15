@@ -5,41 +5,146 @@ import 'package:geolocator/geolocator.dart';
 import 'package:matchu_app/utils/location_utils.dart';
 import 'package:matchu_app/models/nearby_user_vm.dart';
 
+enum NearbyLocationIssue {
+  serviceDisabled,
+  permissionDenied,
+  permissionDeniedForever,
+  permissionRequestInProgress,
+  permissionDefinitionMissing,
+  timeout,
+  unavailable,
+}
+
+class NearbyLocationException implements Exception {
+  const NearbyLocationException(this.issue, this.message, {this.cause});
+
+  final NearbyLocationIssue issue;
+  final String message;
+  final Object? cause;
+
+  bool get canOpenAppSettings =>
+      issue == NearbyLocationIssue.permissionDeniedForever ||
+      issue == NearbyLocationIssue.permissionDefinitionMissing;
+
+  bool get canOpenLocationSettings =>
+      issue == NearbyLocationIssue.serviceDisabled;
+
+  @override
+  String toString() => message;
+}
+
 class NearbyService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   Future<Position> getCurrentPosition({
-    Duration timeLimit = const Duration(seconds: 12),
+    Duration timeLimit = const Duration(seconds: 16),
+    Duration cachedMaxAge = const Duration(minutes: 20),
   }) async {
-    bool enabled = await Geolocator.isLocationServiceEnabled();
+    await _ensureLocationPermission();
 
-    if (!enabled) throw Exception("Gps chưa được bật");
-
-    LocationPermission permission = await Geolocator.checkPermission();
-
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied) {
-      throw Exception("Chua cap quyen vi tri");
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception("GPS bị từ chối vĩnh viễn");
+    final enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled) {
+      throw const NearbyLocationException(
+        NearbyLocationIssue.serviceDisabled,
+        "GPS đang tắt. Hãy bật dịch vụ vị trí rồi thử lại.",
+      );
     }
 
     try {
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: timeLimit,
+        locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: timeLimit,
+        ),
       );
-    } on TimeoutException {
-      final last = await Geolocator.getLastKnownPosition();
+    } on TimeoutException catch (error) {
+      final last = await _freshLastKnownPosition(maxAge: cachedMaxAge);
       if (last != null) return last;
-      throw Exception("Khong lay duoc vi tri");
+
+      throw NearbyLocationException(
+        NearbyLocationIssue.timeout,
+        "Không lấy được vị trí hiện tại. Hãy thử đứng ở nơi thoáng hơn rồi làm mới.",
+        cause: error,
+      );
+    } on LocationServiceDisabledException catch (error) {
+      throw NearbyLocationException(
+        NearbyLocationIssue.serviceDisabled,
+        "GPS đang tắt. Hãy bật dịch vụ vị trí rồi thử lại.",
+        cause: error,
+      );
+    } on PermissionDefinitionsNotFoundException catch (error) {
+      throw NearbyLocationException(
+        NearbyLocationIssue.permissionDefinitionMissing,
+        "Ứng dụng chưa cấu hình quyền vị trí cho nền tảng này.",
+        cause: error,
+      );
+    } catch (error) {
+      final last = await _freshLastKnownPosition(maxAge: cachedMaxAge);
+      if (last != null) return last;
+
+      throw NearbyLocationException(
+        NearbyLocationIssue.unavailable,
+        "Không thể lấy vị trí lúc này. Vui lòng thử lại sau.",
+        cause: error,
+      );
     }
   }
+
+  Future<void> _ensureLocationPermission() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        throw const NearbyLocationException(
+          NearbyLocationIssue.permissionDenied,
+          "Bạn chưa cấp quyền vị trí cho MatchU.",
+        );
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw const NearbyLocationException(
+          NearbyLocationIssue.permissionDeniedForever,
+          "Quyền vị trí đã bị từ chối vĩnh viễn. Hãy mở cài đặt ứng dụng để cấp lại quyền.",
+        );
+      }
+    } on NearbyLocationException {
+      rethrow;
+    } on PermissionRequestInProgressException catch (error) {
+      throw NearbyLocationException(
+        NearbyLocationIssue.permissionRequestInProgress,
+        "Đang xin quyền vị trí. Vui lòng chờ một chút rồi thử lại.",
+        cause: error,
+      );
+    } on PermissionDefinitionsNotFoundException catch (error) {
+      throw NearbyLocationException(
+        NearbyLocationIssue.permissionDefinitionMissing,
+        "Ứng dụng chưa cấu hình quyền vị trí cho nền tảng này.",
+        cause: error,
+      );
+    }
+  }
+
+  Future<Position?> _freshLastKnownPosition({required Duration maxAge}) async {
+    final last = await Geolocator.getLastKnownPosition();
+    if (last == null) return null;
+
+    if (!LocationUtils.isValidCoordinate(last.latitude, last.longitude)) {
+      return null;
+    }
+
+    final age = DateTime.now().difference(last.timestamp);
+    if (!age.isNegative && age > maxAge) return null;
+
+    return last;
+  }
+
+  Future<bool> openAppSettings() => Geolocator.openAppSettings();
+
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
 
   Future<List<NearbyUserVM>> fetchNearbyUsers({
     required String currentUid,
@@ -47,6 +152,8 @@ class NearbyService {
     required double myLng,
     required double radiusKm,
   }) async {
+    if (!LocationUtils.isValidCoordinate(myLat, myLng)) return [];
+
     final box = LocationUtils.calculateBoundingBox(
       lat: myLat,
       lng: myLng,
@@ -70,29 +177,25 @@ class NearbyService {
 
       final lastActive = data["lastActiveAt"];
 
-      if (lastActive == null) continue;
+      if (lastActive is! Timestamp) continue;
 
-      final lastActiveTime = (lastActive as Timestamp).toDate();
+      final lastActiveTime = lastActive.toDate();
 
       if (lastActiveTime.isBefore(now.subtract(const Duration(hours: 24)))) {
         continue;
       }
 
       final location = data["location"];
-      if (location == null) continue;
+      if (location is! Map) continue;
 
-      final lat = location["lat"];
-      final lng = location["lng"];
+      final lat = _asDouble(location["lat"]);
+      final lng = _asDouble(location["lng"]);
       if (lat == null || lng == null) continue;
+      if (!LocationUtils.isValidCoordinate(lat, lng)) continue;
 
-      if (lng < box.minLng || lng > box.maxLng) continue;
+      if (!box.containsLongitude(lng)) continue;
 
-      final distance = LocationUtils.distanceKm(
-        myLat,
-        myLng,
-        lat.toDouble(),
-        lng.toDouble(),
-      );
+      final distance = LocationUtils.distanceKm(myLat, myLng, lat, lng);
 
       if (distance > radiusKm) continue;
 
@@ -110,5 +213,10 @@ class NearbyService {
     }
     result.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
     return result;
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return null;
   }
 }

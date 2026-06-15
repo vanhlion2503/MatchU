@@ -5,12 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 
 class ChatService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
   final _storage = FirebaseStorage.instance;
+  final _restrictionService = PostRestrictionService();
 
   String get uid => _auth.currentUser!.uid;
 
@@ -98,6 +100,7 @@ class ChatService {
     final roomSnap = await roomRef.get();
     final participants = List<String>.from(roomSnap["participants"]);
     final otherUid = participants.firstWhere((e) => e != uid);
+    await _ensureCanMessage(otherUid);
 
     final encrypted = await MessageCryptoService.encrypt(
       roomId: roomId,
@@ -152,6 +155,7 @@ class ChatService {
     final roomSnap = await roomRef.get();
     final participants = List<String>.from(roomSnap["participants"]);
     final otherUid = participants.firstWhere((e) => e != uid);
+    await _ensureCanMessage(otherUid);
 
     final imagePath = "chatRooms/$roomId/images/${msgRef.id}.jpg";
     final storageRef = _storage.ref(imagePath);
@@ -229,10 +233,21 @@ class ChatService {
         .collection("chatRooms")
         .where("participants", arrayContains: uid)
         .snapshots()
-        .map((snap) {
+        .asyncMap((snap) async {
+          Set<String> blockedUserIds = const <String>{};
+          try {
+            blockedUserIds = await _restrictionService.fetchBlockedUserIds();
+          } catch (_) {}
           int total = 0;
           for (final doc in snap.docs) {
             final data = doc.data();
+            final participants = List<String>.from(
+              data["participants"] ?? const [],
+            );
+            final otherUid = _otherUidFromParticipants(participants);
+            if (otherUid.isNotEmpty && blockedUserIds.contains(otherUid)) {
+              continue;
+            }
             final unread = data["unread"]?[uid] ?? 0;
             total += unread as int;
           }
@@ -290,6 +305,7 @@ class ChatService {
 
   Future<String> getOrCreateRoom(String otherUid) async {
     final myUid = uid;
+    await _ensureCanMessage(otherUid);
 
     final query =
         await _db
@@ -317,6 +333,24 @@ class ChatService {
     });
 
     return roomRef.id;
+  }
+
+  Future<void> _ensureCanMessage(String otherUid) async {
+    final normalizedOtherUid = otherUid.trim();
+    if (normalizedOtherUid.isEmpty) return;
+
+    if (await _restrictionService.isUserBlocked(normalizedOtherUid)) {
+      throw StateError(
+        'B\u1EA1n \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y. H\u00E3y g\u1EE1 ch\u1EB7n \u0111\u1EC3 nh\u1EAFn tin.',
+      );
+    }
+  }
+
+  String _otherUidFromParticipants(List<String> participants) {
+    return participants.firstWhere(
+      (participant) => participant != uid,
+      orElse: () => '',
+    );
   }
 
   String _buildNotificationPreview(String text) {

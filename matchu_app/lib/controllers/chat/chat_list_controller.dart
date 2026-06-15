@@ -5,12 +5,14 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
 import 'package:matchu_app/services/security/session_key_service.dart';
 
 class ChatListController extends GetxController with WidgetsBindingObserver {
   final ChatService _service = ChatService();
+  final PostRestrictionService _restrictionService = PostRestrictionService();
   String get uid => _service.uid;
 
   final RxList<ChatRoomModel> rooms = <ChatRoomModel>[].obs;
@@ -27,6 +29,8 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   StreamSubscription<List<ChatRoomModel>>? _sub;
   final isLoading = true.obs;
   bool _hasFirstData = false;
+  final Set<String> _blockedUserIds = <String>{};
+  List<ChatRoomModel> _latestIncomingRooms = const <ChatRoomModel>[];
   // bool _hasAnimated = false;
 
   @override
@@ -36,8 +40,10 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     // final presence = Get.put(PresenceController(), permanent: true);
 
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_loadBlockedUserIds());
     _sub = _service.listenChatRooms().listen(
       (incoming) {
+        _latestIncomingRooms = incoming;
         _mergeAndReorder(incoming);
         _applySearch();
         _keepAliveVisibleUsers();
@@ -82,13 +88,18 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     final userCache = Get.find<ChatUserCacheController>();
     final presence = Get.find<PresenceController>();
 
-    final visible = incoming.where((r) => !r.isDeletedFor(uid)).toList();
+    final visible =
+        incoming
+            .where((r) => !r.isDeletedFor(uid))
+            .where((r) => !_isRoomWithBlockedUser(r))
+            .toList();
 
     final aliveUids = <String>{};
     final visibleRoomIds = <String>{};
 
     for (final room in visible) {
-      final otherUid = room.participants.firstWhere((e) => e != uid);
+      final otherUid = _otherUidOf(room);
+      if (otherUid.isEmpty) continue;
       aliveUids.add(otherUid);
       unawaited(userCache.loadIfNeeded(otherUid));
       presence.listen(otherUid);
@@ -120,7 +131,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     final userCache = Get.find<ChatUserCacheController>();
 
     final aliveUids =
-        rooms.map((r) => r.participants.firstWhere((e) => e != uid)).toSet();
+        rooms.map(_otherUidOf).where((uid) => uid.isNotEmpty).toSet();
 
     userCache.cleanupExcept(aliveUids);
   }
@@ -129,7 +140,8 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     final userCache = Get.find<ChatUserCacheController>();
 
     for (final room in rooms) {
-      final otherUid = room.participants.firstWhere((e) => e != uid);
+      final otherUid = _otherUidOf(room);
+      if (otherUid.isEmpty) continue;
       unawaited(userCache.loadIfNeeded(otherUid));
     }
   }
@@ -155,7 +167,8 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
           return true;
         }
 
-        final otherUid = room.participants.firstWhere((e) => e != uid);
+        final otherUid = _otherUidOf(room);
+        if (otherUid.isEmpty) return false;
 
         final user = userCache.getUser(otherUid);
         if (user == null) {
@@ -179,6 +192,42 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     textController.clear();
     filteredRooms.assignAll(rooms);
     focusNode.unfocus();
+  }
+
+  Future<void> _loadBlockedUserIds() async {
+    try {
+      final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
+      _blockedUserIds
+        ..clear()
+        ..addAll(blockedUserIds);
+      _mergeAndReorder(_latestIncomingRooms);
+      _applySearch();
+    } catch (_) {}
+  }
+
+  void applyUserBlocked(String userId) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return;
+    _blockedUserIds.add(normalizedUserId);
+    _mergeAndReorder(_latestIncomingRooms);
+    _applySearch();
+  }
+
+  void applyUserUnblocked(String userId) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return;
+    _blockedUserIds.remove(normalizedUserId);
+    _mergeAndReorder(_latestIncomingRooms);
+    _applySearch();
+  }
+
+  bool _isRoomWithBlockedUser(ChatRoomModel room) {
+    final otherUid = _otherUidOf(room);
+    return otherUid.isNotEmpty && _blockedUserIds.contains(otherUid);
+  }
+
+  String _otherUidOf(ChatRoomModel room) {
+    return room.participants.firstWhere((e) => e != uid, orElse: () => '');
   }
 
   /// ========================

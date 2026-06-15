@@ -21,10 +21,44 @@ class NearbyUserList extends StatelessWidget {
       }
 
       if (!controller.isLocationVisible.value) {
-        return const NearbyEmptyState(
+        return NearbyEmptyState(
           icon: Icons.visibility_off_rounded,
-          title: "Bạn đang tắt hiện thị vị trí",
+          title: "Bạn đang tắt hiển thị vị trí",
           subtitle: "Bật vị trí để xem những người ở quanh bạn",
+          actionLabel: "Bật vị trí",
+          actionIcon: Icons.location_on_rounded,
+          onActionPressed: () => controller.setLocationVisibility(true),
+        );
+      }
+
+      final locationError = controller.locationErrorMessage.value;
+      if (locationError != null) {
+        final canOpenLocationSettings =
+            controller.canOpenLocationSettings.value;
+        final canOpenAppSettings = controller.canOpenAppSettings.value;
+
+        return NearbyEmptyState(
+          icon: Icons.my_location_rounded,
+          title: "Không lấy được vị trí",
+          subtitle: locationError,
+          actionLabel:
+              canOpenLocationSettings
+                  ? "Bật GPS"
+                  : canOpenAppSettings
+                  ? "Mở cài đặt"
+                  : "Thử lại",
+          actionIcon:
+              canOpenLocationSettings
+                  ? Icons.location_on_rounded
+                  : canOpenAppSettings
+                  ? Icons.settings_rounded
+                  : Icons.refresh_rounded,
+          onActionPressed:
+              canOpenLocationSettings
+                  ? controller.openLocationSettings
+                  : canOpenAppSettings
+                  ? controller.openAppSettings
+                  : controller.retryLocation,
         );
       }
 

@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
@@ -62,6 +63,31 @@ class OtherProfileView extends StatelessWidget {
             ),
           ),
         ),
+        actions: [
+          Obx(() {
+            final user = c.user.value;
+            final isMe = user != null && c.currentUid == user.uid;
+            if (user == null || isMe || c.isBlocked.value) {
+              return const SizedBox.shrink();
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _OtherProfileActionMenu(
+                isBlocking: c.isBlocking.value,
+                onReport: () {
+                  Get.snackbar(
+                    'B\u00E1o c\u00E1o',
+                    'T\u00EDnh n\u0103ng b\u00E1o c\u00E1o s\u1EBD \u0111\u01B0\u1EE3c ho\u00E0n thi\u1EC7n \u1EDF b\u01B0\u1EDBc ti\u1EBFp theo.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    margin: const EdgeInsets.all(12),
+                  );
+                },
+                onBlock: () => _confirmBlockUser(context, c),
+              ),
+            );
+          }),
+        ],
       ),
       body: Obx(() {
         if (c.isLoadingFollowing.value || c.user.value == null) {
@@ -71,6 +97,11 @@ class OtherProfileView extends StatelessWidget {
         final UserModel u = c.user.value!;
         final String currentUid = c.currentUid;
         final bool isMe = currentUid == u.uid;
+        if (!isMe && c.isBlocked.value) {
+          return _BlockedProfileState(
+            onOpenRestrictions: () => Get.toNamed(AppRouter.restrictionList),
+          );
+        }
         final bool canSeeFollowersOnly = isMe || c.isFollowing.value;
         final postsTag = ProfilePostsController.otherProfileTag(
           u.uid,
@@ -421,12 +452,205 @@ class OtherProfileView extends StatelessWidget {
     final chatService = ChatService();
 
     // 🔥 Tạo hoặc lấy roomId (nên làm ở service)
-    final roomId = await chatService.getOrCreateRoom(otherUid);
+    try {
+      final roomId = await chatService.getOrCreateRoom(otherUid);
 
-    Get.to(
-      () => const ChatView(),
-      arguments: {"roomId": roomId, "otherUid": otherUid},
-      transition: Transition.cupertino,
+      Get.to(
+        () => const ChatView(),
+        arguments: {"roomId": roomId, "otherUid": otherUid},
+        transition: Transition.cupertino,
+      );
+    } catch (error) {
+      Get.snackbar(
+        'L\u1ED7i',
+        error is StateError
+            ? error.message
+            : 'Kh\u00F4ng th\u1EC3 m\u1EDF cu\u1ED9c tr\u00F2 chuy\u1EC7n.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+    }
+  }
+
+  Future<void> _confirmBlockUser(
+    BuildContext context,
+    OtherProfileController controller,
+  ) async {
+    if (controller.isBlocking.value) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng?'),
+            content: const Text(
+              'B\u1EA1n s\u1EBD kh\u00F4ng c\u00F2n th\u1EA5y h\u1ED3 s\u01A1, b\u00E0i vi\u1EBFt v\u00E0 ng\u01B0\u1EDDi d\u00F9ng n\u00E0y trong c\u00E1c danh s\u00E1ch c\u1EE7a b\u1EA1n.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('H\u1EE7y'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Ch\u1EB7n'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed != true) return;
+
+    final blocked = await controller.blockUser();
+    if (blocked && Get.key.currentState?.canPop() == true) {
+      Get.back();
+    }
+  }
+}
+
+enum _OtherProfileMenuAction { report, block }
+
+class _OtherProfileActionMenu extends StatelessWidget {
+  const _OtherProfileActionMenu({
+    required this.isBlocking,
+    required this.onReport,
+    required this.onBlock,
+  });
+
+  final bool isBlocking;
+  final VoidCallback onReport;
+  final VoidCallback onBlock;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return PopupMenuButton<_OtherProfileMenuAction>(
+      icon:
+          isBlocking
+              ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+              : Icon(Iconsax.warning_2, color: theme.colorScheme.onPrimary),
+      enabled: !isBlocking,
+      offset: const Offset(0, 46),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      onSelected: (action) {
+        switch (action) {
+          case _OtherProfileMenuAction.report:
+            onReport();
+            break;
+          case _OtherProfileMenuAction.block:
+            onBlock();
+            break;
+        }
+      },
+      itemBuilder:
+          (context) => [
+            const PopupMenuItem(
+              value: _OtherProfileMenuAction.report,
+              child: _OtherProfileMenuItem(
+                icon: Iconsax.warning_2,
+                label: 'B\u00E1o c\u00E1o',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _OtherProfileMenuAction.block,
+              child: _OtherProfileMenuItem(
+                icon: Iconsax.profile_delete,
+                label: 'Ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng',
+                danger: true,
+              ),
+            ),
+          ],
+    );
+  }
+}
+
+class _OtherProfileMenuItem extends StatelessWidget {
+  const _OtherProfileMenuItem({
+    required this.icon,
+    required this.label,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color =
+        danger ? theme.colorScheme.error : theme.colorScheme.onSurface;
+
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BlockedProfileState extends StatelessWidget {
+  const _BlockedProfileState({required this.onOpenRestrictions});
+
+  final VoidCallback onOpenRestrictions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Iconsax.shield_cross,
+                size: 46,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'B\u1EA1n \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'C\u00F3 th\u1EC3 g\u1EE1 ch\u1EB7n trong Danh s\u00E1ch h\u1EA1n ch\u1EBF.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.textTheme.bodySmall?.color,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onOpenRestrictions,
+                child: const Text('M\u1EDF danh s\u00E1ch h\u1EA1n ch\u1EBF'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

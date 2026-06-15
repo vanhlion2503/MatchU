@@ -8,6 +8,8 @@
 	<string>Cho phép chọn ảnh avatar</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Cho phép lưu ảnh QR của bạn vào thư viện ảnh</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Cho phép MatchU sử dụng vị trí để tìm những người ở gần bạn</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

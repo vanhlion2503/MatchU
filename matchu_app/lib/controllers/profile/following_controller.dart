@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 
 class FollowingController extends GetxController {
   final UserService _userService = UserService();
+  final PostRestrictionService _restrictionService = PostRestrictionService();
   final String userId;
 
   FollowingController(this.userId);
@@ -26,8 +28,10 @@ class FollowingController extends GetxController {
       return;
     }
 
+    final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
     List<UserModel> list = [];
     for (String id in targetUser.following) {
+      if (blockedUserIds.contains(id.trim())) continue;
       final u = await _userService.getUser(id);
       if (u != null) list.add(u);
     }

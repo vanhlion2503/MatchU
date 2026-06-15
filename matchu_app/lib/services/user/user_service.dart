@@ -144,6 +144,13 @@ class UserService {
     }, SetOptions(merge: true));
   }
 
+  Future<void> clearUserLocation() async {
+    await _db.collection("users").doc(uid).set({
+      "location": {"lat": null, "lng": null},
+      "updatedAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Future<void> setNearbyVisibility(
     bool enabled, {
     bool clearLocationWhenDisabled = true,

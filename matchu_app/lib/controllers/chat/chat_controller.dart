@@ -674,17 +674,26 @@ class ChatController extends GetxController {
       return;
     }
 
-    await _service.sendMessage(
-      roomId: roomId,
-      text: text,
-      type: type,
-      replyToId: reply?["id"],
-      replyText: reply?["text"],
-      keyId: _currentKeyId,
-    );
+    try {
+      await _service.sendMessage(
+        roomId: roomId,
+        text: text,
+        type: type,
+        replyToId: reply?["id"],
+        replyText: reply?["text"],
+        keyId: _currentKeyId,
+      );
 
-    replyingMessage.value = null;
-    inputController.clear();
+      replyingMessage.value = null;
+      inputController.clear();
+    } catch (error) {
+      Get.snackbar(
+        "L\u1ED7i",
+        error is StateError
+            ? error.message
+            : "Kh\u00F4ng th\u1EC3 g\u1EEDi tin nh\u1EAFn.",
+      );
+    }
   }
 
   Future<void> pickAndSendImage({

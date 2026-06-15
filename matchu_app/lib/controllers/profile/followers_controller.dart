@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 
-class FollowersController extends GetxController{
+class FollowersController extends GetxController {
   final UserService _userService = UserService();
+  final PostRestrictionService _restrictionService = PostRestrictionService();
   final String userId;
 
   RxList<UserModel> followers = RxList<UserModel>([]);
@@ -12,31 +14,34 @@ class FollowersController extends GetxController{
   FollowersController(this.userId);
 
   @override
-  void onInit(){
+  void onInit() {
     super.onInit();
     loadFollowers();
   }
+
   Future<void> loadFollowers() async {
     isLoading.value = true;
     final targetUser = await _userService.getUser(userId);
-    if(targetUser == null){
+    if (targetUser == null) {
       isLoading.value = false;
       return;
     }
+    final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
     List<UserModel> list = [];
-    for(String id in targetUser.followers){
+    for (String id in targetUser.followers) {
+      if (blockedUserIds.contains(id.trim())) continue;
       final u = await _userService.getUser(id);
       if (u != null) list.add(u);
     }
     followers.assignAll(list);
     isLoading.value = false;
   }
-  
-  Future<bool> isFollowingBack(String uid) async{
+
+  Future<bool> isFollowingBack(String uid) async {
     return await _userService.isFollowing(uid);
   }
 
-  Future<void> follow(String uid) async{
+  Future<void> follow(String uid) async {
     await _userService.followUser(uid);
     update();
   }

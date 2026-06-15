@@ -8,6 +8,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 enum CommentSortMode { featured, newest }
@@ -31,7 +32,9 @@ class PostCommentsController extends GetxController {
     this.initialCommentCount = 0,
     this.pageSize = PostCommentService.defaultTopLevelPageSize,
     PostCommentService? service,
-  }) : _service = service ?? PostCommentService();
+    PostRestrictionService? restrictionService,
+  }) : _service = service ?? PostCommentService(),
+       _restrictionService = restrictionService ?? PostRestrictionService();
 
   final String postId;
   final String postAuthorId;
@@ -39,6 +42,7 @@ class PostCommentsController extends GetxController {
   final int initialCommentCount;
   final int pageSize;
   final PostCommentService _service;
+  final PostRestrictionService _restrictionService;
   final GetStorage _storage = GetStorage();
 
   final TextEditingController inputController = TextEditingController();
@@ -66,6 +70,7 @@ class PostCommentsController extends GetxController {
   final Map<String, bool> _queuedLikeStates = <String, bool>{};
   final Set<String> _likeSyncingCommentIds = <String>{};
   final Set<String> _loadedReplyParentIds = <String>{};
+  final Set<String> _blockedUserIds = <String>{};
   final Map<String, int> _topLevelOrderRanks = <String, int>{};
   int _optimisticCommentSequence = 0;
 
@@ -170,6 +175,11 @@ class PostCommentsController extends GetxController {
         return true;
       }
 
+      if (_blockedUserIds.contains(comment.userId.trim())) {
+        suppressedCache[comment.commentId] = true;
+        return true;
+      }
+
       final parentId = comment.parentId;
       if (parentId == null || parentId.isEmpty) {
         suppressedCache[comment.commentId] = false;
@@ -254,6 +264,7 @@ class PostCommentsController extends GetxController {
       isLoading.value = true;
       errorMessage.value = null;
       _resetLoadedState();
+      await _loadBlockedUserIds();
 
       await _loadMoreTopLevelComments(resetCursor: true);
     } catch (error) {
@@ -792,11 +803,12 @@ class PostCommentsController extends GetxController {
 
     _topLevelCursor = page.nextCursor;
     hasMoreComments.value = page.hasMore;
-    _upsertComments(page.comments, rebuildThreadEntries: false);
+    final visibleComments = _filterBlockedComments(page.comments);
+    _upsertComments(visibleComments, rebuildThreadEntries: false);
     if (resetCursor) {
       _rebuildTopLevelOrder(comments);
     } else {
-      _appendTopLevelOrder(page.comments);
+      _appendTopLevelOrder(visibleComments);
     }
     _rebuildThreadEntries();
   }
@@ -806,7 +818,9 @@ class PostCommentsController extends GetxController {
     _setReplyLoading(parentId, true);
 
     try {
-      final replies = await _service.fetchReplies(postId, parentId);
+      final replies = _filterBlockedComments(
+        await _service.fetchReplies(postId, parentId),
+      );
       _loadedReplyParentIds.add(parentId);
       _upsertComments(replies);
       _expandThreadPath(parentId);
@@ -844,6 +858,9 @@ class PostCommentsController extends GetxController {
     var hasChanges = false;
 
     for (final incoming in incomingComments) {
+      if (_blockedUserIds.contains(incoming.userId.trim())) {
+        continue;
+      }
       _mergeLikeCaches(incoming);
 
       final index = nextComments.indexWhere(
@@ -920,6 +937,26 @@ class PostCommentsController extends GetxController {
     _confirmedLikeStates.clear();
     _queuedLikeStates.clear();
     _likeSyncingCommentIds.clear();
+  }
+
+  Future<void> _loadBlockedUserIds() async {
+    try {
+      final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
+      _blockedUserIds
+        ..clear()
+        ..addAll(blockedUserIds);
+    } catch (error) {
+      debugPrint('Failed to load blocked users for comments: $error');
+    }
+  }
+
+  List<PostCommentModel> _filterBlockedComments(
+    Iterable<PostCommentModel> source,
+  ) {
+    if (_blockedUserIds.isEmpty) return source.toList(growable: false);
+    return source
+        .where((comment) => !_blockedUserIds.contains(comment.userId.trim()))
+        .toList(growable: false);
   }
 
   String get _hiddenCommentsStorageKey {

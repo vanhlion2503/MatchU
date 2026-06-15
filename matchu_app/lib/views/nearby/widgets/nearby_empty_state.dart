@@ -4,12 +4,18 @@ class NearbyEmptyState extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final String? actionLabel;
+  final IconData? actionIcon;
+  final VoidCallback? onActionPressed;
 
   const NearbyEmptyState({
     super.key,
     this.title = "Không tìm thấy ai phù hợp",
     this.subtitle = "Hãy thử tăng khoảng cách để tìm kiếm",
     this.icon = Icons.location_off,
+    this.actionLabel,
+    this.actionIcon,
+    this.onActionPressed,
   });
 
   @override
@@ -42,6 +48,14 @@ class NearbyEmptyState extends StatelessWidget {
                 color: colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
+            if (actionLabel != null && onActionPressed != null) ...[
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: onActionPressed,
+                icon: Icon(actionIcon ?? Icons.refresh_rounded, size: 18),
+                label: Text(actionLabel!),
+              ),
+            ],
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
+import 'package:matchu_app/models/feed/blocked_user_model.dart';
 import 'package:matchu_app/models/feed/hidden_post_author_model.dart';
 
 class RestrictionListView extends StatefulWidget {
@@ -31,7 +32,6 @@ class _RestrictionListViewState extends State<RestrictionListView>
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<PostRestrictionsController>();
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -47,7 +47,7 @@ class _RestrictionListViewState extends State<RestrictionListView>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _BlockedListPlaceholder(theme: theme),
+          _BlockedUsersTab(controller: controller),
           _HiddenPostAuthorsTab(controller: controller),
         ],
       ),
@@ -55,42 +55,146 @@ class _RestrictionListViewState extends State<RestrictionListView>
   }
 }
 
-class _BlockedListPlaceholder extends StatelessWidget {
-  const _BlockedListPlaceholder({required this.theme});
+class _BlockedUsersTab extends StatelessWidget {
+  const _BlockedUsersTab({required this.controller});
 
-  final ThemeData theme;
+  final PostRestrictionsController controller;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Iconsax.shield_cross,
-              size: 42,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'Danh s\u00E1ch b\u1ECB ch\u1EB7n',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+    final theme = Theme.of(context);
+
+    return Obx(() {
+      final status = controller.blockedUsersStatus.value;
+      final items = controller.blockedUsers.toList(growable: false);
+
+      if (status == PostRestrictionsStatus.loading && items.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (status == PostRestrictionsStatus.error && items.isEmpty) {
+        return _RestrictionState(
+          icon: Iconsax.warning_2,
+          title: 'Kh\u00F4ng th\u1EC3 t\u1EA3i danh s\u00E1ch',
+          message:
+              controller.errorMessage.value ??
+              'Vui l\u00F2ng th\u1EED l\u1EA1i sau.',
+          actionLabel: 'Th\u1EED l\u1EA1i',
+          onAction: controller.loadBlockedUsers,
+        );
+      }
+
+      if (items.isEmpty) {
+        return _RestrictionState(
+          icon: Iconsax.shield_cross,
+          title: 'Ch\u01B0a ch\u1EB7n ai',
+          message:
+              'Nh\u1EEFng ng\u01B0\u1EDDi b\u1EA1n \u0111\u00E3 ch\u1EB7n s\u1EBD xu\u1EA5t hi\u1EC7n \u1EDF \u0111\u00E2y.',
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: controller.loadBlockedUsers,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemBuilder: (context, index) {
+            return _BlockedUserTile(
+              item: items[index],
+              isLoading: controller.isUserUnblocking(
+                items[index].blockedUserId,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'T\u00EDnh n\u0103ng n\u00E0y s\u1EBD \u0111\u01B0\u1EE3c ph\u00E1t tri\u1EC3n sau.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.textTheme.bodySmall?.color,
-                height: 1.45,
+              onUnblock:
+                  () => controller.unblockUser(items[index].blockedUserId),
+            );
+          },
+          separatorBuilder:
+              (context, index) => Divider(
+                height: 1,
+                color: theme.dividerColor.withValues(alpha: 0.45),
               ),
-            ),
-          ],
+          itemCount: items.length,
         ),
+      );
+    });
+  }
+}
+
+class _BlockedUserTile extends StatelessWidget {
+  const _BlockedUserTile({
+    required this.item,
+    required this.isLoading,
+    required this.onUnblock,
+  });
+
+  final BlockedUserModel item;
+  final bool isLoading;
+  final VoidCallback onUnblock;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final avatarUrl = item.avatarUrl.trim();
+    final handle = item.handle;
+    final blockedAt = item.blockedAt;
+    final blockedAtLabel =
+        blockedAt == null ? null : DateFormat('dd/MM/yyyy').format(blockedAt);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundImage:
+                avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+            child:
+                avatarUrl.isEmpty
+                    ? Text(item.title.characters.first.toUpperCase())
+                    : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    if (handle.isNotEmpty) '@$handle',
+                    if (blockedAtLabel != null)
+                      '\u0110\u00E3 ch\u1EB7n t\u1EEB $blockedAtLabel',
+                  ].join(' \u2022 '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.textTheme.bodySmall?.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton(
+            onPressed: isLoading ? null : onUnblock,
+            child:
+                isLoading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('G\u1EE1 ch\u1EB7n'),
+          ),
+        ],
       ),
     );
   }

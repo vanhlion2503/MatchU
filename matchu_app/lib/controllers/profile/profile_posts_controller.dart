@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
@@ -18,7 +19,9 @@ class ProfilePostsController extends GetxController {
     this.includeFollowersOnly = false,
     this.source = ProfilePostsSource.authored,
     PostService? postService,
-  }) : _service = postService ?? PostService();
+    PostRestrictionService? restrictionService,
+  }) : _service = postService ?? PostService(),
+       _restrictionService = restrictionService ?? PostRestrictionService();
 
   static const int _pageSize = 10;
   static const Duration _postRemovalAnimationDuration = Duration(
@@ -53,6 +56,7 @@ class ProfilePostsController extends GetxController {
   final bool includeFollowersOnly;
   final ProfilePostsSource source;
   final PostService _service;
+  final PostRestrictionService _restrictionService;
 
   final RxList<PostModel> posts = <PostModel>[].obs;
   final Rx<ProfilePostsStatus> status = ProfilePostsStatus.initial.obs;
@@ -78,6 +82,7 @@ class ProfilePostsController extends GetxController {
   final Set<String> _repostReferenceLoadingIds = <String>{};
   final Set<String> _fetchedRepostReferenceIds = <String>{};
   final RxSet<String> _removingPostIds = <String>{}.obs;
+  final Set<String> _blockedAuthorIds = <String>{};
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   final Map<String, DocumentSnapshot<Map<String, dynamic>>>
   _lastDocumentsByScope = <String, DocumentSnapshot<Map<String, dynamic>>>{};
@@ -530,6 +535,7 @@ class ProfilePostsController extends GetxController {
               );
 
       if (reset) {
+        await _loadBlockedAuthorIds();
         _savedAtByPostId
           ..clear()
           ..addAll(page.savedAtByPostId);
@@ -537,8 +543,9 @@ class ProfilePostsController extends GetxController {
         _savedAtByPostId.addAll(page.savedAtByPostId);
       }
 
+      final visibleIncomingPosts = _filterBlockedPosts(page.posts);
       final likedHydratedPosts = await _attachLikeStates(
-        page.posts,
+        visibleIncomingPosts,
         reset: reset,
       );
       final hydratedPosts = await _attachRepostStates(
@@ -718,10 +725,12 @@ class ProfilePostsController extends GetxController {
     List<PostModel> incoming,
   ) {
     final merged = <String, PostModel>{
-      for (final post in current) post.postId: post,
+      for (final post in current)
+        if (!_shouldHideBlockedPost(post)) post.postId: post,
     };
 
     for (final post in incoming) {
+      if (_shouldHideBlockedPost(post)) continue;
       merged[post.postId] = post;
     }
 
@@ -753,6 +762,7 @@ class ProfilePostsController extends GetxController {
     final localPosts = _locallyPrependedPosts.values
         .where((post) => post.authorId == userId)
         .where(_canIncludeAuthoredPost)
+        .where((post) => !_shouldHideBlockedPost(post))
         .toList(growable: false);
 
     if (localPosts.isEmpty) return incoming;
@@ -763,6 +773,33 @@ class ProfilePostsController extends GetxController {
     if (includePrivate) return true;
     if (post.isPublic) return true;
     return includeFollowersOnly && post.isFollowersOnly;
+  }
+
+  Future<void> _loadBlockedAuthorIds() async {
+    try {
+      final blockedAuthorIds = await _restrictionService.fetchBlockedUserIds();
+      _blockedAuthorIds
+        ..clear()
+        ..addAll(blockedAuthorIds);
+    } catch (error) {
+      debugPrint('Failed to load blocked users for profile posts: $error');
+    }
+  }
+
+  List<PostModel> _filterBlockedPosts(List<PostModel> incoming) {
+    if (_blockedAuthorIds.isEmpty || incoming.isEmpty) return incoming;
+    return incoming
+        .where((post) => !_shouldHideBlockedPost(post))
+        .toList(growable: false);
+  }
+
+  bool _shouldHideBlockedPost(PostModel post) {
+    if (_blockedAuthorIds.isEmpty) return false;
+
+    final postAuthorId = post.authorId.trim();
+    final referenceAuthorId = post.referencePost?.authorId.trim() ?? '';
+    return _blockedAuthorIds.contains(postAuthorId) ||
+        _blockedAuthorIds.contains(referenceAuthorId);
   }
 
   Future<void> _removePostByIdWithAnimation(String postId) async {
