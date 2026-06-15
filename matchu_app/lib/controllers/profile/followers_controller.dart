@@ -37,6 +37,13 @@ class FollowersController extends GetxController {
     isLoading.value = false;
   }
 
+  void applyUserBlocked(String userId) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return;
+
+    followers.removeWhere((user) => user.uid.trim() == normalizedUserId);
+  }
+
   Future<bool> isFollowingBack(String uid) async {
     return await _userService.isFollowing(uid);
   }

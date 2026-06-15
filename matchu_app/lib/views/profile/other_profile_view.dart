@@ -39,30 +39,42 @@ class OtherProfileView extends StatelessWidget {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 8),
-          child: Center(
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: colorScheme.onPrimary.withValues(alpha: 0.8),
-                  width: 1,
+        leading: Obx(() {
+          final isBlocked = c.isBlocked.value;
+          final foregroundColor =
+              isBlocked ? colorScheme.onSurface : colorScheme.onPrimary;
+          final borderColor =
+              isBlocked
+                  ? colorScheme.outline.withValues(alpha: 0.45)
+                  : colorScheme.onPrimary.withValues(alpha: 0.8);
+          final backgroundColor =
+              isBlocked
+                  ? colorScheme.surface.withValues(alpha: 0.92)
+                  : Colors.transparent;
+
+          return Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: borderColor, width: 1),
+                ),
+                child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(Icons.arrow_back_ios_new),
+                  color: foregroundColor,
+                  iconSize: 20,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ),
-              child: IconButton(
-                onPressed: () => Get.back(),
-                icon: const Icon(Icons.arrow_back_ios_new),
-                color: colorScheme.onPrimary,
-                iconSize: 20,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
             ),
-          ),
-        ),
+          );
+        }),
         actions: [
           Obx(() {
             final user = c.user.value;
@@ -99,6 +111,7 @@ class OtherProfileView extends StatelessWidget {
         final bool isMe = currentUid == u.uid;
         if (!isMe && c.isBlocked.value) {
           return _BlockedProfileState(
+            onBack: () => Navigator.of(context).maybePop(),
             onOpenRestrictions: () => Get.toNamed(AppRouter.restrictionList),
           );
         }
@@ -502,8 +515,8 @@ class OtherProfileView extends StatelessWidget {
     if (confirmed != true) return;
 
     final blocked = await controller.blockUser();
-    if (blocked && Get.key.currentState?.canPop() == true) {
-      Get.back();
+    if (blocked && context.mounted) {
+      await Navigator.of(context).maybePop();
     }
   }
 }
@@ -605,8 +618,12 @@ class _OtherProfileMenuItem extends StatelessWidget {
 }
 
 class _BlockedProfileState extends StatelessWidget {
-  const _BlockedProfileState({required this.onOpenRestrictions});
+  const _BlockedProfileState({
+    required this.onBack,
+    required this.onOpenRestrictions,
+  });
 
+  final VoidCallback onBack;
   final VoidCallback onOpenRestrictions;
 
   @override
@@ -643,9 +660,23 @@ class _BlockedProfileState extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onOpenRestrictions,
-                child: const Text('M\u1EDF danh s\u00E1ch h\u1EA1n ch\u1EBF'),
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: onBack,
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 16),
+                    label: const Text('Quay l\u1EA1i'),
+                  ),
+                  FilledButton(
+                    onPressed: onOpenRestrictions,
+                    child: const Text(
+                      'M\u1EDF danh s\u00E1ch h\u1EA1n ch\u1EBF',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

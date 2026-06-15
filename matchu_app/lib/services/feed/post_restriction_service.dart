@@ -31,6 +31,10 @@ class PostRestrictionService {
         .collection('blockedUsers');
   }
 
+  DocumentReference<Map<String, dynamic>> _userRef(String userId) {
+    return _firestore.collection('users').doc(userId);
+  }
+
   Future<Set<String>> fetchBlockedUserIds() async {
     final currentUid = uid;
     if (currentUid.isEmpty) {
@@ -187,8 +191,6 @@ class PostRestrictionService {
       );
     }
 
-    final blockRef = _blockedUsersRef(currentUid).doc(blockedUserId);
-
     final payload = <String, dynamic>{
       'userId': currentUid,
       'blockedUserId': blockedUserId,
@@ -199,7 +201,25 @@ class PostRestrictionService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
-    await blockRef.set(payload);
+    final batch = _firestore.batch();
+    batch.set(_blockedUsersRef(currentUid).doc(blockedUserId), payload);
+    batch.update(_userRef(currentUid), {
+      'followers': FieldValue.arrayRemove([blockedUserId]),
+      'following': FieldValue.arrayRemove([blockedUserId]),
+    });
+
+    final targetUpdate = <String, dynamic>{};
+    if (_containsUserId(targetUser.followers, currentUid)) {
+      targetUpdate['followers'] = FieldValue.arrayRemove([currentUid]);
+    }
+    if (_containsUserId(targetUser.following, currentUid)) {
+      targetUpdate['following'] = FieldValue.arrayRemove([currentUid]);
+    }
+    if (targetUpdate.isNotEmpty) {
+      batch.update(_userRef(blockedUserId), targetUpdate);
+    }
+
+    await batch.commit();
   }
 
   Future<void> unblockUser(String blockedUserId) async {
@@ -218,5 +238,9 @@ class PostRestrictionService {
     }
 
     await _blockedUsersRef(currentUid).doc(normalizedBlockedUserId).delete();
+  }
+
+  bool _containsUserId(Iterable<String> userIds, String userId) {
+    return userIds.any((item) => item.trim() == userId);
   }
 }

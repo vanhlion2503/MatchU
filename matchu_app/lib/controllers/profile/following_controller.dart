@@ -40,6 +40,13 @@ class FollowingController extends GetxController {
     isLoading.value = false;
   }
 
+  void applyUserBlocked(String userId) {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) return;
+
+    users.removeWhere((user) => user.uid.trim() == normalizedUserId);
+  }
+
   Future<void> follow(String uid) async {
     await _userService.followUser(uid);
     update();

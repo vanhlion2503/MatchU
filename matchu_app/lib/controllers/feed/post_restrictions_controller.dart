@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
+import 'package:matchu_app/controllers/profile/followers_controller.dart';
+import 'package:matchu_app/controllers/profile/following_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/models/feed/blocked_user_model.dart';
 import 'package:matchu_app/models/feed/hidden_post_author_model.dart';
@@ -256,6 +258,12 @@ class PostRestrictionsController extends GetxController {
     }
     if (Get.isRegistered<ChatListController>()) {
       Get.find<ChatListController>().applyUserBlocked(userId);
+    }
+    if (Get.isRegistered<FollowersController>()) {
+      Get.find<FollowersController>().applyUserBlocked(userId);
+    }
+    if (Get.isRegistered<FollowingController>()) {
+      Get.find<FollowingController>().applyUserBlocked(userId);
     }
   }
 

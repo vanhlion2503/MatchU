@@ -65,7 +65,9 @@ class OtherProfileController extends GetxController {
               : Get.put(PostRestrictionsController());
       final blocked = await restrictionsController.blockUser(targetUser);
       if (blocked) {
+        _removeCurrentUserFromTargetRelations(targetUser);
         isBlocked.value = true;
+        isFollowing.value = false;
         canMessage.value = false;
       }
       return blocked;
@@ -83,6 +85,20 @@ class OtherProfileController extends GetxController {
   Future<void> unfollow() async {
     await _userService.unfollowUser(userId);
     isFollowing.value = false;
+  }
+
+  void _removeCurrentUserFromTargetRelations(UserModel targetUser) {
+    final normalizedCurrentUid = currentUid.trim();
+    if (normalizedCurrentUid.isEmpty) return;
+
+    user.value = targetUser.copyWith(
+      followers: targetUser.followers
+          .where((id) => id.trim() != normalizedCurrentUid)
+          .toList(growable: false),
+      following: targetUser.following
+          .where((id) => id.trim() != normalizedCurrentUid)
+          .toList(growable: false),
+    );
   }
 
   int get age {

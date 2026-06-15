@@ -83,6 +83,18 @@ service cloud.firestore {
           : [];
       }
 
+      function followingBefore() {
+        return resource.data.following is list
+          ? resource.data.following
+          : [];
+      }
+
+      function followingAfter() {
+        return request.resource.data.following is list
+          ? request.resource.data.following
+          : [];
+      }
+
       function isAddSelfFollower() {
         return !(request.auth.uid in followersBefore())
           && request.auth.uid in followersAfter()
@@ -95,11 +107,26 @@ service cloud.firestore {
           && followersAfter().size() + 1 == followersBefore().size();
       }
 
+      function isRemoveSelfFollowing() {
+        return request.auth.uid in followingBefore()
+          && !(request.auth.uid in followingAfter())
+          && followingAfter().size() + 1 == followingBefore().size();
+      }
+
       function isFollowersOnlyUpdate() {
         return request.auth != null
           && request.resource.data.diff(resource.data).changedKeys()
             .hasOnly(["followers"])
           && (isAddSelfFollower() || isRemoveSelfFollower());
+      }
+
+      function isSocialConnectionCleanupUpdate() {
+        let changed = request.resource.data.diff(resource.data).changedKeys();
+        return request.auth != null
+          && changed.hasOnly(["followers", "following"])
+          && changed.hasAny(["followers", "following"])
+          && (!changed.hasAny(["followers"]) || isRemoveSelfFollower())
+          && (!changed.hasAny(["following"]) || isRemoveSelfFollowing());
       }
 
       function isRatingOnlyUpdate() {
@@ -223,6 +250,7 @@ service cloud.firestore {
       allow create: if isOwnerSafeCreate();
       allow update: if isOwnerSafeUpdate()
         || isFollowersOnlyUpdate()
+        || isSocialConnectionCleanupUpdate()
         || isRatingOnlyUpdate()
         || isReportOnlyUpdate();
       allow delete: if false;
