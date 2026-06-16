@@ -522,6 +522,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     final canEditPrivacy = canDeletePost;
     final canHidePost =
         currentUserId.isNotEmpty && post.authorId.trim() != currentUserId;
+    final canReportPost =
+        currentUserId.isNotEmpty && post.authorId.trim() != currentUserId;
 
     return PostActionSheet.show(
       context,
@@ -543,6 +545,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           canDeletePost
               ? () => _deletePost(post, controllerTag: controllerTag)
               : null,
+      canReportPost: canReportPost,
     );
   }
 

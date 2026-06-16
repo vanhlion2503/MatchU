@@ -79,6 +79,8 @@ class _PostDetailViewState extends State<PostDetailView> {
     final canEditPost = canDeletePost && !post.postType.isRepostOnly;
     final canEditPrivacy = canDeletePost;
     final canHidePost = controller.canHidePostFromFeed(post);
+    final canReportPost =
+        currentUserId.isNotEmpty && post.authorId.trim() != currentUserId;
 
     return PostActionSheet.show(
       context,
@@ -98,6 +100,7 @@ class _PostDetailViewState extends State<PostDetailView> {
           canEditPrivacy ? () => _editPostPrivacy(context, post) : null,
       canDeletePost: canDeletePost,
       onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
+      canReportPost: canReportPost,
     );
   }
 

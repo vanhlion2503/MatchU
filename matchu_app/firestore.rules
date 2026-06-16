@@ -1415,6 +1415,17 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // ================= POST REPORT =================
+    match /postReports/{reportId} {
+
+      // Create report
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid;
+
+      // KhÃ´ng cho Ä‘á»c / sá»­a / xÃ³a
+      allow read, update, delete: if false;
+    }
+
     // ================= USER PROFILE REPORT =================
     match /userProfileReports/{reportId} {
 

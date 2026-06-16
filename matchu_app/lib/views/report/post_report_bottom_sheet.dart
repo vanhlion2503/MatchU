@@ -1,47 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:matchu_app/controllers/report/user_profile_report_controller.dart';
-import 'package:matchu_app/views/report/report_form_widgets.dart';
+import 'package:matchu_app/controllers/report/post_report_controller.dart';
+import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/report/report_form_widgets.dart';
 
-class ProfileUserReportBottomSheet extends StatefulWidget {
-  const ProfileUserReportBottomSheet({
-    super.key,
-    required this.toUid,
-    this.reportedUserName = '',
-  });
+class PostReportBottomSheet extends StatefulWidget {
+  const PostReportBottomSheet({super.key, required this.post});
 
-  final String toUid;
-  final String reportedUserName;
+  final PostModel post;
+
+  static Future<bool?> show({required PostModel post}) {
+    return Get.bottomSheet<bool>(
+      PostReportBottomSheet(post: post),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
 
   @override
-  State<ProfileUserReportBottomSheet> createState() =>
-      _ProfileUserReportBottomSheetState();
+  State<PostReportBottomSheet> createState() => _PostReportBottomSheetState();
 }
 
-class _ProfileUserReportBottomSheetState
-    extends State<ProfileUserReportBottomSheet> {
+class _PostReportBottomSheetState extends State<PostReportBottomSheet> {
   late final String _controllerTag;
-  late final UserProfileReportController _controller;
+  late final PostReportController _controller;
 
   @override
   void initState() {
     super.initState();
     _controllerTag =
-        'profile-user-report-${widget.toUid}-${identityHashCode(this)}';
+        'post-report-${widget.post.postId}-${identityHashCode(this)}';
     _controller = Get.put(
-      UserProfileReportController(
-        toUid: widget.toUid,
-        reportedUserName: widget.reportedUserName,
-      ),
+      PostReportController(post: widget.post),
       tag: _controllerTag,
     );
   }
 
   @override
   void dispose() {
-    if (Get.isRegistered<UserProfileReportController>(tag: _controllerTag)) {
-      Get.delete<UserProfileReportController>(tag: _controllerTag);
+    if (Get.isRegistered<PostReportController>(tag: _controllerTag)) {
+      Get.delete<PostReportController>(tag: _controllerTag);
     }
     super.dispose();
   }
@@ -54,7 +53,7 @@ class _ProfileUserReportBottomSheetState
     return SafeArea(
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
         ),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
@@ -101,7 +100,7 @@ class _ProfileUserReportBottomSheetState
                       Expanded(
                         child: Text(
                           selectedCategory == null
-                              ? 'Báo cáo người dùng'
+                              ? 'Báo cáo bài viết'
                               : selectedCategory.title,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleLarge?.copyWith(
@@ -116,16 +115,46 @@ class _ProfileUserReportBottomSheetState
                     ],
                   ),
                   const SizedBox(height: 8),
-                  if (selectedCategory == null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
+                  if (selectedCategory == null) ...[
+                    Text(
+                      'Bài viết của ${_controller.reportedAuthorName}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color:
+                              theme.brightness == Brightness.dark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
+                        ),
+                      ),
                       child: Text(
-                        'Chọn nhóm lý do phù hợp nhất.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withValues(alpha: 0.68),
+                        _controller.postPreviewText,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.78),
+                          height: 1.4,
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Chọn nhóm lý do phù hợp nhất.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.68),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (selectedCategory == null)
                     ..._controller.categories.map(
                       (category) => Padding(
@@ -200,7 +229,7 @@ class _ProfileUserReportBottomSheetState
                             textAlignVertical: TextAlignVertical.top,
                             decoration: const InputDecoration(
                               hintText:
-                                  'Bạn có thể bổ sung bối cảnh để đội ngũ kiểm duyệt xem xét chính xác hơn.',
+                                  'Bạn có thể bổ sung bối cảnh hoặc dấu hiệu cụ thể để đội ngũ kiểm duyệt xem xét chính xác hơn.',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
@@ -236,7 +265,7 @@ class _ProfileUserReportBottomSheetState
                               const Spacer(),
                               Obx(
                                 () => Text(
-                                  '${_controller.evidenceImages.length}/${UserProfileReportController.maxEvidenceImages}',
+                                  '${_controller.evidenceImages.length}/${PostReportController.maxEvidenceImages}',
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: colorScheme.onSurface.withValues(
                                       alpha: 0.54,
@@ -263,8 +292,7 @@ class _ProfileUserReportBottomSheetState
                                   ),
                                 ),
                                 if (_controller.evidenceImages.length <
-                                    UserProfileReportController
-                                        .maxEvidenceImages)
+                                    PostReportController.maxEvidenceImages)
                                   ReportFormAddEvidenceTile(
                                     isLoading:
                                         _controller.isPickingImages.value,

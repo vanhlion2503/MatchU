@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
+import 'package:matchu_app/views/report/post_report_bottom_sheet.dart';
 
 class PostActionSheet extends StatelessWidget {
   const PostActionSheet({
@@ -20,6 +21,7 @@ class PostActionSheet extends StatelessWidget {
     this.onEditPrivacyTap,
     this.canDeletePost = false,
     this.onDeleteTap,
+    this.canReportPost = true,
   });
 
   final PostModel post;
@@ -35,6 +37,7 @@ class PostActionSheet extends StatelessWidget {
   final Future<void> Function()? onEditPrivacyTap;
   final bool canDeletePost;
   final Future<void> Function()? onDeleteTap;
+  final bool canReportPost;
   static const Duration _sheetExitDelay = Duration(milliseconds: 220);
 
   static Future<void> show(
@@ -52,6 +55,7 @@ class PostActionSheet extends StatelessWidget {
     Future<void> Function()? onEditPrivacyTap,
     bool canDeletePost = false,
     Future<void> Function()? onDeleteTap,
+    bool canReportPost = true,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -72,6 +76,7 @@ class PostActionSheet extends StatelessWidget {
             onEditPrivacyTap: onEditPrivacyTap,
             canDeletePost: canDeletePost,
             onDeleteTap: onDeleteTap,
+            canReportPost: canReportPost,
           ),
     );
   }
@@ -151,9 +156,8 @@ class PostActionSheet extends StatelessWidget {
                     if (canEditPost) ...[
                       _PostActionTile(
                         icon: Iconsax.edit_2,
-                        title: 'Ch\u1EC9nh s\u1EEDa b\u00E0i vi\u1EBFt',
-                        subtitle:
-                            'C\u1EADp nh\u1EADt n\u1ED9i dung, th\u1EBB v\u00E0 t\u1EC7p \u0111\u00EDnh k\u00E8m.',
+                        title: 'Chỉnh sửa bài viết',
+                        subtitle: 'Cập nhật nội dung, thẻ và tệp đính kèm.',
                         palette: palette,
                         onTap: () => _onEditPostTap(context),
                       ),
@@ -162,10 +166,8 @@ class PostActionSheet extends StatelessWidget {
                     if (canEditPrivacy) ...[
                       _PostActionTile(
                         icon: Iconsax.lock,
-                        title:
-                            'Ch\u1EC9nh s\u1EEDa quy\u1EC1n ri\u00EAng t\u01B0',
-                        subtitle:
-                            'Thay \u0111\u1ED5i ai c\u00F3 th\u1EC3 xem b\u00E0i vi\u1EBFt n\u00E0y.',
+                        title: 'Chỉnh sửa quyền riêng tư',
+                        subtitle: 'Thay đổi ai có thể xem bài viết này.',
                         palette: palette,
                         onTap: () => _onEditPrivacyTap(context),
                       ),
@@ -174,9 +176,8 @@ class PostActionSheet extends StatelessWidget {
                     if (canHidePost) ...[
                       _PostActionTile(
                         icon: Iconsax.eye_slash,
-                        title: '\u1EA8n b\u00E0i vi\u1EBFt',
-                        subtitle:
-                            '\u1EA8n b\u00E0i vi\u1EBFt n\u00E0y kh\u1ECFi trang tin.',
+                        title: 'Ẩn bài viết',
+                        subtitle: 'Ẩn bài viết này khỏi trang tin.',
                         palette: palette,
                         onTap: () => _onHidePostTap(context),
                       ),
@@ -209,10 +210,10 @@ class PostActionSheet extends StatelessWidget {
                         icon: Iconsax.user_remove,
                         title:
                             authorHandle.isNotEmpty
-                                ? '\u1EA8n b\u00E0i vi\u1EBFt t\u1EEB @$authorHandle'
-                                : '\u1EA8n b\u00E0i vi\u1EBFt t\u1EEB t\u00E1c gi\u1EA3 n\u00E0y',
+                                ? 'Ẩn bài viết từ @$authorHandle'
+                                : 'Ẩn bài viết từ tác giả này',
                         subtitle:
-                            '\u1EA8n to\u00E0n b\u1ED9 b\u00E0i vi\u1EBFt t\u1EEB ng\u01B0\u1EDDi n\u00E0y trong feed.',
+                            'Ẩn toàn bộ bài viết từ người này trong feed.',
                         palette: palette,
                         onTap: () => _onHideAuthorPostsTap(context),
                       ),
@@ -230,16 +231,18 @@ class PostActionSheet extends StatelessWidget {
                         onTap: () => _onDeletePostTap(context),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    _PostActionTile(
-                      icon: Iconsax.flag,
-                      title: 'Báo cáo bài viết',
-                      subtitle: 'Gửi báo cáo nếu nội dung này không phù hợp.',
-                      palette: palette,
-                      iconColor: theme.colorScheme.error,
-                      textColor: theme.colorScheme.error,
-                      onTap: () => Navigator.of(context).pop(),
-                    ),
+                    if (canReportPost) ...[
+                      const SizedBox(height: 12),
+                      _PostActionTile(
+                        icon: Iconsax.flag,
+                        title: 'Báo cáo bài viết',
+                        subtitle: 'Gửi báo cáo nếu nội dung này không phù hợp.',
+                        palette: palette,
+                        iconColor: theme.colorScheme.error,
+                        textColor: theme.colorScheme.error,
+                        onTap: () => _onReportPostTap(context),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -304,6 +307,13 @@ class PostActionSheet extends StatelessWidget {
 
     await Future<void>.delayed(_sheetExitDelay);
     await onDeleteTap!();
+  }
+
+  Future<void> _onReportPostTap(BuildContext context) async {
+    Navigator.of(context).pop();
+
+    await Future<void>.delayed(_sheetExitDelay);
+    await PostReportBottomSheet.show(post: post);
   }
 
   Future<bool> _confirmDeletePost(BuildContext context) async {
@@ -421,7 +431,7 @@ class PostActionSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '\u1EA8n b\u00E0i vi\u1EBFt t\u1EEB $authorName?',
+                  'Ẩn bài viết từ $authorName?',
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: palette.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -429,7 +439,7 @@ class PostActionSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'T\u1EA5t c\u1EA3 b\u00E0i vi\u1EBFt c\u1EE7a ng\u01B0\u1EDDi n\u00E0y s\u1EBD b\u1ECB \u1EA9n kh\u1ECFi feed. B\u1EA1n c\u00F3 th\u1EC3 b\u1ECF \u1EA9n trong Danh s\u00E1ch h\u1EA1n ch\u1EBF.',
+                  'Tất cả bài viết của người này sẽ bị ẩn khỏi feed. Bạn có thể bỏ ẩn trong Danh sách hạn chế.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: palette.textSecondary,
                     height: 1.45,
@@ -440,7 +450,7 @@ class PostActionSheet extends StatelessWidget {
                   children: [
                     Expanded(
                       child: _DeleteDialogButton(
-                        label: 'Kh\u00F4ng',
+                        label: 'Không',
                         onTap: () => Navigator.of(dialogContext).pop(false),
                         backgroundColor: palette.surfaceMuted,
                         borderColor: palette.border,
@@ -450,7 +460,7 @@ class PostActionSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _DeleteDialogButton(
-                        label: 'C\u00F3',
+                        label: 'Có',
                         onTap: () => Navigator.of(dialogContext).pop(true),
                         backgroundColor: theme.colorScheme.error,
                         borderColor: theme.colorScheme.error,
@@ -612,5 +622,5 @@ String _authorDisplayName(PostModel post) {
   final handle = _authorHandle(post);
   if (handle.isNotEmpty) return '@$handle';
 
-  return 'ng\u01B0\u1EDDi n\u00E0y';
+  return 'người này';
 }
