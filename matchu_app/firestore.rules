@@ -1415,6 +1415,17 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // ================= USER PROFILE REPORT =================
+    match /userProfileReports/{reportId} {
+
+      // âž• Create report
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid;
+
+      // âŒ KhÃ´ng cho Ä‘á»c / sá»­a / xÃ³a
+      allow read, update, delete: if false;
+    }
+
   }
 }
 

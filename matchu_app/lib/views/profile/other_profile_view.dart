@@ -13,6 +13,7 @@ import 'package:matchu_app/views/profile/avatar_fullscreen_view.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
 import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
+import 'package:matchu_app/views/report/profile_user_report_bottom_sheet.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class OtherProfileView extends StatelessWidget {
@@ -87,14 +88,7 @@ class OtherProfileView extends StatelessWidget {
               padding: const EdgeInsets.only(right: 8),
               child: _OtherProfileActionMenu(
                 isBlocking: c.isBlocking.value,
-                onReport: () {
-                  Get.snackbar(
-                    'B\u00E1o c\u00E1o',
-                    'T\u00EDnh n\u0103ng b\u00E1o c\u00E1o s\u1EBD \u0111\u01B0\u1EE3c ho\u00E0n thi\u1EC7n \u1EDF b\u01B0\u1EDBc ti\u1EBFp theo.',
-                    snackPosition: SnackPosition.BOTTOM,
-                    margin: const EdgeInsets.all(12),
-                  );
-                },
+                onReport: () => _openProfileReportSheet(user),
                 onBlock: () => _confirmBlockUser(context, c),
               ),
             );
@@ -453,6 +447,17 @@ class OtherProfileView extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+
+  void _openProfileReportSheet(UserModel user) {
+    Get.bottomSheet(
+      ProfileUserReportBottomSheet(
+        toUid: user.uid,
+        reportedUserName: user.fullname,
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
     );
   }
 
