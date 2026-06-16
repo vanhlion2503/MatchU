@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/report/user_profile_report_controller.dart';
@@ -139,7 +141,7 @@ class _ProfileUserReportBottomSheetState
                       ),
                     )
                   else ...[
-                    _SectionLabel(label: 'Mục chi tiết'),
+                    const _SectionLabel(label: 'Mục chi tiết'),
                     const SizedBox(height: 12),
                     ...selectedCategory.reasons.map(
                       (reason) => Padding(
@@ -153,7 +155,7 @@ class _ProfileUserReportBottomSheetState
                     ),
                     const SizedBox(height: 18),
                     if (requiresCustomReason) ...[
-                      _SectionLabel(label: 'Lý do cụ thể'),
+                      const _SectionLabel(label: 'Lý do cụ thể'),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _controller.customReasonCtrl,
@@ -167,7 +169,7 @@ class _ProfileUserReportBottomSheetState
                       ),
                       const SizedBox(height: 6),
                     ],
-                    _SectionLabel(label: 'Chi tiết thêm'),
+                    const _SectionLabel(label: 'Chi tiết thêm'),
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -186,7 +188,6 @@ class _ProfileUserReportBottomSheetState
                         children: [
                           Text(
                             'Mô tả thêm (không bắt buộc)',
-                            textAlign: TextAlign.left,
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w700,
                               color: theme.colorScheme.onSurface.withValues(
@@ -221,6 +222,57 @@ class _ProfileUserReportBottomSheetState
                                   ),
                                 ),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                'Ảnh đính kèm',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.76,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              Obx(
+                                () => Text(
+                                  '${_controller.evidenceImages.length}/${UserProfileReportController.maxEvidenceImages}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.54),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Obx(
+                            () => Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: [
+                                ...List.generate(
+                                  _controller.evidenceImages.length,
+                                  (index) => _EvidenceImageTile(
+                                    file: _controller.evidenceImages[index],
+                                    onRemove:
+                                        () => _controller.removeEvidenceImageAt(
+                                          index,
+                                        ),
+                                  ),
+                                ),
+                                if (_controller.evidenceImages.length <
+                                    UserProfileReportController
+                                        .maxEvidenceImages)
+                                  _AddEvidenceTile(
+                                    isLoading:
+                                        _controller.isPickingImages.value,
+                                    onTap: _controller.pickEvidenceImages,
+                                  ),
+                              ],
                             ),
                           ),
                         ],
@@ -266,6 +318,113 @@ class _ProfileUserReportBottomSheetState
           );
         }),
       ),
+    );
+  }
+}
+
+class _AddEvidenceTile extends StatelessWidget {
+  const _AddEvidenceTile({required this.isLoading, required this.onTap});
+
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: isLoading ? null : onTap,
+        child: Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.45,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.outline.withValues(alpha: 0.25),
+            ),
+          ),
+          child:
+              isLoading
+                  ? const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.2),
+                    ),
+                  )
+                  : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_photo_alternate_outlined,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Thêm ảnh',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EvidenceImageTile extends StatelessWidget {
+  const _EvidenceImageTile({required this.file, required this.onRemove});
+
+  final File file;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Stack(
+      children: [
+        Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            image: DecorationImage(image: FileImage(file), fit: BoxFit.cover),
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onRemove,
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.close,
+                  size: 15,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

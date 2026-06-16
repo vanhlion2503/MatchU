@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/models/user_profile_report_model.dart';
 import 'package:matchu_app/models/user_profile_report_reason.dart';
@@ -11,8 +14,11 @@ class UserProfileReportController extends GetxController {
     this.reportedUserName = '',
   });
 
+  static const int maxEvidenceImages = 3;
+
   final String toUid;
   final String reportedUserName;
+  final ImagePicker _picker = ImagePicker();
 
   final List<UserProfileReportCategory> categories =
       userProfileReportCategories;
@@ -20,8 +26,10 @@ class UserProfileReportController extends GetxController {
   final selectedCategory = Rxn<UserProfileReportCategory>();
   final selectedReason = Rxn<UserProfileReportReason>();
   final isSubmitting = false.obs;
+  final isPickingImages = false.obs;
   final customReasonText = ''.obs;
   final descriptionText = ''.obs;
+  final RxList<File> evidenceImages = <File>[].obs;
 
   final customReasonCtrl = TextEditingController();
   final descriptionCtrl = TextEditingController();
@@ -54,6 +62,7 @@ class UserProfileReportController extends GetxController {
     selectedReason.value = null;
     customReasonCtrl.clear();
     descriptionCtrl.clear();
+    evidenceImages.clear();
   }
 
   void goBackToCategories() {
@@ -61,6 +70,7 @@ class UserProfileReportController extends GetxController {
     selectedReason.value = null;
     customReasonCtrl.clear();
     descriptionCtrl.clear();
+    evidenceImages.clear();
   }
 
   void selectReason(UserProfileReportReason reason) {
@@ -68,6 +78,42 @@ class UserProfileReportController extends GetxController {
     if (!reason.requiresCustomReason) {
       customReasonCtrl.clear();
     }
+  }
+
+  Future<void> pickEvidenceImages() async {
+    if (isPickingImages.value || isSubmitting.value) return;
+
+    final remainingSlots = maxEvidenceImages - evidenceImages.length;
+    if (remainingSlots <= 0) {
+      _showError('Bạn chỉ có thể đính kèm tối đa $maxEvidenceImages ảnh.');
+      return;
+    }
+
+    try {
+      isPickingImages.value = true;
+      final picked = await _picker.pickMultiImage(imageQuality: 88);
+      if (picked.isEmpty) return;
+
+      final limited = picked.take(remainingSlots).toList(growable: false);
+      evidenceImages.addAll(limited.map((file) => File(file.path)));
+
+      if (picked.length > remainingSlots) {
+        Get.snackbar(
+          'Giới hạn ảnh',
+          'Chỉ lưu $remainingSlots ảnh đầu tiên. Tối đa $maxEvidenceImages ảnh cho mỗi báo cáo.',
+          snackPosition: SnackPosition.TOP,
+        );
+      }
+    } catch (_) {
+      _showError('Không thể chọn ảnh lúc này.');
+    } finally {
+      isPickingImages.value = false;
+    }
+  }
+
+  void removeEvidenceImageAt(int index) {
+    if (index < 0 || index >= evidenceImages.length) return;
+    evidenceImages.removeAt(index);
   }
 
   Future<void> submit() async {
@@ -107,6 +153,7 @@ class UserProfileReportController extends GetxController {
           description: descriptionCtrl.text.trim(),
           createdAt: DateTime.now(),
         ),
+        evidenceImages: evidenceImages.toList(growable: false),
       );
 
       Get.back(result: true);

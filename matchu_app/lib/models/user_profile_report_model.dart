@@ -11,6 +11,7 @@ class UserProfileReportModel {
     required this.createdAt,
     this.customReason = '',
     this.description = '',
+    this.imageUrls = const [],
   });
 
   final String fromUid;
@@ -21,9 +22,10 @@ class UserProfileReportModel {
   final String reasonTitle;
   final String customReason;
   final String description;
+  final List<String> imageUrls;
   final DateTime createdAt;
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson({List<String>? imageUrlsOverride}) {
     return {
       'fromUid': fromUid,
       'toUid': toUid,
@@ -33,6 +35,7 @@ class UserProfileReportModel {
       'reasonTitle': reasonTitle,
       'customReason': customReason,
       'description': description,
+      'imageUrls': imageUrlsOverride ?? imageUrls,
       'source': 'profile',
       'createdAt': Timestamp.fromDate(createdAt),
     };
