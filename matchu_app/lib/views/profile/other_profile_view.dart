@@ -88,7 +88,7 @@ class OtherProfileView extends StatelessWidget {
               padding: const EdgeInsets.only(right: 8),
               child: _OtherProfileActionMenu(
                 isBlocking: c.isBlocking.value,
-                onReport: () => _openProfileReportSheet(user),
+                onReport: () => _openProfileReportSheet(context, c, user),
                 onBlock: () => _confirmBlockUser(context, c),
               ),
             );
@@ -450,8 +450,12 @@ class OtherProfileView extends StatelessWidget {
     );
   }
 
-  void _openProfileReportSheet(UserModel user) {
-    Get.bottomSheet(
+  Future<void> _openProfileReportSheet(
+    BuildContext context,
+    OtherProfileController controller,
+    UserModel user,
+  ) async {
+    final reported = await Get.bottomSheet<bool>(
       ProfileUserReportBottomSheet(
         toUid: user.uid,
         reportedUserName: user.fullname,
@@ -459,6 +463,42 @@ class OtherProfileView extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
     );
+
+    if (reported != true || !context.mounted) return;
+
+    final shouldBlock = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Đã gửi báo cáo'),
+            content: Text(
+              'Bạn có muốn chặn ${user.fullname} không? Nếu chặn, bạn sẽ không còn thấy hồ sơ, bài viết và tin nhắn từ tài khoản này.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Bỏ qua'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Chặn luôn'),
+              ),
+            ],
+          ),
+    );
+
+    if (shouldBlock != true || !context.mounted) return;
+    if (controller.isBlocking.value) return;
+
+    final blocked = await controller.blockUser();
+    if (blocked && context.mounted) {
+      Get.snackbar(
+        'Đã chặn người dùng',
+        'Tài khoản này đã được thêm vào danh sách hạn chế.',
+        snackPosition: SnackPosition.TOP,
+      );
+      await Navigator.of(context).maybePop();
+    }
   }
 
   void openAvatarFullscreen(BuildContext context, String? avatarUrl) {
