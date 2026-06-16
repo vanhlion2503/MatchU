@@ -38,11 +38,14 @@ class MatchingService {
     return null;
   }
 
-
   // =========================================================
   // CORE MATCH
   // =========================================================
-  Future<String?> _tryMatch(QueueUserModel seeker, String myAnonymousAvatar,String sessionId) async {
+  Future<String?> _tryMatch(
+    QueueUserModel seeker,
+    String myAnonymousAvatar,
+    String sessionId,
+  ) async {
     final snap = await _rtdb.child(queuePath).get();
     if (!snap.exists || snap.value is! Map) return null;
 
@@ -52,14 +55,19 @@ class MatchingService {
       if (child.value is! Map) continue;
 
       final data = Map<String, dynamic>.from(child.value as Map);
-      final oppUid = data["uid"];
+      final oppUid = data["uid"]?.toString().trim();
       final oppSessionId = data["sessionId"];
       final createdAt = data["createdAt"] ?? 0;
 
       if (oppUid == null ||
+          oppUid.isEmpty ||
           oppUid == seeker.uid ||
           now - createdAt > ttlMs ||
           !_mutual(seeker, data)) {
+        continue;
+      }
+
+      if (await _hasBlockRelationship(seeker.uid, oppUid)) {
         continue;
       }
 
@@ -80,10 +88,7 @@ class MatchingService {
 
       final putRes = await http.put(
         Uri.parse(url),
-        headers: {
-          "If-Match": etag,
-          "Content-Type": "application/json",
-        },
+        headers: {"If-Match": etag, "Content-Type": "application/json"},
         body: jsonEncode(node),
       );
 
@@ -92,8 +97,8 @@ class MatchingService {
       final roomId = await _createNewRoom(
         seeker.uid,
         oppUid,
-        sessionId,        // session của A
-        oppSessionId,     // session của B
+        sessionId, // session của A
+        oppSessionId, // session của B
       );
 
       await _cleanupAfterMatch(seeker.uid, oppUid, child.key!);
@@ -106,8 +111,35 @@ class MatchingService {
   // =========================================================
   bool _mutual(QueueUserModel A, Map<String, dynamic> B) {
     bool ok(String t, String g) => t == "random" || t == g;
-    return ok(A.targetGender, B["gender"]) &&
-        ok(B["targetGender"], A.gender);
+    return ok(A.targetGender, B["gender"]) && ok(B["targetGender"], A.gender);
+  }
+
+  Future<bool> _hasBlockRelationship(String a, String b) async {
+    final userA = a.trim();
+    final userB = b.trim();
+    if (userA.isEmpty || userB.isEmpty || userA == userB) {
+      return false;
+    }
+
+    final outgoing =
+        await _firestore
+            .collection("users")
+            .doc(userA)
+            .collection("blockedUsers")
+            .doc(userB)
+            .get();
+    if (outgoing.exists) {
+      return true;
+    }
+
+    final incoming =
+        await _firestore
+            .collection("users")
+            .doc(userA)
+            .collection("blockedBy")
+            .doc(userB)
+            .get();
+    return incoming.exists;
   }
 
   // =========================================================
@@ -133,7 +165,6 @@ class MatchingService {
     indexRef.onDisconnect().remove();
   }
 
-
   Future<void> dequeue(String uid) async {
     final snap = await _rtdb.child(indexPath).child(uid).get();
     if (!snap.exists) return;
@@ -146,17 +177,15 @@ class MatchingService {
 
   // =========================================================
   Future<void> _lockSoft(String uid) async {
-    await _firestore.collection("users").doc(uid).set(
-      {"isMatching": true},
-      SetOptions(merge: true),
-    );
+    await _firestore.collection("users").doc(uid).set({
+      "isMatching": true,
+    }, SetOptions(merge: true));
   }
 
   Future<void> _unlock(String uid) async {
-    await _firestore.collection("users").doc(uid).set(
-      {"isMatching": false},
-      SetOptions(merge: true),
-    );
+    await _firestore.collection("users").doc(uid).set({
+      "isMatching": false,
+    }, SetOptions(merge: true));
   }
 
   // =========================================================
@@ -183,9 +212,7 @@ class MatchingService {
     return ref.id;
   }
 
-
-  Future<void> _cleanupAfterMatch(
-      String a, String b, String queueKey) async {
+  Future<void> _cleanupAfterMatch(String a, String b, String queueKey) async {
     // Xóa queue entry (của user B)
     await _rtdb.child(queuePath).child(queueKey).remove();
     // Xóa index của cả user A và user B
@@ -200,10 +227,8 @@ class MatchingService {
 
   // MatchingService.dart
   Future<void> forceUnlock(String uid) async {
-    await _firestore.collection("users").doc(uid).set(
-      {"isMatching": false},
-      SetOptions(merge: true),
-    );
+    await _firestore.collection("users").doc(uid).set({
+      "isMatching": false,
+    }, SetOptions(merge: true));
   }
-
 }

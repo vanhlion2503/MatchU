@@ -40,7 +40,7 @@ class OtherProfileView extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
         leading: Obx(() {
-          final isBlocked = c.isBlocked.value;
+          final isBlocked = c.hasBlockRelationship;
           final foregroundColor =
               isBlocked ? colorScheme.onSurface : colorScheme.onPrimary;
           final borderColor =
@@ -79,7 +79,7 @@ class OtherProfileView extends StatelessWidget {
           Obx(() {
             final user = c.user.value;
             final isMe = user != null && c.currentUid == user.uid;
-            if (user == null || isMe || c.isBlocked.value) {
+            if (user == null || isMe || c.hasBlockRelationship) {
               return const SizedBox.shrink();
             }
 
@@ -102,15 +102,18 @@ class OtherProfileView extends StatelessWidget {
         ],
       ),
       body: Obx(() {
-        if (c.isLoadingFollowing.value || c.user.value == null) {
+        if (c.isLoadingFollowing.value ||
+            c.isLoadingBlockState.value ||
+            c.user.value == null) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final UserModel u = c.user.value!;
         final String currentUid = c.currentUid;
         final bool isMe = currentUid == u.uid;
-        if (!isMe && c.isBlocked.value) {
+        if (!isMe && c.hasBlockRelationship) {
           return _BlockedProfileState(
+            isBlockedByUser: c.isBlockedByUser.value,
             onBack: () => Navigator.of(context).maybePop(),
             onOpenRestrictions: () => Get.toNamed(AppRouter.restrictionList),
           );
@@ -619,10 +622,12 @@ class _OtherProfileMenuItem extends StatelessWidget {
 
 class _BlockedProfileState extends StatelessWidget {
   const _BlockedProfileState({
+    required this.isBlockedByUser,
     required this.onBack,
     required this.onOpenRestrictions,
   });
 
+  final bool isBlockedByUser;
   final VoidCallback onBack;
   final VoidCallback onOpenRestrictions;
 
@@ -644,7 +649,9 @@ class _BlockedProfileState extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                'B\u1EA1n \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y',
+                isBlockedByUser
+                    ? 'Kh\u00F4ng th\u1EC3 xem h\u1ED3 s\u01A1 n\u00E0y'
+                    : 'B\u1EA1n \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -652,7 +659,9 @@ class _BlockedProfileState extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'C\u00F3 th\u1EC3 g\u1EE1 ch\u1EB7n trong Danh s\u00E1ch h\u1EA1n ch\u1EBF.',
+                isBlockedByUser
+                    ? 'Ng\u01B0\u1EDDi d\u00F9ng n\u00E0y hi\u1EC7n kh\u00F4ng kh\u1EA3 d\u1EE5ng v\u1EDBi t\u00E0i kho\u1EA3n c\u1EE7a b\u1EA1n.'
+                    : 'C\u00F3 th\u1EC3 g\u1EE1 ch\u1EB7n trong Danh s\u00E1ch h\u1EA1n ch\u1EBF.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.textTheme.bodySmall?.color,
@@ -670,12 +679,13 @@ class _BlockedProfileState extends StatelessWidget {
                     icon: const Icon(Icons.arrow_back_ios_new, size: 16),
                     label: const Text('Quay l\u1EA1i'),
                   ),
-                  FilledButton(
-                    onPressed: onOpenRestrictions,
-                    child: const Text(
-                      'M\u1EDF danh s\u00E1ch h\u1EA1n ch\u1EBF',
+                  if (!isBlockedByUser)
+                    FilledButton(
+                      onPressed: onOpenRestrictions,
+                      child: const Text(
+                        'M\u1EDF danh s\u00E1ch h\u1EA1n ch\u1EBF',
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],

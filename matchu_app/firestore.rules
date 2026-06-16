@@ -61,6 +61,29 @@ service cloud.firestore {
         );
     }
 
+    function isBlockedBetween(userA, userB) {
+      return userA is string
+        && userB is string
+        && userA != userB
+        && (
+          exists(/databases/$(database)/documents/users/$(userA)/blockedUsers/$(userB))
+          || exists(/databases/$(database)/documents/users/$(userB)/blockedUsers/$(userA))
+        );
+    }
+
+    function hasTwoDistinctParticipants(data) {
+      return data.participants is list
+        && data.participants.size() == 2
+        && data.participants[0] is string
+        && data.participants[1] is string
+        && data.participants[0] != data.participants[1];
+    }
+
+    function participantsHaveNoBlock(data) {
+      return hasTwoDistinctParticipants(data)
+        && !isBlockedBetween(data.participants[0], data.participants[1]);
+    }
+
     // ================= USERS =================
     match /users/{userId} {
       function isSignedIn() {
@@ -460,6 +483,34 @@ service cloud.firestore {
       allow get, list: if isOwner();
       allow create, update: if isOwner() && hasValidBlockedUserData();
       allow delete: if isOwner();
+    }
+
+    match /users/{userId}/blockedBy/{blockerId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isBlocker() {
+        return request.auth != null && request.auth.uid == blockerId;
+      }
+
+      function hasValidBlockedByData() {
+        return request.resource.data.keys().hasOnly([
+          "userId",
+          "blockerId",
+          "blockedAt",
+          "updatedAt"
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.blockerId == blockerId
+        && request.resource.data.blockerId != userId
+        && request.resource.data.blockedAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      }
+
+      allow get, list: if isOwner();
+      allow create, update: if isBlocker() && hasValidBlockedByData();
+      allow delete: if isBlocker();
     }
 
     match /users/{userId}/security/backup {
@@ -916,7 +967,8 @@ service cloud.firestore {
       // âž• Create room
       allow create: if request.auth != null
         && request.resource.data.participants is list
-        && request.auth.uid in request.resource.data.participants;
+        && request.auth.uid in request.resource.data.participants
+        && participantsHaveNoBlock(request.resource.data);
 
       // âœï¸ Update
       allow update: if isParticipant()
@@ -989,7 +1041,12 @@ service cloud.firestore {
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.createdAt != null
           && (
-            isPendingUserMessageCreate()
+            (
+              isPendingUserMessageCreate()
+              && participantsHaveNoBlock(
+                get(/databases/$(database)/documents/tempChats/$(roomId)).data
+              )
+            )
             || isLegacySystemMessageCreate()
           );
 
@@ -1017,7 +1074,8 @@ service cloud.firestore {
       // âž• táº¡o room (khi convert)
       allow create: if request.auth != null
         && request.resource.data.participants is list
-        && request.auth.uid in request.resource.data.participants;
+        && request.auth.uid in request.resource.data.participants
+        && participantsHaveNoBlock(request.resource.data);
 
       allow update: if isParticipant()
         && request.resource.data.diff(resource.data).changedKeys()
@@ -1093,6 +1151,9 @@ service cloud.firestore {
 
         // âž• gá»­i / copy tin nháº¯n
         allow create: if isRoomParticipant()
+          && participantsHaveNoBlock(
+            get(/databases/$(database)/documents/chatRooms/$(roomId)).data
+          )
           && request.resource.data.senderId is string
           && request.resource.data.createdAt != null;
 
@@ -1231,6 +1292,10 @@ service cloud.firestore {
         && request.resource.data.callerId == request.auth.uid
         && request.resource.data.receiverId is string
         && request.resource.data.receiverId != request.auth.uid
+        && !isBlockedBetween(
+          request.resource.data.callerId,
+          request.resource.data.receiverId
+        )
         && request.resource.data.participants is list
         && request.resource.data.participants.size() == 2
         && request.resource.data.participants.hasAll([

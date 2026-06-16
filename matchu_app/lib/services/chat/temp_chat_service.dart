@@ -1,11 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 
 class TempChatService {
-  TempChatService({FirebaseFirestore? db})
-    : _db = db ?? FirebaseFirestore.instance;
+  TempChatService({
+    FirebaseFirestore? db,
+    PostRestrictionService? restrictionService,
+  }) : _db = db ?? FirebaseFirestore.instance,
+       _restrictionService = restrictionService ?? PostRestrictionService();
 
   final FirebaseFirestore _db;
+  final PostRestrictionService _restrictionService;
   final Map<String, String> _typingKeyCache = {};
 
   static const Map<String, dynamic> _approvedSystemFields = {
@@ -42,6 +47,7 @@ class TempChatService {
   }
 
   Future<void> sendMessages(String roomId, TempMessageModel messages) async {
+    await _ensureCanInteract(roomId, messages.senderId);
     await _messagesRef(roomId).add(messages.toJson());
   }
 
@@ -122,6 +128,7 @@ class TempChatService {
 
   Future<String> convertToPermanent(String tempRoomId) async {
     final tempRef = _roomRef(tempRoomId);
+    await _ensurePermanentConversionAllowed(tempRoomId);
 
     return _db.runTransaction<String>((tx) async {
       final tempSnap = await tx.get(tempRef);
@@ -176,6 +183,58 @@ class TempChatService {
       ..._approvedSystemFields,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> _ensureCanInteract(String roomId, String senderId) async {
+    final snap = await _roomRef(roomId).get();
+    final data = snap.data();
+    if (data == null) return;
+
+    final otherUid = _otherParticipant(data, senderId);
+    if (otherUid == null) return;
+
+    if (await _restrictionService.hasBlockRelationship(otherUid)) {
+      throw StateError(
+        'Kh\u00F4ng th\u1EC3 nh\u1EAFn tin v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
+      );
+    }
+  }
+
+  Future<void> _ensurePermanentConversionAllowed(String roomId) async {
+    final data = await getRoom(roomId);
+    final participants = List<String>.from(data['participants'] ?? const []);
+    final currentUid = _restrictionService.uid;
+    if (currentUid.isEmpty) return;
+
+    final otherUid = participants.firstWhere(
+      (participant) => participant.trim() != currentUid,
+      orElse: () => '',
+    );
+    if (otherUid.isEmpty) return;
+
+    if (await _restrictionService.hasBlockRelationship(otherUid)) {
+      throw StateError(
+        'Kh\u00F4ng th\u1EC3 chuy\u1EC3n sang chat d\u00E0i v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
+      );
+    }
+  }
+
+  String? _otherParticipant(Map<String, dynamic> roomData, String senderId) {
+    final participants = List<String>.from(
+      roomData['participants'] ?? const [],
+    );
+    final normalizedSenderId = senderId.trim();
+    if (normalizedSenderId.isEmpty) return null;
+
+    final otherUid =
+        participants
+            .firstWhere(
+              (participant) => participant.trim() != normalizedSenderId,
+              orElse: () => '',
+            )
+            .trim();
+
+    return otherUid.isEmpty ? null : otherUid;
   }
 
   Future<String?> _resolveTypingField({

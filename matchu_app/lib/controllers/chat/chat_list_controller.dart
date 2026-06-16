@@ -31,6 +31,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   bool _hasFirstData = false;
   final Set<String> _blockedUserIds = <String>{};
   List<ChatRoomModel> _latestIncomingRooms = const <ChatRoomModel>[];
+  StreamSubscription<Set<String>>? _blockedUserIdsSub;
   // bool _hasAnimated = false;
 
   @override
@@ -40,7 +41,7 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     // final presence = Get.put(PresenceController(), permanent: true);
 
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_loadBlockedUserIds());
+    _subscribeBlockedUserIds();
     _sub = _service.listenChatRooms().listen(
       (incoming) {
         _latestIncomingRooms = incoming;
@@ -205,6 +206,22 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  void _subscribeBlockedUserIds() {
+    _blockedUserIdsSub?.cancel();
+    _blockedUserIdsSub = _restrictionService.watchBlockedUserIds().listen(
+      (blockedUserIds) {
+        _blockedUserIds
+          ..clear()
+          ..addAll(blockedUserIds);
+        _mergeAndReorder(_latestIncomingRooms);
+        _applySearch();
+      },
+      onError: (_) {
+        unawaited(_loadBlockedUserIds());
+      },
+    );
+  }
+
   void applyUserBlocked(String userId) {
     final normalizedUserId = userId.trim();
     if (normalizedUserId.isEmpty) return;
@@ -346,6 +363,8 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
   void cleanup() {
     _sub?.cancel();
     _sub = null;
+    _blockedUserIdsSub?.cancel();
+    _blockedUserIdsSub = null;
     rooms.clear();
     filteredRooms.clear();
     lastMessagePreviewCache.clear();
@@ -363,6 +382,12 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     _sub = null;
     if (sub != null) {
       futures.add(sub.cancel());
+    }
+
+    final blockedUserIdsSub = _blockedUserIdsSub;
+    _blockedUserIdsSub = null;
+    if (blockedUserIdsSub != null) {
+      futures.add(blockedUserIdsSub.cancel());
     }
 
     for (final sub in _sessionKeySubs.values) {

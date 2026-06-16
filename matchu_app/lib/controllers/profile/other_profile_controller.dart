@@ -16,13 +16,17 @@ class OtherProfileController extends GetxController {
   Rx<UserModel?> user = Rx<UserModel?>(null);
   RxBool isFollowing = false.obs;
   RxBool isLoadingFollowing = true.obs;
+  RxBool isLoadingBlockState = true.obs;
   RxBool canMessage = false.obs;
   RxBool isBlocked = false.obs;
+  RxBool isBlockedByUser = false.obs;
   RxBool isBlocking = false.obs;
 
   StreamSubscription<UserModel?>? _userSub;
 
   String get currentUid => _userService.uid;
+
+  bool get hasBlockRelationship => isBlocked.value || isBlockedByUser.value;
 
   @override
   void onInit() {
@@ -40,16 +44,25 @@ class OtherProfileController extends GetxController {
       if (userdata != null) {
         isFollowing.value = await _userService.isFollowing(userId);
         canMessage.value =
-            !isBlocked.value && userdata.followers.contains(currentUid);
+            !hasBlockRelationship && userdata.followers.contains(currentUid);
       }
     });
   }
 
   Future<void> loadBlockState() async {
-    final blocked = await _restrictionService.isUserBlocked(userId);
-    isBlocked.value = blocked;
-    if (blocked) {
-      canMessage.value = false;
+    isLoadingBlockState.value = true;
+    try {
+      final states = await Future.wait([
+        _restrictionService.isUserBlocked(userId),
+        _restrictionService.isBlockedByUser(userId),
+      ]);
+      isBlocked.value = states[0];
+      isBlockedByUser.value = states[1];
+      if (hasBlockRelationship) {
+        canMessage.value = false;
+      }
+    } finally {
+      isLoadingBlockState.value = false;
     }
   }
 
@@ -77,7 +90,7 @@ class OtherProfileController extends GetxController {
   }
 
   Future<void> follow() async {
-    if (isBlocked.value) return;
+    if (hasBlockRelationship) return;
     await _userService.followUser(userId);
     isFollowing.value = true;
   }

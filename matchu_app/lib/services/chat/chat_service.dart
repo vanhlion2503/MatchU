@@ -339,9 +339,9 @@ class ChatService {
     final normalizedOtherUid = otherUid.trim();
     if (normalizedOtherUid.isEmpty) return;
 
-    if (await _restrictionService.isUserBlocked(normalizedOtherUid)) {
+    if (await _restrictionService.hasBlockRelationship(normalizedOtherUid)) {
       throw StateError(
-        'B\u1EA1n \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y. H\u00E3y g\u1EE1 ch\u1EB7n \u0111\u1EC3 nh\u1EAFn tin.',
+        'Kh\u00F4ng th\u1EC3 nh\u1EAFn tin v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
       );
     }
   }

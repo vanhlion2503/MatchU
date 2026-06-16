@@ -10,6 +10,7 @@ import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/call_signaling_service.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
 import 'package:matchu_app/services/chat/webrtc_service.dart';
+import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 
 enum CallUiState { idle, creating, ringing, connecting, active, ended, error }
@@ -41,6 +42,7 @@ class CallController extends GetxController {
   final WebRTCService _webRTCService = WebRTCService();
   final IceServerService _iceServerService = IceServerService();
   final UserService _userService = UserService();
+  final PostRestrictionService _restrictionService = PostRestrictionService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final RxnString currentUserId = RxnString();
@@ -206,6 +208,12 @@ class CallController extends GetxController {
     }
     if (callState.value != CallUiState.idle && currentCallId.value != null) {
       _setError('A call is already in progress.');
+      return;
+    }
+    if (await _restrictionService.hasBlockRelationship(receiverId)) {
+      _setError(
+        'Kh\u00F4ng th\u1EC3 g\u1ECDi v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
+      );
       return;
     }
 
@@ -510,6 +518,11 @@ class CallController extends GetxController {
               final type = _normalizeCallType(data['type'] as String?);
 
               if (callerId.isEmpty) return;
+
+              if (await _restrictionService.hasBlockRelationship(callerId)) {
+                await _signalingService.rejectCall(callId, reason: 'rejected');
+                return;
+              }
 
               // If user is busy on another call, reject new incoming call as busy.
               final activeCallId = currentCallId.value;

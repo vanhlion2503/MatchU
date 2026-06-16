@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/models/feed/blocked_user_model.dart';
@@ -31,11 +33,83 @@ class PostRestrictionService {
         .collection('blockedUsers');
   }
 
+  CollectionReference<Map<String, dynamic>> _blockedByRef(String userId) {
+    return _firestore.collection('users').doc(userId).collection('blockedBy');
+  }
+
   DocumentReference<Map<String, dynamic>> _userRef(String userId) {
     return _firestore.collection('users').doc(userId);
   }
 
   Future<Set<String>> fetchBlockedUserIds() async {
+    final results = await Future.wait([
+      fetchOutgoingBlockedUserIds(),
+      fetchIncomingBlockerUserIds(),
+    ]);
+
+    return <String>{...results[0], ...results[1]};
+  }
+
+  Stream<Set<String>> watchBlockedUserIds() {
+    final currentUid = uid;
+    if (currentUid.isEmpty) {
+      return Stream<Set<String>>.value(const <String>{});
+    }
+
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? outgoingSub;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? incomingSub;
+
+    final controller = StreamController<Set<String>>();
+    var outgoingIds = const <String>{};
+    var incomingIds = const <String>{};
+    var hasOutgoingSnapshot = false;
+    var hasIncomingSnapshot = false;
+
+    void emitIfReady() {
+      if (!hasOutgoingSnapshot || !hasIncomingSnapshot || controller.isClosed) {
+        return;
+      }
+
+      controller.add(<String>{...outgoingIds, ...incomingIds});
+    }
+
+    controller.onListen = () {
+      outgoingSub = _blockedUsersRef(currentUid).snapshots().listen((snapshot) {
+        outgoingIds =
+            snapshot.docs
+                .map(
+                  (doc) =>
+                      (doc.data()['blockedUserId'] ?? doc.id).toString().trim(),
+                )
+                .where((blockedUserId) => blockedUserId.isNotEmpty)
+                .toSet();
+        hasOutgoingSnapshot = true;
+        emitIfReady();
+      }, onError: controller.addError);
+
+      incomingSub = _blockedByRef(currentUid).snapshots().listen((snapshot) {
+        incomingIds =
+            snapshot.docs
+                .map(
+                  (doc) =>
+                      (doc.data()['blockerId'] ?? doc.id).toString().trim(),
+                )
+                .where((blockerId) => blockerId.isNotEmpty)
+                .toSet();
+        hasIncomingSnapshot = true;
+        emitIfReady();
+      }, onError: controller.addError);
+    };
+
+    controller.onCancel = () async {
+      await outgoingSub?.cancel();
+      await incomingSub?.cancel();
+    };
+
+    return controller.stream;
+  }
+
+  Future<Set<String>> fetchOutgoingBlockedUserIds() async {
     final currentUid = uid;
     if (currentUid.isEmpty) {
       return const <String>{};
@@ -45,6 +119,19 @@ class PostRestrictionService {
     return snapshot.docs
         .map((doc) => (doc.data()['blockedUserId'] ?? doc.id).toString().trim())
         .where((blockedUserId) => blockedUserId.isNotEmpty)
+        .toSet();
+  }
+
+  Future<Set<String>> fetchIncomingBlockerUserIds() async {
+    final currentUid = uid;
+    if (currentUid.isEmpty) {
+      return const <String>{};
+    }
+
+    final snapshot = await _blockedByRef(currentUid).get();
+    return snapshot.docs
+        .map((doc) => (doc.data()['blockerId'] ?? doc.id).toString().trim())
+        .where((blockerId) => blockerId.isNotEmpty)
         .toSet();
   }
 
@@ -83,6 +170,30 @@ class PostRestrictionService {
     final doc =
         await _blockedUsersRef(currentUid).doc(normalizedBlockedUserId).get();
     return doc.exists;
+  }
+
+  Future<bool> isBlockedByUser(String blockerId) async {
+    final currentUid = uid;
+    final normalizedBlockerId = blockerId.trim();
+    if (currentUid.isEmpty || normalizedBlockerId.isEmpty) {
+      return false;
+    }
+
+    final doc = await _blockedByRef(currentUid).doc(normalizedBlockerId).get();
+    return doc.exists;
+  }
+
+  Future<bool> hasBlockRelationship(String otherUserId) async {
+    final normalizedOtherUserId = otherUserId.trim();
+    if (normalizedOtherUserId.isEmpty) {
+      return false;
+    }
+
+    final results = await Future.wait([
+      isUserBlocked(normalizedOtherUserId),
+      isBlockedByUser(normalizedOtherUserId),
+    ]);
+    return results.any((blocked) => blocked);
   }
 
   Future<Set<String>> fetchHiddenPostAuthorIds() async {
@@ -203,6 +314,12 @@ class PostRestrictionService {
 
     final batch = _firestore.batch();
     batch.set(_blockedUsersRef(currentUid).doc(blockedUserId), payload);
+    batch.set(_blockedByRef(blockedUserId).doc(currentUid), {
+      'userId': blockedUserId,
+      'blockerId': currentUid,
+      'blockedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
     batch.update(_userRef(currentUid), {
       'followers': FieldValue.arrayRemove([blockedUserId]),
       'following': FieldValue.arrayRemove([blockedUserId]),
@@ -237,7 +354,10 @@ class PostRestrictionService {
       );
     }
 
-    await _blockedUsersRef(currentUid).doc(normalizedBlockedUserId).delete();
+    final batch = _firestore.batch();
+    batch.delete(_blockedUsersRef(currentUid).doc(normalizedBlockedUserId));
+    batch.delete(_blockedByRef(normalizedBlockedUserId).doc(currentUid));
+    await batch.commit();
   }
 
   bool _containsUserId(Iterable<String> userIds, String userId) {
