@@ -16,6 +16,7 @@ import 'package:matchu_app/services/auth/logout_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/user/avatar_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
+import 'package:matchu_app/utils/interest_tags.dart';
 import 'package:matchu_app/utils/profile_input_validator.dart';
 
 enum DobField { day, month, year }
@@ -77,6 +78,7 @@ class AuthController extends GetxController {
   final fullnameC = TextEditingController();
   final nicknameC = TextEditingController();
   final birthdayC = TextEditingController();
+  final interestC = TextEditingController();
 
   final RxString fullPhoneNumber = ''.obs;
   final Rx<DateTime?> selectedBirthday = Rx<DateTime?>(null);
@@ -105,6 +107,7 @@ class AuthController extends GetxController {
   final isCheckingNickname = false.obs;
   final isNicknameAvailable = RxnBool();
   final nicknameCheckMessage = ''.obs;
+  final selectedInterests = <String>[].obs;
   final RxString _nicknameDraft = ''.obs;
 
   Timer? _emailTimer;
@@ -143,6 +146,8 @@ class AuthController extends GetxController {
     birthdayC.clear();
     nicknameC.clear();
     fullnameC.clear();
+    interestC.clear();
+    selectedInterests.clear();
     fullPhoneNumber.value = '';
     loginVerificationId = null;
     _mfaException = null;
@@ -353,6 +358,28 @@ class AuthController extends GetxController {
     }
 
     _scheduleNicknameCheck(normalized);
+  }
+
+  void addInterest(String tag) {
+    if (selectedInterests.length >= InterestTags.maxSelected) return;
+
+    final resolved = InterestTags.resolve(tag);
+    if (resolved == null) return;
+
+    final exists = selectedInterests.any(
+      (item) => InterestTags.fold(item) == InterestTags.fold(resolved),
+    );
+    if (!exists) {
+      selectedInterests.add(resolved);
+    }
+
+    interestC.clear();
+  }
+
+  void removeInterest(String tag) {
+    selectedInterests.removeWhere(
+      (item) => InterestTags.fold(item) == InterestTags.fold(tag),
+    );
   }
 
   void _scheduleNicknameCheck(String nickname) {
@@ -1059,6 +1086,7 @@ class AuthController extends GetxController {
         phonenumber: fullPhoneNumber.value.trim(),
         birthday: selectedBirthday.value!,
         gender: selectedGender.value,
+        interests: InterestTags.normalizeList(selectedInterests),
         avatarUrl: avatarUrl,
       );
 
@@ -1130,6 +1158,7 @@ class AuthController extends GetxController {
     fullnameC.dispose();
     nicknameC.dispose();
     birthdayC.dispose();
+    interestC.dispose();
 
     _emailTimer?.cancel();
     _enrollTimer?.cancel();

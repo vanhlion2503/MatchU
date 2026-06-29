@@ -216,6 +216,7 @@ class AuthService {
     required String phonenumber,
     DateTime? birthday,
     String? gender,
+    List<String> interests = const [],
     String? avatarUrl,
   }) async {
     final user = _auth.currentUser;
@@ -246,7 +247,7 @@ class AuthService {
       "birthday": birthday?.toIso8601String(),
       "gender": gender,
       "bio": "",
-      "interests": [],
+      "interests": interests,
 
       "location": {"lat": null, "lng": null},
 

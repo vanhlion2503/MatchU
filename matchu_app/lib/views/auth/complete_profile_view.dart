@@ -9,6 +9,7 @@ import 'package:matchu_app/utils/profile_input_validator.dart';
 import 'package:matchu_app/views/auth/show_avatar_bottom_sheet_auth.dart';
 import 'package:matchu_app/widgets/dob_box.dart';
 import 'package:matchu_app/widgets/gender_widget.dart';
+import 'package:matchu_app/widgets/interest_tag_selector.dart';
 
 class CompleteProfileView extends StatelessWidget {
   const CompleteProfileView({super.key});
@@ -46,6 +47,8 @@ class CompleteProfileView extends StatelessWidget {
                 _BirthdayField(),
                 SizedBox(height: 16),
                 _GenderField(),
+                SizedBox(height: 20),
+                _InterestsField(),
                 SizedBox(height: 46),
                 _SaveButton(),
               ],
@@ -372,6 +375,32 @@ class _GenderField extends StatelessWidget {
             ],
           );
         }),
+      ],
+    );
+  }
+}
+
+class _InterestsField extends StatelessWidget {
+  const _InterestsField();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Get.find<AuthController>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionLabel("Sở thích của bạn"),
+        const SizedBox(height: 12),
+        Obx(
+          () => InterestTagSelector(
+            controller: c.interestC,
+            selectedTags: c.selectedInterests.toList(growable: false),
+            enabled: !c.isLoadingRegister.value,
+            onAddTag: c.addInterest,
+            onRemoveTag: c.removeInterest,
+          ),
+        ),
       ],
     );
   }

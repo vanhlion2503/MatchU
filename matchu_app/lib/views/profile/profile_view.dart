@@ -18,6 +18,7 @@ import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
 import 'package:matchu_app/views/profile/profile_widget/right_side_menu.dart';
 import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
 import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
+import 'package:matchu_app/widgets/profile_interests_wrap.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class ProfileView extends StatelessWidget {
@@ -258,6 +259,11 @@ class ProfileView extends StatelessWidget {
                   ],
                 ),
               ),
+
+              if (user.interests.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ProfileInterestsWrap(interests: user.interests),
+              ],
 
               const SizedBox(height: 25),
 

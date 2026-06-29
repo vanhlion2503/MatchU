@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/profile_snap_shot.dart';
 import 'package:matchu_app/services/user/account_service.dart';
+import 'package:matchu_app/utils/interest_tags.dart';
 import 'package:matchu_app/utils/profile_input_validator.dart';
 
 enum DobField { day, month, year }
@@ -11,6 +12,7 @@ enum DobField { day, month, year }
 class AccountSettingsController extends GetxController {
   final fullnameC = TextEditingController();
   final nicknameC = TextEditingController();
+  final interestC = TextEditingController();
 
   final selectedGender = ''.obs;
 
@@ -27,6 +29,7 @@ class AccountSettingsController extends GetxController {
   final isCheckingNickname = false.obs;
   final isNicknameAvailable = RxnBool();
   final nicknameCheckMessage = ''.obs;
+  final selectedInterests = <String>[].obs;
   final RxString _nicknameDraft = ''.obs;
 
   final _service = AccountService();
@@ -74,6 +77,9 @@ class AccountSettingsController extends GetxController {
       );
       final gender = (data['gender'] ?? '').toString().trim();
       final birthday = _parseBirthday(data['birthday']);
+      final interests = InterestTags.normalizeList(
+        List<String>.from(data['interests'] ?? const []),
+      );
 
       if (birthday == null) {
         throw Exception("Ngày sinh không hợp lệ");
@@ -87,12 +93,15 @@ class AccountSettingsController extends GetxController {
       selectedDay.value = birthday.day;
       selectedMonth.value = birthday.month;
       selectedYear.value = birthday.year;
+      selectedInterests.assignAll(interests);
+      interestC.clear();
 
       _original = ProfileSnapshot(
         fullname: fullname,
         nickname: nickname,
         gender: gender,
         birthday: birthday,
+        interests: interests,
       );
 
       isNicknameAvailable.value = true;
@@ -117,7 +126,8 @@ class AccountSettingsController extends GetxController {
     return currentFullname != _original!.fullname ||
         currentNickname != _original!.nickname ||
         selectedGender.value != _original!.gender ||
-        !_isSameDate(selectedBirthday.value, _original!.birthday);
+        !_isSameDate(selectedBirthday.value, _original!.birthday) ||
+        !_isSameInterests(selectedInterests, _original!.interests);
   }
 
   // ===== GHÉP NGÀY SINH =====
@@ -162,6 +172,28 @@ class AccountSettingsController extends GetxController {
     }
 
     _scheduleNicknameCheck(normalized);
+  }
+
+  void addInterest(String tag) {
+    if (selectedInterests.length >= InterestTags.maxSelected) return;
+
+    final resolved = InterestTags.resolve(tag);
+    if (resolved == null) return;
+
+    final exists = selectedInterests.any(
+      (item) => InterestTags.fold(item) == InterestTags.fold(resolved),
+    );
+    if (!exists) {
+      selectedInterests.add(resolved);
+    }
+
+    interestC.clear();
+  }
+
+  void removeInterest(String tag) {
+    selectedInterests.removeWhere(
+      (item) => InterestTags.fold(item) == InterestTags.fold(tag),
+    );
   }
 
   void _scheduleNicknameCheck(String nickname) {
@@ -263,6 +295,7 @@ class AccountSettingsController extends GetxController {
     );
     final gender = selectedGender.value;
     final birthday = selectedBirthday.value;
+    final interests = InterestTags.normalizeList(selectedInterests);
 
     if (fullnameC.text != fullname) {
       _replaceControllerText(fullnameC, fullname);
@@ -319,6 +352,7 @@ class AccountSettingsController extends GetxController {
         nickname: nickname,
         gender: gender,
         birthday: birthday,
+        interests: interests,
       );
 
       _original = ProfileSnapshot(
@@ -326,6 +360,7 @@ class AccountSettingsController extends GetxController {
         nickname: nickname,
         gender: gender,
         birthday: birthday,
+        interests: interests,
       );
 
       isNicknameAvailable.value = true;
@@ -353,6 +388,18 @@ class AccountSettingsController extends GetxController {
     if (a == null || b == null) return false;
 
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isSameInterests(List<String> a, List<String> b) {
+    final left = InterestTags.normalizeList(a);
+    final right = InterestTags.normalizeList(b);
+    if (left.length != right.length) return false;
+
+    for (var i = 0; i < left.length; i++) {
+      if (left[i] != right[i]) return false;
+    }
+
+    return true;
   }
 
   bool _isAdult(DateTime birthday) {
@@ -395,6 +442,7 @@ class AccountSettingsController extends GetxController {
     _nicknameDebounceWorker?.dispose();
     fullnameC.dispose();
     nicknameC.dispose();
+    interestC.dispose();
     super.onClose();
   }
 }

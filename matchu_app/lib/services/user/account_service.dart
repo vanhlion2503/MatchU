@@ -29,6 +29,7 @@ class AccountService {
     required String nickname,
     required String gender,
     required DateTime birthday,
+    required List<String> interests,
   }) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -49,6 +50,7 @@ class AccountService {
       "nickname": normalizedNickname,
       "gender": gender, // male / female / other
       "birthday": birthday.toIso8601String(),
+      "interests": interests,
       "updatedAt": FieldValue.serverTimestamp(),
     });
   }

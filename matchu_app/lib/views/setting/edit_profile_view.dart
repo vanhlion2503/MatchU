@@ -4,6 +4,7 @@ import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 import 'package:matchu_app/utils/profile_input_validator.dart';
 import 'package:matchu_app/views/setting/widgets/dob_box_edit.dart';
 import 'package:matchu_app/widgets/gender_widget.dart';
+import 'package:matchu_app/widgets/interest_tag_selector.dart';
 
 class EditProfileView extends StatelessWidget {
   const EditProfileView({super.key});
@@ -191,6 +192,21 @@ class EditProfileView extends StatelessWidget {
                         onTap: () => c.selectedGender.value = "other",
                       ),
                     ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  const Text(
+                    "Sở thích của bạn",
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  InterestTagSelector(
+                    controller: c.interestC,
+                    selectedTags: c.selectedInterests.toList(growable: false),
+                    enabled: !c.isSaving.value,
+                    onAddTag: c.addInterest,
+                    onRemoveTag: c.removeInterest,
                   ),
 
                   const SizedBox(height: 48),

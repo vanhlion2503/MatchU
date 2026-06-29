@@ -14,6 +14,7 @@ import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
 import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
 import 'package:matchu_app/views/report/profile_user_report_bottom_sheet.dart';
+import 'package:matchu_app/widgets/profile_interests_wrap.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class OtherProfileView extends StatelessWidget {
@@ -391,6 +392,11 @@ class OtherProfileView extends StatelessWidget {
                   style: textTheme.bodyMedium,
                 ),
               ),
+
+              if (u.interests.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ProfileInterestsWrap(interests: u.interests),
+              ],
 
               const SizedBox(height: 25),
 
