@@ -20,13 +20,7 @@ class _LoginViewState extends State<LoginView> {
   void initState() {
     super.initState();
     c = Get.find<AuthController>();
-    c.emailC.clear();
-    c.passwordC.clear();
-    c.otpC.clear();
-    c.birthdayC.clear();
-    c.nicknameC.clear();
-    c.fullnameC.clear();
-    c.fullPhoneNumber.value = '';
+    c.prepareLoginForm();
   }
 
   @override
@@ -132,6 +126,55 @@ class _LoginViewState extends State<LoginView> {
                     ),
                   );
                 }),
+                const SizedBox(height: 8),
+                Obx(() {
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap:
+                        c.isLoadingLogin.value
+                            ? null
+                            : () {
+                              c.rememberLoginAccount.value =
+                                  !c.rememberLoginAccount.value;
+                            },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: c.rememberLoginAccount.value,
+                              onChanged:
+                                  c.isLoadingLogin.value
+                                      ? null
+                                      : (value) {
+                                        c.rememberLoginAccount.value =
+                                            value ?? false;
+                                      },
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Lưu tài khoản",
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(
+                              color:
+                                  Theme.of(context).textTheme.bodySmall?.color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 32),
                 Obx(() {
                   final isLoading = c.isLoadingLogin.value;
@@ -208,6 +251,90 @@ class _LoginViewState extends State<LoginView> {
                   },
                 ),
                 const SizedBox(height: 24),
+                Obx(() {
+                  final account = c.rememberedLoginAccount.value;
+                  if (account == null) return const SizedBox.shrink();
+
+                  final isLoading = c.isLoadingLogin.value;
+                  final isDark =
+                      Theme.of(context).brightness == Brightness.dark;
+                  final borderColor =
+                      isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: isLoading ? null : c.loginWithRememberedAccount,
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: 0.12),
+                              child: Icon(
+                                Icons.person,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    account.displayName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodyLarge
+                                        ?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    account.email,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.copyWith(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall?.color,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            if (isLoading)
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              )
+                            else
+                              Icon(
+                                Icons.login,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
                 Row(
                   children: [
                     Expanded(

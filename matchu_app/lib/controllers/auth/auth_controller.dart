@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -18,8 +20,43 @@ import 'package:matchu_app/utils/profile_input_validator.dart';
 
 enum DobField { day, month, year }
 
+class RememberedLoginAccount {
+  const RememberedLoginAccount({
+    required this.email,
+    required this.password,
+    required this.savedAt,
+  });
+
+  final String email;
+  final String password;
+  final DateTime savedAt;
+
+  String get displayName {
+    final name = email.split('@').first.trim();
+    return name.isEmpty ? email : name;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'password': password,
+    'savedAt': savedAt.toIso8601String(),
+  };
+
+  factory RememberedLoginAccount.fromJson(Map<String, dynamic> json) {
+    return RememberedLoginAccount(
+      email: (json['email'] ?? '').toString(),
+      password: (json['password'] ?? '').toString(),
+      savedAt:
+          DateTime.tryParse((json['savedAt'] ?? '').toString()) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
 class AuthController extends GetxController {
   final AuthService _auth = AuthService();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  static const String _rememberedLoginAccountKey = 'auth_remembered_login';
 
   // ========= INPUT CONTROLLERS =========
   final emailC = TextEditingController();
@@ -39,6 +76,9 @@ class AuthController extends GetxController {
   final isPasswordHidden = true.obs;
   final isLoadingRegister = false.obs;
   final isLoadingLogin = false.obs;
+  final rememberLoginAccount = false.obs;
+  final rememberedLoginAccount = Rxn<RememberedLoginAccount>();
+  final isLoadingRememberedAccount = false.obs;
 
   final resendEmailSeconds = 60.obs;
   final resendEnrollOtpSeconds = 60.obs;
@@ -83,6 +123,108 @@ class AuthController extends GetxController {
       (value) => _checkNicknameDebounced(value),
       time: const Duration(milliseconds: 500),
     );
+  }
+
+  Future<void> prepareLoginForm() async {
+    emailC.clear();
+    passwordC.clear();
+    otpC.clear();
+    birthdayC.clear();
+    nicknameC.clear();
+    fullnameC.clear();
+    fullPhoneNumber.value = '';
+    loginVerificationId = null;
+    _mfaException = null;
+    await loadRememberedLoginAccount();
+  }
+
+  Future<void> loadRememberedLoginAccount() async {
+    if (isLoadingRememberedAccount.value) return;
+
+    isLoadingRememberedAccount.value = true;
+    try {
+      final raw = await _secureStorage.read(key: _rememberedLoginAccountKey);
+      if (raw == null || raw.isEmpty) {
+        rememberedLoginAccount.value = null;
+        rememberLoginAccount.value = false;
+        return;
+      }
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        await _clearRememberedLoginAccount();
+        return;
+      }
+
+      final account = RememberedLoginAccount.fromJson(decoded);
+      if (account.email.trim().isEmpty || account.password.isEmpty) {
+        await _clearRememberedLoginAccount();
+        return;
+      }
+
+      rememberedLoginAccount.value = account;
+      rememberLoginAccount.value = true;
+    } catch (_) {
+      rememberedLoginAccount.value = null;
+      rememberLoginAccount.value = false;
+    } finally {
+      isLoadingRememberedAccount.value = false;
+    }
+  }
+
+  Future<void> loginWithRememberedAccount() async {
+    if (isLoadingLogin.value) return;
+
+    var account = rememberedLoginAccount.value;
+    if (account == null) {
+      await loadRememberedLoginAccount();
+      account = rememberedLoginAccount.value;
+    }
+
+    if (account == null) {
+      Get.snackbar("Lỗi", "Không tìm thấy tài khoản đã lưu");
+      return;
+    }
+
+    emailC.text = account.email;
+    passwordC.text = account.password;
+    rememberLoginAccount.value = true;
+    await loginC();
+  }
+
+  Future<void> _saveRememberedLoginAccount({
+    required String email,
+    required String password,
+  }) async {
+    final account = RememberedLoginAccount(
+      email: email.trim(),
+      password: password,
+      savedAt: DateTime.now(),
+    );
+
+    await _secureStorage.write(
+      key: _rememberedLoginAccountKey,
+      value: jsonEncode(account.toJson()),
+    );
+    rememberedLoginAccount.value = account;
+  }
+
+  Future<void> _clearRememberedLoginAccount() async {
+    await _secureStorage.delete(key: _rememberedLoginAccountKey);
+    rememberedLoginAccount.value = null;
+    rememberLoginAccount.value = false;
+  }
+
+  Future<void> _syncRememberedLoginAfterSuccess() async {
+    final email = emailC.text.trim();
+    final password = passwordC.text.trim();
+    if (email.isEmpty || password.isEmpty) return;
+
+    if (rememberLoginAccount.value) {
+      await _saveRememberedLoginAccount(email: email, password: password);
+    } else if (rememberedLoginAccount.value != null) {
+      await _clearRememberedLoginAccount();
+    }
   }
 
   void updateBirthdayIfReady() {
@@ -540,6 +682,7 @@ class AuthController extends GetxController {
       email: emailC.text.trim(),
       password: passwordC.text.trim(),
       onSuccess: () {
+        unawaited(_syncRememberedLoginAfterSuccess());
         isLoadingLogin.value = false;
       },
       onMfaRequired: (e) {
@@ -631,6 +774,7 @@ class AuthController extends GetxController {
         verificationId: loginVerificationId!,
         smsCode: otpC.text.trim(),
       );
+      await _syncRememberedLoginAfterSuccess();
 
       // ❌ KHÔNG kiểm tra currentUser
       // ❌ KHÔNG Get.to / Get.off ở đây
