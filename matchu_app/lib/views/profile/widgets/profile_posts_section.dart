@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
@@ -546,7 +547,27 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
               ? () => _deletePost(post, controllerTag: controllerTag)
               : null,
       canReportPost: canReportPost,
+      onBlockAuthorTap:
+          canReportPost
+              ? () =>
+                  _blockPostAuthor(context, post, controllerTag: controllerTag)
+              : null,
     );
+  }
+
+  Future<void> _blockPostAuthor(
+    BuildContext context,
+    PostModel post, {
+    required String controllerTag,
+  }) async {
+    final blocked = await PostAuthorBlockHelper.blockAuthor(post);
+    if (!blocked || !context.mounted) return;
+
+    final controller = Get.find<ProfilePostsController>(tag: controllerTag);
+    if (!widget.isOwnerView &&
+        post.authorId.trim() == controller.userId.trim()) {
+      await Navigator.of(context).maybePop();
+    }
   }
 
   Future<void> _hidePostFromFeed(PostModel post) async {

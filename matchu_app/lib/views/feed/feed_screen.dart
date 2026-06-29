@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
@@ -282,7 +283,12 @@ class _FeedScreenState extends State<FeedScreen>
       canDeletePost: canDeletePost,
       onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
       canReportPost: canReportPost,
+      onBlockAuthorTap: canReportPost ? () => _blockPostAuthor(post) : null,
     );
+  }
+
+  Future<void> _blockPostAuthor(PostModel post) async {
+    await PostAuthorBlockHelper.blockAuthor(post);
   }
 
   Future<void> _openRepostSheet(BuildContext context, PostModel post) {

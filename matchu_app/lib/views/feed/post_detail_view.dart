@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
@@ -101,7 +102,15 @@ class _PostDetailViewState extends State<PostDetailView> {
       canDeletePost: canDeletePost,
       onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
       canReportPost: canReportPost,
+      onBlockAuthorTap: canReportPost ? () => _blockPostAuthor(post) : null,
     );
+  }
+
+  Future<void> _blockPostAuthor(PostModel post) async {
+    final blocked = await PostAuthorBlockHelper.blockAuthor(post);
+    if (blocked && mounted) {
+      Get.back();
+    }
   }
 
   Future<void> _openRepostSheet(BuildContext context, PostModel post) {

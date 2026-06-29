@@ -4,6 +4,7 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/report/post_report_bottom_sheet.dart';
+import 'package:matchu_app/views/report/post_report_follow_up_sheet.dart';
 
 class PostActionSheet extends StatelessWidget {
   const PostActionSheet({
@@ -22,6 +23,7 @@ class PostActionSheet extends StatelessWidget {
     this.canDeletePost = false,
     this.onDeleteTap,
     this.canReportPost = true,
+    this.onBlockAuthorTap,
   });
 
   final PostModel post;
@@ -38,6 +40,7 @@ class PostActionSheet extends StatelessWidget {
   final bool canDeletePost;
   final Future<void> Function()? onDeleteTap;
   final bool canReportPost;
+  final Future<void> Function()? onBlockAuthorTap;
   static const Duration _sheetExitDelay = Duration(milliseconds: 220);
 
   static Future<void> show(
@@ -56,6 +59,7 @@ class PostActionSheet extends StatelessWidget {
     bool canDeletePost = false,
     Future<void> Function()? onDeleteTap,
     bool canReportPost = true,
+    Future<void> Function()? onBlockAuthorTap,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -77,6 +81,7 @@ class PostActionSheet extends StatelessWidget {
             canDeletePost: canDeletePost,
             onDeleteTap: onDeleteTap,
             canReportPost: canReportPost,
+            onBlockAuthorTap: onBlockAuthorTap,
           ),
     );
   }
@@ -313,7 +318,21 @@ class PostActionSheet extends StatelessWidget {
     Navigator.of(context).pop();
 
     await Future<void>.delayed(_sheetExitDelay);
-    await PostReportBottomSheet.show(post: post);
+    final reported = await PostReportBottomSheet.show(post: post);
+    if (reported != true) return;
+
+    if (!canHidePost && !canHideAuthorPosts && onBlockAuthorTap == null) {
+      return;
+    }
+
+    await PostReportFollowUpSheet.show(
+      post: post,
+      canHidePost: canHidePost,
+      onHidePostTap: onHidePostTap,
+      canHideAuthorPosts: canHideAuthorPosts,
+      onHideAuthorPostsTap: onHideAuthorPostsTap,
+      onBlockAuthorTap: onBlockAuthorTap,
+    );
   }
 
   Future<bool> _confirmDeletePost(BuildContext context) async {
