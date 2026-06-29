@@ -64,12 +64,6 @@ class NearbyUserListItem extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               _DistanceBadge(distanceKm: user.distanceKm),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: colorScheme.onSurface.withValues(alpha: 0.34),
-              ),
             ],
           ),
         ),

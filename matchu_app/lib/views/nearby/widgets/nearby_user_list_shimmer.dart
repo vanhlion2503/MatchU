@@ -9,10 +9,22 @@ class NearbyUserListShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final shimmer = _NearbyShimmerPalette.of(context);
-    final background = Theme.of(context).scaffoldBackgroundColor;
-    final colorScheme = Theme.of(context).colorScheme;
-    final dividerColor = colorScheme.outlineVariant.withValues(alpha: 0.45);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor =
+        isDark
+            ? Color.alphaBlend(
+              Colors.white.withValues(alpha: 0.05),
+              colorScheme.surface,
+            )
+            : theme.scaffoldBackgroundColor;
+    final cardBorderColor =
+        isDark
+            ? colorScheme.outlineVariant.withValues(alpha: 0.7)
+            : colorScheme.outlineVariant.withValues(alpha: 0.75);
+    final dividerColor = colorScheme.outlineVariant.withValues(alpha: 0.42);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -28,13 +40,15 @@ class NearbyUserListShimmer extends StatelessWidget {
           ),
         ),
         Material(
-          color: colorScheme.surface,
+          color: cardColor,
           borderRadius: BorderRadius.circular(18),
           clipBehavior: Clip.antiAlias,
+          elevation: isDark ? 0 : 2,
+          shadowColor: Colors.black.withValues(alpha: 0.08),
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: dividerColor),
+              border: Border.all(color: cardBorderColor),
             ),
             child: Column(
               children: [
@@ -43,7 +57,7 @@ class NearbyUserListShimmer extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: _NearbyUserListItemShimmer(
                       shimmer: shimmer,
-                      background: background,
+                      background: cardColor,
                     ),
                   ),
                   if (index != itemCount - 1)
