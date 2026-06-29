@@ -13,7 +13,20 @@
           "package_name": "com.example.matchu_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "758089818242-tumqt53vdilf85c1ctbudqbvi8v7a20b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.matchu_app",
+            "certificate_hash": "5dc0d41bfc6a674b470f03aa66e4f16bc5ff532c"
+          }
+        },
+        {
+          "client_id": "758089818242-419srv84hju5gaj228rp7sr1qu3q8bod.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCMVtY2c1MO1oO-p67TgdwOpHfZ79X5QAI"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "758089818242-419srv84hju5gaj228rp7sr1qu3q8bod.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "758089818242-5abeapm8k1v9b5ojuu9nq42plkqmcq6d.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.matchuApp"
+              }
+            }
+          ]
         }
       }
     }

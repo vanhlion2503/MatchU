@@ -127,7 +127,7 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Lắng nghe trạng thái đăng nhập nhưng KHÔNG redirect
+    // LÃ¡ÂºÂ¯ng nghe trÃ¡ÂºÂ¡ng thÃƒÂ¡i Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p nhÃ†Â°ng KHÃƒâ€NG redirect
     _userRx.bindStream(_auth.authStateChanges);
     _nicknameDebounceWorker = debounce<String>(
       _nicknameDraft,
@@ -193,7 +193,10 @@ class AuthController extends GetxController {
     }
 
     if (account == null) {
-      Get.snackbar("Lỗi", "Không tìm thấy tài khoản đã lưu");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y tÃƒÂ i khoÃ¡ÂºÂ£n Ã„â€˜ÃƒÂ£ lÃ†Â°u",
+      );
       return;
     }
 
@@ -239,7 +242,10 @@ class AuthController extends GetxController {
 
   Future<void> removeRememberedLoginAccount() async {
     await _clearRememberedLoginAccount();
-    Get.snackbar("Đã xóa", "Tài khoản này sẽ không còn được lưu");
+    Get.snackbar(
+      "Ã„ÂÃƒÂ£ xÃƒÂ³a",
+      "TÃƒÂ i khoÃ¡ÂºÂ£n nÃƒÂ y sÃ¡ÂºÂ½ khÃƒÂ´ng cÃƒÂ²n Ã„â€˜Ã†Â°Ã¡Â»Â£c lÃ†Â°u",
+    );
   }
 
   Future<void> _clearRememberedLoginAccount() async {
@@ -303,7 +309,7 @@ class AuthController extends GetxController {
     final m = selectedMonth.value!;
     final d = selectedDay.value!;
 
-    // 🔒 Validate số ngày trong tháng
+    // Ã°Å¸â€â€™ Validate sÃ¡Â»â€˜ ngÃƒÂ y trong thÃƒÂ¡ng
     final lastDayOfMonth = DateTime(y, m + 1, 0).day;
     if (d > lastDayOfMonth) {
       selectedDay.value = lastDayOfMonth;
@@ -401,13 +407,15 @@ class AuthController extends GetxController {
 
       isNicknameAvailable.value = isUnique;
       nicknameCheckMessage.value =
-          isUnique ? "Nickname có thể sử dụng" : "Nickname đã được sử dụng";
+          isUnique
+              ? "Nickname cÃƒÂ³ thÃ¡Â»Æ’ sÃ¡Â»Â­ dÃ¡Â»Â¥ng"
+              : "Nickname Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c sÃ¡Â»Â­ dÃ¡Â»Â¥ng";
       return isUnique;
     } catch (_) {
       if (currentToken == _nicknameCheckToken) {
         isNicknameAvailable.value = null;
         nicknameCheckMessage.value =
-            "Không thể kiểm tra nickname. Vui lòng thử lại";
+            "KhÃƒÂ´ng thÃ¡Â»Æ’ kiÃ¡Â»Æ’m tra nickname. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i";
       }
       return null;
     } finally {
@@ -448,6 +456,14 @@ class AuthController extends GetxController {
     );
   }
 
+  String normalizePhoneNumber(String value) {
+    final normalized = value.trim().replaceAll(RegExp(r'[\s()-]'), '');
+    if (normalized.startsWith('+840')) {
+      return '+84${normalized.substring(4)}';
+    }
+    return normalized;
+  }
+
   // =============================================================
   //                      REGISTER ACCOUNT
   // =============================================================
@@ -456,17 +472,26 @@ class AuthController extends GetxController {
 
     _box.remove('isRegistering');
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "Vui lÃƒÂ²ng nhÃ¡ÂºÂ­p Ã„â€˜Ã¡ÂºÂ§y Ã„â€˜Ã¡Â»Â§ thÃƒÂ´ng tin",
+      );
       return;
     }
 
     if (passwordC.text.length < 6) {
-      Get.snackbar("Lỗi", "Mật khẩu phải từ 6 ký tự trở lên");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "MÃ¡ÂºÂ­t khÃ¡ÂºÂ©u phÃ¡ÂºÂ£i tÃ¡Â»Â« 6 kÃƒÂ½ tÃ¡Â»Â± trÃ¡Â»Å¸ lÃƒÂªn",
+      );
       return;
     }
 
     if (passwordC.text != confirmPasswordC.text) {
-      Get.snackbar("Lỗi", "Mật khẩu nhập lại không khớp");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "MÃ¡ÂºÂ­t khÃ¡ÂºÂ©u nhÃ¡ÂºÂ­p lÃ¡ÂºÂ¡i khÃƒÂ´ng khÃ¡Â»â€ºp",
+      );
       return;
     }
 
@@ -484,17 +509,20 @@ class AuthController extends GetxController {
         onFailed: (errorMsg) {
           isLoadingRegister.value = false;
           _box.remove('isRegistering');
-          Get.snackbar("Đăng ký thất bại", errorMsg);
+          Get.snackbar("Ã„ÂÃ„Æ’ng kÃƒÂ½ thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i", errorMsg);
         },
       );
     } on FirebaseAuthException catch (e) {
       isLoadingRegister.value = false;
       _box.remove('isRegistering');
-      Get.snackbar("Đăng ký thất bại", firebaseErrorToVietnamese(e.code));
+      Get.snackbar(
+        "Ã„ÂÃ„Æ’ng kÃƒÂ½ thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i",
+        firebaseErrorToVietnamese(e.code),
+      );
     } catch (e) {
       isLoadingRegister.value = false;
       _box.remove('isRegistering');
-      Get.snackbar("Đăng ký thất bại", e.toString());
+      Get.snackbar("Ã„ÂÃ„Æ’ng kÃƒÂ½ thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i", e.toString());
     }
   }
 
@@ -535,7 +563,10 @@ class AuthController extends GetxController {
         }
       }
     } catch (e) {
-      Get.snackbar("Lỗi", "Không thể hủy luồng đăng ký: $e");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "KhÃƒÂ´ng thÃ¡Â»Æ’ hÃ¡Â»Â§y luÃ¡Â»â€œng Ã„â€˜Ã„Æ’ng kÃƒÂ½: $e",
+      );
     } finally {
       _box.remove('isRegistering');
       enrollVerificationId = null;
@@ -566,7 +597,10 @@ class AuthController extends GetxController {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        Get.snackbar("Lỗi", "Không tìm thấy người dùng");
+        Get.snackbar(
+          "LÃ¡Â»â€”i",
+          "KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y ngÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng",
+        );
         isLoadingRegister.value = false;
         return;
       }
@@ -579,11 +613,11 @@ class AuthController extends GetxController {
         Get.toNamed('/enroll-phone');
       } else {
         isLoadingRegister.value = false;
-        Get.snackbar("Chưa xác minh", "Vui lòng kiểm tra email.");
+        Get.snackbar("ChÃ†Â°a xÃƒÂ¡c minh", "Vui lÃƒÂ²ng kiÃ¡Â»Æ’m tra email.");
       }
     } catch (e) {
       isLoadingRegister.value = false;
-      Get.snackbar("Lỗi", e.toString());
+      Get.snackbar("LÃ¡Â»â€”i", e.toString());
     }
   }
 
@@ -596,14 +630,14 @@ class AuthController extends GetxController {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      Get.snackbar("Lỗi", "Không tìm thấy user");
+      Get.snackbar("LÃ¡Â»â€”i", "KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y user");
       return;
     }
 
     try {
       await user.sendEmailVerification();
       startEmailTimer();
-      Get.snackbar("Thành công", "Đã gửi email xác minh");
+      Get.snackbar("ThÃƒÂ nh cÃƒÂ´ng", "Ã„ÂÃƒÂ£ gÃ¡Â»Â­i email xÃƒÂ¡c minh");
     } catch (_) {}
   }
 
@@ -626,31 +660,30 @@ class AuthController extends GetxController {
   Future<void> sendEnrollOtp() async {
     if (isLoadingRegister.value) return;
 
-    final phone = fullPhoneNumber.value.trim();
+    final phone = normalizePhoneNumber(fullPhoneNumber.value);
 
     if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
-      Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "SÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡",
+      );
       return;
     }
-    // Kiểm tra số điện thoại được dùng tối đa 2 lần
     isLoadingRegister.value = true;
 
     try {
-      final phoneQuery =
-          await _auth.db
-              .collection('users')
-              .where("phonenumber", isEqualTo: phone)
-              .get();
+      final isUnique = await _auth.isPhoneNumberUnique(phone);
 
-      if (phoneQuery.docs.length >= 2) {
+      if (!isUnique) {
         isLoadingRegister.value = false;
         Get.snackbar(
-          "Lỗi",
-          "Số điện thoại này đã được sử dụng cho tối đa 2 tài khoản",
+          "LÃ¡Â»â€”i",
+          "SÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i nÃƒÂ y Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c sÃ¡Â»Â­ dÃ¡Â»Â¥ng",
         );
         return;
       }
 
+      fullPhoneNumber.value = phone;
       await _auth.sendEnrollMfaOtp(
         phonenumber: phone,
         onCodeSent: (verId) {
@@ -664,12 +697,15 @@ class AuthController extends GetxController {
         },
         onFailed: (msg) {
           isLoadingRegister.value = false;
-          Get.snackbar("Lỗi OTP", msg);
+          Get.snackbar("LÃ¡Â»â€”i OTP", msg);
         },
       );
     } catch (_) {
       isLoadingRegister.value = false;
-      Get.snackbar("Lỗi", "Không thể gửi OTP. Vui lòng thử lại");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "KhÃƒÂ´ng thÃ¡Â»Æ’ gÃ¡Â»Â­i OTP. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i",
+      );
     }
   }
 
@@ -687,13 +723,13 @@ class AuthController extends GetxController {
   }
 
   // =============================================================
-  //             CONFIRM ENROLL OTP → LOGOUT (FLOW OF YOU)
+  //             CONFIRM ENROLL OTP Ã¢â€ â€™ LOGOUT (FLOW OF YOU)
   // =============================================================
   Future<void> confirmEnrollOtp() async {
     if (isLoadingRegister.value) return;
 
     if (enrollVerificationId == null || otpC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Thiếu mã OTP");
+      Get.snackbar("LÃ¡Â»â€”i", "ThiÃ¡ÂºÂ¿u mÃƒÂ£ OTP");
       return;
     }
 
@@ -709,8 +745,8 @@ class AuthController extends GetxController {
       _box.remove('isRegistering');
 
       Get.snackbar(
-        "🎉 Đăng ký thành công",
-        "Vui lòng đăng nhập để tiếp tục",
+        "Ã°Å¸Å½â€° Ã„ÂÃ„Æ’ng kÃƒÂ½ thÃƒÂ nh cÃƒÂ´ng",
+        "Vui lÃƒÂ²ng Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p Ã„â€˜Ã¡Â»Æ’ tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c",
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green.withValues(alpha: 0.9),
         colorText: Colors.white,
@@ -718,15 +754,74 @@ class AuthController extends GetxController {
       );
       Get.offAllNamed('/');
     } on FirebaseAuthException catch (e) {
-      Get.snackbar("Lỗi OTP", firebaseErrorToVietnamese(e.code));
+      Get.snackbar("LÃ¡Â»â€”i OTP", firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      Get.snackbar("Lỗi OTP", e.toString());
+      Get.snackbar("LÃ¡Â»â€”i OTP", e.toString());
     } finally {
       isLoadingRegister.value = false;
     }
   }
 
-  // =============================================================
+  Future<void> signInWithGoogle({bool fromRegister = false}) async {
+    final loading = fromRegister ? isLoadingRegister : isLoadingLogin;
+    if (loading.value) return;
+
+    _box.remove('isRegistering');
+    if (fromRegister) {
+      _box.write('isRegistering', true);
+    }
+    loading.value = true;
+
+    try {
+      final credential = await _auth.signInWithGoogle();
+      if (fromRegister) {
+        final uid = credential.user?.uid;
+        if (uid != null) {
+          final snap = await _auth.db.collection('users').doc(uid).get();
+          if (snap.data()?['isProfileCompleted'] == true) {
+            _box.remove('isRegistering');
+            await FirebaseAuth.instance.signOut();
+            Get.snackbar(
+              "T\u00e0i kho\u1ea3n \u0111\u00e3 t\u1ed3n t\u1ea1i",
+              "Vui l\u00f2ng \u0111\u0103ng nh\u1eadp b\u1eb1ng Google \u0111\u1ec3 ti\u1ebfp t\u1ee5c",
+            );
+          }
+        }
+      } else {
+        await _auth.markGoogleProvider(credential);
+        await _auth.setOnlineStatus(true);
+      }
+    } on FirebaseAuthMultiFactorException catch (e) {
+      _box.remove('isRegistering');
+      if (fromRegister) {
+        Get.snackbar(
+          "T\u00e0i kho\u1ea3n \u0111\u00e3 t\u1ed3n t\u1ea1i",
+          "Vui l\u00f2ng \u0111\u0103ng nh\u1eadp b\u1eb1ng Google \u0111\u1ec3 x\u00e1c minh OTP",
+        );
+      } else {
+        _mfaException = e;
+        sendLoginOtp();
+      }
+    } on FirebaseAuthException catch (e) {
+      _box.remove('isRegistering');
+      Get.snackbar(
+        "\u0110\u0103ng nh\u1eadp Google th\u1ea5t b\u1ea1i",
+        firebaseErrorToVietnamese(e.code),
+      );
+    } catch (e) {
+      _box.remove('isRegistering');
+      final message = e.toString();
+      if (!message.toLowerCase().contains('canceled')) {
+        Get.snackbar(
+          "\u0110\u0103ng nh\u1eadp Google th\u1ea5t b\u1ea1i",
+          message,
+        );
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
   //                       LOGIN
   // =============================================================
   Future<void> loginC() async {
@@ -735,7 +830,7 @@ class AuthController extends GetxController {
     _box.remove('isRegistering');
 
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Nhập email và mật khẩu");
+      Get.snackbar("LÃ¡Â»â€”i", "NhÃ¡ÂºÂ­p email vÃƒÂ  mÃ¡ÂºÂ­t khÃ¡ÂºÂ©u");
       return;
     }
 
@@ -756,7 +851,7 @@ class AuthController extends GetxController {
       },
       onFailed: (msg) {
         isLoadingLogin.value = false;
-        Get.snackbar("Đăng nhập thất bại", msg);
+        Get.snackbar("Ã„ÂÃ„Æ’ng nhÃ¡ÂºÂ­p thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i", msg);
       },
     );
   }
@@ -768,7 +863,7 @@ class AuthController extends GetxController {
     if (isLoadingLogin.value && loginVerificationId != null) return;
 
     if (_mfaException == null) {
-      Get.snackbar("Lỗi", "Không tìm thấy phiên MFA");
+      Get.snackbar("LÃ¡Â»â€”i", "KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃƒÂªn MFA");
       return;
     }
 
@@ -799,7 +894,7 @@ class AuthController extends GetxController {
       },
       onFailed: (msg) {
         isLoadingLogin.value = false;
-        Get.snackbar("Lỗi OTP", msg);
+        Get.snackbar("LÃ¡Â»â€”i OTP", msg);
       },
     );
   }
@@ -826,14 +921,14 @@ class AuthController extends GetxController {
     if (_mfaException == null ||
         loginVerificationId == null ||
         otpC.text.isEmpty) {
-      Get.snackbar("Lỗi", "Phiên OTP không hợp lệ");
+      Get.snackbar("LÃ¡Â»â€”i", "PhiÃƒÂªn OTP khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡");
       return;
     }
 
     isLoadingLogin.value = true;
 
     try {
-      // ✅ CHỈ XÁC THỰC OTP
+      // Ã¢Å“â€¦ CHÃ¡Â»Ë† XÃƒÂC THÃ¡Â»Â°C OTP
       await _auth.confirmLoginOtp(
         e: _mfaException!,
         verificationId: loginVerificationId!,
@@ -841,13 +936,16 @@ class AuthController extends GetxController {
       );
       await _syncRememberedLoginAfterSuccess();
 
-      // ❌ KHÔNG kiểm tra currentUser
-      // ❌ KHÔNG Get.to / Get.off ở đây
-      // ✅ AuthGateController sẽ tự xử lý authStateChanges
+      // Ã¢ÂÅ’ KHÃƒâ€NG kiÃ¡Â»Æ’m tra currentUser
+      // Ã¢ÂÅ’ KHÃƒâ€NG Get.to / Get.off Ã¡Â»Å¸ Ã„â€˜ÃƒÂ¢y
+      // Ã¢Å“â€¦ AuthGateController sÃ¡ÂºÂ½ tÃ¡Â»Â± xÃ¡Â»Â­ lÃƒÂ½ authStateChanges
     } on FirebaseAuthException catch (e) {
-      Get.snackbar("OTP sai", e.message ?? "Xác thực thất bại");
+      Get.snackbar(
+        "OTP sai",
+        e.message ?? "XÃƒÂ¡c thÃ¡Â»Â±c thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i",
+      );
     } catch (e) {
-      Get.snackbar("Lỗi", e.toString());
+      Get.snackbar("LÃ¡Â»â€”i", e.toString());
     } finally {
       isLoadingLogin.value = false;
     }
@@ -868,8 +966,11 @@ class AuthController extends GetxController {
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         compressFormat: ImageCompressFormat.jpg,
         uiSettings: [
-          AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
-          IOSUiSettings(title: 'Cắt ảnh'),
+          AndroidUiSettings(
+            toolbarTitle: 'CÃ¡ÂºÂ¯t Ã¡ÂºÂ£nh',
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(title: 'CÃ¡ÂºÂ¯t Ã¡ÂºÂ£nh'),
         ],
       );
 
@@ -893,13 +994,13 @@ class AuthController extends GetxController {
 
     final fullnameError = ProfileInputValidator.validateFullname(fullname);
     if (fullnameError != null) {
-      Get.snackbar("Lỗi", fullnameError);
+      Get.snackbar("LÃ¡Â»â€”i", fullnameError);
       return;
     }
 
     final nicknameError = ProfileInputValidator.validateNickname(nickname);
     if (nicknameError != null) {
-      Get.snackbar("Lỗi", nicknameError);
+      Get.snackbar("LÃ¡Â»â€”i", nicknameError);
       return;
     }
 
@@ -907,25 +1008,38 @@ class AuthController extends GetxController {
     if (!isNicknameUnique) {
       final message =
           isNicknameAvailable.value == false
-              ? "Nickname đã được sử dụng"
-              : "Không thể kiểm tra nickname. Vui lòng thử lại";
-      Get.snackbar("Lỗi", message);
+              ? "Nickname Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c sÃ¡Â»Â­ dÃ¡Â»Â¥ng"
+              : "KhÃƒÂ´ng thÃ¡Â»Æ’ kiÃ¡Â»Æ’m tra nickname. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i";
+      Get.snackbar("LÃ¡Â»â€”i", message);
       return;
     }
 
     if (selectedGender.value.isEmpty) {
-      Get.snackbar("Lỗi", "Vui lòng chọn giới tính");
+      Get.snackbar("LÃ¡Â»â€”i", "Vui lÃƒÂ²ng chÃ¡Â»Ân giÃ¡Â»â€ºi tÃƒÂ­nh");
       return;
     }
     if (selectedBirthday.value == null) {
-      Get.snackbar("Lỗi", "Vui lòng chọn ngày sinh");
+      Get.snackbar("LÃ¡Â»â€”i", "Vui lÃƒÂ²ng chÃ¡Â»Ân ngÃƒÂ y sinh");
       return;
+    }
+
+    final normalizedPhone = normalizePhoneNumber(fullPhoneNumber.value);
+    if (normalizedPhone.isNotEmpty) {
+      final isPhoneUnique = await _auth.isPhoneNumberUnique(normalizedPhone);
+      if (!isPhoneUnique) {
+        Get.snackbar(
+          "LÃ¡Â»â€”i",
+          "SÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i nÃƒÂ y Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c sÃ¡Â»Â­ dÃ¡Â»Â¥ng",
+        );
+        return;
+      }
+      fullPhoneNumber.value = normalizedPhone;
     }
 
     if (tempAvatarFile.value == null) {
       Get.snackbar(
-        "Thiếu ảnh đại diện",
-        "Vui lòng chọn ảnh đại diện để tiếp tục",
+        "ThiÃ¡ÂºÂ¿u Ã¡ÂºÂ£nh Ã„â€˜Ã¡ÂºÂ¡i diÃ¡Â»â€¡n",
+        "Vui lÃƒÂ²ng chÃ¡Â»Ân Ã¡ÂºÂ£nh Ã„â€˜Ã¡ÂºÂ¡i diÃ¡Â»â€¡n Ã„â€˜Ã¡Â»Æ’ tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c",
         snackPosition: SnackPosition.TOP,
       );
       return;
@@ -967,7 +1081,7 @@ class AuthController extends GetxController {
 
       Get.offAllNamed('/main');
     } catch (e) {
-      Get.snackbar("Lỗi", e.toString());
+      Get.snackbar("LÃ¡Â»â€”i", e.toString());
     } finally {
       isLoadingRegister.value = false;
       isUploadingAvatar.value = false;
@@ -997,7 +1111,10 @@ class AuthController extends GetxController {
       if (Get.currentRoute != '/main') {
         Get.offAllNamed('/main');
       }
-      Get.snackbar("Lỗi", "Đăng xuất thất bại. Vui lòng thử lại.");
+      Get.snackbar(
+        "LÃ¡Â»â€”i",
+        "Ã„ÂÃ„Æ’ng xuÃ¡ÂºÂ¥t thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i.",
+      );
     }
   }
 

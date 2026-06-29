@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -68,7 +68,7 @@ class _LoginViewState extends State<LoginView> {
                 // ===== TITLE =====
                 Center(
                   child: Text(
-                    "Chào mừng trở lại !",
+                    "Chào mừng trở lại!",
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -194,7 +194,9 @@ class _LoginViewState extends State<LoginView> {
                                 context,
                               ).textTheme.bodyMedium?.copyWith(
                                 color:
-                                    Theme.of(context).textTheme.bodySmall?.color,
+                                    Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -370,43 +372,10 @@ class _LoginViewState extends State<LoginView> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () => c.signInWithGoogle(),
                         icon: Image.asset('assets/icon/google.png', width: 40),
                         label: Text(
                           "Google",
-                          style: Theme.of(context).textTheme.bodyMedium!
-                              .copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? AppTheme.darkBorder
-                                    : AppTheme.lightBorder,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 16),
-
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: Icon(
-                          Iconsax.mobile,
-                          size: 40,
-                          color: Theme.of(context).iconTheme.color,
-                        ),
-                        label: Text(
-                          "Số điện thoại",
                           style: Theme.of(context).textTheme.bodyMedium!
                               .copyWith(fontWeight: FontWeight.w600),
                         ),

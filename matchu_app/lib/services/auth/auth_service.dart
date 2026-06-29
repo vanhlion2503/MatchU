@@ -1,15 +1,25 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  bool _googleSignInInitialized = false;
 
   FirebaseAuth get auth => _auth;
   FirebaseFirestore get db => _db;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<void> _ensureGoogleSignInInitialized() async {
+    if (_googleSignInInitialized || kIsWeb) return;
+
+    await GoogleSignIn.instance.initialize();
+    _googleSignInInitialized = true;
+  }
 
   /* ======================= REGISTER ======================= */
 
@@ -20,28 +30,30 @@ class AuthService {
     required Function(String error) onFailed,
   }) async {
     try {
-      // 1. Tạo tài khoản email/password
+      // 1. Táº¡o tÃ i khoáº£n email/password
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       final user = cred.user;
-      if (user == null) throw Exception("Không tạo được user");
+      if (user == null) throw Exception("KhÃ´ng táº¡o Ä‘Æ°á»£c user");
 
-      // 2. Gửi mail verify
+      // 2. Gá»­i mail verify
       await user.sendEmailVerification();
 
-      // 3. Gọi callback thành công
+      // 3. Gá»i callback thÃ nh cÃ´ng
       onSuccess();
     } on FirebaseAuthException catch (e) {
       onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
+      onFailed(
+        "ÄÃ£ xáº£y ra lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh. Vui lÃ²ng thá»­ láº¡i.",
+      );
     }
   }
 
-  /* ======================= ENROLL MFA SAU KHI EMAIL ĐÃ VERIFY ======================= */
+  /* ======================= ENROLL MFA SAU KHI EMAIL ÄÃƒ VERIFY ======================= */
 
   Future<void> sendEnrollMfaOtp({
     required String phonenumber,
@@ -50,13 +62,13 @@ class AuthService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) throw Exception("User chưa đăng nhập");
+      if (user == null) throw Exception("User chÆ°a Ä‘Äƒng nháº­p");
 
       await user.reload();
       final refreshedUser = _auth.currentUser ?? user;
       if (!refreshedUser.emailVerified) {
         throw Exception(
-          "Bạn phải xác minh email trước khi dùng số điện thoại.",
+          "Báº¡n pháº£i xÃ¡c minh email trÆ°á»›c khi dÃ¹ng sá»‘ Ä‘iá»‡n thoáº¡i.",
         );
       }
 
@@ -67,16 +79,16 @@ class AuthService {
         multiFactorSession: session,
         verificationCompleted: (_) {},
         verificationFailed: (FirebaseAuthException e) {
-          onFailed(e.message ?? "Gửi OTP bị lỗi");
+          onFailed(e.message ?? "Gá»­i OTP bá»‹ lá»—i");
         },
         codeSent: (String verificationId, int? resendToken) {
           onCodeSent(verificationId);
-          // print("OTP ĐÃ ĐƯỢC GỬI - verificationId = $verificationId");
+          // print("OTP ÄÃƒ ÄÆ¯á»¢C Gá»¬I - verificationId = $verificationId");
         },
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed("Không thể gửi OTP. Vui lòng thử lại.");
+      onFailed("KhÃ´ng thá»ƒ gá»­i OTP. Vui lÃ²ng thá»­ láº¡i.");
     }
   }
 
@@ -86,12 +98,12 @@ class AuthService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) throw Exception("User chưa đăng nhập");
+      if (user == null) throw Exception("User chÆ°a Ä‘Äƒng nháº­p");
 
       await user.reload();
       final refreshedUser = _auth.currentUser ?? user;
       if (!refreshedUser.emailVerified) {
-        throw Exception("Email chưa được xác minh");
+        throw Exception("Email chÆ°a Ä‘Æ°á»£c xÃ¡c minh");
       }
 
       final credential = PhoneAuthProvider.credential(
@@ -102,10 +114,15 @@ class AuthService {
       final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
 
       await refreshedUser.multiFactor.enroll(assertion, displayName: "SMS");
+      try {
+        await refreshedUser.linkWithCredential(credential);
+      } on FirebaseAuthException {
+        // MFA enrollment remains the source of truth for the existing flow.
+      }
     } on FirebaseAuthException catch (e) {
       throw firebaseErrorToVietnamese(e.code);
     } catch (e) {
-      throw "Đã xảy ra lỗi khi xác minh OTP.";
+      throw "ÄÃ£ xáº£y ra lá»—i khi xÃ¡c minh OTP.";
     }
   }
 
@@ -128,6 +145,69 @@ class AuthService {
     return currentUid != null && snap.docs.first.id == currentUid;
   }
 
+  Future<bool> isPhoneNumberUnique(
+    String phoneNumber, {
+    String? excludeUid,
+  }) async {
+    final normalized = phoneNumber.trim();
+    if (normalized.isEmpty) return false;
+
+    final snap =
+        await _db
+            .collection('users')
+            .where('phonenumber', isEqualTo: normalized)
+            .limit(1)
+            .get();
+
+    if (snap.docs.isEmpty) {
+      return true;
+    }
+
+    final currentUid = excludeUid ?? _auth.currentUser?.uid;
+    return currentUid != null && snap.docs.first.id == currentUid;
+  }
+
+  Future<UserCredential> signInWithGoogle() async {
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      return _auth.signInWithPopup(provider);
+    }
+
+    await _ensureGoogleSignInInitialized();
+    final googleUser = await GoogleSignIn.instance.authenticate();
+    final googleAuth = googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      idToken: googleAuth.idToken,
+    );
+
+    return _auth.signInWithCredential(credential);
+  }
+
+  Future<void> markGoogleProvider(UserCredential credential) async {
+    final user = credential.user ?? _auth.currentUser;
+    if (user == null) return;
+
+    final userRef = _db.collection('users').doc(user.uid);
+    final userSnap = await userRef.get();
+    if (!userSnap.exists) return;
+
+    UserInfo? googleProvider;
+    for (final provider in user.providerData) {
+      if (provider.providerId == 'google.com') {
+        googleProvider = provider;
+        break;
+      }
+    }
+
+    await userRef.set({
+      'email': user.email,
+      'googleId': googleProvider?.uid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /* ======================= SAVE PROFILE ======================= */
 
   Future<void> saveUserProfile({
@@ -139,13 +219,20 @@ class AuthService {
     String? avatarUrl,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception("User chưa đăng nhập");
+    if (user == null) throw Exception("User chÆ°a Ä‘Äƒng nháº­p");
 
     await user.updateDisplayName(nickname);
 
     final userRef = _db.collection('users').doc(user.uid);
     final userSnap = await userRef.get();
     final isCreatingUserDoc = !userSnap.exists;
+    UserInfo? googleProvider;
+    for (final provider in user.providerData) {
+      if (provider.providerId == 'google.com') {
+        googleProvider = provider;
+        break;
+      }
+    }
 
     final data = <String, dynamic>{
       "uid": user.uid,
@@ -154,7 +241,7 @@ class AuthService {
       "nickname": nickname,
       "phonenumber": phonenumber,
 
-      "googleId": null,
+      "googleId": googleProvider?.uid,
 
       "birthday": birthday?.toIso8601String(),
       "gender": gender,
@@ -194,7 +281,7 @@ class AuthService {
       "updatedAt": FieldValue.serverTimestamp(),
     };
 
-    // ⭐⭐⭐ CHỈ GHI KHI CÓ AVATAR
+    // â­â­â­ CHá»ˆ GHI KHI CÃ“ AVATAR
     if (isCreatingUserDoc) {
       data.addAll({
         "reputationScore": 100,
@@ -232,7 +319,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed("Lỗi không xác định.");
+      onFailed("Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh.");
     }
   }
 
@@ -251,7 +338,7 @@ class AuthService {
         }
       }
       if (phoneInfo == null) {
-        onFailed("Không tìm thấy số điện thoại xác minh MFA.");
+        onFailed("KhÃ´ng tÃ¬m tháº¥y sá»‘ Ä‘iá»‡n thoáº¡i xÃ¡c minh MFA.");
         return;
       }
 
@@ -272,7 +359,7 @@ class AuthService {
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed("Không thể gửi OTP xác minh MFA.");
+      onFailed("KhÃ´ng thá»ƒ gá»­i OTP xÃ¡c minh MFA.");
     }
   }
 
@@ -298,7 +385,11 @@ class AuthService {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    await _db.collection('users').doc(user.uid).set({
+    final userRef = _db.collection('users').doc(user.uid);
+    final userSnap = await userRef.get();
+    if (!userSnap.exists) return;
+
+    await userRef.set({
       'activeStatus': online ? 'online' : 'offline',
       'lastActiveAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),

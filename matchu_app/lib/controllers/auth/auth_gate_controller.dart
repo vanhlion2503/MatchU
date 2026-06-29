@@ -61,9 +61,14 @@ class AuthGateController extends GetxController {
       _signedOutRedirectRoute = null;
       _logoutSplashShownAt = null;
       _box.remove('isRegistering');
+      _box.remove('isPhoneSignInResolving');
       if (Get.currentRoute != redirectRoute) {
         Get.offAllNamed(redirectRoute);
       }
+      return;
+    }
+
+    if (_box.read('isPhoneSignInResolving') == true) {
       return;
     }
 
@@ -215,6 +220,11 @@ class AuthGateController extends GetxController {
     _isLoggingOut = false;
     _signedOutRedirectRoute = null;
     _logoutSplashShownAt = null;
+  }
+
+  Future<void> refreshCurrentUser() async {
+    _navigated = false;
+    await _handleAuth(FirebaseAuth.instance.currentUser);
   }
 
   @override

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -21,7 +21,7 @@ class _RegisterViewState extends State<RegisterView> {
 
     controllerRegis = Get.find<AuthController>();
 
-    // ✅ RESET FORM KHI VÀO MÀN
+    // Reset form khi vào màn đăng ký.
     controllerRegis.emailC.clear();
     controllerRegis.passwordC.clear();
     controllerRegis.confirmPasswordC.clear();
@@ -92,7 +92,7 @@ class _RegisterViewState extends State<RegisterView> {
                   obscureText: controllerRegis.isPasswordHidden.value,
                   decoration: InputDecoration(
                     labelText: "Mật khẩu",
-                    hintText: "8+ | Aa | 0–9 | !@#",
+                    hintText: "8+ | Aa | 0-9 | !@#",
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -216,42 +216,13 @@ class _RegisterViewState extends State<RegisterView> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed:
+                          () => controllerRegis.signInWithGoogle(
+                            fromRegister: true,
+                          ),
                       icon: Image.asset('assets/icon/google.png', width: 40),
                       label: Text(
                         "Google",
-                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(
-                          color:
-                              Theme.of(context).brightness == Brightness.dark
-                                  ? AppTheme.darkBorder
-                                  : AppTheme.lightBorder,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(width: 16),
-
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.phone,
-                        size: 40,
-                        color: Theme.of(context).iconTheme.color,
-                      ),
-                      label: Text(
-                        "Số điện thoại",
                         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
