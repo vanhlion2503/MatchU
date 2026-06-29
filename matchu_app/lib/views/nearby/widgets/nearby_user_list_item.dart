@@ -14,7 +14,6 @@ class NearbyUserListItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final isOnline = user.activeStatus == "online";
     final fullName = user.fullname.isNotEmpty ? user.fullname : "Người dùng";
     final nickname = user.nickname.isNotEmpty ? user.nickname : fullName;
 
@@ -31,11 +30,7 @@ class NearbyUserListItem extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _Avatar(
-                avatarUrl: user.avatarUrl,
-                isOnline: isOnline,
-                displayName: nickname,
-              ),
+              _Avatar(avatarUrl: user.avatarUrl, displayName: nickname),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -56,32 +51,13 @@ class NearbyUserListItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            "@$nickname",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.68,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusDot(isOnline: isOnline),
-                        const SizedBox(width: 4),
-                        Text(
-                          isOnline ? "Online" : "Offline",
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withValues(
-                              alpha: 0.58,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      "@$nickname",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.68),
+                      ),
                     ),
                   ],
                 ),
@@ -104,79 +80,31 @@ class NearbyUserListItem extends StatelessWidget {
 
 class _Avatar extends StatelessWidget {
   final String avatarUrl;
-  final bool isOnline;
   final String displayName;
 
-  const _Avatar({
-    required this.avatarUrl,
-    required this.isOnline,
-    required this.displayName,
-  });
+  const _Avatar({required this.avatarUrl, required this.displayName});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CircleAvatar(
-          radius: 26,
-          backgroundColor: colorScheme.surfaceContainerHighest,
-          backgroundImage:
-              avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-          child:
-              avatarUrl.isEmpty
-                  ? Text(
-                    displayName.isEmpty
-                        ? "U"
-                        : displayName.substring(0, 1).toUpperCase(),
-                    style: textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  )
-                  : null,
-        ),
-        Positioned(
-          bottom: 0,
-          right: 0,
-          child: Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color:
-                  isOnline ? colorScheme.primary : colorScheme.outlineVariant,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                width: 2,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusDot extends StatelessWidget {
-  final bool isOnline;
-
-  const _StatusDot({required this.isOnline});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: 6,
-      height: 6,
-      decoration: BoxDecoration(
-        color: isOnline ? colorScheme.primary : colorScheme.outline,
-        shape: BoxShape.circle,
-      ),
+    return CircleAvatar(
+      radius: 26,
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+      child:
+          avatarUrl.isEmpty
+              ? Text(
+                displayName.isEmpty
+                    ? "U"
+                    : displayName.substring(0, 1).toUpperCase(),
+                style: textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              )
+              : null,
     );
   }
 }

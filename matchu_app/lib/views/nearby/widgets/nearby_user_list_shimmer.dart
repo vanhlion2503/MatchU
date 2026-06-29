@@ -11,42 +11,54 @@ class NearbyUserListShimmer extends StatelessWidget {
   Widget build(BuildContext context) {
     final shimmer = _NearbyShimmerPalette.of(context);
     final background = Theme.of(context).scaffoldBackgroundColor;
-    final dividerColor = Theme.of(
-      context,
-    ).colorScheme.outlineVariant.withValues(alpha: 0.45);
+    final colorScheme = Theme.of(context).colorScheme;
+    final dividerColor = colorScheme.outlineVariant.withValues(alpha: 0.45);
 
-    return ListView.separated(
+    return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
       physics: const BouncingScrollPhysics(),
-      itemCount: itemCount + 1,
-      separatorBuilder: (context, index) {
-        if (index == 0) return const SizedBox(height: 10);
-
-        return Divider(
-          height: 1,
-          thickness: 1,
-          indent: 68,
-          color: dividerColor,
-        );
-      },
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: _ShimmerBlock(
-              width: 180,
-              height: 12,
-              radius: 6,
-              shimmer: shimmer,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 10),
+          child: _ShimmerBlock(
+            width: 180,
+            height: 12,
+            radius: 6,
+            shimmer: shimmer,
+          ),
+        ),
+        Material(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: dividerColor),
             ),
-          );
-        }
-
-        return _NearbyUserListItemShimmer(
-          shimmer: shimmer,
-          background: background,
-        );
-      },
+            child: Column(
+              children: [
+                for (var index = 0; index < itemCount; index++) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: _NearbyUserListItemShimmer(
+                      shimmer: shimmer,
+                      background: background,
+                    ),
+                  ),
+                  if (index != itemCount - 1)
+                    Divider(
+                      height: 1,
+                      thickness: 1,
+                      indent: 82,
+                      color: dividerColor,
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

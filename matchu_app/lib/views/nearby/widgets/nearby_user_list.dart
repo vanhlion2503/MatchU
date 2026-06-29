@@ -86,20 +86,35 @@ class NearbyUserList extends StatelessWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                if (index.isOdd) {
-                  return Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: 68,
-                    color: dividerColor,
-                  );
-                }
-
-                final user = items[index ~/ 2];
-                return NearbyUserListItem(user: user);
-              }, childCount: items.length * 2 - 1),
+            sliver: SliverToBoxAdapter(
+              child: Material(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(18),
+                clipBehavior: Clip.antiAlias,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: dividerColor),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < items.length; index++) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: NearbyUserListItem(user: items[index]),
+                        ),
+                        if (index != items.length - 1)
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            indent: 82,
+                            color: dividerColor,
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
