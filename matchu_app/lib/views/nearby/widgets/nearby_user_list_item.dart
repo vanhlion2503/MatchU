@@ -4,10 +4,10 @@ import 'package:matchu_app/models/nearby_user_vm.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
-class NearbyUserCard extends StatelessWidget {
+class NearbyUserListItem extends StatelessWidget {
   final NearbyUserVM user;
 
-  const NearbyUserCard({super.key, required this.user});
+  const NearbyUserListItem({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -18,65 +18,82 @@ class NearbyUserCard extends StatelessWidget {
     final fullName = user.fullname.isNotEmpty ? user.fullname : "Người dùng";
     final nickname = user.nickname.isNotEmpty ? user.nickname : fullName;
 
-    return Material(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      borderRadius: BorderRadius.circular(20),
-      elevation: 0,
+    return Semantics(
+      button: true,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
         onTap: () {
           if (user.uid.isEmpty) return;
           Get.to(() => OtherProfileView(userId: user.uid));
         },
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               _Avatar(
                 avatarUrl: user.avatarUrl,
                 isOnline: isOnline,
                 displayName: nickname,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    VerifiedNameRow(
+                      isVerified: user.isFaceVerified,
+                      badgeSize: 16,
+                      child: Text(
+                        fullName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        Expanded(
-                          child: VerifiedNameRow(
-                            isVerified: user.isFaceVerified,
-                            child: Text(
-                              fullName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
+                        Flexible(
+                          child: Text(
+                            "@$nickname",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.68,
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        _DistanceBadge(distanceKm: user.distanceKm),
+                        _StatusDot(isOnline: isOnline),
+                        const SizedBox(width: 4),
+                        Text(
+                          isOnline ? "Online" : "Offline",
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.58,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "@$nickname",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.8),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
+              _DistanceBadge(distanceKm: user.distanceKm),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: colorScheme.onSurface.withValues(alpha: 0.34),
+              ),
             ],
           ),
         ),
@@ -117,7 +134,7 @@ class _Avatar extends StatelessWidget {
                         : displayName.substring(0, 1).toUpperCase(),
                     style: textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface.withOpacity(0.7),
+                      color: colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                   )
                   : null,
@@ -144,6 +161,26 @@ class _Avatar extends StatelessWidget {
   }
 }
 
+class _StatusDot extends StatelessWidget {
+  final bool isOnline;
+
+  const _StatusDot({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: isOnline ? colorScheme.primary : colorScheme.outline,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
 class _DistanceBadge extends StatelessWidget {
   final double distanceKm;
 
@@ -155,16 +192,16 @@ class _DistanceBadge extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         _formatDistance(distanceKm),
         style: textTheme.bodySmall?.copyWith(
           fontWeight: FontWeight.w600,
-          color: colorScheme.onSecondaryContainer,
+          color: colorScheme.onSurface.withValues(alpha: 0.72),
         ),
       ),
     );

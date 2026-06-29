@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_empty_state.dart';
-import 'package:matchu_app/views/nearby/widgets/nearby_user_card.dart';
+import 'package:matchu_app/views/nearby/widgets/nearby_user_list_item.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_user_list_shimmer.dart';
 
 class NearbyUserList extends StatelessWidget {
@@ -67,14 +67,14 @@ class NearbyUserList extends StatelessWidget {
         return const NearbyEmptyState();
       }
 
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+      final dividerColor = colorScheme.outlineVariant.withValues(alpha: 0.45);
+
+      return CustomScrollView(
         physics: const BouncingScrollPhysics(),
-        itemCount: items.length + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 18, top: 12),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+            sliver: SliverToBoxAdapter(
               child: Text(
                 "Tìm thấy ${items.length} người gần bạn",
                 style: textTheme.bodySmall?.copyWith(
@@ -82,15 +82,28 @@ class NearbyUserList extends StatelessWidget {
                   color: colorScheme.onSurface.withValues(alpha: 0.8),
                 ),
               ),
-            );
-          }
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                if (index.isOdd) {
+                  return Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: 68,
+                    color: dividerColor,
+                  );
+                }
 
-          final user = items[index - 1];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 0),
-            child: NearbyUserCard(user: user),
-          );
-        },
+                final user = items[index ~/ 2];
+                return NearbyUserListItem(user: user);
+              }, childCount: items.length * 2 - 1),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
       );
     });
   }

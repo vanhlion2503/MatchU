@@ -11,15 +11,28 @@ class NearbyUserListShimmer extends StatelessWidget {
   Widget build(BuildContext context) {
     final shimmer = _NearbyShimmerPalette.of(context);
     final background = Theme.of(context).scaffoldBackgroundColor;
+    final dividerColor = Theme.of(
+      context,
+    ).colorScheme.outlineVariant.withValues(alpha: 0.45);
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
       physics: const BouncingScrollPhysics(),
       itemCount: itemCount + 1,
+      separatorBuilder: (context, index) {
+        if (index == 0) return const SizedBox(height: 10);
+
+        return Divider(
+          height: 1,
+          thickness: 1,
+          indent: 68,
+          color: dividerColor,
+        );
+      },
       itemBuilder: (context, index) {
         if (index == 0) {
           return Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 18, top: 12),
+            padding: const EdgeInsets.only(left: 4),
             child: _ShimmerBlock(
               width: 180,
               height: 12,
@@ -29,76 +42,58 @@ class NearbyUserListShimmer extends StatelessWidget {
           );
         }
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _NearbyUserCardShimmer(
-            shimmer: shimmer,
-            background: background,
-          ),
+        return _NearbyUserListItemShimmer(
+          shimmer: shimmer,
+          background: background,
         );
       },
     );
   }
 }
 
-class _NearbyUserCardShimmer extends StatelessWidget {
+class _NearbyUserListItemShimmer extends StatelessWidget {
   final _NearbyShimmerPalette shimmer;
   final Color background;
 
-  const _NearbyUserCardShimmer({
+  const _NearbyUserListItemShimmer({
     required this.shimmer,
     required this.background,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return Container(
       color: background,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ShimmerBlock(width: 52, height: 52, radius: 26, shimmer: shimmer),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ShimmerBlock(
-                          width: double.infinity,
-                          height: 16,
-                          radius: 8,
-                          shimmer: shimmer,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _ShimmerBlock(
-                        width: 62,
-                        height: 20,
-                        radius: 12,
-                        shimmer: shimmer,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  _ShimmerBlock(
-                    width: 120,
-                    height: 12,
-                    radius: 6,
-                    shimmer: shimmer,
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _ShimmerBlock(width: 52, height: 52, radius: 26, shimmer: shimmer),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ShimmerBlock(
+                  width: double.infinity,
+                  height: 16,
+                  radius: 8,
+                  shimmer: shimmer,
+                ),
+                const SizedBox(height: 8),
+                _ShimmerBlock(
+                  width: 132,
+                  height: 12,
+                  radius: 6,
+                  shimmer: shimmer,
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          _ShimmerBlock(width: 66, height: 24, radius: 12, shimmer: shimmer),
+          const SizedBox(width: 28),
+        ],
       ),
     );
   }
