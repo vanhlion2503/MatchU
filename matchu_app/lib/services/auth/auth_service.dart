@@ -30,30 +30,30 @@ class AuthService {
     required Function(String error) onFailed,
   }) async {
     try {
-      // 1. Táº¡o tÃ i khoáº£n email/password
+      // 1. Tạo tài khoản email/password
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       final user = cred.user;
-      if (user == null) throw Exception("KhÃ´ng táº¡o Ä‘Æ°á»£c user");
+      if (user == null) throw Exception("Không tạo được user");
 
-      // 2. Gá»­i mail verify
+      // 2. Gửi mail verify
       await user.sendEmailVerification();
 
-      // 3. Gá»i callback thÃ nh cÃ´ng
+      // 3. Gọi callback thành công
       onSuccess();
     } on FirebaseAuthException catch (e) {
       onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
       onFailed(
-        "ÄÃ£ xáº£y ra lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh. Vui lÃ²ng thá»­ láº¡i.",
+        "Đã xảy ra lỗi không xác định. Vui lòng thử lại.",
       );
     }
   }
 
-  /* ======================= ENROLL MFA SAU KHI EMAIL ÄÃƒ VERIFY ======================= */
+  /* ======================= ENROLL MFA SAU KHI EMAIL ĐÃ VERIFY ======================= */
 
   Future<void> sendEnrollMfaOtp({
     required String phonenumber,
@@ -62,13 +62,13 @@ class AuthService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) throw Exception("User chÆ°a Ä‘Äƒng nháº­p");
+      if (user == null) throw Exception("User chưa đăng nhập");
 
       await user.reload();
       final refreshedUser = _auth.currentUser ?? user;
       if (!refreshedUser.emailVerified) {
         throw Exception(
-          "Báº¡n pháº£i xÃ¡c minh email trÆ°á»›c khi dÃ¹ng sá»‘ Ä‘iá»‡n thoáº¡i.",
+          "Bạn phải xác minh email trước khi dùng số điện thoại.",
         );
       }
 
@@ -79,16 +79,16 @@ class AuthService {
         multiFactorSession: session,
         verificationCompleted: (_) {},
         verificationFailed: (FirebaseAuthException e) {
-          onFailed(e.message ?? "Gá»­i OTP bá»‹ lá»—i");
+          onFailed(e.message ?? "Gửi OTP bị lỗi");
         },
         codeSent: (String verificationId, int? resendToken) {
           onCodeSent(verificationId);
-          // print("OTP ÄÃƒ ÄÆ¯á»¢C Gá»¬I - verificationId = $verificationId");
+          // print("OTP ĐÃ ĐƯỢC GỬI - verificationId = $verificationId");
         },
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed("KhÃ´ng thá»ƒ gá»­i OTP. Vui lÃ²ng thá»­ láº¡i.");
+      onFailed("Không thể gửi OTP. Vui lòng thử lại.");
     }
   }
 
@@ -98,12 +98,12 @@ class AuthService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) throw Exception("User chÆ°a Ä‘Äƒng nháº­p");
+      if (user == null) throw Exception("User chưa đăng nhập");
 
       await user.reload();
       final refreshedUser = _auth.currentUser ?? user;
       if (!refreshedUser.emailVerified) {
-        throw Exception("Email chÆ°a Ä‘Æ°á»£c xÃ¡c minh");
+        throw Exception("Email chưa được xác minh");
       }
 
       final credential = PhoneAuthProvider.credential(
@@ -122,7 +122,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       throw firebaseErrorToVietnamese(e.code);
     } catch (e) {
-      throw "ÄÃ£ xáº£y ra lá»—i khi xÃ¡c minh OTP.";
+      throw "Đã xảy ra lỗi khi xác minh OTP.";
     }
   }
 
@@ -220,7 +220,7 @@ class AuthService {
     String? avatarUrl,
   }) async {
     final user = _auth.currentUser;
-    if (user == null) throw Exception("User chÆ°a Ä‘Äƒng nháº­p");
+    if (user == null) throw Exception("User chưa đăng nhập");
 
     await user.updateDisplayName(nickname);
 
@@ -282,7 +282,7 @@ class AuthService {
       "updatedAt": FieldValue.serverTimestamp(),
     };
 
-    // â­â­â­ CHá»ˆ GHI KHI CÃ“ AVATAR
+    // ⭐⭐⭐ CHỈ GHI KHI CÓ AVATAR
     if (isCreatingUserDoc) {
       data.addAll({
         "reputationScore": 100,
@@ -320,7 +320,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed("Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh.");
+      onFailed("Lỗi không xác định.");
     }
   }
 
@@ -339,7 +339,7 @@ class AuthService {
         }
       }
       if (phoneInfo == null) {
-        onFailed("KhÃ´ng tÃ¬m tháº¥y sá»‘ Ä‘iá»‡n thoáº¡i xÃ¡c minh MFA.");
+        onFailed("Không tìm thấy số điện thoại xác minh MFA.");
         return;
       }
 
@@ -360,7 +360,7 @@ class AuthService {
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed("KhÃ´ng thá»ƒ gá»­i OTP xÃ¡c minh MFA.");
+      onFailed("Không thể gửi OTP xác minh MFA.");
     }
   }
 

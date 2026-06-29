@@ -301,7 +301,7 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Cau ${index + 1}/$total',
+                    'Câu ${index + 1}/$total',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.white70,
                       fontWeight: FontWeight.w600,
@@ -384,7 +384,7 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                   _buildOptionCard(
                     height: optionHeight,
                     label: question.left,
-                    subtitle: answered ? 'Da khoa lua chon' : 'Cham de chon',
+                    subtitle: answered ? 'Đã khóa lựa chọn' : 'Chạm để chọn',
                     badge: 'A',
                     icon: Icons.home_outlined,
                     selected: mySelected == question.left,
@@ -402,7 +402,7 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                   _buildOptionCard(
                     height: optionHeight,
                     label: question.right,
-                    subtitle: answered ? 'Da khoa lua chon' : 'Cham de chon',
+                    subtitle: answered ? 'Đã khóa lựa chọn' : 'Chạm để chọn',
                     badge: 'B',
                     icon: Icons.terrain_outlined,
                     selected: mySelected == question.right,
@@ -438,15 +438,15 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
     if (waitingSync) {
       icon = Icons.cloud_upload_outlined;
       color = _matchColor;
-      text = 'Dang gui dap an...';
+      text = 'Đang gửi đáp án...';
     } else if (isRevealing) {
       icon = Icons.auto_awesome;
       color = Colors.white;
-      text = 'Dang doi chieu dap an...';
+      text = 'Đang đối chiếu đáp án...';
     } else if (waitingOther) {
       icon = Icons.hourglass_top_rounded;
       color = Colors.white70;
-      text = 'Dang cho doi phuong tra loi';
+      text = 'Đang chờ đối phương trả lời';
     }
 
     if (text == null) {
@@ -726,7 +726,7 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                                     ),
                                   const SizedBox(width: 5),
                                   Text(
-                                    syncing ? 'Dang gui...' : 'Da chon',
+                                    syncing ? 'Đang gửi...' : 'Đã chọn',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,

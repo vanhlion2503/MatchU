@@ -947,10 +947,10 @@ service cloud.firestore {
       }
 
       function onlyUpdateMyAvatar() {
-        // CÃ¡c field thay Ä‘á»•i
+        // Các field thay đổi
         let changed = request.resource.data.diff(resource.data).changedKeys();
 
-        // Chá»‰ Ä‘Æ°á»£c thay Ä‘á»•i Ä‘Ãºng 1 field
+        // Chỉ được thay đổi đúng 1 field
         return changed.size() == 1
           && changed.hasOnly(["anonymousAvatars"])
           && request.resource.data.anonymousAvatars.keys().hasOnly(
@@ -960,17 +960,17 @@ service cloud.firestore {
               == request.resource.data.anonymousAvatars[request.auth.uid];
       }
 
-      // ðŸ‘€ READ temp chat room
+      // 👀 READ temp chat room
       allow read: if request.auth != null;
 
 
-      // âž• Create room
+      // ➕ Create room
       allow create: if request.auth != null
         && request.resource.data.participants is list
         && request.auth.uid in request.resource.data.participants
         && participantsHaveNoBlock(request.resource.data);
 
-      // âœï¸ Update
+      // ✏️ Update
       allow update: if isParticipant()
         && (
           request.resource.data.diff(resource.data).changedKeys()
@@ -1068,10 +1068,10 @@ service cloud.firestore {
           && request.auth.uid in resource.data.participants;
       }
 
-      // ðŸ‘€ Ä‘á»c room
+      // 👀 đọc room
       allow read: if isParticipant();
 
-      // âž• táº¡o room (khi convert)
+      // ➕ tạo room (khi convert)
       allow create: if request.auth != null
         && request.resource.data.participants is list
         && request.auth.uid in request.resource.data.participants
@@ -1097,7 +1097,7 @@ service cloud.firestore {
           ]);
       
        // ===============================
-      // ðŸ” SESSION KEYS (E2EE) - KHÃ”NG ROTATE KEY
+      // 🔐 SESSION KEYS (E2EE) - KHÔNG ROTATE KEY
       // ===============================
       match /sessionKeys/{deviceId} {
 
@@ -1108,7 +1108,7 @@ service cloud.firestore {
                 .data.participants;
         }
 
-        // âœ… Bá»Ž epoch - chá»‰ cáº§n userId, encryptedKey, createdAt
+        // ✅ BỎ epoch - chỉ cần userId, encryptedKey, createdAt
         allow create, update: if isRoomParticipant()
           && (
             request.resource.data.keys().hasOnly([
@@ -1130,7 +1130,7 @@ service cloud.firestore {
             || request.resource.data.keyId is int
           );
 
-        // cho phÃ©p participant Ä‘á»c
+        // cho phép participant đọc
         allow read: if isRoomParticipant();
 
         allow delete: if false;
@@ -1146,10 +1146,10 @@ service cloud.firestore {
                 .data.participants;
         }
 
-        // ðŸ‘€ Ä‘á»c tin nháº¯n
+        // 👀 đọc tin nhắn
         allow read: if isRoomParticipant();
 
-        // âž• gá»­i / copy tin nháº¯n
+        // ➕ gửi / copy tin nhắn
         allow create: if isRoomParticipant()
           && participantsHaveNoBlock(
             get(/databases/$(database)/documents/chatRooms/$(roomId)).data
@@ -1393,25 +1393,25 @@ service cloud.firestore {
   
     match /chatRatings/{id} {
 
-      // ðŸ‘€ Transaction cáº§n read
+      // 👀 Transaction cần read
       allow read: if request.auth != null;
 
-      // âž• Create rating (má»—i user chá»‰ rate tá»« UID cá»§a mÃ¬nh)
+      // ➕ Create rating (mỗi user chỉ rate từ UID của mình)
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid;
 
-      // âŒ KhÃ´ng update / delete
+      // ❌ Không update / delete
       allow update, delete: if false;
     }
 		
     // ================= USER MATCHING REPORT =================
     match /userMatchingReports/{reportId} {
 
-      // âž• Create report
+      // ➕ Create report
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid;
 
-      // âŒ KhÃ´ng cho Ä‘á»c / sá»­a / xÃ³a
+      // ❌ Không cho đọc / sửa / xóa
       allow read, update, delete: if false;
     }
 
@@ -1422,18 +1422,18 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid;
 
-      // KhÃ´ng cho Ä‘á»c / sá»­a / xÃ³a
+      // Không cho đọc / sửa / xóa
       allow read, update, delete: if false;
     }
 
     // ================= USER PROFILE REPORT =================
     match /userProfileReports/{reportId} {
 
-      // âž• Create report
+      // ➕ Create report
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid;
 
-      // âŒ KhÃ´ng cho Ä‘á»c / sá»­a / xÃ³a
+      // ❌ Không cho đọc / sửa / xóa
       allow read, update, delete: if false;
     }
 

@@ -131,8 +131,8 @@ class RewardMotto extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Text(
-        '“Chiến thắng cho bạn quyền đặt thử thách — nhưng kết nối chỉ xảy ra '
-        'khi cả hai đều được tôn trọng.”',
+        '"Chiến thắng cho bạn quyền đặt thử thách — nhưng kết nối chỉ xảy ra '
+        'khi cả hai đều được tôn trọng."',
         textAlign: TextAlign.center,
         style: theme.textTheme.bodySmall?.copyWith(
           fontStyle: FontStyle.italic,

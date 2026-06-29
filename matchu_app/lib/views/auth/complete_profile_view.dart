@@ -182,7 +182,7 @@ class _FullnameField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(" Họ và tên"),
+        _SectionLabel("Họ và tên"),
         const SizedBox(height: 12),
         TextField(
           controller: c.fullnameC,
@@ -211,7 +211,7 @@ class _NicknameField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(" Biệt danh"),
+        _SectionLabel("Biệt danh"),
         const SizedBox(height: 12),
         TextField(
           controller: c.nicknameC,
@@ -342,7 +342,7 @@ class _GenderField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(" Giới tính"),
+        _SectionLabel("Giới tính"),
         const SizedBox(height: 12),
         Obx(() {
           final selectedGender = c.selectedGender.value;

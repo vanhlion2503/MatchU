@@ -357,7 +357,7 @@ class ChatService {
     const maxLength = 160;
     final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (normalized.isEmpty) {
-      return "Tin nhan moi";
+      return "Tin nhắn mới";
     }
     if (normalized.length <= maxLength) {
       return normalized;
@@ -366,6 +366,6 @@ class ChatService {
   }
 
   String _buildImageNotificationPreview() {
-    return "Da gui mot anh";
+    return "Đã gửi một ảnh";
   }
 }

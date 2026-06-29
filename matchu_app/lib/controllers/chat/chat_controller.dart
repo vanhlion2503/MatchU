@@ -732,7 +732,7 @@ class ChatController extends GetxController {
       replyingMessage.value = null;
     } catch (e) {
       pending.failed.value = true;
-      Get.snackbar("Loi", "Khong the gui anh.");
+      Get.snackbar("Lỗi", "Không thể gửi ảnh.");
       Future.delayed(const Duration(seconds: 2), () {
         pendingImageMessages.remove(pending);
       });
@@ -778,7 +778,7 @@ class ChatController extends GetxController {
     }
 
     if (!hasKey) {
-      Get.snackbar("Loi", "Dang thiet lap ma hoa, vui long thu lai.");
+      Get.snackbar("Lỗi", "Đang thiết lập mã hóa, vui lòng thử lại.");
       return false;
     }
     return true;
@@ -834,7 +834,7 @@ class ChatController extends GetxController {
       editingMessage.value = null;
       inputController.clear();
     } catch (e) {
-      Get.snackbar("Loi", "Khong the cap nhat tin nhan.");
+      Get.snackbar("Lỗi", "Không thể cập nhật tin nhắn.");
     }
   }
 
@@ -879,7 +879,7 @@ class ChatController extends GetxController {
         cancelEdit();
       }
     } catch (e) {
-      Get.snackbar("Loi", "Khong the xoa tin nhan.");
+      Get.snackbar("Lỗi", "Không thể xóa tin nhắn.");
     }
   }
 
@@ -890,7 +890,7 @@ class ChatController extends GetxController {
     required bool isLatest,
   }) {
     if (imagePath.isEmpty) {
-      Get.snackbar("Loi", viewOnceDeletedText);
+      Get.snackbar("Lỗi", viewOnceDeletedText);
       return;
     }
 
