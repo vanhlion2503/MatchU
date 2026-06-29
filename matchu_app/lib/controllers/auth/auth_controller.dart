@@ -245,6 +245,8 @@ class AuthController extends GetxController {
   //                      REGISTER ACCOUNT
   // =============================================================
   Future<void> register() async {
+    if (isLoadingRegister.value) return;
+
     _box.remove('isRegistering');
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
@@ -350,6 +352,8 @@ class AuthController extends GetxController {
   //               CHECK EMAIL VERIFIED (AFTER REGISTER)
   // =============================================================
   Future<void> checkEmailVerified() async {
+    if (isLoadingRegister.value) return;
+
     isLoadingRegister.value = true;
 
     try {
@@ -380,6 +384,8 @@ class AuthController extends GetxController {
   //                RESEND VERIFY EMAIL
   // =============================================================
   Future<void> resendVerifyEmail() async {
+    if (resendEmailSeconds.value > 0) return;
+
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -398,7 +404,7 @@ class AuthController extends GetxController {
     resendEmailSeconds.value = 60;
     _emailTimer?.cancel();
 
-    _emailTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _emailTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (resendEmailSeconds.value == 0) {
         timer.cancel();
       } else {
@@ -411,6 +417,8 @@ class AuthController extends GetxController {
   //                    SEND OTP (MFA ENROLL)
   // =============================================================
   Future<void> sendEnrollOtp() async {
+    if (isLoadingRegister.value) return;
+
     final phone = fullPhoneNumber.value.trim();
 
     if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
@@ -418,45 +426,51 @@ class AuthController extends GetxController {
       return;
     }
     // Kiểm tra số điện thoại được dùng tối đa 2 lần
-    final phoneQuery =
-        await _auth.db
-            .collection('users')
-            .where("phonenumber", isEqualTo: phone)
-            .get();
-
-    if (phoneQuery.docs.length >= 2) {
-      Get.snackbar(
-        "Lỗi",
-        "Số điện thoại này đã được sử dụng cho tối đa 2 tài khoản",
-      );
-      return;
-    }
-
     isLoadingRegister.value = true;
 
-    await _auth.sendEnrollMfaOtp(
-      phonenumber: phone,
-      onCodeSent: (verId) {
-        enrollVerificationId = verId;
-        otpC.clear();
-        startEnrollOtpTimer();
+    try {
+      final phoneQuery =
+          await _auth.db
+              .collection('users')
+              .where("phonenumber", isEqualTo: phone)
+              .get();
+
+      if (phoneQuery.docs.length >= 2) {
         isLoadingRegister.value = false;
-        if (Get.currentRoute != '/otp-enroll') {
-          Get.toNamed('/otp-enroll');
-        }
-      },
-      onFailed: (msg) {
-        isLoadingRegister.value = false;
-        Get.snackbar("Lỗi OTP", msg);
-      },
-    );
+        Get.snackbar(
+          "Lỗi",
+          "Số điện thoại này đã được sử dụng cho tối đa 2 tài khoản",
+        );
+        return;
+      }
+
+      await _auth.sendEnrollMfaOtp(
+        phonenumber: phone,
+        onCodeSent: (verId) {
+          enrollVerificationId = verId;
+          otpC.clear();
+          startEnrollOtpTimer();
+          isLoadingRegister.value = false;
+          if (Get.currentRoute != '/otp-enroll') {
+            Get.toNamed('/otp-enroll');
+          }
+        },
+        onFailed: (msg) {
+          isLoadingRegister.value = false;
+          Get.snackbar("Lỗi OTP", msg);
+        },
+      );
+    } catch (_) {
+      isLoadingRegister.value = false;
+      Get.snackbar("Lỗi", "Không thể gửi OTP. Vui lòng thử lại");
+    }
   }
 
   void startEnrollOtpTimer() {
     resendEnrollOtpSeconds.value = 60;
     _enrollTimer?.cancel();
 
-    _enrollTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _enrollTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (resendEnrollOtpSeconds.value == 0) {
         timer.cancel();
       } else {
@@ -469,6 +483,8 @@ class AuthController extends GetxController {
   //             CONFIRM ENROLL OTP → LOGOUT (FLOW OF YOU)
   // =============================================================
   Future<void> confirmEnrollOtp() async {
+    if (isLoadingRegister.value) return;
+
     if (enrollVerificationId == null || otpC.text.isEmpty) {
       Get.snackbar("Lỗi", "Thiếu mã OTP");
       return;
@@ -507,6 +523,8 @@ class AuthController extends GetxController {
   //                       LOGIN
   // =============================================================
   Future<void> loginC() async {
+    if (isLoadingLogin.value) return;
+
     _box.remove('isRegistering');
 
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
@@ -515,6 +533,8 @@ class AuthController extends GetxController {
     }
 
     isLoadingLogin.value = true;
+    loginVerificationId = null;
+    otpC.clear();
 
     await _auth.login(
       email: emailC.text.trim(),
@@ -523,7 +543,6 @@ class AuthController extends GetxController {
         isLoadingLogin.value = false;
       },
       onMfaRequired: (e) {
-        isLoadingLogin.value = false;
         _mfaException = e;
         sendLoginOtp();
       },
@@ -538,10 +557,14 @@ class AuthController extends GetxController {
   //               SEND LOGIN OTP (MFA LOGIN)
   // =============================================================
   Future<void> sendLoginOtp() async {
+    if (isLoadingLogin.value && loginVerificationId != null) return;
+
     if (_mfaException == null) {
       Get.snackbar("Lỗi", "Không tìm thấy phiên MFA");
       return;
     }
+
+    isLoadingLogin.value = true;
 
     PhoneMultiFactorInfo? phoneHint;
     for (final hint in _mfaException!.resolver.hints) {
@@ -561,11 +584,13 @@ class AuthController extends GetxController {
         loginVerificationId = verId;
         otpC.clear();
         startLoginOtpTimer();
+        isLoadingLogin.value = false;
         if (Get.currentRoute != '/otp-login') {
           Get.toNamed('/otp-login');
         }
       },
       onFailed: (msg) {
+        isLoadingLogin.value = false;
         Get.snackbar("Lỗi OTP", msg);
       },
     );
@@ -575,7 +600,7 @@ class AuthController extends GetxController {
     resendLoginOtpSeconds.value = 60;
     _loginTimer?.cancel();
 
-    _loginTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _loginTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (resendLoginOtpSeconds.value == 0) {
         timer.cancel();
       } else {
@@ -588,6 +613,8 @@ class AuthController extends GetxController {
   //               CONFIRM LOGIN OTP
   // =============================================================
   Future<void> confirmLogOtp() async {
+    if (isLoadingLogin.value) return;
+
     if (_mfaException == null ||
         loginVerificationId == null ||
         otpC.text.isEmpty) {

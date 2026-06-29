@@ -53,13 +53,14 @@ class AuthService {
       if (user == null) throw Exception("User chưa đăng nhập");
 
       await user.reload();
-      if (!user.emailVerified) {
+      final refreshedUser = _auth.currentUser ?? user;
+      if (!refreshedUser.emailVerified) {
         throw Exception(
           "Bạn phải xác minh email trước khi dùng số điện thoại.",
         );
       }
 
-      final session = await user.multiFactor.getSession();
+      final session = await refreshedUser.multiFactor.getSession();
 
       await _auth.verifyPhoneNumber(
         phoneNumber: phonenumber,
@@ -88,7 +89,8 @@ class AuthService {
       if (user == null) throw Exception("User chưa đăng nhập");
 
       await user.reload();
-      if (!user.emailVerified) {
+      final refreshedUser = _auth.currentUser ?? user;
+      if (!refreshedUser.emailVerified) {
         throw Exception("Email chưa được xác minh");
       }
 
@@ -99,7 +101,7 @@ class AuthService {
 
       final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
 
-      await user.multiFactor.enroll(assertion, displayName: "SMS");
+      await refreshedUser.multiFactor.enroll(assertion, displayName: "SMS");
     } on FirebaseAuthException catch (e) {
       throw firebaseErrorToVietnamese(e.code);
     } catch (e) {

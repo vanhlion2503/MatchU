@@ -16,6 +16,7 @@ class AuthGateController extends GetxController {
   StreamSubscription<User?>? _sub;
   bool _navigated = false;
   bool _isLoggingOut = false;
+  int _authEventToken = 0;
   String? _signedOutRedirectRoute;
   DateTime? _logoutSplashShownAt;
 
@@ -33,8 +34,11 @@ class AuthGateController extends GetxController {
   /// CORE AUTH FLOW
   /// ============================
   Future<void> _handleAuth(User? user) async {
+    final eventToken = ++_authEventToken;
+
     // ⛔ UI chưa sẵn sàng → đợi
     await _waitForContext();
+    if (eventToken != _authEventToken) return;
 
     // ============================
     // 1️⃣ CHƯA LOGIN
@@ -46,6 +50,7 @@ class AuthGateController extends GetxController {
     if (user == null) {
       final redirectRoute = _signedOutRedirectRoute ?? AppRouter.welcome;
       await _holdSplashBeforeSignedOutRedirect(redirectRoute);
+      if (eventToken != _authEventToken) return;
 
       if (FirebaseAuth.instance.currentUser != null) {
         return;
@@ -70,6 +75,8 @@ class AuthGateController extends GetxController {
     final isRegistering = _box.read('isRegistering') == true;
     if (isRegistering) {
       await user.reload();
+      if (eventToken != _authEventToken) return;
+
       final refreshedUser = FirebaseAuth.instance.currentUser ?? user;
       final currentRoute = Get.currentRoute;
 
@@ -95,7 +102,9 @@ class AuthGateController extends GetxController {
     await user.getIdToken(true);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    if (_isLoggingOut || FirebaseAuth.instance.currentUser?.uid != user.uid) {
+    if (eventToken != _authEventToken ||
+        _isLoggingOut ||
+        FirebaseAuth.instance.currentUser?.uid != user.uid) {
       return;
     }
 
@@ -120,7 +129,9 @@ class AuthGateController extends GetxController {
     // ============================
     final snap = await _loadUserDoc(user.uid);
 
-    if (_isLoggingOut || FirebaseAuth.instance.currentUser?.uid != user.uid) {
+    if (eventToken != _authEventToken ||
+        _isLoggingOut ||
+        FirebaseAuth.instance.currentUser?.uid != user.uid) {
       return;
     }
 
