@@ -25,13 +25,20 @@ class RememberedLoginAccount {
     required this.email,
     required this.password,
     required this.savedAt,
+    this.fullname = '',
+    this.avatarUrl = '',
   });
 
   final String email;
   final String password;
   final DateTime savedAt;
+  final String fullname;
+  final String avatarUrl;
 
   String get displayName {
+    final nameFromProfile = fullname.trim();
+    if (nameFromProfile.isNotEmpty) return nameFromProfile;
+
     final name = email.split('@').first.trim();
     return name.isEmpty ? email : name;
   }
@@ -40,6 +47,8 @@ class RememberedLoginAccount {
     'email': email,
     'password': password,
     'savedAt': savedAt.toIso8601String(),
+    'fullname': fullname,
+    'avatarUrl': avatarUrl,
   };
 
   factory RememberedLoginAccount.fromJson(Map<String, dynamic> json) {
@@ -49,6 +58,8 @@ class RememberedLoginAccount {
       savedAt:
           DateTime.tryParse((json['savedAt'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      fullname: (json['fullname'] ?? '').toString(),
+      avatarUrl: (json['avatarUrl'] ?? '').toString(),
     );
   }
 }
@@ -196,10 +207,27 @@ class AuthController extends GetxController {
     required String email,
     required String password,
   }) async {
+    final fallbackAccount = RememberedLoginAccount(
+      email: email.trim(),
+      password: password,
+      savedAt: DateTime.now(),
+      fullname: rememberedLoginAccount.value?.fullname ?? '',
+      avatarUrl: rememberedLoginAccount.value?.avatarUrl ?? '',
+    );
+
+    await _secureStorage.write(
+      key: _rememberedLoginAccountKey,
+      value: jsonEncode(fallbackAccount.toJson()),
+    );
+    rememberedLoginAccount.value = fallbackAccount;
+
+    final profile = await _loadCurrentRememberedProfile();
     final account = RememberedLoginAccount(
       email: email.trim(),
       password: password,
       savedAt: DateTime.now(),
+      fullname: profile.fullname,
+      avatarUrl: profile.avatarUrl,
     );
 
     await _secureStorage.write(
@@ -209,10 +237,47 @@ class AuthController extends GetxController {
     rememberedLoginAccount.value = account;
   }
 
+  Future<void> removeRememberedLoginAccount() async {
+    await _clearRememberedLoginAccount();
+    Get.snackbar("Đã xóa", "Tài khoản này sẽ không còn được lưu");
+  }
+
   Future<void> _clearRememberedLoginAccount() async {
     await _secureStorage.delete(key: _rememberedLoginAccountKey);
     rememberedLoginAccount.value = null;
     rememberLoginAccount.value = false;
+  }
+
+  Future<({String fullname, String avatarUrl})>
+  _loadCurrentRememberedProfile() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final uid = currentUser?.uid.trim() ?? '';
+    if (uid.isEmpty) {
+      return (fullname: '', avatarUrl: '');
+    }
+
+    try {
+      final snap = await _auth.db.collection('users').doc(uid).get();
+      final data = snap.data();
+      if (data == null) {
+        return (
+          fullname: currentUser?.displayName?.trim() ?? '',
+          avatarUrl: currentUser?.photoURL?.trim() ?? '',
+        );
+      }
+
+      final fullname =
+          (data['fullname'] ?? data['displayName'] ?? '').toString().trim();
+      final avatarUrl =
+          (data['avatarUrl'] ?? data['avatar'] ?? '').toString().trim();
+
+      return (fullname: fullname, avatarUrl: avatarUrl);
+    } catch (_) {
+      return (
+        fullname: currentUser?.displayName?.trim() ?? '',
+        avatarUrl: currentUser?.photoURL?.trim() ?? '',
+      );
+    }
   }
 
   Future<void> _syncRememberedLoginAfterSuccess() async {
