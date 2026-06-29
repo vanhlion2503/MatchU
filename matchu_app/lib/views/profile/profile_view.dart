@@ -260,11 +260,6 @@ class ProfileView extends StatelessWidget {
                 ),
               ),
 
-              if (user.interests.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                ProfileInterestsWrap(interests: user.interests),
-              ],
-
               const SizedBox(height: 25),
 
               // ---------------- STATS ----------------
@@ -400,6 +395,10 @@ class ProfileView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              if (user.interests.isNotEmpty) ...[
+                ProfileInterestsWrap(interests: user.interests),
+                const SizedBox(height: 16),
+              ],
               ProfilePostsSection(
                 controllerTag: postsTag,
                 isOwnerView: true,

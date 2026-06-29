@@ -393,11 +393,6 @@ class OtherProfileView extends StatelessWidget {
                 ),
               ),
 
-              if (u.interests.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                ProfileInterestsWrap(interests: u.interests),
-              ],
-
               const SizedBox(height: 25),
 
               // ================= FOLLOW STATS =================
@@ -441,6 +436,11 @@ class OtherProfileView extends StatelessWidget {
                   ],
                 ),
               ),
+
+              if (u.interests.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                ProfileInterestsWrap(interests: u.interests),
+              ],
 
               const SizedBox(height: 30),
 
