@@ -116,14 +116,14 @@ class _DistanceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+        color: colorScheme.secondary,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         _formatDistance(distanceKm),
         style: textTheme.bodySmall?.copyWith(
           fontWeight: FontWeight.w600,
-          color: colorScheme.onSurface.withValues(alpha: 0.72),
+          color: colorScheme.onPrimary,
         ),
       ),
     );

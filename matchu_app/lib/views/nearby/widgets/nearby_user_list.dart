@@ -27,7 +27,6 @@ class NearbyUserList extends StatelessWidget {
         isDark
             ? colorScheme.outlineVariant.withValues(alpha: 0.7)
             : colorScheme.outlineVariant.withValues(alpha: 0.75);
-    final dividerColor = colorScheme.outlineVariant.withValues(alpha: 0.42);
 
     return Obx(() {
       if (controller.isLoading.value) {
@@ -112,19 +111,11 @@ class NearbyUserList extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      for (var index = 0; index < items.length; index++) ...[
+                      for (var index = 0; index < items.length; index++)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           child: NearbyUserListItem(user: items[index]),
                         ),
-                        if (index != items.length - 1)
-                          Divider(
-                            height: 1,
-                            thickness: 1,
-                            indent: 82,
-                            color: dividerColor,
-                          ),
-                      ],
                     ],
                   ),
                 ),

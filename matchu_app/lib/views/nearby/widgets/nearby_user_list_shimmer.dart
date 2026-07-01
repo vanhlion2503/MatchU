@@ -24,7 +24,6 @@ class NearbyUserListShimmer extends StatelessWidget {
         isDark
             ? colorScheme.outlineVariant.withValues(alpha: 0.7)
             : colorScheme.outlineVariant.withValues(alpha: 0.75);
-    final dividerColor = colorScheme.outlineVariant.withValues(alpha: 0.42);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -52,7 +51,7 @@ class NearbyUserListShimmer extends StatelessWidget {
             ),
             child: Column(
               children: [
-                for (var index = 0; index < itemCount; index++) ...[
+                for (var index = 0; index < itemCount; index++)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: _NearbyUserListItemShimmer(
@@ -60,14 +59,6 @@ class NearbyUserListShimmer extends StatelessWidget {
                       background: cardColor,
                     ),
                   ),
-                  if (index != itemCount - 1)
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      indent: 82,
-                      color: dividerColor,
-                    ),
-                ],
               ],
             ),
           ),
