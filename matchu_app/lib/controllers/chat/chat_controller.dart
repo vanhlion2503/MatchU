@@ -704,6 +704,12 @@ class ChatController extends GetxController {
     final picked = await _picker.pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
+    await sendImageFile(File(picked.path));
+  }
+
+  Future<void> sendImageFile(File imageFile) async {
+    if (editingMessage.value != null) return;
+
     _justSentMessage = true;
     _typingTimer?.cancel();
     isTyping.value = false;
@@ -718,7 +724,7 @@ class ChatController extends GetxController {
     try {
       await _service.sendImageMessage(
         roomId: roomId,
-        file: File(picked.path),
+        file: imageFile,
         replyToId: reply?["id"],
         replyText: reply?["text"],
         onUploadProgress: (progress) {

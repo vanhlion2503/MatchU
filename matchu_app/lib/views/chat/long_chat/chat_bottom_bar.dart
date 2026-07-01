@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 class ChatBottomBar extends StatefulWidget {
   static final GlobalKey bottomBarKey = GlobalKey();
@@ -136,9 +137,24 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
       onPressed: () {
         HapticFeedback.lightImpact();
         widget.controller.hideEmoji();
-        widget.controller.pickAndSendImage();
+        _showPhotoLibrary();
       },
     );
+  }
+
+  Future<void> _showPhotoLibrary() async {
+    if (widget.controller.editingMessage.value != null) return;
+
+    FocusScope.of(context).unfocus();
+    final selections = await PhotoLibraryBottomSheet.show(
+      context,
+      maxSelection: 1,
+      title: 'Thu vien anh',
+      actionLabel: 'Gui',
+    );
+    if (!mounted || selections == null || selections.isEmpty) return;
+
+    await widget.controller.sendImageFile(selections.first.file);
   }
 
   Widget _buildEmojiButton(BuildContext context) {

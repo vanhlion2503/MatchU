@@ -5,7 +5,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Cho phép dùng camera để chụp ảnh avatar, xác thực khuôn mặt và quét mã QR</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Cho phép chọn ảnh avatar</string>
+	<string>Cho phép chọn ảnh từ thư viện để cập nhật avatar, đăng bài viết và gửi tin nhắn</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Cho phép lưu ảnh QR của bạn vào thư viện ảnh</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

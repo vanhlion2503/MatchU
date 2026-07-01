@@ -10,6 +10,7 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
+import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CreatePostSheet extends StatefulWidget {
@@ -818,7 +819,7 @@ class _BottomToolbar extends StatelessWidget {
               onTap:
                   controller.isPickingMedia.value
                       ? null
-                      : controller.pickImages,
+                      : () => _showPhotoLibrary(context),
               palette: palette,
             ),
             const SizedBox(width: 14),
@@ -839,6 +840,28 @@ class _BottomToolbar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showPhotoLibrary(BuildContext context) async {
+    final remainingSlots = controller.remainingMediaSlots;
+    if (remainingSlots <= 0) {
+      controller.showMediaLimitNotice();
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    final selections = await PhotoLibraryBottomSheet.show(
+      context,
+      maxSelection: remainingSlots,
+      title: 'Thu vien anh',
+      actionLabel: 'Them',
+    );
+    if (!context.mounted) return;
+    if (selections == null || selections.isEmpty) return;
+
+    controller.addImageFiles(
+      selections.map((selection) => selection.file).toList(growable: false),
     );
   }
 }

@@ -37,6 +37,8 @@ class PostComposerController extends GetxController {
 
   bool get isEditComposer => editingPost != null;
   bool get isQuoteComposer => quotedPost != null;
+  int get remainingMediaSlots =>
+      maxMediaItems - existingMedia.length - mediaDrafts.length;
 
   PostModel? get previewReferencePost {
     if (quotedPost != null) return quotedPost;
@@ -99,6 +101,22 @@ class PostComposerController extends GetxController {
     }
   }
 
+  void addImageFiles(List<File> files) {
+    if (files.isEmpty) return;
+
+    final drafts = files
+        .map(
+          (file) => PostMediaDraft(
+            file: file,
+            type: PostMediaType.image,
+            fileName: _fileNameFromPath(file.path),
+          ),
+        )
+        .toList(growable: false);
+
+    _appendMedia(drafts);
+  }
+
   Future<void> pickVideo() async {
     if (isPickingMedia.value) return;
 
@@ -127,6 +145,10 @@ class PostComposerController extends GetxController {
 
   void removeExistingMedia(MediaModel media) {
     existingMedia.remove(media);
+  }
+
+  void showMediaLimitNotice() {
+    _showMaxMediaNotice();
   }
 
   void removeTag(String tag) {
@@ -285,6 +307,17 @@ class PostComposerController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  String _fileNameFromPath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final slashIndex = normalized.lastIndexOf('/');
+    if (slashIndex >= 0 && slashIndex < normalized.length - 1) {
+      return normalized.substring(slashIndex + 1);
+    }
+    return normalized.isEmpty
+        ? 'image_${DateTime.now().microsecondsSinceEpoch}.jpg'
+        : normalized;
   }
 
   String _humanizeError(Object error) {
