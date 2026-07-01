@@ -13,24 +13,37 @@ import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class CreatePostSheet extends StatefulWidget {
-  const CreatePostSheet({super.key, this.quotedPost, this.editingPost})
-    : assert(quotedPost == null || editingPost == null);
+  const CreatePostSheet({
+    super.key,
+    this.quotedPost,
+    this.editingPost,
+    this.closeOnSubmitStarted = false,
+    this.onSubmitStarted,
+  }) : assert(quotedPost == null || editingPost == null);
 
   final PostModel? quotedPost;
   final PostModel? editingPost;
+  final bool closeOnSubmitStarted;
+  final ValueChanged<Future<PostModel?>>? onSubmitStarted;
 
   static Future<PostModel?> show(
     BuildContext context, {
     PostModel? quotedPost,
     PostModel? editingPost,
+    bool closeOnSubmitStarted = false,
+    ValueChanged<Future<PostModel?>>? onSubmitStarted,
   }) {
     return showModalBottomSheet<PostModel>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder:
-          (_) =>
-              CreatePostSheet(quotedPost: quotedPost, editingPost: editingPost),
+          (_) => CreatePostSheet(
+            quotedPost: quotedPost,
+            editingPost: editingPost,
+            closeOnSubmitStarted: closeOnSubmitStarted,
+            onSubmitStarted: onSubmitStarted,
+          ),
     );
   }
 
@@ -43,6 +56,7 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
   late final PostComposerController _controller;
   final FocusNode _contentFocusNode = FocusNode();
   final FocusNode _tagFocusNode = FocusNode();
+  Future<PostModel?>? _detachedSubmitFuture;
 
   @override
   void initState() {
@@ -69,13 +83,32 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
     _contentFocusNode.dispose();
     _tagFocusNode.dispose();
 
-    if (Get.isRegistered<PostComposerController>(tag: _tag)) {
-      Get.delete<PostComposerController>(tag: _tag, force: true);
+    if (_detachedSubmitFuture != null) {
+      _detachedSubmitFuture!.whenComplete(_deleteController);
+      super.dispose();
+      return;
     }
+
+    _deleteController();
     super.dispose();
   }
 
+  void _deleteController() {
+    if (Get.isRegistered<PostComposerController>(tag: _tag)) {
+      Get.delete<PostComposerController>(tag: _tag, force: true);
+    }
+  }
+
   Future<void> _submitPost() async {
+    if (widget.closeOnSubmitStarted) {
+      final submitFuture = _controller.submit();
+      _detachedSubmitFuture = submitFuture;
+      widget.onSubmitStarted?.call(submitFuture);
+      if (!mounted) return;
+      Get.back<PostModel?>();
+      return;
+    }
+
     final created = await _controller.submit();
     if (!mounted || created == null) return;
     Get.back<PostModel?>(result: created);

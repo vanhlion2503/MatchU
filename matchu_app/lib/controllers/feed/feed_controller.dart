@@ -57,6 +57,10 @@ class FeedController extends GetxController {
   final RxBool followingHasMore = true.obs;
   final RxnString followingErrorMessage = RxnString();
 
+  final RxInt latestPostSubmissionCount = 0.obs;
+  final RxInt featuredPostSubmissionCount = 0.obs;
+  final RxInt followingPostSubmissionCount = 0.obs;
+
   final ScrollController scrollController = ScrollController();
 
   final Map<String, bool> _likeCache = <String, bool>{};
@@ -157,6 +161,20 @@ class FeedController extends GetxController {
       case FeedTimeline.latest:
         return errorMessage.value;
     }
+  }
+
+  bool isPostSubmissionPending(FeedTimeline timeline) {
+    return _postSubmissionCountFor(timeline).value > 0;
+  }
+
+  void beginPostSubmission(FeedTimeline timeline) {
+    final counter = _postSubmissionCountFor(timeline);
+    counter.value = counter.value + 1;
+  }
+
+  void endPostSubmission(FeedTimeline timeline) {
+    final counter = _postSubmissionCountFor(timeline);
+    counter.value = math.max(0, counter.value - 1);
   }
 
   bool isPostRemoving(String postId) {
@@ -2200,6 +2218,17 @@ class FeedController extends GetxController {
     }
 
     return 'Không thể tải bảng tin lúc này. Vui lòng thử lại.';
+  }
+
+  RxInt _postSubmissionCountFor(FeedTimeline timeline) {
+    switch (timeline) {
+      case FeedTimeline.featured:
+        return featuredPostSubmissionCount;
+      case FeedTimeline.following:
+        return followingPostSubmissionCount;
+      case FeedTimeline.latest:
+        return latestPostSubmissionCount;
+    }
   }
 
   void _showError(String message) {

@@ -116,7 +116,11 @@ class _FeedScreenState extends State<FeedScreen>
   }
 
   Future<void> _openCreatePostSheet(BuildContext context) async {
-    final createdPost = await CreatePostSheet.show(context);
+    final createdPost = await CreatePostSheet.show(
+      context,
+      closeOnSubmitStarted: true,
+      onSubmitStarted: _handleDetachedPostSubmission,
+    );
     _handlePostCreated(createdPost);
   }
 
@@ -124,6 +128,8 @@ class _FeedScreenState extends State<FeedScreen>
     final createdPost = await CreatePostSheet.show(
       context,
       quotedPost: sourcePost,
+      closeOnSubmitStarted: true,
+      onSubmitStarted: _handleDetachedPostSubmission,
     );
     _handlePostCreated(createdPost);
   }
@@ -165,6 +171,24 @@ class _FeedScreenState extends State<FeedScreen>
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  void _handleDetachedPostSubmission(Future<PostModel?> submitFuture) {
+    final timeline = controller.activeTimeline.value;
+    controller.beginPostSubmission(timeline);
+    unawaited(_resolveDetachedPostSubmission(timeline, submitFuture));
+  }
+
+  Future<void> _resolveDetachedPostSubmission(
+    FeedTimeline timeline,
+    Future<PostModel?> submitFuture,
+  ) async {
+    try {
+      final createdPost = await submitFuture;
+      _handlePostCreated(createdPost);
+    } finally {
+      controller.endPostSubmission(timeline);
+    }
   }
 
   void _handlePostRemoved(PostModel? removedPost) {
@@ -342,6 +366,9 @@ class _FeedScreenState extends State<FeedScreen>
               status: controller.featuredStatus.value,
               isLoadingMore: controller.featuredIsLoadingMore.value,
               hasMore: controller.featuredHasMore.value,
+              isPostSubmitting: controller.isPostSubmissionPending(
+                FeedTimeline.featured,
+              ),
               errorMessage: controller.featuredErrorMessage.value,
               scrollController: _featuredScrollController,
               storageKey: const PageStorageKey<String>('feed_featured_posts'),
@@ -369,6 +396,9 @@ class _FeedScreenState extends State<FeedScreen>
               status: controller.status.value,
               isLoadingMore: controller.isLoadingMore.value,
               hasMore: controller.hasMore.value,
+              isPostSubmitting: controller.isPostSubmissionPending(
+                FeedTimeline.latest,
+              ),
               errorMessage: controller.errorMessage.value,
               scrollController: _latestScrollController,
               storageKey: const PageStorageKey<String>('feed_latest_posts'),
@@ -396,6 +426,9 @@ class _FeedScreenState extends State<FeedScreen>
               status: controller.followingStatus.value,
               isLoadingMore: controller.followingIsLoadingMore.value,
               hasMore: controller.followingHasMore.value,
+              isPostSubmitting: controller.isPostSubmissionPending(
+                FeedTimeline.following,
+              ),
               errorMessage: controller.followingErrorMessage.value,
               scrollController: _followingScrollController,
               storageKey: const PageStorageKey<String>('feed_following_posts'),
@@ -538,6 +571,7 @@ class _FeedTimelineBody extends StatefulWidget {
     required this.status,
     required this.isLoadingMore,
     required this.hasMore,
+    required this.isPostSubmitting,
     required this.errorMessage,
     required this.scrollController,
     required this.storageKey,
@@ -562,6 +596,7 @@ class _FeedTimelineBody extends StatefulWidget {
   final FeedStatus status;
   final bool isLoadingMore;
   final bool hasMore;
+  final bool isPostSubmitting;
   final String? errorMessage;
   final ScrollController scrollController;
   final PageStorageKey<String> storageKey;
@@ -644,13 +679,19 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
     if ((widget.status == FeedStatus.initial ||
             widget.status == FeedStatus.loading) &&
         widget.posts.isEmpty) {
-      return const FeedShimmer();
+      return Column(
+        children: [
+          _PostSubmissionStatusBar(isVisible: widget.isPostSubmitting),
+          const Expanded(child: FeedShimmer()),
+        ],
+      );
     }
 
     if (widget.status == FeedStatus.error && widget.posts.isEmpty) {
       return _FeedStateScrollView(
         onRefresh: widget.onRefresh,
         children: [
+          _PostSubmissionStatusBar(isVisible: widget.isPostSubmitting),
           const SizedBox(height: 72),
           FeedErrorState(
             message: widget.errorMessage ?? 'Đã xảy ra lỗi khi tải bảng tin.',
@@ -664,6 +705,7 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
       return _FeedStateScrollView(
         onRefresh: widget.onRefresh,
         children: [
+          _PostSubmissionStatusBar(isVisible: widget.isPostSubmitting),
           const SizedBox(height: 72),
           FeedEmptyState(
             onRefresh: widget.onRefresh,
@@ -676,7 +718,9 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
 
     final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
-    final itemCount = widget.posts.length + (widget.isLoadingMore ? 1 : 0);
+    final pendingOffset = widget.isPostSubmitting ? 1 : 0;
+    final itemCount =
+        widget.posts.length + pendingOffset + (widget.isLoadingMore ? 1 : 0);
 
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
@@ -693,7 +737,12 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
           padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
           itemCount: itemCount,
           itemBuilder: (context, index) {
-            if (index >= widget.posts.length) {
+            if (widget.isPostSubmitting && index == 0) {
+              return const _PostSubmissionStatusBar(isVisible: true);
+            }
+
+            final postIndex = index - pendingOffset;
+            if (postIndex >= widget.posts.length) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 18),
                 child: Center(
@@ -706,13 +755,13 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
               );
             }
 
-            final post = widget.posts[index];
+            final post = widget.posts[postIndex];
 
             return _FeedRemovalAnimatedPostItem(
               key: ValueKey('feed_post_${post.postId}'),
               controller: widget.controller,
               post: post,
-              showDivider: index > 0,
+              showDivider: postIndex > 0 || widget.isPostSubmitting,
               onTap: () => widget.onPostTap(post),
               onLikeTap: () => widget.onLikeTap(post.postId),
               onCommentTap: () => widget.onCommentTap(post),
@@ -729,6 +778,80 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
           },
         ),
       ),
+    );
+  }
+}
+
+class _PostSubmissionStatusBar extends StatelessWidget {
+  const _PostSubmissionStatusBar({required this.isVisible});
+
+  final bool isVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return SizeTransition(
+          sizeFactor: animation,
+          axisAlignment: -1,
+          child: FadeTransition(opacity: animation, child: child),
+        );
+      },
+      child:
+          isVisible
+              ? DecoratedBox(
+                key: const ValueKey<String>('post_submission_status_visible'),
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  border: Border(bottom: BorderSide(color: palette.border)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(
+                      minHeight: 3,
+                      color: theme.colorScheme.primary,
+                      backgroundColor: theme.colorScheme.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Iconsax.clock,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Đang xử lý bài viết...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: palette.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : const SizedBox(
+                key: ValueKey<String>('post_submission_status_hidden'),
+              ),
     );
   }
 }
