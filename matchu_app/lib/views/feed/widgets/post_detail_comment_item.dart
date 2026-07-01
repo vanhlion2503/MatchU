@@ -1,10 +1,14 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
+import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/views/feed/widgets/comment_thread_guides.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
+import 'package:matchu_app/views/feed/widgets/post_image_viewer_screen.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
@@ -167,14 +171,20 @@ class PostDetailCommentItem extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      contentLabel,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 14,
-                        height: 1.55,
-                        color: palette.textPrimary,
+                    if (contentLabel.trim().isNotEmpty)
+                      Text(
+                        contentLabel,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                          height: 1.55,
+                          color: palette.textPrimary,
+                        ),
                       ),
-                    ),
+                    if (!isDeleted && comment.hasImage) ...[
+                      if (contentLabel.trim().isNotEmpty)
+                        const SizedBox(height: 8),
+                      _CommentImage(comment: comment, palette: palette),
+                    ],
                     const SizedBox(height: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,6 +263,95 @@ class PostDetailCommentItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CommentImage extends StatelessWidget {
+  const _CommentImage({required this.comment, required this.palette});
+
+  final PostCommentModel comment;
+  final FeedPalette palette;
+
+  Future<void> _openViewer(BuildContext context, String imageUrl) {
+    if (imageUrl.trim().isEmpty) return Future<void>.value();
+
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PostImageViewerScreen(imageUrls: [imageUrl]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = comment.imageUrl.trim();
+    final localPath = comment.localImagePath?.trim() ?? '';
+    final borderRadius = BorderRadius.circular(14);
+
+    Widget image;
+    if (imageUrl.isNotEmpty) {
+      image = Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openViewer(context, imageUrl),
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            placeholder:
+                (_, __) => ColoredBox(
+                  color: palette.surfaceMuted,
+                  child: const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+            errorWidget:
+                (_, __, ___) => ColoredBox(
+                  color: palette.surfaceMuted,
+                  child: const Center(
+                    child: Icon(Iconsax.gallery_slash, size: 30),
+                  ),
+                ),
+          ),
+        ),
+      );
+    } else if (localPath.isNotEmpty) {
+      image = Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.file(File(localPath), fit: BoxFit.cover),
+          ColoredBox(
+            color: Colors.black.withValues(alpha: 0.18),
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      image = ColoredBox(
+        color: palette.surfaceMuted,
+        child: const Center(child: Icon(Iconsax.gallery_slash, size: 30)),
+      );
+    }
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 240),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: ClipRRect(borderRadius: borderRadius, child: image),
       ),
     );
   }

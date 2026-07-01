@@ -1,7 +1,16 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
+import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
+import 'package:path_provider/path_provider.dart';
 
 class PostCommentPageResult {
   const PostCommentPageResult({
@@ -19,10 +28,15 @@ class PostCommentService {
   PostCommentService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    FirebaseStorage? storage,
     UserService? userService,
+    ImageModerationService? imageModerationService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
-       _userService = userService ?? UserService();
+       _storage = storage ?? FirebaseStorage.instance,
+       _userService = userService ?? UserService(),
+       _imageModerationService =
+           imageModerationService ?? ImageModerationService();
 
   static const int maxCommentLength = 300;
   static const int defaultTopLevelPageSize = 5;
@@ -30,7 +44,9 @@ class PostCommentService {
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final FirebaseStorage _storage;
   final UserService _userService;
+  final ImageModerationService _imageModerationService;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -116,13 +132,16 @@ class PostCommentService {
     required String postId,
     required String content,
     String? parentId,
+    File? imageFile,
+    String? imageFileName,
   }) async {
     if (uid.isEmpty) {
       throw StateError('Bạn cần đăng nhập để bình luận.');
     }
 
     final normalizedContent = content.trim();
-    if (normalizedContent.isEmpty) {
+    final hasImage = imageFile != null;
+    if (normalizedContent.isEmpty && !hasImage) {
       throw StateError('Nội dung bình luận không được để trống.');
     }
     if (normalizedContent.length > maxCommentLength) {
@@ -141,50 +160,77 @@ class PostCommentService {
             ? null
             : postRef.collection('comments').doc(parentId.trim());
 
-    await _firestore.runTransaction((transaction) async {
-      final postSnap = await transaction.get(postRef);
-      if (!postSnap.exists) {
-        throw StateError('Bài viết không còn tồn tại.');
+    Reference? uploadedImageRef;
+    var imageUrl = '';
+
+    try {
+      if (imageFile != null) {
+        uploadedImageRef = _storage.ref(
+          'posts/$uid/$postId/comments/${commentRef.id}/image.jpg',
+        );
+        final uploadFile = await _prepareImageFile(commentRef.id, imageFile);
+        await _ensureImageContentAllowed(uploadFile);
+        await uploadedImageRef.putFile(
+          uploadFile,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+        imageUrl = await uploadedImageRef.getDownloadURL();
       }
 
-      if (parentRef != null) {
-        final parentSnap = await transaction.get(parentRef);
-        if (!parentSnap.exists) {
-          throw StateError('Không tìm thấy bình luận gốc để trả lời.');
+      await _firestore.runTransaction((transaction) async {
+        final postSnap = await transaction.get(postRef);
+        if (!postSnap.exists) {
+          throw StateError('Bài viết không còn tồn tại.');
         }
 
-        if (parentSnap.data()?['deletedAt'] != null) {
-          throw StateError('Không thể trả lời bình luận đã bị xóa.');
+        if (parentRef != null) {
+          final parentSnap = await transaction.get(parentRef);
+          if (!parentSnap.exists) {
+            throw StateError('Không tìm thấy bình luận gốc để trả lời.');
+          }
+
+          if (parentSnap.data()?['deletedAt'] != null) {
+            throw StateError('Không thể trả lời bình luận đã bị xóa.');
+          }
+
+          final currentReplyCount =
+              (parentSnap.data()?['replyCount'] as num?)?.toInt() ?? 0;
+
+          transaction.update(parentRef, {'replyCount': currentReplyCount + 1});
         }
 
-        final currentReplyCount =
-            (parentSnap.data()?['replyCount'] as num?)?.toInt() ?? 0;
+        final rawStats = postSnap.data()?['stats'];
+        final stats =
+            rawStats is Map
+                ? Map<String, dynamic>.from(rawStats)
+                : const <String, dynamic>{};
+        final currentCommentCount =
+            (stats['commentCount'] as num?)?.toInt() ?? 0;
 
-        transaction.update(parentRef, {'replyCount': currentReplyCount + 1});
+        transaction.set(commentRef, {
+          'commentId': commentRef.id,
+          'userId': uid,
+          'content': normalizedContent,
+          'imageUrl': imageUrl,
+          'parentId': parentRef?.id,
+          'likeCount': 0,
+          'replyCount': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(postRef, {
+          'stats.commentCount': currentCommentCount + 1,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (_) {
+      if (uploadedImageRef != null) {
+        try {
+          await uploadedImageRef.delete();
+        } catch (_) {}
       }
-
-      final rawStats = postSnap.data()?['stats'];
-      final stats =
-          rawStats is Map
-              ? Map<String, dynamic>.from(rawStats)
-              : const <String, dynamic>{};
-      final currentCommentCount = (stats['commentCount'] as num?)?.toInt() ?? 0;
-
-      transaction.set(commentRef, {
-        'commentId': commentRef.id,
-        'userId': uid,
-        'content': normalizedContent,
-        'parentId': parentRef?.id,
-        'likeCount': 0,
-        'replyCount': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      transaction.update(postRef, {
-        'stats.commentCount': currentCommentCount + 1,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    });
+      rethrow;
+    }
 
     return PostCommentModel(
       commentId: commentRef.id,
@@ -193,6 +239,7 @@ class PostCommentService {
       parentId: parentRef?.id,
       likeCount: 0,
       replyCount: 0,
+      imageUrl: imageUrl,
       createdAt: DateTime.now(),
       author: author,
     );
@@ -433,6 +480,7 @@ class PostCommentService {
         .where(
           (comment) =>
               comment.content.trim().isNotEmpty ||
+              comment.imageUrl.trim().isNotEmpty ||
               (comment.isDeleted && comment.replyCount > 0),
         )
         .toList(growable: false);
@@ -485,6 +533,8 @@ class PostCommentService {
   bool _shouldIncludeCommentData(Map<String, dynamic> data) {
     final content = (data['content'] ?? '').toString().trim();
     if (content.isNotEmpty) return true;
+    final imageUrl = (data['imageUrl'] ?? '').toString().trim();
+    if (imageUrl.isNotEmpty) return true;
 
     final isDeleted = data['deletedAt'] != null;
     final replyCount = _parseInt(data['replyCount']);
@@ -495,5 +545,61 @@ class PostCommentService {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return 0;
+  }
+
+  Future<File> _prepareImageFile(String commentId, File source) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final targetPath = '${tempDir.path}/comment_${commentId}_image.jpg';
+      final Uint8List? bytes = await FlutterImageCompress.compressWithFile(
+        source.path,
+        quality: 78,
+        format: CompressFormat.jpeg,
+      );
+
+      if (bytes == null) return source;
+
+      final file = File(targetPath);
+      await file.writeAsBytes(bytes, flush: true);
+      return file;
+    } catch (_) {
+      return source;
+    }
+  }
+
+  Future<void> _ensureImageContentAllowed(File imageFile) async {
+    try {
+      final result = await _imageModerationService.moderate(imageFile);
+      if (!result.isViolation) return;
+
+      final reason = result.reason?.trim();
+      throw StateError(
+        reason == null || reason.isEmpty
+            ? 'Hinh anh binh luan vi pham tieu chuan cong dong.'
+            : 'Hinh anh binh luan vi pham tieu chuan cong dong: $reason',
+      );
+    } on StateError {
+      rethrow;
+    } on TimeoutException {
+      throw StateError(
+        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'unauthenticated') {
+        throw StateError('Ban can dang nhap de binh luan.');
+      }
+
+      if (error.code == 'invalid-argument') {
+        throw StateError('Hinh anh khong hop le.');
+      }
+
+      throw StateError(
+        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+      );
+    } catch (_) {
+      throw StateError(
+        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+      );
+    }
   }
 }

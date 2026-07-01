@@ -57,6 +57,8 @@ class PostCommentModel {
     required this.parentId,
     required this.likeCount,
     required this.replyCount,
+    this.imageUrl = '',
+    this.localImagePath,
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
@@ -74,6 +76,8 @@ class PostCommentModel {
   final String? parentId;
   final int likeCount;
   final int replyCount;
+  final String imageUrl;
+  final String? localImagePath;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
@@ -88,6 +92,9 @@ class PostCommentModel {
 
   bool get isReply => parentId != null && parentId!.trim().isNotEmpty;
   bool get isDeleted => deletedAt != null;
+  bool get hasImage =>
+      imageUrl.trim().isNotEmpty ||
+      (localImagePath?.trim().isNotEmpty ?? false);
 
   factory PostCommentModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     return PostCommentModel.fromJson(doc.data() ?? <String, dynamic>{}, doc.id);
@@ -104,6 +111,7 @@ class PostCommentModel {
       parentId: _parseParentId(json['parentId']),
       likeCount: _parseInt(json['likeCount']),
       replyCount: _parseInt(json['replyCount']),
+      imageUrl: (json['imageUrl'] ?? '').toString().trim(),
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
       deletedAt: _parseDateTime(json['deletedAt']),
@@ -120,6 +128,7 @@ class PostCommentModel {
       'parentId': parentId,
       'likeCount': likeCount,
       'replyCount': replyCount,
+      'imageUrl': imageUrl,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
       'deletedAt': deletedAt,
@@ -135,6 +144,8 @@ class PostCommentModel {
     String? parentId,
     int? likeCount,
     int? replyCount,
+    String? imageUrl,
+    String? localImagePath,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
@@ -152,6 +163,8 @@ class PostCommentModel {
       parentId: parentId ?? this.parentId,
       likeCount: likeCount ?? this.likeCount,
       replyCount: replyCount ?? this.replyCount,
+      imageUrl: imageUrl ?? this.imageUrl,
+      localImagePath: localImagePath ?? this.localImagePath,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,

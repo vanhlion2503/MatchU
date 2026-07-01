@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 
 class AvatarService {
   static final _storage = FirebaseStorage.instance;
   static final _auth = FirebaseAuth.instance;
+  static final _imageModerationService = ImageModerationService();
 
   static Reference _ref() {
     final uid = _auth.currentUser!.uid;
@@ -12,17 +16,52 @@ class AvatarService {
   }
 
   static Future<String> uploadAvatar(File file) async {
+    await _ensureImageContentAllowed(file);
+
     final ref = _ref();
-    await ref.putFile(
-      file,
-      SettableMetadata(contentType: "image/jpeg"),
-    );
+    await ref.putFile(file, SettableMetadata(contentType: "image/jpeg"));
     return await ref.getDownloadURL();
   }
 
   static Future<void> deleteAvatar() async {
-    try{
+    try {
       await _ref().delete();
-    } catch (_){}
+    } catch (_) {}
+  }
+
+  static Future<void> _ensureImageContentAllowed(File imageFile) async {
+    try {
+      final result = await _imageModerationService.moderate(imageFile);
+      if (!result.isViolation) return;
+
+      final reason = result.reason?.trim();
+      throw StateError(
+        reason == null || reason.isEmpty
+            ? 'Avatar vi pham tieu chuan cong dong.'
+            : 'Avatar vi pham tieu chuan cong dong: $reason',
+      );
+    } on StateError {
+      rethrow;
+    } on TimeoutException {
+      throw StateError(
+        'Khong the kiem duyet avatar luc nay. Vui long thu lai sau.',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'unauthenticated') {
+        throw StateError('Ban can dang nhap de cap nhat avatar.');
+      }
+
+      if (error.code == 'invalid-argument') {
+        throw StateError('Avatar khong hop le.');
+      }
+
+      throw StateError(
+        'Khong the kiem duyet avatar luc nay. Vui long thu lai sau.',
+      );
+    } catch (_) {
+      throw StateError(
+        'Khong the kiem duyet avatar luc nay. Vui long thu lai sau.',
+      );
+    }
   }
 }

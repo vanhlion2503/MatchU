@@ -14,6 +14,7 @@ import 'package:matchu_app/models/feed/post_page_result.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/feed/post_text_moderation_service.dart';
+import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -24,12 +25,15 @@ class PostService {
     FirebaseStorage? storage,
     UserService? userService,
     PostTextModerationService? textModerationService,
+    ImageModerationService? imageModerationService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
        _userService = userService ?? UserService(),
        _textModerationService =
-           textModerationService ?? PostTextModerationService();
+           textModerationService ?? PostTextModerationService(),
+       _imageModerationService =
+           imageModerationService ?? ImageModerationService();
 
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
@@ -44,6 +48,7 @@ class PostService {
   final FirebaseStorage _storage;
   final UserService _userService;
   final PostTextModerationService _textModerationService;
+  final ImageModerationService _imageModerationService;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -1299,6 +1304,10 @@ class PostService {
               ? await _prepareImageFile(postId, draft.file, storageIndex)
               : draft.file;
 
+      if (draft.isImage) {
+        await _ensureImageContentAllowed(uploadFile);
+      }
+
       await ref.putFile(
         uploadFile,
         SettableMetadata(contentType: _contentTypeForDraft(draft)),
@@ -1531,6 +1540,42 @@ class PostService {
     } catch (_) {
       throw StateError(
         'Không thể kiểm duyệt nội dung lúc này. Vui lòng thử lại sau.',
+      );
+    }
+  }
+
+  Future<void> _ensureImageContentAllowed(File imageFile) async {
+    try {
+      final result = await _imageModerationService.moderate(imageFile);
+      if (!result.isViolation) return;
+
+      final reason = result.reason?.trim();
+      throw StateError(
+        reason == null || reason.isEmpty
+            ? 'Hinh anh vi pham tieu chuan cong dong.'
+            : 'Hinh anh vi pham tieu chuan cong dong: $reason',
+      );
+    } on StateError {
+      rethrow;
+    } on TimeoutException {
+      throw StateError(
+        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'unauthenticated') {
+        throw StateError('Ban can dang nhap de dang bai viet.');
+      }
+
+      if (error.code == 'invalid-argument') {
+        throw StateError('Hinh anh khong hop le.');
+      }
+
+      throw StateError(
+        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+      );
+    } catch (_) {
+      throw StateError(
+        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
       );
     }
   }

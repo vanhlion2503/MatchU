@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
@@ -44,6 +46,7 @@ class PostCommentsController extends GetxController {
   final PostCommentService _service;
   final PostRestrictionService _restrictionService;
   final GetStorage _storage = GetStorage();
+  final ImagePicker _imagePicker = ImagePicker();
 
   final TextEditingController inputController = TextEditingController();
   final FocusNode inputFocusNode = FocusNode();
@@ -52,6 +55,7 @@ class PostCommentsController extends GetxController {
   final RxList<CommentThreadEntry> threadEntries = <CommentThreadEntry>[].obs;
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
+  final RxBool isPickingImage = false.obs;
   final RxBool hasInputText = false.obs;
   final RxBool isLoadingMoreComments = false.obs;
   final RxBool hasMoreComments = true.obs;
@@ -237,6 +241,7 @@ class PostCommentsController extends GetxController {
   bool canEditComment(PostCommentModel comment) {
     final uid = currentUserId;
     if (uid.isEmpty || comment.isSending || comment.isDeleted) return false;
+    if (comment.hasImage) return false;
     return comment.userId.trim() == uid;
   }
 
@@ -434,6 +439,68 @@ class PostCommentsController extends GetxController {
     }
   }
 
+  Future<void> pickAndSubmitImageComment() async {
+    if (isSubmitting.value || isPickingImage.value) return;
+    if (editingComment.value != null) return;
+
+    final currentUid = _service.uid.trim();
+    if (currentUid.isEmpty) {
+      _showError('Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ bÃ¬nh luáº­n.');
+      return;
+    }
+
+    try {
+      isPickingImage.value = true;
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 92,
+      );
+      if (picked == null) return;
+
+      final parentId = replyingTo.value?.commentId;
+      final imageFile = File(picked.path);
+      final optimisticComment = _createOptimisticComment(
+        userId: currentUid,
+        content: '',
+        parentId: parentId,
+        localImagePath: picked.path,
+      );
+
+      isSubmitting.value = true;
+      _insertLocalComment(optimisticComment);
+      totalCommentCount.value += 1;
+      onCommentCountChanged?.call(1);
+      inputController.clear();
+      replyingTo.value = null;
+      inputFocusNode.unfocus();
+
+      try {
+        final created = await _service.addComment(
+          postId: postId,
+          content: '',
+          parentId: parentId,
+          imageFile: imageFile,
+          imageFileName: picked.name,
+        );
+        _resolveOptimisticComment(
+          optimisticCommentId: optimisticComment.commentId,
+          serverComment: created,
+        );
+      } catch (error) {
+        _rollbackOptimisticComment(optimisticComment.commentId);
+        totalCommentCount.value = max(0, totalCommentCount.value - 1);
+        onCommentCountChanged?.call(-1);
+        _showError(_mapError(error));
+      } finally {
+        isSubmitting.value = false;
+      }
+    } catch (error) {
+      _showError('KhÃ´ng thá»ƒ chá»n áº£nh lÃºc nÃ y: $error');
+    } finally {
+      isPickingImage.value = false;
+    }
+  }
+
   Future<void> _submitEditedComment(PostCommentModel editingTarget) async {
     final currentUid = _service.uid.trim();
     if (currentUid.isEmpty) {
@@ -596,6 +663,7 @@ class PostCommentsController extends GetxController {
     required String userId,
     required String content,
     required String? parentId,
+    String? localImagePath,
   }) {
     final normalizedParentId = parentId?.trim();
     final resolvedParentId =
@@ -611,6 +679,7 @@ class PostCommentsController extends GetxController {
       parentId: resolvedParentId,
       likeCount: 0,
       replyCount: 0,
+      localImagePath: localImagePath,
       createdAt: DateTime.now(),
       author: _currentUserAuthor(userId),
       isSending: true,

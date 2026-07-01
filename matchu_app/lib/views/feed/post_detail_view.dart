@@ -498,13 +498,7 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
 
   void _showImageCommentNotice() {
     HapticFeedback.selectionClick();
-    Get.snackbar(
-      'Sắp hỗ trợ',
-      'Bình luận kèm ảnh đang được hoàn thiện.',
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-      duration: const Duration(seconds: 2),
-    );
+    widget.controller.commentsController.pickAndSubmitImageComment();
   }
 
   @override
@@ -534,6 +528,7 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
         final replyingTo = commentsController.replyingTo.value;
         final editingComment = commentsController.editingComment.value;
         final isSubmitting = commentsController.isSubmitting.value;
+        final isPickingImage = commentsController.isPickingImage.value;
         final hasInputText = commentsController.hasInputText.value;
         final shouldShowSubmit = editingComment != null || hasInputText;
 
@@ -798,7 +793,9 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                                           icon: Iconsax.gallery,
                                           color: palette.iconMuted,
                                           onPressed:
-                                              isSubmitting
+                                              isSubmitting ||
+                                                      isPickingImage ||
+                                                      editingComment != null
                                                   ? null
                                                   : _showImageCommentNotice,
                                         ),
