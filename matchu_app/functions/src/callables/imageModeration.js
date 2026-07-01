@@ -16,7 +16,7 @@ const client = new vision.ImageAnnotatorClient();
 
 const MAX_IMAGE_BASE64_LENGTH = 9 * 1024 * 1024;
 const MIN_REPUTATION_TO_MODERATE_POST_IMAGE = MIN_REPUTATION_TO_POST;
-const VIOLATION_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+const VIOLATION_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const USERS_COLLECTION = db.collection("users");
 const REJECT_LEVELS = new Set(["LIKELY", "VERY_LIKELY"]);
 const CONTEXT_ALLOWED_LABELS = new Set([
@@ -163,6 +163,7 @@ async function applyPostImageViolationPenalty({ uid, moderationResult }) {
     tx.set(userRef, {
       reputationScore: reputationAfter,
       reputation: reputationAfter,
+      postModerationViolationCount1d: penaltyMeta.violationNumber,
       postModerationViolationCount7d: penaltyMeta.violationNumber,
       lastPostViolationAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -176,6 +177,7 @@ async function applyPostImageViolationPenalty({ uid, moderationResult }) {
       basePenalty: penaltyMeta.basePenalty,
       multiplier: penaltyMeta.multiplier,
       penalty: penaltyMeta.penalty,
+      violationNumber1d: penaltyMeta.violationNumber,
       violationNumber7d: penaltyMeta.violationNumber,
       reputationBefore,
       reputationAfter,
@@ -193,6 +195,7 @@ async function applyPostImageViolationPenalty({ uid, moderationResult }) {
       penalty: penaltyMeta.penalty,
       basePenalty: penaltyMeta.basePenalty,
       multiplier: penaltyMeta.multiplier,
+      violationNumber1d: penaltyMeta.violationNumber,
       violationNumber7d: penaltyMeta.violationNumber,
       reputationBefore,
       reputationAfter,

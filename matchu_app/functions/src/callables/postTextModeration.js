@@ -22,7 +22,7 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_POST_CONTENT_LENGTH = 300;
 const KEYWORD_MIN_LENGTH = 3;
 const MIN_REPUTATION_TO_POST = 60;
-const VIOLATION_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+const VIOLATION_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const USERS_COLLECTION = db.collection("users");
 const CACHE = new Map();
 
@@ -336,9 +336,9 @@ function buildAllowedResult(reputationScore = null) {
 }
 
 function recurrenceMultiplier(violationNumber) {
-  if (violationNumber <= 1) return 1;
-  if (violationNumber === 2) return 1.5;
-  if (violationNumber === 3) return 2;
+  if (violationNumber <= 2) return 1;
+  if (violationNumber === 3) return 1.5;
+  if (violationNumber === 4) return 2;
   return 3;
 }
 
@@ -347,13 +347,15 @@ function calculatePenalty(severity, priorViolationCount) {
   const basePenalty = VIOLATION_SEVERITIES[normalizedSeverity].basePenalty;
   const violationNumber = Math.max(1, priorViolationCount + 1);
   const multiplier = recurrenceMultiplier(violationNumber);
+  const penalty =
+    violationNumber === 1 ? 0 : Math.ceil(basePenalty * multiplier);
 
   return {
     severity: normalizedSeverity,
     basePenalty,
     violationNumber,
     multiplier,
-    penalty: Math.ceil(basePenalty * multiplier),
+    penalty,
   };
 }
 
@@ -415,6 +417,7 @@ async function applyPostViolationPenalty({ uid, moderationResult, content }) {
     tx.set(userRef, {
       reputationScore: reputationAfter,
       reputation: reputationAfter,
+      postModerationViolationCount1d: penaltyMeta.violationNumber,
       postModerationViolationCount7d: penaltyMeta.violationNumber,
       lastPostViolationAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -428,6 +431,7 @@ async function applyPostViolationPenalty({ uid, moderationResult, content }) {
       basePenalty: penaltyMeta.basePenalty,
       multiplier: penaltyMeta.multiplier,
       penalty: penaltyMeta.penalty,
+      violationNumber1d: penaltyMeta.violationNumber,
       violationNumber7d: penaltyMeta.violationNumber,
       reputationBefore,
       reputationAfter,
@@ -441,6 +445,7 @@ async function applyPostViolationPenalty({ uid, moderationResult, content }) {
       penalty: penaltyMeta.penalty,
       basePenalty: penaltyMeta.basePenalty,
       multiplier: penaltyMeta.multiplier,
+      violationNumber1d: penaltyMeta.violationNumber,
       violationNumber7d: penaltyMeta.violationNumber,
       reputationBefore,
       reputationAfter,
