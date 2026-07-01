@@ -1546,36 +1546,49 @@ class PostService {
 
   Future<void> _ensureImageContentAllowed(File imageFile) async {
     try {
-      final result = await _imageModerationService.moderate(imageFile);
+      final result = await _imageModerationService.moderate(
+        imageFile,
+        context: 'post',
+      );
       if (!result.isViolation) return;
 
       final reason = result.reason?.trim();
+      final penaltyMessage =
+          result.penalty > 0
+              ? ' Bạn bị trừ ${result.penalty} điểm uy tín.'
+              : '';
       throw StateError(
         reason == null || reason.isEmpty
-            ? 'Hinh anh vi pham tieu chuan cong dong.'
-            : 'Hinh anh vi pham tieu chuan cong dong: $reason',
+            ? 'Hình ảnh vi phạm tiêu chuẩn cộng đồng.$penaltyMessage'
+            : 'Hình ảnh vi phạm tiêu chuẩn cộng đồng: $reason.$penaltyMessage',
       );
     } on StateError {
       rethrow;
     } on TimeoutException {
       throw StateError(
-        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     } on FirebaseFunctionsException catch (error) {
       if (error.code == 'unauthenticated') {
-        throw StateError('Ban can dang nhap de dang bai viet.');
+        throw StateError('Bạn cần đăng nhập để đăng bài viết.');
       }
 
       if (error.code == 'invalid-argument') {
-        throw StateError('Hinh anh khong hop le.');
+        throw StateError('Hình ảnh không hợp lệ.');
+      }
+
+      if (error.code == 'failed-precondition') {
+        throw StateError(
+          'Điểm uy tín dưới $minReputationToCreatePost nên bạn không thể đăng bài viết.',
+        );
       }
 
       throw StateError(
-        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     } catch (_) {
       throw StateError(
-        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     }
   }
@@ -1591,7 +1604,7 @@ class PostService {
     if (user.reputationScore >= minReputationToCreatePost) return;
 
     throw StateError(
-      'Diem uy tin duoi $minReputationToCreatePost nen ban khong the dang bai viet.',
+      'Điểm uy tín dưới $minReputationToCreatePost nên bạn không thể đăng bài viết.',
     );
   }
 

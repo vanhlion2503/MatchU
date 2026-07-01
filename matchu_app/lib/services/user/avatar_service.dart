@@ -37,30 +37,30 @@ class AvatarService {
       final reason = result.reason?.trim();
       throw StateError(
         reason == null || reason.isEmpty
-            ? 'Avatar vi pham tieu chuan cong dong.'
-            : 'Avatar vi pham tieu chuan cong dong: $reason',
+            ? 'Avatar vi phạm tiêu chuẩn cộng đồng.'
+            : 'Avatar vi phạm tiêu chuẩn cộng đồng: $reason',
       );
     } on StateError {
       rethrow;
     } on TimeoutException {
       throw StateError(
-        'Khong the kiem duyet avatar luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt avatar lúc này. Vui lòng thử lại sau.',
       );
     } on FirebaseFunctionsException catch (error) {
       if (error.code == 'unauthenticated') {
-        throw StateError('Ban can dang nhap de cap nhat avatar.');
+        throw StateError('Bạn cần đăng nhập để cập nhật avatar.');
       }
 
       if (error.code == 'invalid-argument') {
-        throw StateError('Avatar khong hop le.');
+        throw StateError('Avatar không hợp lệ.');
       }
 
       throw StateError(
-        'Khong the kiem duyet avatar luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt avatar lúc này. Vui lòng thử lại sau.',
       );
     } catch (_) {
       throw StateError(
-        'Khong the kiem duyet avatar luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt avatar lúc này. Vui lòng thử lại sau.',
       );
     }
   }

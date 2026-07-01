@@ -1,9 +1,23 @@
 const vision = require("@google-cloud/vision");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
+const { admin, db } = require("../shared/firebase");
+const { REPUTATION_MAX_SCORE } = require("../../reputation/taskConfig");
+const {
+  clamp,
+  getCurrentReputationScore,
+} = require("../../reputation/types");
+const {
+  MIN_REPUTATION_TO_POST,
+  calculatePenalty,
+} = require("./postTextModeration");
+
 const client = new vision.ImageAnnotatorClient();
 
 const MAX_IMAGE_BASE64_LENGTH = 9 * 1024 * 1024;
+const MIN_REPUTATION_TO_MODERATE_POST_IMAGE = MIN_REPUTATION_TO_POST;
+const VIOLATION_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+const USERS_COLLECTION = db.collection("users");
 const REJECT_LEVELS = new Set(["LIKELY", "VERY_LIKELY"]);
 const CONTEXT_ALLOWED_LABELS = new Set([
   "beach",
@@ -50,10 +64,11 @@ function hasAllowedRacyContext(labels) {
   });
 }
 
-function buildViolationResult(reason, safeSearch, labels = []) {
+function buildViolationResult(reason, severity, safeSearch, labels = []) {
   return {
     isViolation: true,
     reason,
+    severity,
     safeSearch,
     labels,
     source: "google_cloud_vision",
@@ -64,10 +79,128 @@ function buildAllowedResult(safeSearch, labels = []) {
   return {
     isViolation: false,
     reason: null,
+    severity: null,
+    penalty: 0,
+    reputationBefore: null,
+    reputationAfter: null,
+    minReputationToPost: MIN_REPUTATION_TO_MODERATE_POST_IMAGE,
     safeSearch,
     labels,
     source: "google_cloud_vision",
   };
+}
+
+function shouldApplyPostPenalty(request) {
+  return String(request.data?.context || "").trim().toLowerCase() === "post";
+}
+
+async function assertCanPostImage(uid) {
+  const userSnap = await USERS_COLLECTION.doc(uid).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const reputationScore = getCurrentReputationScore(userSnap.data() || {});
+  if (reputationScore < MIN_REPUTATION_TO_MODERATE_POST_IMAGE) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Reputation score is too low to create posts.",
+      {
+        reputationScore,
+        minReputationToPost: MIN_REPUTATION_TO_MODERATE_POST_IMAGE,
+      }
+    );
+  }
+
+  return reputationScore;
+}
+
+function summarizeSafeSearch(safeSearch) {
+  const safe = safeSearch && typeof safeSearch === "object" ? safeSearch : {};
+  return {
+    adult: safe.adult || "UNKNOWN",
+    violence: safe.violence || "UNKNOWN",
+    racy: safe.racy || "UNKNOWN",
+    spoof: safe.spoof || "UNKNOWN",
+    medical: safe.medical || "UNKNOWN",
+  };
+}
+
+async function applyPostImageViolationPenalty({ uid, moderationResult }) {
+  const userRef = USERS_COLLECTION.doc(uid);
+  const violationsRef = userRef.collection("postModerationViolations");
+  const nowMs = Date.now();
+  const cutoffMs = nowMs - VIOLATION_LOOKBACK_MS;
+  const violationRef = violationsRef.doc();
+  let penaltyResult = null;
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, recentViolationsSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(
+        violationsRef
+          .where("createdAtMillis", ">=", cutoffMs)
+          .limit(3)
+      ),
+    ]);
+
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    const userData = userSnap.data() || {};
+    const reputationBefore = getCurrentReputationScore(userData);
+    const penaltyMeta = calculatePenalty(
+      moderationResult.severity,
+      recentViolationsSnap.size
+    );
+    const reputationAfter = clamp(
+      reputationBefore - penaltyMeta.penalty,
+      0,
+      REPUTATION_MAX_SCORE
+    );
+
+    tx.set(userRef, {
+      reputationScore: reputationAfter,
+      reputation: reputationAfter,
+      postModerationViolationCount7d: penaltyMeta.violationNumber,
+      lastPostViolationAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    tx.set(violationRef, {
+      uid,
+      contentType: "image",
+      reason: moderationResult.reason || null,
+      severity: penaltyMeta.severity,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      penalty: penaltyMeta.penalty,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+      safeSearch: summarizeSafeSearch(moderationResult.safeSearch),
+      labels: Array.isArray(moderationResult.labels)
+        ? moderationResult.labels.slice(0, 10)
+        : [],
+      createdAtMillis: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    penaltyResult = {
+      ...moderationResult,
+      severity: penaltyMeta.severity,
+      penalty: penaltyMeta.penalty,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+      minReputationToPost: MIN_REPUTATION_TO_MODERATE_POST_IMAGE,
+    };
+  });
+
+  return penaltyResult;
 }
 
 async function runSafeSearch(base64Image) {
@@ -118,25 +251,37 @@ const moderateImageContent = onCall(
       throw new HttpsError("invalid-argument", "Image content is too large.");
     }
 
+    const applyPostPenalty = shouldApplyPostPenalty(request);
+    if (applyPostPenalty) {
+      await assertCanPostImage(request.auth.uid);
+    }
+
     try {
       const safeSearch = await runSafeSearch(base64Image);
+      let moderationResult = null;
 
       if (isRejectedLikelihood(safeSearch.adult)) {
-        return buildViolationResult(
+        moderationResult = buildViolationResult(
           "Hình ảnh có nội dung người lớn không phù hợp.",
+          "severe",
           safeSearch
         );
-      }
-
-      if (isRejectedLikelihood(safeSearch.violence)) {
-        return buildViolationResult(
+      } else if (isRejectedLikelihood(safeSearch.violence)) {
+        moderationResult = buildViolationResult(
           "Hình ảnh có nội dung bạo lực không phù hợp.",
+          "critical",
           safeSearch
         );
+      } else if (safeSearch.racy !== "VERY_LIKELY") {
+        return buildAllowedResult(safeSearch);
       }
 
-      if (safeSearch.racy !== "VERY_LIKELY") {
-        return buildAllowedResult(safeSearch);
+      if (moderationResult) {
+        if (!applyPostPenalty) return moderationResult;
+        return applyPostImageViolationPenalty({
+          uid: request.auth.uid,
+          moderationResult,
+        });
       }
 
       const labels = await runLabelDetection(base64Image);
@@ -144,12 +289,21 @@ const moderateImageContent = onCall(
         return buildAllowedResult(safeSearch, labels);
       }
 
-      return buildViolationResult(
+      moderationResult = buildViolationResult(
         "Hình ảnh có nội dung khiêu gợi, không phù hợp với ngữ cảnh.",
+        "moderate",
         safeSearch,
         labels
       );
+
+      if (!applyPostPenalty) return moderationResult;
+      return applyPostImageViolationPenalty({
+        uid: request.auth.uid,
+        moderationResult,
+      });
     } catch (error) {
+      if (error instanceof HttpsError) throw error;
+
       console.error("Image moderation failed:", {
         uid: request.auth.uid,
         error: error?.message || String(error),

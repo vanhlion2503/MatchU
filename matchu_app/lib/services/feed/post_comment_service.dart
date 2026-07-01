@@ -575,30 +575,30 @@ class PostCommentService {
       final reason = result.reason?.trim();
       throw StateError(
         reason == null || reason.isEmpty
-            ? 'Hinh anh binh luan vi pham tieu chuan cong dong.'
-            : 'Hinh anh binh luan vi pham tieu chuan cong dong: $reason',
+            ? 'Hình ảnh bình luận vi phạm tiêu chuẩn cộng đồng.'
+            : 'Hình ảnh bình luận vi phạm tiêu chuẩn cộng đồng: $reason',
       );
     } on StateError {
       rethrow;
     } on TimeoutException {
       throw StateError(
-        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     } on FirebaseFunctionsException catch (error) {
       if (error.code == 'unauthenticated') {
-        throw StateError('Ban can dang nhap de binh luan.');
+        throw StateError('Bạn cần đăng nhập để bình luận.');
       }
 
       if (error.code == 'invalid-argument') {
-        throw StateError('Hinh anh khong hop le.');
+        throw StateError('Hình ảnh không hợp lệ.');
       }
 
       throw StateError(
-        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     } catch (_) {
       throw StateError(
-        'Khong the kiem duyet hinh anh luc nay. Vui long thu lai sau.',
+        'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     }
   }
