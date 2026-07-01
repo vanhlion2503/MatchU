@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -11,6 +13,7 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/post_page_result.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/services/feed/post_text_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -20,10 +23,13 @@ class PostService {
     FirebaseAuth? auth,
     FirebaseStorage? storage,
     UserService? userService,
+    PostTextModerationService? textModerationService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
-       _userService = userService ?? UserService();
+       _userService = userService ?? UserService(),
+       _textModerationService =
+           textModerationService ?? PostTextModerationService();
 
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
@@ -36,6 +42,7 @@ class PostService {
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
   final UserService _userService;
+  final PostTextModerationService _textModerationService;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -614,6 +621,8 @@ class PostService {
       throw StateError('Bài viết cần có nội dung hoặc media.');
     }
 
+    await _ensureTextContentAllowed(normalizedContent);
+
     final uploadedRefs = <Reference>[];
 
     try {
@@ -966,6 +975,8 @@ class PostService {
     if (postType.requiresReference && referencePost == null) {
       throw StateError('Dạng bài này cần có bài viết gốc.');
     }
+
+    await _ensureTextContentAllowed(normalizedContent);
 
     final author = await _resolveCurrentAuthor();
     final normalizedTags =
@@ -1482,6 +1493,44 @@ class PostService {
   String _repostDocId(String sourcePostId) {
     final sanitized = sourcePostId.trim().replaceAll('/', '_');
     return 'repost_${uid}_$sanitized';
+  }
+
+  Future<void> _ensureTextContentAllowed(String content) async {
+    if (content.trim().isEmpty) return;
+
+    try {
+      final result = await _textModerationService.moderate(content);
+      if (!result.isViolation) return;
+
+      final reason = result.reason?.trim();
+      throw StateError(
+        reason == null || reason.isEmpty
+            ? 'Nội dung bài viết vi phạm tiêu chuẩn cộng đồng.'
+            : 'Nội dung bài viết vi phạm tiêu chuẩn cộng đồng: $reason',
+      );
+    } on StateError {
+      rethrow;
+    } on TimeoutException {
+      throw StateError(
+        'Không thể kiểm duyệt nội dung lúc này. Vui lòng thử lại sau.',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'unauthenticated') {
+        throw StateError('Bạn cần đăng nhập để đăng bài viết.');
+      }
+
+      if (error.code == 'invalid-argument') {
+        throw StateError('Nội dung bài viết không hợp lệ.');
+      }
+
+      throw StateError(
+        'Không thể kiểm duyệt nội dung lúc này. Vui lòng thử lại sau.',
+      );
+    } catch (_) {
+      throw StateError(
+        'Không thể kiểm duyệt nội dung lúc này. Vui lòng thử lại sau.',
+      );
+    }
   }
 
   List<String> _normalizeTags(List<String> tags) {

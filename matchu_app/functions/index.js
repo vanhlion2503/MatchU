@@ -2,6 +2,9 @@ require("./src/shared/firebase");
 
 const { getTurnCredentials } = require("./src/callables/getTurnCredentials");
 const {
+  moderatePostText,
+} = require("./src/callables/postTextModeration");
+const {
   storeFaceRecoveryBackup,
   getFaceRecoveryBackupStatus,
   recoverBackupKeyWithFace,
@@ -42,6 +45,7 @@ const {
 } = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
+exports.moderatePostText = moderatePostText;
 exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
 exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;
 exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;
