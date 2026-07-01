@@ -95,14 +95,26 @@ class _HistoryTile extends StatelessWidget {
         item.isPenalty ? theme.colorScheme.error : const Color(0xFF1E9E55);
     final bgColor = color.withValues(alpha: 0.1);
     final pointsText = item.points > 0 ? "+${item.points}" : "${item.points}";
-    final description = item.description.trim();
+    final title = _displayTitle(item);
+    final description = _displayDescription(item);
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.45)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withValues(alpha: 0.1),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,7 +139,7 @@ class _HistoryTile extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        item.title,
+                        title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -268,6 +280,74 @@ String _formatDateTime(int millis) {
   final time = "${date.hour}:$minute";
   if (isToday) return "Hôm nay $time";
   return "${date.day}/${date.month}/${date.year} $time";
+}
+
+String _displayTitle(ReputationHistoryItem item) {
+  if (item.isPenalty) {
+    switch (item.source) {
+      case "postModeration":
+        return "Vi phạm bài viết";
+      case "tempChatModeration":
+        return "Vi phạm chat tạm";
+      default:
+        return "Trừ điểm uy tín";
+    }
+  }
+
+  switch (item.taskId) {
+    case "loginDaily":
+      return "Đăng nhập hằng ngày";
+    case "appUsage15Minutes":
+      return "Sử dụng app 15 phút";
+    case "tempChat3Rooms3Minutes":
+      return "Chat tạm đủ thời lượng";
+    case "mutualLikeLongChat5Times":
+      return "Match và chuyển sang chat dài";
+    case "receivedFiveStarRating":
+      return "Nhận đánh giá 5 sao";
+    default:
+      return "Cộng điểm uy tín";
+  }
+}
+
+String _displayDescription(ReputationHistoryItem item) {
+  final raw = item.description.trim();
+
+  if (item.source == "postModeration") {
+    if (raw.isEmpty ||
+        raw == "Noi dung bai viet vi pham tieu chuan cong dong") {
+      return "Nội dung bài viết vi phạm tiêu chuẩn cộng đồng.";
+    }
+    return raw;
+  }
+
+  if (item.source == "tempChatModeration") {
+    if (raw.isEmpty || raw == "Vi pham tieu chuan cong dong") {
+      return "Tin nhắn vi phạm tiêu chuẩn cộng đồng.";
+    }
+    return _tempChatReasonLabel(raw);
+  }
+
+  if (!item.isPenalty) {
+    return "Nhận điểm từ nhiệm vụ uy tín.";
+  }
+
+  return raw;
+}
+
+String _tempChatReasonLabel(String reason) {
+  switch (reason) {
+    case "sexual":
+      return "Nội dung nhạy cảm hoặc tình dục.";
+    case "hate_or_threat":
+      return "Đe dọa, bạo lực hoặc xúc phạm ác ý.";
+    case "grooming":
+      return "Nội dung không an toàn.";
+    case "scam":
+      return "Nội dung có dấu hiệu lừa đảo.";
+    default:
+      return reason;
+  }
 }
 
 String _severityLabel(String severity) {
