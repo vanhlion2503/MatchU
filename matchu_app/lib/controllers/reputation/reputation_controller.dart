@@ -13,6 +13,10 @@ class ReputationController extends GetxController {
   final isLoading = false.obs;
   final RxnString isClaimingTaskId = RxnString();
   final RxnString errorMessage = RxnString();
+  final RxList<ReputationHistoryItem> historyItems =
+      <ReputationHistoryItem>[].obs;
+  final isLoadingHistory = false.obs;
+  final RxnString historyErrorMessage = RxnString();
 
   @override
   void onInit() {
@@ -61,6 +65,23 @@ class ReputationController extends GetxController {
       );
     } finally {
       isClaimingTaskId.value = null;
+    }
+  }
+
+  Future<void> loadHistory({bool force = false}) async {
+    if (isLoadingHistory.value) return;
+    if (!force && historyItems.isNotEmpty) return;
+
+    isLoadingHistory.value = true;
+    historyErrorMessage.value = null;
+
+    try {
+      final response = await _service.getHistory();
+      historyItems.assignAll(response.items);
+    } catch (error) {
+      historyErrorMessage.value = _toDisplayError(error);
+    } finally {
+      isLoadingHistory.value = false;
     }
   }
 

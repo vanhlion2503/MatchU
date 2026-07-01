@@ -30,6 +30,10 @@ const MINUTE_MS = 60 * 1000;
 const APP_USAGE_REWARD_INTERVAL_MS =
   APP_USAGE_REWARD_INTERVAL_MINUTES * MINUTE_MS;
 const MAX_SESSION_ELAPSED_MS = 5 * MINUTE_MS;
+const HISTORY_DEFAULT_LIMIT = 50;
+const HISTORY_MAX_LIMIT = 100;
+const HISTORY_DAILY_DOC_LIMIT = 60;
+const HISTORY_CLAIM_LOGS_PER_DAY_LIMIT = 20;
 const SESSION_END_SOURCES = new Set([
   "pause",
   "inactive",
@@ -70,12 +74,120 @@ function sanitizeSource(rawValue) {
   return source.slice(0, 32);
 }
 
+function sanitizeHistoryLimit(rawLimit) {
+  return clamp(toInt(rawLimit, HISTORY_DEFAULT_LIMIT), 1, HISTORY_MAX_LIMIT);
+}
+
 function shouldKeepSessionActive(source) {
   return !SESSION_END_SOURCES.has(source);
 }
 
 function buildDailyRef(uid, dateKey) {
   return USERS_COLLECTION.doc(uid).collection("reputationDaily").doc(dateKey);
+}
+
+function timestampToMillis(value) {
+  const millis = toMillis(value);
+  return millis == null ? null : millis;
+}
+
+function taskHistoryTitle(taskId) {
+  switch (taskId) {
+    case "loginDaily":
+      return "Dang nhap hang ngay";
+    case "appUsage15Minutes":
+      return "Su dung app 15 phut";
+    case "tempChat3Rooms3Minutes":
+      return "Chat tam 3 phong tren 3 phut";
+    case "mutualLikeLongChat5Times":
+      return "Match va chuyen sang chat dai";
+    case "receivedFiveStarRating":
+      return "Nhan danh gia 5 sao";
+    default:
+      return "Nhiem vu uy tin";
+  }
+}
+
+function buildEarnHistoryItem({ doc, dailyDoc }) {
+  const data = doc.data() || {};
+  const awarded = Math.max(0, toInt(data.awarded, 0));
+  if (awarded <= 0) return null;
+
+  const taskId = typeof data.taskId === "string" ? data.taskId : "";
+  return {
+    id: `claim_${dailyDoc.id}_${doc.id}`,
+    type: "earn",
+    source: "reputationTask",
+    title: taskHistoryTitle(taskId),
+    description: "Nhan diem tu nhiem vu uy tin",
+    points: awarded,
+    reason: typeof data.reason === "string" ? data.reason : null,
+    taskId,
+    reputationBefore: toInt(data.reputationBefore, 0),
+    reputationAfter: toInt(data.reputationAfter, 0),
+    createdAtMillis:
+      timestampToMillis(data.createdAt) ??
+      timestampToMillis(doc.createTime) ??
+      timestampToMillis(dailyDoc.createTime) ??
+      0,
+  };
+}
+
+function buildPostPenaltyHistoryItem(doc) {
+  const data = doc.data() || {};
+  const penalty = Math.max(0, toInt(data.penalty, 0));
+  if (penalty <= 0) return null;
+
+  return {
+    id: `postPenalty_${doc.id}`,
+    type: "penalty",
+    source: "postModeration",
+    title: "Vi pham bai viet",
+    description:
+      typeof data.reason === "string" && data.reason.trim()
+        ? data.reason.trim()
+        : "Noi dung bai viet vi pham tieu chuan cong dong",
+    points: -penalty,
+    reason: typeof data.reason === "string" ? data.reason : null,
+    severity: typeof data.severity === "string" ? data.severity : null,
+    reputationBefore: toInt(data.reputationBefore, 0),
+    reputationAfter: toInt(data.reputationAfter, 0),
+    createdAtMillis:
+      toInt(data.createdAtMillis, 0) ||
+      timestampToMillis(data.createdAt) ||
+      timestampToMillis(doc.createTime) ||
+      0,
+  };
+}
+
+function buildGenericPenaltyHistoryItem(doc) {
+  const data = doc.data() || {};
+  const penalty = Math.max(0, toInt(data.penalty, 0));
+  if (penalty <= 0) return null;
+
+  return {
+    id: `penalty_${doc.id}`,
+    type: "penalty",
+    source: typeof data.source === "string" ? data.source : "moderation",
+    title:
+      typeof data.title === "string" && data.title.trim()
+        ? data.title.trim()
+        : "Tru diem uy tin",
+    description:
+      typeof data.reason === "string" && data.reason.trim()
+        ? data.reason.trim()
+        : "Vi pham tieu chuan cong dong",
+    points: -penalty,
+    reason: typeof data.reason === "string" ? data.reason : null,
+    severity: typeof data.severity === "string" ? data.severity : null,
+    reputationBefore: toInt(data.reputationBefore, 0),
+    reputationAfter: toInt(data.reputationAfter, 0),
+    createdAtMillis:
+      toInt(data.createdAtMillis, 0) ||
+      timestampToMillis(data.createdAt) ||
+      timestampToMillis(doc.createTime) ||
+      0,
+  };
 }
 
 function serializeTasksForWrite(tasks, claimTimestampTaskId = null) {
@@ -787,8 +899,78 @@ const claimReputationTask = onCall(
   }
 );
 
+const getReputationHistory = onCall(async (request) => {
+  const uid = assertAuthenticated(request);
+  const payload = parsePayload(request.data);
+  const limit = sanitizeHistoryLimit(payload.limit);
+  const userRef = USERS_COLLECTION.doc(uid);
+
+  const userSnap = await userRef.get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const dailyDocsSnap = await userRef
+    .collection("reputationDaily")
+    .orderBy("dateKey", "desc")
+    .limit(HISTORY_DAILY_DOC_LIMIT)
+    .get();
+
+  const earnItems = [];
+  await Promise.all(
+    dailyDocsSnap.docs.map(async (dailyDoc) => {
+      const claimLogsSnap = await dailyDoc.ref
+        .collection("claimLogs")
+        .orderBy("createdAt", "desc")
+        .limit(HISTORY_CLAIM_LOGS_PER_DAY_LIMIT)
+        .get();
+
+      for (const claimDoc of claimLogsSnap.docs) {
+        const item = buildEarnHistoryItem({ doc: claimDoc, dailyDoc });
+        if (item) earnItems.push(item);
+      }
+    })
+  );
+
+  const [postPenaltySnap, genericPenaltySnap] = await Promise.all([
+    userRef
+      .collection("postModerationViolations")
+      .orderBy("createdAtMillis", "desc")
+      .limit(limit)
+      .get(),
+    userRef
+      .collection("reputationPenaltyLogs")
+      .orderBy("createdAtMillis", "desc")
+      .limit(limit)
+      .get(),
+  ]);
+
+  const items = [];
+  for (const doc of postPenaltySnap.docs) {
+    const item = buildPostPenaltyHistoryItem(doc);
+    if (item) items.push(item);
+  }
+  for (const doc of genericPenaltySnap.docs) {
+    const item = buildGenericPenaltyHistoryItem(doc);
+    if (item) items.push(item);
+  }
+  items.push(...earnItems);
+
+  items.sort((a, b) => {
+    const byTime = (b.createdAtMillis || 0) - (a.createdAtMillis || 0);
+    if (byTime !== 0) return byTime;
+    return String(b.id).localeCompare(String(a.id));
+  });
+
+  return {
+    items: items.slice(0, limit),
+    limit,
+  };
+});
+
 module.exports = {
   touchReputationDailyOnAppOpen,
   getReputationDailyState,
   claimReputationTask,
+  getReputationHistory,
 };

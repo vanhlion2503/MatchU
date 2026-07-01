@@ -1,6 +1,7 @@
 const { GoogleGenAI, Type } = require("@google/genai");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
+const { admin, db } = require("../shared/firebase");
 const { GEMINI_API_KEY } = require("../shared/secrets");
 const {
   AI_MODERATION_CACHE_MAX_ENTRIES,
@@ -11,11 +12,26 @@ const {
   LINK_PATTERN,
   PHONE_PATTERN,
 } = require("../shared/moderationConstants");
+const { REPUTATION_MAX_SCORE } = require("../../reputation/taskConfig");
+const {
+  clamp,
+  getCurrentReputationScore,
+} = require("../../reputation/types");
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_POST_CONTENT_LENGTH = 300;
 const KEYWORD_MIN_LENGTH = 3;
+const MIN_REPUTATION_TO_POST = 60;
+const VIOLATION_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+const USERS_COLLECTION = db.collection("users");
 const CACHE = new Map();
+
+const VIOLATION_SEVERITIES = Object.freeze({
+  minor: Object.freeze({ basePenalty: 1 }),
+  moderate: Object.freeze({ basePenalty: 3 }),
+  severe: Object.freeze({ basePenalty: 5 }),
+  critical: Object.freeze({ basePenalty: 7 }),
+});
 
 function normalizeText(value) {
   if (typeof value !== "string") return "";
@@ -130,23 +146,28 @@ function containsKeyword(textVariants, keywordMatcher) {
   const compactText =
     typeof textVariants.compact === "string" ? textVariants.compact : "";
 
-  const spacedKeywords = Array.isArray(keywordMatcher.spaced)
-    ? keywordMatcher.spaced
-    : [];
-  for (const keyword of spacedKeywords) {
-    if (typeof keyword !== "string" || !keyword) continue;
-    if (spacedText.includes(keyword)) return true;
+  for (const keyword of keywordMatcher.spaced || []) {
+    if (typeof keyword === "string" && keyword && spacedText.includes(keyword)) {
+      return true;
+    }
   }
 
-  const compactKeywords = Array.isArray(keywordMatcher.compact)
-    ? keywordMatcher.compact
-    : [];
-  for (const keyword of compactKeywords) {
-    if (typeof keyword !== "string" || !keyword) continue;
-    if (compactText.includes(keyword)) return true;
+  for (const keyword of keywordMatcher.compact || []) {
+    if (typeof keyword === "string" && keyword && compactText.includes(keyword)) {
+      return true;
+    }
   }
 
   return false;
+}
+
+function violationResult(reason, severity, source = "fallback_rule") {
+  return {
+    isViolation: true,
+    reason,
+    severity: normalizeViolationSeverity(severity),
+    source,
+  };
 }
 
 function fallbackRuleCheck(content) {
@@ -154,42 +175,38 @@ function fallbackRuleCheck(content) {
   const ruleText = normalizeRuleCheckText(content);
 
   if (!normalizedText) {
-    return { isViolation: false, reason: null, source: "fallback_rule" };
+    return { isViolation: false, reason: null, severity: null, source: "fallback_rule" };
   }
 
   if (containsKeyword(ruleText, DANGEROUS_KEYWORD_MATCHERS.sexual)) {
-    return {
-      isViolation: true,
-      reason: "Nội dung khiêu dâm, tình dục: phát hiện từ khóa nhạy cảm",
-      source: "fallback_rule",
-    };
+    return violationResult(
+      "Nội dung khiêu dâm hoặc tình dục: phát hiện từ khóa nhạy cảm",
+      "severe"
+    );
   }
 
   if (containsKeyword(ruleText, DANGEROUS_KEYWORD_MATCHERS.hate_or_threat)) {
-    return {
-      isViolation: true,
-      reason: "Đe dọa, bạo lực hoặc xúc phạm ác ý: phát hiện từ khóa nguy hiểm",
-      source: "fallback_rule",
-    };
+    return violationResult(
+      "Đe dọa, bạo lực hoặc xúc phạm ác ý: phát hiện từ khóa nguy hiểm",
+      "critical"
+    );
   }
 
   if (containsKeyword(ruleText, DANGEROUS_KEYWORD_MATCHERS.grooming)) {
-    return {
-      isViolation: true,
-      reason: "Nội dung không an toàn: phát hiện từ khóa nguy hiểm",
-      source: "fallback_rule",
-    };
+    return violationResult(
+      "Nội dung không an toàn: phát hiện từ khóa nguy hiểm",
+      "critical"
+    );
   }
 
   if (LINK_PATTERN.test(normalizedText) || PHONE_PATTERN.test(normalizedText)) {
-    return {
-      isViolation: true,
-      reason: "Thông tin sai lệch nghiêm trọng, lừa đảo: phát hiện liên kết hoặc số điện thoại",
-      source: "fallback_rule",
-    };
+    return violationResult(
+      "Thông tin sai lệch nghiêm trọng hoặc lừa đảo: phát hiện liên kết/số điện thoại",
+      "severe"
+    );
   }
 
-  return { isViolation: false, reason: null, source: "fallback_rule" };
+  return { isViolation: false, reason: null, severity: null, source: "fallback_rule" };
 }
 
 function getCachedResult(key) {
@@ -226,18 +243,26 @@ function stripJsonFence(text) {
     .trim();
 }
 
+function normalizeViolationSeverity(value) {
+  const severity =
+    typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (VIOLATION_SEVERITIES[severity]) return severity;
+  return "moderate";
+}
+
 function normalizeGeminiResult(raw) {
   const isViolation = raw?.isViolation === true || raw?.violation === true;
   const reason =
     typeof raw?.reason === "string" ? raw.reason.trim().slice(0, 500) : "";
 
   if (!isViolation) {
-    return { isViolation: false, reason: null };
+    return { isViolation: false, reason: null, severity: null };
   }
 
   return {
     isViolation: true,
-    reason: reason || "Nội dung vi phạm tiêu chuẩn cộng đồng.",
+    reason: reason || "Noi dung bai viet vi pham tieu chuan cong dong.",
+    severity: normalizeViolationSeverity(raw?.severity),
   };
 }
 
@@ -264,35 +289,166 @@ function isGeminiQuotaOrBillingError(error) {
 }
 
 function buildPrompt(content) {
-  return `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội thông minh và thấu hiểu ngữ cảnh cho người dùng Việt Nam.
-Hãy phân tích nội dung sau và đánh giá xem có thực sự vi phạm tiêu chuẩn cộng đồng không.
+  return `You are a Vietnamese social-feed moderation system.
+Analyze the following post content and decide whether it clearly violates community standards.
 
-Nội dung cần kiểm tra:
+Content:
 """
 ${content}
 """
 
-Các tiêu chí vi phạm:
-1. Ngôn từ thù ghét, phân biệt chủng tộc, giới tính, tôn giáo, phân biệt vùng miền
-2. Đe dọa, bạo lực, kích động bạo lực có chủ đích
-3. Nội dung khiêu dâm, tình dục
-4. Quấy rối, bắt nạt, xúc phạm cá nhân có chủ đích tấn công ác ý
-5. Tự gây hại, khuyến khích tự tử hoặc tự làm đau bản thân
-6. Thông tin sai lệch nghiêm trọng, lừa đảo
+Violation criteria:
+1. Hate speech or discrimination.
+2. Threats, violence, or incitement.
+3. Sexual or pornographic content.
+4. Harassment, bullying, or targeted personal insults.
+5. Self-harm encouragement.
+6. Serious misinformation, fraud, impersonation, scam, illegal content.
+7. Spam, repeated low-quality content, or wrong category.
 
-QUY TẮC QUAN TRỌNG VỀ NGỮ CẢNH:
-- Phải phân biệt lời chửi rủa/tấn công ác ý thật sự với lời nói đùa, slang, teencode thông thường của bạn bè.
-- Chỉ đánh dấu vi phạm khi nội dung thể hiện ý định vi phạm rõ ràng theo các tiêu chí trên.
-- Không đánh dấu vi phạm chỉ vì có từ lóng nhẹ nếu ngữ cảnh không tấn công, không khiêu dâm, không đe dọa.
+Context rules:
+- Distinguish malicious attacks from jokes, slang, and casual friend banter.
+- Mark violation only when the intent is clear.
+- Do not mark mild slang as violation when there is no attack, sexual content, or threat.
 
-Quy tắc trả kết quả:
-- Chỉ trả về JSON hợp lệ, không markdown.
-- Schema: {"isViolation": boolean, "reason": string|null}
-- Nếu không vi phạm: {"isViolation": false, "reason": null}
-- Nếu vi phạm: reason phải là tên tiêu chí vi phạm + trích dẫn CHÍNH XÁC từ/cụm từ vi phạm trong nội dung.
-- Nếu cùng 1 tiêu chí có nhiều từ vi phạm: gộp các từ lại, phân cách bằng dấu phẩy.
-- Nếu vi phạm nhiều tiêu chí khác nhau: phân cách bằng dấu "; ".
-- Ví dụ reason: "Quấy rối, xúc phạm cá nhân: \\"đồ ngu\\", \\"đồ ăn hại\\"; Đe dọa, bạo lực: \\"tao giết mày\\"".`;
+Severity:
+- minor: wrong category, light spam, low-quality content.
+- moderate: insults, inflammatory content, repeated spam.
+- severe: harassment, light scam, harmful content.
+- critical: clear fraud, impersonation, threats, illegal content.
+
+Return only valid JSON, no markdown.
+Schema: {"isViolation": boolean, "reason": string|null, "severity": "minor"|"moderate"|"severe"|"critical"|null}
+If not violation: {"isViolation": false, "reason": null, "severity": null}
+If violation: reason must include the violated criterion and exact quoted offending word/phrase from the content.`;
+}
+
+function buildAllowedResult(reputationScore = null) {
+  return {
+    isViolation: false,
+    reason: null,
+    severity: null,
+    penalty: 0,
+    reputationBefore: reputationScore,
+    reputationAfter: reputationScore,
+    minReputationToPost: MIN_REPUTATION_TO_POST,
+  };
+}
+
+function recurrenceMultiplier(violationNumber) {
+  if (violationNumber <= 1) return 1;
+  if (violationNumber === 2) return 1.5;
+  if (violationNumber === 3) return 2;
+  return 3;
+}
+
+function calculatePenalty(severity, priorViolationCount) {
+  const normalizedSeverity = normalizeViolationSeverity(severity);
+  const basePenalty = VIOLATION_SEVERITIES[normalizedSeverity].basePenalty;
+  const violationNumber = Math.max(1, priorViolationCount + 1);
+  const multiplier = recurrenceMultiplier(violationNumber);
+
+  return {
+    severity: normalizedSeverity,
+    basePenalty,
+    violationNumber,
+    multiplier,
+    penalty: Math.ceil(basePenalty * multiplier),
+  };
+}
+
+async function assertCanPost(uid) {
+  const userSnap = await USERS_COLLECTION.doc(uid).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const reputationScore = getCurrentReputationScore(userSnap.data() || {});
+  if (reputationScore < MIN_REPUTATION_TO_POST) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Reputation score is too low to create posts.",
+      {
+        reputationScore,
+        minReputationToPost: MIN_REPUTATION_TO_POST,
+      }
+    );
+  }
+
+  return reputationScore;
+}
+
+async function applyPostViolationPenalty({ uid, moderationResult, content }) {
+  const userRef = USERS_COLLECTION.doc(uid);
+  const violationsRef = userRef.collection("postModerationViolations");
+  const nowMs = Date.now();
+  const cutoffMs = nowMs - VIOLATION_LOOKBACK_MS;
+  const violationRef = violationsRef.doc();
+  let penaltyResult = null;
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, recentViolationsSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(
+        violationsRef
+          .where("createdAtMillis", ">=", cutoffMs)
+          .limit(3)
+      ),
+    ]);
+
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    const userData = userSnap.data() || {};
+    const reputationBefore = getCurrentReputationScore(userData);
+    const penaltyMeta = calculatePenalty(
+      moderationResult.severity,
+      recentViolationsSnap.size
+    );
+    const reputationAfter = clamp(
+      reputationBefore - penaltyMeta.penalty,
+      0,
+      REPUTATION_MAX_SCORE
+    );
+
+    tx.set(userRef, {
+      reputationScore: reputationAfter,
+      reputation: reputationAfter,
+      postModerationViolationCount7d: penaltyMeta.violationNumber,
+      lastPostViolationAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    tx.set(violationRef, {
+      uid,
+      contentPreview: String(content || "").slice(0, 300),
+      reason: moderationResult.reason || null,
+      severity: penaltyMeta.severity,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      penalty: penaltyMeta.penalty,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+      createdAtMillis: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    penaltyResult = {
+      ...moderationResult,
+      severity: penaltyMeta.severity,
+      penalty: penaltyMeta.penalty,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+      minReputationToPost: MIN_REPUTATION_TO_POST,
+    };
+  });
+
+  return penaltyResult;
 }
 
 function getFallbackResult({ cacheKey, content, request, error, logLevel }) {
@@ -333,6 +489,7 @@ const moderatePostText = onCall(
       throw new HttpsError("unauthenticated", "Authentication is required.");
     }
 
+    const uid = request.auth.uid;
     const content =
       typeof request.data?.content === "string" ? request.data.content : "";
     const normalizedContent = content.trim();
@@ -344,22 +501,37 @@ const moderatePostText = onCall(
       );
     }
 
+    const reputationScore = await assertCanPost(uid);
+
     if (shouldFastApprove(normalizedContent)) {
-      return { isViolation: false, reason: null };
+      return buildAllowedResult(reputationScore);
     }
 
     const cacheKey = normalizeText(normalizedContent);
     const cached = cacheKey ? getCachedResult(cacheKey) : null;
-    if (cached) return cached;
+    if (cached) {
+      if (!cached.isViolation) return buildAllowedResult(reputationScore);
+      return applyPostViolationPenalty({
+        uid,
+        moderationResult: cached,
+        content: normalizedContent,
+      });
+    }
 
     const apiKey = (GEMINI_API_KEY.value() || "").trim();
     if (!apiKey) {
-      return getFallbackResult({
+      const fallbackResult = getFallbackResult({
         cacheKey,
         content: normalizedContent,
         request,
         error: new Error("Gemini API key is not configured."),
         logLevel: "warn",
+      });
+      if (!fallbackResult.isViolation) return buildAllowedResult(reputationScore);
+      return applyPostViolationPenalty({
+        uid,
+        moderationResult: fallbackResult,
+        content: normalizedContent,
       });
     }
 
@@ -377,9 +549,14 @@ const moderatePostText = onCall(
             properties: {
               isViolation: { type: Type.BOOLEAN },
               reason: { type: Type.STRING, nullable: true },
+              severity: {
+                type: Type.STRING,
+                nullable: true,
+                enum: ["minor", "moderate", "severe", "critical"],
+              },
             },
-            required: ["isViolation", "reason"],
-            propertyOrdering: ["isViolation", "reason"],
+            required: ["isViolation", "reason", "severity"],
+            propertyOrdering: ["isViolation", "reason", "severity"],
           },
         },
       });
@@ -389,26 +566,30 @@ const moderatePostText = onCall(
         setCachedResult(cacheKey, moderationResult);
       }
 
-      return moderationResult;
+      if (!moderationResult.isViolation) {
+        return buildAllowedResult(reputationScore);
+      }
+
+      return applyPostViolationPenalty({
+        uid,
+        moderationResult,
+        content: normalizedContent,
+      });
     } catch (error) {
       if (error instanceof HttpsError) throw error;
 
-      if (isGeminiQuotaOrBillingError(error)) {
-        return getFallbackResult({
-          cacheKey,
-          content: normalizedContent,
-          request,
-          error,
-          logLevel: "warn",
-        });
-      }
-
-      return getFallbackResult({
+      const fallbackResult = getFallbackResult({
         cacheKey,
         content: normalizedContent,
         request,
         error,
-        logLevel: "error",
+        logLevel: isGeminiQuotaOrBillingError(error) ? "warn" : "error",
+      });
+      if (!fallbackResult.isViolation) return buildAllowedResult(reputationScore);
+      return applyPostViolationPenalty({
+        uid,
+        moderationResult: fallbackResult,
+        content: normalizedContent,
       });
     }
   }
@@ -416,4 +597,6 @@ const moderatePostText = onCall(
 
 module.exports = {
   moderatePostText,
+  MIN_REPUTATION_TO_POST,
+  calculatePenalty,
 };

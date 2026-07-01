@@ -553,6 +553,21 @@ service cloud.firestore {
         return isSignedIn() && request.resource.data.authorId == request.auth.uid;
       }
 
+      function authorReputationScore() {
+        let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+        return userData.reputationScore is number
+          ? userData.reputationScore
+          : (
+            userData.reputation is number
+              ? userData.reputation
+              : 100
+          );
+      }
+
+      function canCreatePostByReputation() {
+        return isSignedIn() && authorReputationScore() >= 60;
+      }
+
       function isOwnRepostDocPath() {
         return isSignedIn()
           && postId.matches('^repost_' + request.auth.uid + '_.*$');
@@ -620,6 +635,7 @@ service cloud.firestore {
 
       allow read: if canReadPost();
       allow create: if isAuthorCreate()
+        && canCreatePostByReputation()
         && hasValidPostVisibilityForWrite(request.resource.data);
       allow update: if (
           isAuthor()
@@ -1439,5 +1455,4 @@ service cloud.firestore {
 
   }
 }
-
 

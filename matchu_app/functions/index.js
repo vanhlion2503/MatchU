@@ -14,6 +14,7 @@ const {
   touchReputationDailyOnAppOpen,
   getReputationDailyState,
   claimReputationTask,
+  getReputationHistory,
 } = require("./reputation/callables");
 const {
   migrateTempChatMessages,
@@ -53,6 +54,7 @@ exports.deleteFaceRecoveryBackup = deleteFaceRecoveryBackup;
 exports.touchReputationDailyOnAppOpen = touchReputationDailyOnAppOpen;
 exports.getReputationDailyState = getReputationDailyState;
 exports.claimReputationTask = claimReputationTask;
+exports.getReputationHistory = getReputationHistory;
 exports.queueChatMessageNotification = queueChatMessageNotification;
 exports.dispatchQueuedChatNotification = dispatchQueuedChatNotification;
 exports.cleanupStaleUserDevices = cleanupStaleUserDevices;

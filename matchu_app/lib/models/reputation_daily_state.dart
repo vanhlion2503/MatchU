@@ -147,6 +147,75 @@ class ReputationClaimResponse {
   const ReputationClaimResponse({required this.claim, required this.state});
 }
 
+class ReputationHistoryItem {
+  final String id;
+  final String type;
+  final String source;
+  final String title;
+  final String description;
+  final int points;
+  final String? reason;
+  final String? severity;
+  final String? taskId;
+  final int reputationBefore;
+  final int reputationAfter;
+  final int createdAtMillis;
+
+  const ReputationHistoryItem({
+    required this.id,
+    required this.type,
+    required this.source,
+    required this.title,
+    required this.description,
+    required this.points,
+    required this.reason,
+    required this.severity,
+    required this.taskId,
+    required this.reputationBefore,
+    required this.reputationAfter,
+    required this.createdAtMillis,
+  });
+
+  factory ReputationHistoryItem.fromMap(Map<String, dynamic> data) {
+    return ReputationHistoryItem(
+      id: (data["id"] ?? "").toString(),
+      type: (data["type"] ?? "").toString(),
+      source: (data["source"] ?? "").toString(),
+      title: (data["title"] ?? "Cập nhật uy tín").toString(),
+      description: (data["description"] ?? "").toString(),
+      points: _asInt(data["points"]),
+      reason: _asNullableString(data["reason"]),
+      severity: _asNullableString(data["severity"]),
+      taskId: _asNullableString(data["taskId"]),
+      reputationBefore: _asInt(data["reputationBefore"], min: 0, max: 100),
+      reputationAfter: _asInt(data["reputationAfter"], min: 0, max: 100),
+      createdAtMillis: _asInt(data["createdAtMillis"], min: 0),
+    );
+  }
+
+  bool get isPenalty => points < 0;
+}
+
+class ReputationHistoryResponse {
+  final List<ReputationHistoryItem> items;
+
+  const ReputationHistoryResponse({required this.items});
+
+  factory ReputationHistoryResponse.fromMap(Map<String, dynamic> data) {
+    final rawItems = data["items"];
+    final items = <ReputationHistoryItem>[];
+    if (rawItems is List) {
+      for (final item in rawItems) {
+        if (item is! Map) continue;
+        items.add(
+          ReputationHistoryItem.fromMap(Map<String, dynamic>.from(item)),
+        );
+      }
+    }
+    return ReputationHistoryResponse(items: items);
+  }
+}
+
 int _asInt(dynamic value, {int fallback = 0, int? min, int? max}) {
   int parsed;
   if (value is int) {
@@ -181,4 +250,10 @@ bool _asBool(dynamic value, {bool fallback = false}) {
     if (normalized == "false" || normalized == "0") return false;
   }
   return fallback;
+}
+
+String? _asNullableString(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
 }

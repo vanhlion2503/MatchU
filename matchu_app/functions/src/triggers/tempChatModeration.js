@@ -336,6 +336,7 @@ async function applyViolationPenaltyAndBlock({
     const currentReputation = getCurrentReputationScore(userData);
     const penalty = calculatePenalty(nextCount);
     const nextReputation = Math.max(0, currentReputation - penalty);
+    const nowMs = Date.now();
 
     tx.set(
       userRef,
@@ -345,6 +346,27 @@ async function applyViolationPenaltyAndBlock({
       },
       { merge: true }
     );
+
+    if (penalty > 0) {
+      const penaltyLogRef = userRef
+        .collection("reputationPenaltyLogs")
+        .doc(`tempChat_${roomId}_${snap.id}`);
+      tx.set(penaltyLogRef, {
+        source: "tempChatModeration",
+        title: "Vi pham chat tam",
+        roomId,
+        messageId: snap.id,
+        reason,
+        blockedBy,
+        aiScore: isNumber(aiScore) ? aiScore : null,
+        penalty,
+        violationCount: nextCount,
+        reputationBefore: currentReputation,
+        reputationAfter: nextReputation,
+        createdAtMillis: nowMs,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
 
     tx.set(
       snap.ref,

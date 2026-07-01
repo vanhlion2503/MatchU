@@ -34,6 +34,7 @@ class PostService {
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
   static const int maxMediaItems = 6;
+  static const int minReputationToCreatePost = 60;
   static const int _whereInLimit = 30;
   static const String _authorPublicScope = 'public';
   static const String _authorFollowersScope = 'followers';
@@ -976,6 +977,7 @@ class PostService {
       throw StateError('Dạng bài này cần có bài viết gốc.');
     }
 
+    await _ensureCanCreatePostByReputation();
     await _ensureTextContentAllowed(normalizedContent);
 
     final author = await _resolveCurrentAuthor();
@@ -1531,6 +1533,21 @@ class PostService {
         'Không thể kiểm duyệt nội dung lúc này. Vui lòng thử lại sau.',
       );
     }
+  }
+
+  Future<void> _ensureCanCreatePostByReputation() async {
+    final user = await _userService.getUser(uid);
+    if (user == null) {
+      throw StateError(
+        'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin ngÆ°á»i dÃ¹ng hiá»‡n táº¡i.',
+      );
+    }
+
+    if (user.reputationScore >= minReputationToCreatePost) return;
+
+    throw StateError(
+      'Diem uy tin duoi $minReputationToCreatePost nen ban khong the dang bai viet.',
+    );
   }
 
   List<String> _normalizeTags(List<String> tags) {

@@ -9,6 +9,7 @@ import 'package:matchu_app/views/reputation/widget/build_received_fire_star_task
 import 'package:matchu_app/views/reputation/widget/build_temp_chat_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/header_card.dart';
 import 'package:matchu_app/views/reputation/widget/reputation_view_shimmer.dart';
+import 'package:matchu_app/views/reputation/reputation_history_view.dart';
 
 class ReputationView extends StatelessWidget {
   const ReputationView({super.key});
@@ -94,13 +95,13 @@ class ReputationView extends StatelessWidget {
                 textTheme: textTheme,
                 fullName: profileController.fullName,
                 isVerified: user.isFaceVerified,
-                rank: profileController.rank,
                 avatarUrl: user.avatarUrl,
                 avatarVersion: user.updatedAt?.millisecondsSinceEpoch ?? 0,
                 reputationScore: reputationScore,
                 todayClaimed: safeClaimed,
                 dailyCap: safeCap,
                 progress: todayProgress,
+                onHistoryTap: () => Get.to(() => const ReputationHistoryView()),
               ),
               const SizedBox(height: 16),
               Row(

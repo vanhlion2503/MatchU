@@ -66,6 +66,16 @@ class ReputationService {
     );
   }
 
+  Future<ReputationHistoryResponse> getHistory({int limit = 50}) async {
+    final callable = _functions.httpsCallable("getReputationHistory");
+    final result = await _callWithRetry(callable, <String, dynamic>{
+      "limit": limit,
+    });
+
+    final payload = _asMap(result.data);
+    return ReputationHistoryResponse.fromMap(payload);
+  }
+
   Future<ReputationDailyState?> touchDailyLoginTaskSilently({
     String timezone = _defaultTimezone,
     String source = "app_open",

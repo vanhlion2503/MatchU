@@ -7,13 +7,13 @@ Widget buildHeaderCard({
   required TextTheme textTheme,
   required String fullName,
   required bool isVerified,
-  required int rank,
   required String avatarUrl,
   required int avatarVersion,
   required int reputationScore,
   required int todayClaimed,
   required int dailyCap,
   required double progress,
+  VoidCallback? onHistoryTap,
 }) {
   return Container(
     width: double.infinity,
@@ -117,32 +117,35 @@ Widget buildHeaderCard({
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Iconsax.star_1,
-                        size: 15,
-                        color: Colors.white.withValues(alpha: 0.95),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        "Cấp $rank",
-                        style: textTheme.bodySmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                GestureDetector(
+                  onTap: onHistoryTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Iconsax.receipt_text,
+                          size: 15,
+                          color: Colors.white.withValues(alpha: 0.95),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          "Lịch sử",
+                          style: textTheme.bodySmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
