@@ -198,10 +198,7 @@ class AuthController extends GetxController {
     }
 
     if (account == null) {
-      Get.snackbar(
-        "Lỗi",
-        "Không tìm thấy tài khoản đã lưu",
-      );
+      Get.snackbar("Lỗi", "Không tìm thấy tài khoản đã lưu");
       return;
     }
 
@@ -247,10 +244,7 @@ class AuthController extends GetxController {
 
   Future<void> removeRememberedLoginAccount() async {
     await _clearRememberedLoginAccount();
-    Get.snackbar(
-      "Đã xóa",
-      "Tài khoản này sẽ không còn được lưu",
-    );
+    Get.snackbar("Đã xóa", "Tài khoản này sẽ không còn được lưu");
   }
 
   Future<void> _clearRememberedLoginAccount() async {
@@ -434,9 +428,7 @@ class AuthController extends GetxController {
 
       isNicknameAvailable.value = isUnique;
       nicknameCheckMessage.value =
-          isUnique
-              ? "Nickname có thể sử dụng"
-              : "Nickname đã được sử dụng";
+          isUnique ? "Nickname có thể sử dụng" : "Nickname đã được sử dụng";
       return isUnique;
     } catch (_) {
       if (currentToken == _nicknameCheckToken) {
@@ -499,26 +491,17 @@ class AuthController extends GetxController {
 
     _box.remove('isRegistering');
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
-      Get.snackbar(
-        "Lỗi",
-        "Vui lòng nhập đầy đủ thông tin",
-      );
+      Get.snackbar("Lỗi", "Vui lòng nhập đầy đủ thông tin");
       return;
     }
 
     if (passwordC.text.length < 6) {
-      Get.snackbar(
-        "Lỗi",
-        "Mật khẩu phải từ 6 ký tự trở lên",
-      );
+      Get.snackbar("Lỗi", "Mật khẩu phải từ 6 ký tự trở lên");
       return;
     }
 
     if (passwordC.text != confirmPasswordC.text) {
-      Get.snackbar(
-        "Lỗi",
-        "Mật khẩu nhập lại không khớp",
-      );
+      Get.snackbar("Lỗi", "Mật khẩu nhập lại không khớp");
       return;
     }
 
@@ -542,10 +525,7 @@ class AuthController extends GetxController {
     } on FirebaseAuthException catch (e) {
       isLoadingRegister.value = false;
       _box.remove('isRegistering');
-      Get.snackbar(
-        "Đăng ký thất bại",
-        firebaseErrorToVietnamese(e.code),
-      );
+      Get.snackbar("Đăng ký thất bại", firebaseErrorToVietnamese(e.code));
     } catch (e) {
       isLoadingRegister.value = false;
       _box.remove('isRegistering');
@@ -590,10 +570,7 @@ class AuthController extends GetxController {
         }
       }
     } catch (e) {
-      Get.snackbar(
-        "Lỗi",
-        "Không thể hủy luồng đăng ký: $e",
-      );
+      Get.snackbar("Lỗi", "Không thể hủy luồng đăng ký: $e");
     } finally {
       _box.remove('isRegistering');
       enrollVerificationId = null;
@@ -624,10 +601,7 @@ class AuthController extends GetxController {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        Get.snackbar(
-          "Lỗi",
-          "Không tìm thấy người dùng",
-        );
+        Get.snackbar("Lỗi", "Không tìm thấy người dùng");
         isLoadingRegister.value = false;
         return;
       }
@@ -690,10 +664,7 @@ class AuthController extends GetxController {
     final phone = normalizePhoneNumber(fullPhoneNumber.value);
 
     if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
-      Get.snackbar(
-        "Lỗi",
-        "Số điện thoại không hợp lệ",
-      );
+      Get.snackbar("Lỗi", "Số điện thoại không hợp lệ");
       return;
     }
     isLoadingRegister.value = true;
@@ -703,10 +674,7 @@ class AuthController extends GetxController {
 
       if (!isUnique) {
         isLoadingRegister.value = false;
-        Get.snackbar(
-          "Lỗi",
-          "Số điện thoại này đã được sử dụng",
-        );
+        Get.snackbar("Lỗi", "Số điện thoại này đã được sử dụng");
         return;
       }
 
@@ -729,10 +697,7 @@ class AuthController extends GetxController {
       );
     } catch (_) {
       isLoadingRegister.value = false;
-      Get.snackbar(
-        "Lỗi",
-        "Không thể gửi OTP. Vui lòng thử lại",
-      );
+      Get.snackbar("Lỗi", "Không thể gửi OTP. Vui lòng thử lại");
     }
   }
 
@@ -967,10 +932,7 @@ class AuthController extends GetxController {
       // ❌ KHÔNG Get.to / Get.off ở đây
       // ✅ AuthGateController sẽ tự xử lý authStateChanges
     } on FirebaseAuthException catch (e) {
-      Get.snackbar(
-        "OTP sai",
-        e.message ?? "Xác thực thất bại",
-      );
+      Get.snackbar("OTP sai", e.message ?? "Xác thực thất bại");
     } catch (e) {
       Get.snackbar("Lỗi", e.toString());
     } finally {
@@ -981,22 +943,29 @@ class AuthController extends GetxController {
   Future<void> pickTempAvatar(ImageSource source) async {
     if (isUploadingAvatar.value || isLoadingRegister.value) return;
 
-    isUploadingAvatar.value = true;
     try {
       final picker = ImagePicker();
 
       final picked = await picker.pickImage(source: source, imageQuality: 100);
       if (picked == null) return;
 
+      await pickTempAvatarFile(File(picked.path));
+    } catch (error) {
+      Get.snackbar("Lỗi", error.toString());
+    }
+  }
+
+  Future<void> pickTempAvatarFile(File file) async {
+    if (isUploadingAvatar.value || isLoadingRegister.value) return;
+
+    isUploadingAvatar.value = true;
+    try {
       final cropped = await ImageCropper().cropImage(
-        sourcePath: picked.path,
+        sourcePath: file.path,
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         compressFormat: ImageCompressFormat.jpg,
         uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Cắt ảnh',
-            lockAspectRatio: true,
-          ),
+          AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
           IOSUiSettings(title: 'Cắt ảnh'),
         ],
       );
@@ -1054,10 +1023,7 @@ class AuthController extends GetxController {
     if (normalizedPhone.isNotEmpty) {
       final isPhoneUnique = await _auth.isPhoneNumberUnique(normalizedPhone);
       if (!isPhoneUnique) {
-        Get.snackbar(
-          "Lỗi",
-          "Số điện thoại này đã được sử dụng",
-        );
+        Get.snackbar("Lỗi", "Số điện thoại này đã được sử dụng");
         return;
       }
       fullPhoneNumber.value = normalizedPhone;
@@ -1139,10 +1105,7 @@ class AuthController extends GetxController {
       if (Get.currentRoute != '/main') {
         Get.offAllNamed('/main');
       }
-      Get.snackbar(
-        "Lỗi",
-        "Đăng xuất thất bại. Vui lòng thử lại.",
-      );
+      Get.snackbar("Lỗi", "Đăng xuất thất bại. Vui lòng thử lại.");
     }
   }
 

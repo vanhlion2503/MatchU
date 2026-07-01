@@ -149,8 +149,7 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
     final selections = await PhotoLibraryBottomSheet.show(
       context,
       maxSelection: 1,
-      title: 'Thu vien anh',
-      actionLabel: 'Gui',
+      title: 'Thư viện ảnh',
     );
     if (!mounted || selections == null || selections.isEmpty) return;
 

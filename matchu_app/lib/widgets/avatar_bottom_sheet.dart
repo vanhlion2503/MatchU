@@ -5,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 /// ===============================
 /// Avatar Bottom Sheet
@@ -18,9 +19,7 @@ void showAvatarBottomSheet(BuildContext context) {
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(20),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -42,8 +41,8 @@ void showAvatarBottomSheet(BuildContext context) {
               child: Text(
                 "Cập nhật ảnh đại diện",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
 
@@ -55,7 +54,15 @@ void showAvatarBottomSheet(BuildContext context) {
               label: "Chọn ảnh từ thư viện",
               onTap: () {
                 Get.back();
-                c.pickAvatar(ImageSource.gallery);
+                PhotoLibraryBottomSheet.show(
+                  context,
+                  maxSelection: 1,
+                  title: 'Thư viện ảnh',
+                  heightFactor: 1,
+                ).then((selections) {
+                  if (selections == null || selections.isEmpty) return;
+                  c.pickAvatarFile(selections.first.file);
+                });
               },
             ),
 
@@ -89,7 +96,6 @@ void showAvatarBottomSheet(BuildContext context) {
               );
             }),
 
-
             const SizedBox(height: 8),
           ],
         ),
@@ -102,10 +108,7 @@ void showAvatarBottomSheet(BuildContext context) {
 /// ===============================
 /// Confirm delete dialog
 /// ===============================
-void _confirmDeleteAvatar(
-  BuildContext context,
-  AvatarController controller,
-) {
+void _confirmDeleteAvatar(BuildContext context, AvatarController controller) {
   Get.dialog(
     AlertDialog(
       title: const Text("Xoá ảnh đại diện"),
@@ -113,10 +116,7 @@ void _confirmDeleteAvatar(
         "Bạn có chắc chắn muốn xoá ảnh đại diện hiện tại không?",
       ),
       actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: const Text("Huỷ"),
-        ),
+        TextButton(onPressed: () => Get.back(), child: const Text("Huỷ")),
         TextButton(
           onPressed: () {
             Get.back();
@@ -153,15 +153,10 @@ class _AvatarActionItem extends StatelessWidget {
     final theme = Theme.of(context);
 
     return ListTile(
-      leading: Icon(
-        icon,
-        color: color ?? theme.iconTheme.color,
-      ),
+      leading: Icon(icon, color: color ?? theme.iconTheme.color),
       title: Text(
         label,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: color,
-        ),
+        style: theme.textTheme.bodyMedium?.copyWith(color: color),
       ),
       onTap: onTap,
     );

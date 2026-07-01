@@ -9,6 +9,7 @@ import 'package:matchu_app/views/feed/widgets/comment_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
+import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 const double _kCommentsAutoLoadTriggerExtent = 320;
 
@@ -108,6 +109,30 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
           _controller.canHideComment(comment)
               ? () => _controller.hideComment(comment)
               : null,
+    );
+  }
+
+  Future<void> _showImageCommentPicker() async {
+    if (_controller.isSubmitting.value || _controller.isPickingImage.value) {
+      return;
+    }
+    if (_controller.editingComment.value != null) return;
+
+    FocusScope.of(context).unfocus();
+    final selections = await PhotoLibraryBottomSheet.show(
+      context,
+      maxSelection: 1,
+      title: 'Thư viện ảnh',
+      showCameraTile: true,
+      onCameraTap: _controller.pickAndSubmitCameraImageComment,
+    );
+    if (!mounted || selections == null || selections.isEmpty) return;
+
+    final selection = selections.first;
+    await _controller.submitImageCommentFile(
+      selection.file,
+      fileName: selection.fileName,
+      localImagePath: selection.file.path,
     );
   }
 
@@ -379,6 +404,18 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                           : 'Nhập bình luận...',
                                 ),
                                 onSubmitted: (_) => _controller.submitComment(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Obx(
+                              () => IconButton(
+                                onPressed:
+                                    _controller.isSubmitting.value ||
+                                            _controller.isPickingImage.value ||
+                                            editingComment != null
+                                        ? null
+                                        : _showImageCommentPicker,
+                                icon: const Icon(Iconsax.gallery),
                               ),
                             ),
                             const SizedBox(width: 12),

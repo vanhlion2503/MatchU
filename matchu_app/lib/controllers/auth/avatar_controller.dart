@@ -82,7 +82,13 @@ class AvatarController extends GetxController {
     final picked = await _picker.pickImage(source: source, imageQuality: 100);
     if (picked == null) return;
 
-    final cropped = await _crop(File(picked.path));
+    await pickAvatarFile(File(picked.path));
+  }
+
+  Future<void> pickAvatarFile(File file) async {
+    if (_auth.currentUser == null) return;
+
+    final cropped = await _crop(file);
     if (cropped == null) return;
 
     final compressed = await _compress(cropped);

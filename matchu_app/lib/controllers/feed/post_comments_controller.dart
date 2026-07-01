@@ -443,12 +443,6 @@ class PostCommentsController extends GetxController {
     if (isSubmitting.value || isPickingImage.value) return;
     if (editingComment.value != null) return;
 
-    final currentUid = _service.uid.trim();
-    if (currentUid.isEmpty) {
-      _showError('Báº¡n cáº§n Ä‘Äƒng nháº­p Ä‘á»ƒ bÃ¬nh luáº­n.');
-      return;
-    }
-
     try {
       isPickingImage.value = true;
       final picked = await _imagePicker.pickImage(
@@ -457,47 +451,91 @@ class PostCommentsController extends GetxController {
       );
       if (picked == null) return;
 
-      final parentId = replyingTo.value?.commentId;
-      final imageFile = File(picked.path);
-      final optimisticComment = _createOptimisticComment(
-        userId: currentUid,
-        content: '',
-        parentId: parentId,
+      await submitImageCommentFile(
+        File(picked.path),
+        fileName: picked.name,
         localImagePath: picked.path,
       );
-
-      isSubmitting.value = true;
-      _insertLocalComment(optimisticComment);
-      totalCommentCount.value += 1;
-      onCommentCountChanged?.call(1);
-      inputController.clear();
-      replyingTo.value = null;
-      inputFocusNode.unfocus();
-
-      try {
-        final created = await _service.addComment(
-          postId: postId,
-          content: '',
-          parentId: parentId,
-          imageFile: imageFile,
-          imageFileName: picked.name,
-        );
-        _resolveOptimisticComment(
-          optimisticCommentId: optimisticComment.commentId,
-          serverComment: created,
-        );
-      } catch (error) {
-        _rollbackOptimisticComment(optimisticComment.commentId);
-        totalCommentCount.value = max(0, totalCommentCount.value - 1);
-        onCommentCountChanged?.call(-1);
-        _showError(_mapError(error));
-      } finally {
-        isSubmitting.value = false;
-      }
     } catch (error) {
-      _showError('KhÃ´ng thá»ƒ chá»n áº£nh lÃºc nÃ y: $error');
+      _showError('Không thể chọn ảnh lúc này: $error');
     } finally {
       isPickingImage.value = false;
+    }
+  }
+
+  Future<void> pickAndSubmitCameraImageComment() async {
+    if (isSubmitting.value || isPickingImage.value) return;
+    if (editingComment.value != null) return;
+
+    try {
+      isPickingImage.value = true;
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 92,
+      );
+      if (picked == null) return;
+
+      await submitImageCommentFile(
+        File(picked.path),
+        fileName: picked.name,
+        localImagePath: picked.path,
+      );
+    } catch (error) {
+      _showError('Không thể chụp ảnh lúc này: $error');
+    } finally {
+      isPickingImage.value = false;
+    }
+  }
+
+  Future<void> submitImageCommentFile(
+    File imageFile, {
+    required String fileName,
+    String? localImagePath,
+  }) async {
+    if (isSubmitting.value) return;
+    if (editingComment.value != null) return;
+
+    final currentUid = _service.uid.trim();
+    if (currentUid.isEmpty) {
+      _showError('Bạn cần đăng nhập để bình luận.');
+      return;
+    }
+
+    final parentId = replyingTo.value?.commentId;
+    final optimisticComment = _createOptimisticComment(
+      userId: currentUid,
+      content: '',
+      parentId: parentId,
+      localImagePath: localImagePath ?? imageFile.path,
+    );
+
+    isSubmitting.value = true;
+    _insertLocalComment(optimisticComment);
+    totalCommentCount.value += 1;
+    onCommentCountChanged?.call(1);
+    inputController.clear();
+    replyingTo.value = null;
+    inputFocusNode.unfocus();
+
+    try {
+      final created = await _service.addComment(
+        postId: postId,
+        content: '',
+        parentId: parentId,
+        imageFile: imageFile,
+        imageFileName: fileName,
+      );
+      _resolveOptimisticComment(
+        optimisticCommentId: optimisticComment.commentId,
+        serverComment: created,
+      );
+    } catch (error) {
+      _rollbackOptimisticComment(optimisticComment.commentId);
+      totalCommentCount.value = max(0, totalCommentCount.value - 1);
+      onCommentCountChanged?.call(-1);
+      _showError(_mapError(error));
+    } finally {
+      isSubmitting.value = false;
     }
   }
 

@@ -23,6 +23,7 @@ import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 const double _kComposerFloatingGap = 10;
@@ -496,9 +497,26 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
     );
   }
 
-  void _showImageCommentNotice() {
+  Future<void> _showImageCommentNotice() async {
     HapticFeedback.selectionClick();
-    widget.controller.commentsController.pickAndSubmitImageComment();
+    final commentsController = widget.controller.commentsController;
+
+    FocusScope.of(context).unfocus();
+    final selections = await PhotoLibraryBottomSheet.show(
+      context,
+      maxSelection: 1,
+      title: 'Thư viện ảnh',
+      showCameraTile: true,
+      onCameraTap: commentsController.pickAndSubmitCameraImageComment,
+    );
+    if (!mounted || selections == null || selections.isEmpty) return;
+
+    final selection = selections.first;
+    await commentsController.submitImageCommentFile(
+      selection.file,
+      fileName: selection.fileName,
+      localImagePath: selection.file.path,
+    );
   }
 
   @override

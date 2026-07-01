@@ -17,19 +17,25 @@ class PhotoLibraryBottomSheet extends StatefulWidget {
   const PhotoLibraryBottomSheet({
     super.key,
     required this.maxSelection,
-    this.title = 'Chon anh',
-    this.actionLabel = 'Them',
+    this.title = 'Chọn ảnh',
+    this.heightFactor = 0.5,
+    this.showCameraTile = false,
+    this.onCameraTap,
   });
 
   final int maxSelection;
   final String title;
-  final String actionLabel;
+  final double heightFactor;
+  final bool showCameraTile;
+  final Future<void> Function()? onCameraTap;
 
   static Future<List<PhotoLibrarySelection>?> show(
     BuildContext context, {
     required int maxSelection,
-    String title = 'Chon anh',
-    String actionLabel = 'Them',
+    String title = 'Chọn ảnh',
+    double heightFactor = 0.5,
+    bool showCameraTile = false,
+    Future<void> Function()? onCameraTap,
   }) {
     if (maxSelection <= 0) {
       return Future.value(const <PhotoLibrarySelection>[]);
@@ -44,7 +50,9 @@ class PhotoLibraryBottomSheet extends StatefulWidget {
           (_) => PhotoLibraryBottomSheet(
             maxSelection: maxSelection,
             title: title,
-            actionLabel: actionLabel,
+            heightFactor: heightFactor,
+            showCameraTile: showCameraTile,
+            onCameraTap: onCameraTap,
           ),
     );
   }
@@ -166,8 +174,8 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
     final index = _selected.indexWhere((item) => item.id == asset.id);
     if (index < 0 && _selected.length >= widget.maxSelection) {
       Get.snackbar(
-        'Thong bao',
-        'Chi co the chon toi da ${widget.maxSelection} anh.',
+        'Thông báo',
+        'Chỉ có thể chọn tối đa ${widget.maxSelection} ảnh.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -206,6 +214,14 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
     Navigator.of(context).pop(result);
   }
 
+  Future<void> _handleCameraTap() async {
+    final onCameraTap = widget.onCameraTap;
+    if (onCameraTap == null) return;
+
+    Navigator.of(context).pop();
+    await onCameraTap();
+  }
+
   String _fileNameForAsset(AssetEntity asset, File file) {
     final title = asset.title?.trim();
     if (title != null && title.isNotEmpty) return title;
@@ -222,7 +238,8 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
     final mediaQuery = MediaQuery.of(context);
     final theme = Theme.of(context);
     final palette = _PhotoLibraryPalette.of(context);
-    final sheetHeight = mediaQuery.size.height * 0.5;
+    final sheetHeight =
+        mediaQuery.size.height * widget.heightFactor.clamp(0.3, 1.0);
 
     return SafeArea(
       top: false,
@@ -247,7 +264,6 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
               _Header(
                 title: widget.title,
                 selectedCount: _selected.length,
-                actionLabel: widget.actionLabel,
                 isResolvingSelection: _isResolvingSelection,
                 canSubmit: _selected.isNotEmpty,
                 palette: palette,
@@ -280,7 +296,7 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
       return _PermissionStateView(palette: palette);
     }
 
-    if (_assets.isEmpty) {
+    if (_assets.isEmpty && !widget.showCameraTile) {
       return _EmptyStateView(palette: palette);
     }
 
@@ -293,8 +309,15 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
         mainAxisSpacing: 4,
         crossAxisSpacing: 4,
       ),
-      itemCount: _assets.length + (_isLoadingMore && _hasMore ? 1 : 0),
+      itemCount: _gridItemCount,
       itemBuilder: (context, index) {
+        if (widget.showCameraTile) {
+          if (index == 0) {
+            return _CameraTile(palette: palette, onTap: _handleCameraTap);
+          }
+          index -= 1;
+        }
+
         if (index >= _assets.length) {
           return Center(
             child: SizedBox(
@@ -321,13 +344,18 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
       },
     );
   }
+
+  int get _gridItemCount {
+    final cameraItemCount = widget.showCameraTile ? 1 : 0;
+    final loadingItemCount = _isLoadingMore && _hasMore ? 1 : 0;
+    return cameraItemCount + _assets.length + loadingItemCount;
+  }
 }
 
 class _Header extends StatelessWidget {
   const _Header({
     required this.title,
     required this.selectedCount,
-    required this.actionLabel,
     required this.isResolvingSelection,
     required this.canSubmit,
     required this.palette,
@@ -337,7 +365,6 @@ class _Header extends StatelessWidget {
 
   final String title;
   final int selectedCount;
-  final String actionLabel;
   final bool isResolvingSelection;
   final bool canSubmit;
   final _PhotoLibraryPalette palette;
@@ -385,9 +412,45 @@ class _Header extends StatelessWidget {
                         color: theme.colorScheme.primary,
                       ),
                     )
-                    : Text(actionLabel),
+                    : const Icon(Icons.check_rounded),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CameraTile extends StatelessWidget {
+  const _CameraTile({required this.palette, required this.onTap});
+
+  final _PhotoLibraryPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: palette.tileBackground,
+      child: InkWell(
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(border: Border.all(color: palette.border)),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Iconsax.camera, size: 28, color: theme.colorScheme.primary),
+              const SizedBox(height: 6),
+              Text(
+                'Chụp ảnh',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: palette.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -539,7 +602,7 @@ class _PermissionStateView extends StatelessWidget {
             Icon(Iconsax.gallery_slash, size: 40, color: palette.icon),
             const SizedBox(height: 12),
             Text(
-              'Can cap quyen truy cap thu vien anh',
+              'Cần cấp quyền truy cập thư viện ảnh',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
@@ -548,7 +611,7 @@ class _PermissionStateView extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'Mo cai dat de MatchU hien thi anh trong thu vien.',
+              'Mở cài đặt để MatchU hiển thị ảnh trong thư viện.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textSecondary,
@@ -557,7 +620,7 @@ class _PermissionStateView extends StatelessWidget {
             const SizedBox(height: 14),
             FilledButton(
               onPressed: PhotoManager.openSetting,
-              child: const Text('Mo cai dat'),
+              child: const Text('Mở cài đặt'),
             ),
           ],
         ),
@@ -583,7 +646,7 @@ class _EmptyStateView extends StatelessWidget {
           Icon(Iconsax.gallery, size: 40, color: palette.icon),
           const SizedBox(height: 10),
           Text(
-            'Thu vien chua co anh',
+            'Thư viện chưa có ảnh',
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: palette.textPrimary,

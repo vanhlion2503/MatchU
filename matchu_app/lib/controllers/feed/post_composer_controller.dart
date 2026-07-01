@@ -117,6 +117,31 @@ class PostComposerController extends GetxController {
     _appendMedia(drafts);
   }
 
+  Future<void> pickCameraImage() async {
+    if (isPickingMedia.value) return;
+
+    try {
+      isPickingMedia.value = true;
+      final picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 92,
+      );
+      if (picked == null) return;
+
+      _appendMedia([
+        PostMediaDraft(
+          file: File(picked.path),
+          type: PostMediaType.image,
+          fileName: picked.name,
+        ),
+      ]);
+    } catch (error) {
+      _showError('Không thể chụp ảnh lúc này: $error');
+    } finally {
+      isPickingMedia.value = false;
+    }
+  }
+
   Future<void> pickVideo() async {
     if (isPickingMedia.value) return;
 

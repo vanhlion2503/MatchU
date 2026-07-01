@@ -85,6 +85,7 @@ class _AvatarPicker extends StatelessWidget {
                   : () => showAvatarBottomSheetAuth(
                     context,
                     onPick: c.pickTempAvatar,
+                    onPickFile: c.pickTempAvatarFile,
                   ),
           child: SizedBox(
             width: 100,

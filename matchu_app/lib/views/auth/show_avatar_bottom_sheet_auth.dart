@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 void showAvatarBottomSheetAuth(
   BuildContext context, {
   required Function(ImageSource source) onPick,
+  ValueChanged<File>? onPickFile,
   VoidCallback? onDelete,
 }) {
   Get.bottomSheet(
@@ -14,9 +18,7 @@ void showAvatarBottomSheetAuth(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(20),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -43,7 +45,19 @@ void showAvatarBottomSheetAuth(
               title: const Text("Chọn từ thư viện"),
               onTap: () {
                 Get.back();
-                onPick(ImageSource.gallery);
+                PhotoLibraryBottomSheet.show(
+                  context,
+                  maxSelection: 1,
+                  title: 'Thư viện ảnh',
+                  heightFactor: 1,
+                ).then((selections) {
+                  if (selections == null || selections.isEmpty) return;
+                  if (onPickFile != null) {
+                    onPickFile(selections.first.file);
+                    return;
+                  }
+                  onPick(ImageSource.gallery);
+                });
               },
             ),
 

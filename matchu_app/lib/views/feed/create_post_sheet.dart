@@ -854,8 +854,9 @@ class _BottomToolbar extends StatelessWidget {
     final selections = await PhotoLibraryBottomSheet.show(
       context,
       maxSelection: remainingSlots,
-      title: 'Thu vien anh',
-      actionLabel: 'Them',
+      title: 'Thư viện ảnh',
+      showCameraTile: true,
+      onCameraTap: controller.pickCameraImage,
     );
     if (!context.mounted) return;
     if (selections == null || selections.isEmpty) return;
