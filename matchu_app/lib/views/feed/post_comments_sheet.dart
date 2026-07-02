@@ -9,6 +9,7 @@ import 'package:matchu_app/views/feed/widgets/comment_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 const double _kCommentsAutoLoadTriggerExtent = 320;
@@ -314,6 +315,7 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
               Obx(() {
                 final replyingTo = _controller.replyingTo.value;
                 final editingComment = _controller.editingComment.value;
+                final isRecordingVoice = _controller.isRecordingVoice.value;
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
@@ -384,6 +386,29 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                           ],
                         ),
                       ),
+                    if (isRecordingVoice)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Iconsax.microphone_2,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              formatVoiceDurationFromSeconds(
+                                _controller.voiceRecordingSeconds.value,
+                              ),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     TextFieldTapRegion(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -412,17 +437,35 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                 onPressed:
                                     _controller.isSubmitting.value ||
                                             _controller.isPickingImage.value ||
-                                            editingComment != null
+                                            editingComment != null ||
+                                            _controller.isRecordingVoice.value
                                         ? null
                                         : _showImageCommentPicker,
                                 icon: const Icon(Iconsax.gallery),
+                              ),
+                            ),
+                            Obx(
+                              () => IconButton(
+                                onPressed:
+                                    _controller.isSubmitting.value ||
+                                            editingComment != null
+                                        ? null
+                                        : _controller.isRecordingVoice.value
+                                        ? _controller.stopAndSubmitVoiceComment
+                                        : _controller.startVoiceRecording,
+                                icon: Icon(
+                                  _controller.isRecordingVoice.value
+                                      ? Iconsax.stop_circle
+                                      : Iconsax.microphone_2,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Obx(
                               () => FilledButton(
                                 onPressed:
-                                    _controller.isSubmitting.value
+                                    _controller.isSubmitting.value ||
+                                            _controller.isRecordingVoice.value
                                         ? null
                                         : _controller.submitComment,
                                 style: FilledButton.styleFrom(

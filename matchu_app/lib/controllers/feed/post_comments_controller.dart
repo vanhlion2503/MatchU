@@ -12,6 +12,8 @@ import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 enum CommentSortMode { featured, newest }
 
@@ -47,6 +49,7 @@ class PostCommentsController extends GetxController {
   final PostRestrictionService _restrictionService;
   final GetStorage _storage = GetStorage();
   final ImagePicker _imagePicker = ImagePicker();
+  final AudioRecorder _audioRecorder = AudioRecorder();
 
   final TextEditingController inputController = TextEditingController();
   final FocusNode inputFocusNode = FocusNode();
@@ -56,6 +59,8 @@ class PostCommentsController extends GetxController {
   final RxBool isLoading = true.obs;
   final RxBool isSubmitting = false.obs;
   final RxBool isPickingImage = false.obs;
+  final RxBool isRecordingVoice = false.obs;
+  final RxInt voiceRecordingSeconds = 0.obs;
   final RxBool hasInputText = false.obs;
   final RxBool isLoadingMoreComments = false.obs;
   final RxBool hasMoreComments = true.obs;
@@ -77,6 +82,8 @@ class PostCommentsController extends GetxController {
   final Set<String> _blockedUserIds = <String>{};
   final Map<String, int> _topLevelOrderRanks = <String, int>{};
   int _optimisticCommentSequence = 0;
+  Timer? _voiceTimer;
+  DateTime? _voiceStartedAt;
 
   DocumentSnapshot<Map<String, dynamic>>? _topLevelCursor;
 
@@ -242,6 +249,7 @@ class PostCommentsController extends GetxController {
     final uid = currentUserId;
     if (uid.isEmpty || comment.isSending || comment.isDeleted) return false;
     if (comment.hasImage) return false;
+    if (comment.hasVoice) return false;
     return comment.userId.trim() == uid;
   }
 
@@ -539,6 +547,128 @@ class PostCommentsController extends GetxController {
     }
   }
 
+  Future<void> startVoiceRecording() async {
+    if (isSubmitting.value || isPickingImage.value || isRecordingVoice.value) {
+      return;
+    }
+    if (editingComment.value != null) return;
+
+    try {
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        _showError('Cần quyền microphone để ghi âm.');
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path =
+          '${tempDir.path}/comment_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+
+      _voiceStartedAt = DateTime.now();
+      voiceRecordingSeconds.value = 0;
+      isRecordingVoice.value = true;
+      _voiceTimer?.cancel();
+      _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        final startedAt = _voiceStartedAt;
+        if (startedAt == null) return;
+        voiceRecordingSeconds.value =
+            DateTime.now().difference(startedAt).inSeconds;
+      });
+    } catch (error) {
+      _showError('Không thể bắt đầu ghi âm lúc này: $error');
+    }
+  }
+
+  Future<void> stopAndSubmitVoiceComment({bool submit = true}) async {
+    if (!isRecordingVoice.value) return;
+
+    String? path;
+    var durationMs = voiceRecordingSeconds.value * 1000;
+    try {
+      final startedAt = _voiceStartedAt;
+      path = await _audioRecorder.stop();
+      if (startedAt != null) {
+        durationMs = DateTime.now().difference(startedAt).inMilliseconds;
+      }
+    } catch (error) {
+      _showError('Không thể lưu ghi âm lúc này: $error');
+    } finally {
+      _voiceTimer?.cancel();
+      _voiceTimer = null;
+      _voiceStartedAt = null;
+      voiceRecordingSeconds.value = 0;
+      isRecordingVoice.value = false;
+    }
+
+    if (!submit || path == null || durationMs < 1000) return;
+    await submitVoiceCommentFile(
+      File(path),
+      fileName: _fileNameFromPath(path),
+      localVoicePath: path,
+      voiceDurationMs: durationMs,
+    );
+  }
+
+  Future<void> submitVoiceCommentFile(
+    File voiceFile, {
+    required String fileName,
+    required int voiceDurationMs,
+    String? localVoicePath,
+  }) async {
+    if (isSubmitting.value) return;
+    if (editingComment.value != null) return;
+
+    final currentUid = _service.uid.trim();
+    if (currentUid.isEmpty) {
+      _showError('Bạn cần đăng nhập để bình luận.');
+      return;
+    }
+
+    final content = inputController.text.trim();
+    final parentId = replyingTo.value?.commentId;
+    final optimisticComment = _createOptimisticComment(
+      userId: currentUid,
+      content: content,
+      parentId: parentId,
+      localVoicePath: localVoicePath ?? voiceFile.path,
+      voiceDurationMs: voiceDurationMs,
+    );
+
+    isSubmitting.value = true;
+    _insertLocalComment(optimisticComment);
+    totalCommentCount.value += 1;
+    onCommentCountChanged?.call(1);
+    inputController.clear();
+    replyingTo.value = null;
+    inputFocusNode.unfocus();
+
+    try {
+      final created = await _service.addComment(
+        postId: postId,
+        content: content,
+        parentId: parentId,
+        voiceFile: voiceFile,
+        voiceFileName: fileName,
+        voiceDurationMs: voiceDurationMs,
+      );
+      _resolveOptimisticComment(
+        optimisticCommentId: optimisticComment.commentId,
+        serverComment: created,
+      );
+    } catch (error) {
+      _rollbackOptimisticComment(optimisticComment.commentId);
+      totalCommentCount.value = max(0, totalCommentCount.value - 1);
+      onCommentCountChanged?.call(-1);
+      _showError(_mapError(error));
+    } finally {
+      isSubmitting.value = false;
+    }
+  }
+
   Future<void> _submitEditedComment(PostCommentModel editingTarget) async {
     final currentUid = _service.uid.trim();
     if (currentUid.isEmpty) {
@@ -702,6 +832,8 @@ class PostCommentsController extends GetxController {
     required String content,
     required String? parentId,
     String? localImagePath,
+    String? localVoicePath,
+    int? voiceDurationMs,
   }) {
     final normalizedParentId = parentId?.trim();
     final resolvedParentId =
@@ -718,6 +850,8 @@ class PostCommentsController extends GetxController {
       likeCount: 0,
       replyCount: 0,
       localImagePath: localImagePath,
+      localVoicePath: localVoicePath,
+      voiceDurationMs: voiceDurationMs,
       createdAt: DateTime.now(),
       author: _currentUserAuthor(userId),
       isSending: true,
@@ -1394,6 +1528,17 @@ class PostCommentsController extends GetxController {
     return currentCount - 1;
   }
 
+  String _fileNameFromPath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final slashIndex = normalized.lastIndexOf('/');
+    if (slashIndex >= 0 && slashIndex < normalized.length - 1) {
+      return normalized.substring(slashIndex + 1);
+    }
+    return normalized.isEmpty
+        ? 'voice_${DateTime.now().microsecondsSinceEpoch}.m4a'
+        : normalized;
+  }
+
   String _mapError(Object error) {
     if (error is FirebaseException) {
       return firebaseErrorToVietnamese(error.code);
@@ -1424,6 +1569,11 @@ class PostCommentsController extends GetxController {
   @override
   void onClose() {
     inputController.removeListener(_handleInputChanged);
+    _voiceTimer?.cancel();
+    if (isRecordingVoice.value) {
+      unawaited(_audioRecorder.cancel());
+    }
+    unawaited(_audioRecorder.dispose());
     inputController.dispose();
     inputFocusNode.dispose();
     super.onClose();

@@ -10,6 +10,7 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
@@ -831,6 +832,27 @@ class _BottomToolbar extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             _ToolbarIconButton(
+              icon:
+                  controller.isRecordingVoice.value
+                      ? Iconsax.stop_circle
+                      : Iconsax.microphone_2,
+              onTap:
+                  controller.isPickingMedia.value
+                      ? null
+                      : controller.isRecordingVoice.value
+                      ? controller.stopVoiceRecording
+                      : controller.startVoiceRecording,
+              palette: palette,
+              isActive: controller.isRecordingVoice.value,
+              label:
+                  controller.isRecordingVoice.value
+                      ? formatVoiceDurationFromSeconds(
+                        controller.voiceRecordingSeconds.value,
+                      )
+                      : null,
+            ),
+            const SizedBox(width: 14),
+            _ToolbarIconButton(
               icon: Iconsax.tag,
               onTap: onFocusTag,
               palette: palette,
@@ -872,20 +894,42 @@ class _ToolbarIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     required this.palette,
+    this.isActive = false,
+    this.label,
   });
 
   final IconData icon;
   final VoidCallback? onTap;
   final _CreatePostPalette palette;
+  final bool isActive;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
+    final color =
+        isActive ? Theme.of(context).colorScheme.primary : palette.iconMuted;
+
     return Material(
       color: Colors.transparent,
       child: InkResponse(
-        radius: 20,
+        radius: 24,
         onTap: onTap,
-        child: Icon(icon, size: 24, color: palette.iconMuted),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 24, color: color),
+            if (label != null) ...[
+              const SizedBox(width: 5),
+              Text(
+                label!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1078,7 +1122,18 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child:
-                    media.isImage
+                    media.isAudio
+                        ? Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Center(
+                            child: PostVoicePlayer(
+                              url: media.url,
+                              durationMs: media.durationMs,
+                              compact: true,
+                            ),
+                          ),
+                        )
+                        : media.isImage
                         ? CachedNetworkImage(
                           imageUrl: media.url,
                           fit: BoxFit.cover,
@@ -1152,7 +1207,19 @@ class _DraftMediaPreviewCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child:
-                    draft.isImage
+                    draft.isAudio
+                        ? Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Center(
+                            child: PostVoicePlayer(
+                              url: '',
+                              localPath: draft.file.path,
+                              durationMs: draft.durationMs,
+                              compact: true,
+                            ),
+                          ),
+                        )
+                        : draft.isImage
                         ? Image.file(draft.file, fit: BoxFit.cover)
                         : DecoratedBox(
                           decoration: BoxDecoration(

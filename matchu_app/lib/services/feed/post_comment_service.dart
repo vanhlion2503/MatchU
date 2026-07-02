@@ -134,6 +134,9 @@ class PostCommentService {
     String? parentId,
     File? imageFile,
     String? imageFileName,
+    File? voiceFile,
+    String? voiceFileName,
+    int? voiceDurationMs,
   }) async {
     if (uid.isEmpty) {
       throw StateError('Bạn cần đăng nhập để bình luận.');
@@ -141,7 +144,8 @@ class PostCommentService {
 
     final normalizedContent = content.trim();
     final hasImage = imageFile != null;
-    if (normalizedContent.isEmpty && !hasImage) {
+    final hasVoice = voiceFile != null;
+    if (normalizedContent.isEmpty && !hasImage && !hasVoice) {
       throw StateError('Nội dung bình luận không được để trống.');
     }
     if (normalizedContent.length > maxCommentLength) {
@@ -161,7 +165,9 @@ class PostCommentService {
             : postRef.collection('comments').doc(parentId.trim());
 
     Reference? uploadedImageRef;
+    Reference? uploadedVoiceRef;
     var imageUrl = '';
+    var voiceUrl = '';
 
     try {
       if (imageFile != null) {
@@ -175,6 +181,19 @@ class PostCommentService {
           SettableMetadata(contentType: 'image/jpeg'),
         );
         imageUrl = await uploadedImageRef.getDownloadURL();
+      }
+
+      if (voiceFile != null) {
+        uploadedVoiceRef = _storage.ref(
+          'posts/$uid/$postId/comments/${commentRef.id}/voice.${_fileExtension(voiceFileName ?? voiceFile.path)}',
+        );
+        await uploadedVoiceRef.putFile(
+          voiceFile,
+          SettableMetadata(
+            contentType: _voiceContentType(voiceFileName ?? voiceFile.path),
+          ),
+        );
+        voiceUrl = await uploadedVoiceRef.getDownloadURL();
       }
 
       await _firestore.runTransaction((transaction) async {
@@ -212,6 +231,8 @@ class PostCommentService {
           'userId': uid,
           'content': normalizedContent,
           'imageUrl': imageUrl,
+          'voiceUrl': voiceUrl,
+          'voiceDurationMs': voiceDurationMs,
           'parentId': parentRef?.id,
           'likeCount': 0,
           'replyCount': 0,
@@ -229,6 +250,11 @@ class PostCommentService {
           await uploadedImageRef.delete();
         } catch (_) {}
       }
+      if (uploadedVoiceRef != null) {
+        try {
+          await uploadedVoiceRef.delete();
+        } catch (_) {}
+      }
       rethrow;
     }
 
@@ -240,6 +266,8 @@ class PostCommentService {
       likeCount: 0,
       replyCount: 0,
       imageUrl: imageUrl,
+      voiceUrl: voiceUrl,
+      voiceDurationMs: voiceDurationMs,
       createdAt: DateTime.now(),
       author: author,
     );
@@ -481,6 +509,7 @@ class PostCommentService {
           (comment) =>
               comment.content.trim().isNotEmpty ||
               comment.imageUrl.trim().isNotEmpty ||
+              comment.voiceUrl.trim().isNotEmpty ||
               (comment.isDeleted && comment.replyCount > 0),
         )
         .toList(growable: false);
@@ -535,6 +564,8 @@ class PostCommentService {
     if (content.isNotEmpty) return true;
     final imageUrl = (data['imageUrl'] ?? '').toString().trim();
     if (imageUrl.isNotEmpty) return true;
+    final voiceUrl = (data['voiceUrl'] ?? '').toString().trim();
+    if (voiceUrl.isNotEmpty) return true;
 
     final isDeleted = data['deletedAt'] != null;
     final replyCount = _parseInt(data['replyCount']);
@@ -600,6 +631,25 @@ class PostCommentService {
       throw StateError(
         'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
+    }
+  }
+
+  String _fileExtension(String fileName) {
+    final segments = fileName.toLowerCase().split('.');
+    if (segments.length < 2) return 'm4a';
+    return segments.last;
+  }
+
+  String _voiceContentType(String fileName) {
+    switch (_fileExtension(fileName)) {
+      case 'aac':
+        return 'audio/aac';
+      case 'wav':
+        return 'audio/wav';
+      case 'mp3':
+        return 'audio/mpeg';
+      default:
+        return 'audio/mp4';
     }
   }
 }

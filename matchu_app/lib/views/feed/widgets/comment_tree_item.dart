@@ -7,6 +7,7 @@ import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/comment_thread_guides.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 
 class CommentTreeItem extends StatelessWidget {
   const CommentTreeItem({
@@ -170,6 +171,15 @@ class CommentTreeItem extends StatelessWidget {
                       contentLabel,
                       style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                     ),
+                    if (!isDeleted && comment.hasVoice) ...[
+                      const SizedBox(height: 8),
+                      PostVoicePlayer(
+                        url: comment.voiceUrl,
+                        localPath: comment.localVoicePath,
+                        durationMs: comment.voiceDurationMs,
+                        compact: true,
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

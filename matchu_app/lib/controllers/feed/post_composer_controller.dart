@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,8 @@ import 'package:matchu_app/models/feed/media_model.dart';
 import 'package:matchu_app/models/feed/post_media_draft.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 class PostComposerController extends GetxController {
   PostComposerController({
@@ -20,6 +23,7 @@ class PostComposerController extends GetxController {
 
   final PostService _service;
   final ImagePicker _picker = ImagePicker();
+  final AudioRecorder _audioRecorder = AudioRecorder();
   final PostModel? quotedPost;
   final PostModel? editingPost;
 
@@ -32,11 +36,15 @@ class PostComposerController extends GetxController {
   final RxInt contentLength = 0.obs;
   final RxBool isSubmitting = false.obs;
   final RxBool isPickingMedia = false.obs;
+  final RxBool isRecordingVoice = false.obs;
+  final RxInt voiceRecordingSeconds = 0.obs;
   final Rx<PostVisibility> visibility = PostVisibility.public.obs;
   final RxBool isTagEditorVisible = false.obs;
 
   bool get isEditComposer => editingPost != null;
   bool get isQuoteComposer => quotedPost != null;
+  Timer? _voiceTimer;
+  DateTime? _voiceStartedAt;
   int get remainingMediaSlots =>
       maxMediaItems - existingMedia.length - mediaDrafts.length;
 
@@ -161,6 +169,76 @@ class PostComposerController extends GetxController {
       _showError('Không thể chọn video lúc này: $error');
     } finally {
       isPickingMedia.value = false;
+    }
+  }
+
+  Future<void> startVoiceRecording() async {
+    if (isSubmitting.value || isPickingMedia.value || isRecordingVoice.value) {
+      return;
+    }
+    if (remainingMediaSlots <= 0) {
+      _showMaxMediaNotice();
+      return;
+    }
+
+    try {
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        _showError('Cần quyền microphone để ghi âm.');
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path =
+          '${tempDir.path}/post_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+      _voiceStartedAt = DateTime.now();
+      voiceRecordingSeconds.value = 0;
+      isRecordingVoice.value = true;
+      _voiceTimer?.cancel();
+      _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        final startedAt = _voiceStartedAt;
+        if (startedAt == null) return;
+        voiceRecordingSeconds.value =
+            DateTime.now().difference(startedAt).inSeconds;
+      });
+    } catch (error) {
+      _showError('Không thể bắt đầu ghi âm lúc này: $error');
+    }
+  }
+
+  Future<void> stopVoiceRecording({bool keepDraft = true}) async {
+    if (!isRecordingVoice.value) return;
+
+    try {
+      final startedAt = _voiceStartedAt;
+      final path = await _audioRecorder.stop();
+      final durationMs =
+          startedAt == null
+              ? voiceRecordingSeconds.value * 1000
+              : DateTime.now().difference(startedAt).inMilliseconds;
+      if (keepDraft && path != null && durationMs >= 1000) {
+        _appendMedia([
+          PostMediaDraft(
+            file: File(path),
+            type: PostMediaType.audio,
+            fileName: _fileNameFromPath(path),
+            durationMs: durationMs,
+          ),
+        ]);
+      }
+    } catch (error) {
+      _showError('Không thể lưu ghi âm lúc này: $error');
+    } finally {
+      _voiceTimer?.cancel();
+      _voiceTimer = null;
+      _voiceStartedAt = null;
+      voiceRecordingSeconds.value = 0;
+      isRecordingVoice.value = false;
     }
   }
 
@@ -365,6 +443,11 @@ class PostComposerController extends GetxController {
   void onClose() {
     contentController.removeListener(_handleContentChanged);
     tagInputController.removeListener(_handleTagInputChanged);
+    _voiceTimer?.cancel();
+    if (isRecordingVoice.value) {
+      unawaited(_audioRecorder.cancel());
+    }
+    unawaited(_audioRecorder.dispose());
     contentController.dispose();
     tagInputController.dispose();
     super.onClose();

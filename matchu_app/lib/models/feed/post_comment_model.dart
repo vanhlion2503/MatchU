@@ -59,6 +59,9 @@ class PostCommentModel {
     required this.replyCount,
     this.imageUrl = '',
     this.localImagePath,
+    this.voiceUrl = '',
+    this.localVoicePath,
+    this.voiceDurationMs,
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
@@ -78,6 +81,9 @@ class PostCommentModel {
   final int replyCount;
   final String imageUrl;
   final String? localImagePath;
+  final String voiceUrl;
+  final String? localVoicePath;
+  final int? voiceDurationMs;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
@@ -95,6 +101,9 @@ class PostCommentModel {
   bool get hasImage =>
       imageUrl.trim().isNotEmpty ||
       (localImagePath?.trim().isNotEmpty ?? false);
+  bool get hasVoice =>
+      voiceUrl.trim().isNotEmpty ||
+      (localVoicePath?.trim().isNotEmpty ?? false);
 
   factory PostCommentModel.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     return PostCommentModel.fromJson(doc.data() ?? <String, dynamic>{}, doc.id);
@@ -112,6 +121,8 @@ class PostCommentModel {
       likeCount: _parseInt(json['likeCount']),
       replyCount: _parseInt(json['replyCount']),
       imageUrl: (json['imageUrl'] ?? '').toString().trim(),
+      voiceUrl: (json['voiceUrl'] ?? '').toString().trim(),
+      voiceDurationMs: _parseNullablePositiveInt(json['voiceDurationMs']),
       createdAt: _parseDateTime(json['createdAt']),
       updatedAt: _parseDateTime(json['updatedAt']),
       deletedAt: _parseDateTime(json['deletedAt']),
@@ -129,6 +140,8 @@ class PostCommentModel {
       'likeCount': likeCount,
       'replyCount': replyCount,
       'imageUrl': imageUrl,
+      'voiceUrl': voiceUrl,
+      'voiceDurationMs': voiceDurationMs,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
       'deletedAt': deletedAt,
@@ -146,6 +159,9 @@ class PostCommentModel {
     int? replyCount,
     String? imageUrl,
     String? localImagePath,
+    String? voiceUrl,
+    String? localVoicePath,
+    int? voiceDurationMs,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
@@ -165,6 +181,9 @@ class PostCommentModel {
       replyCount: replyCount ?? this.replyCount,
       imageUrl: imageUrl ?? this.imageUrl,
       localImagePath: localImagePath ?? this.localImagePath,
+      voiceUrl: voiceUrl ?? this.voiceUrl,
+      localVoicePath: localVoicePath ?? this.localVoicePath,
+      voiceDurationMs: voiceDurationMs ?? this.voiceDurationMs,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -201,5 +220,14 @@ class PostCommentModel {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return 0;
+  }
+
+  static int? _parseNullablePositiveInt(dynamic value) {
+    if (value is int) return value > 0 ? value : null;
+    if (value is num) {
+      final parsed = value.toInt();
+      return parsed > 0 ? parsed : null;
+    }
+    return null;
   }
 }

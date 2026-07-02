@@ -7,6 +7,7 @@ import 'package:matchu_app/models/feed/media_model.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_image_viewer_screen.dart';
 import 'package:matchu_app/views/feed/widgets/post_video_thumbnail.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 
 enum PostMediaGalleryMultiImageLayout { grid, horizontalScroll }
 
@@ -27,6 +28,7 @@ class PostMediaGallery extends StatelessWidget {
     final palette = FeedPalette.of(context);
     const borderRadius = BorderRadius.all(Radius.circular(18));
     final hasOnlyImages = media.every((item) => item.isImage);
+    final hasOnlyAudio = media.every((item) => item.isAudio);
     final imageUrls = media
         .where((item) => item.isImage)
         .map((item) => item.url)
@@ -36,6 +38,23 @@ class PostMediaGallery extends StatelessWidget {
         hasOnlyImages &&
         media.length >= 2 &&
         multiImageLayout == PostMediaGalleryMultiImageLayout.horizontalScroll;
+
+    if (hasOnlyAudio) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: media
+            .map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: PostVoicePlayer(
+                  url: item.url,
+                  durationMs: item.durationMs,
+                ),
+              ),
+            )
+            .toList(growable: false),
+      );
+    }
 
     if (useHorizontalImageScroll) {
       return LayoutBuilder(
@@ -105,6 +124,16 @@ class PostMediaGallery extends StatelessWidget {
           builder: (context, constraints) {
             if (media.length == 1) {
               final item = media.first;
+              if (item.isAudio) {
+                return Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: PostVoicePlayer(
+                    url: item.url,
+                    durationMs: item.durationMs,
+                  ),
+                );
+              }
+
               final height =
                   item.isVideo
                       ? math.min(constraints.maxWidth * 0.72, 320.0)
@@ -222,6 +251,17 @@ class _MediaTile extends StatelessWidget {
         url: media.url,
         borderRadius: borderRadius,
         useIntrinsicAspectRatio: useIntrinsicVideoAspectRatio,
+      );
+    }
+
+    if (media.isAudio) {
+      return Padding(
+        padding: const EdgeInsets.all(10),
+        child: PostVoicePlayer(
+          url: media.url,
+          durationMs: media.durationMs,
+          compact: true,
+        ),
       );
     }
 

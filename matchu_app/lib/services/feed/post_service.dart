@@ -1315,7 +1315,9 @@ class PostService {
 
       uploadedRefs.add(ref);
       final url = await ref.getDownloadURL();
-      uploaded.add(MediaModel(url: url, type: draft.type));
+      uploaded.add(
+        MediaModel(url: url, type: draft.type, durationMs: draft.durationMs),
+      );
     }
 
     return uploaded;
@@ -1366,6 +1368,9 @@ class PostService {
     }
 
     final extension = _fileExtension(draft.fileName);
+    if (draft.isAudio) {
+      return 'posts/$uid/$postId/voice_$index.$extension';
+    }
     return 'posts/$uid/$postId/video_$index.$extension';
   }
 
@@ -1375,6 +1380,18 @@ class PostService {
     }
 
     final extension = _fileExtension(draft.fileName);
+    if (draft.isAudio) {
+      switch (extension) {
+        case 'm4a':
+          return 'audio/mp4';
+        case 'aac':
+          return 'audio/aac';
+        case 'wav':
+          return 'audio/wav';
+        default:
+          return 'audio/mpeg';
+      }
+    }
     switch (extension) {
       case 'mov':
         return 'video/quicktime';

@@ -10,6 +10,7 @@ import 'package:matchu_app/views/feed/widgets/comment_thread_guides.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_image_viewer_screen.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
 class PostDetailCommentItem extends StatelessWidget {
@@ -184,6 +185,16 @@ class PostDetailCommentItem extends StatelessWidget {
                       if (contentLabel.trim().isNotEmpty)
                         const SizedBox(height: 8),
                       _CommentImage(comment: comment, palette: palette),
+                    ],
+                    if (!isDeleted && comment.hasVoice) ...[
+                      if (contentLabel.trim().isNotEmpty || comment.hasImage)
+                        const SizedBox(height: 8),
+                      PostVoicePlayer(
+                        url: comment.voiceUrl,
+                        localPath: comment.localVoicePath,
+                        durationMs: comment.voiceDurationMs,
+                        compact: true,
+                      ),
                     ],
                     const SizedBox(height: 10),
                     Column(

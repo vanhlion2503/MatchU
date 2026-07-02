@@ -23,6 +23,7 @@ import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
@@ -547,8 +548,10 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
         final editingComment = commentsController.editingComment.value;
         final isSubmitting = commentsController.isSubmitting.value;
         final isPickingImage = commentsController.isPickingImage.value;
+        final isRecordingVoice = commentsController.isRecordingVoice.value;
         final hasInputText = commentsController.hasInputText.value;
-        final shouldShowSubmit = editingComment != null || hasInputText;
+        final shouldShowSubmit =
+            !isRecordingVoice && (editingComment != null || hasInputText);
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -688,6 +691,41 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
               ),
             if (editingComment != null || replyingTo != null)
               const SizedBox(height: 8),
+            if (isRecordingVoice) ...[
+              _ComposerSurface(
+                borderRadius: BorderRadius.circular(16),
+                backgroundColor: composerSurfaceColor,
+                borderColor: palette.border.withValues(alpha: 0.72),
+                shadowColor: palette.shadowColor.withValues(alpha: 0.08),
+                blurSigma: 0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Iconsax.microphone_2,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        formatVoiceDurationFromSeconds(
+                          commentsController.voiceRecordingSeconds.value,
+                        ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             TextFieldTapRegion(
               child: _ComposerSurface(
                 borderRadius: BorderRadius.circular(999),
@@ -813,16 +851,40 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                                           onPressed:
                                               isSubmitting ||
                                                       isPickingImage ||
-                                                      editingComment != null
+                                                      editingComment != null ||
+                                                      isRecordingVoice
                                                   ? null
                                                   : _showImageCommentNotice,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        _ComposerActionButton(
+                                          icon:
+                                              isRecordingVoice
+                                                  ? Iconsax.stop_circle
+                                                  : Iconsax.microphone_2,
+                                          color:
+                                              isRecordingVoice
+                                                  ? theme.colorScheme.primary
+                                                  : palette.iconMuted,
+                                          onPressed:
+                                              isSubmitting ||
+                                                      editingComment != null
+                                                  ? null
+                                                  : isRecordingVoice
+                                                  ? commentsController
+                                                      .stopAndSubmitVoiceComment
+                                                  : commentsController
+                                                      .startVoiceRecording,
                                         ),
                                         const SizedBox(width: 2),
                                         _ComposerActionButton(
                                           icon: Iconsax.emoji_happy,
                                           color: palette.iconMuted,
                                           onPressed:
-                                              () => _openEmojiPicker(context),
+                                              isRecordingVoice
+                                                  ? null
+                                                  : () =>
+                                                      _openEmojiPicker(context),
                                         ),
                                       ],
                                     ),
