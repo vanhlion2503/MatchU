@@ -695,8 +695,12 @@ class PostCommentsController extends GetxController {
 
   double _normalizeVoiceAmplitude(double decibels) {
     if (decibels.isNaN || decibels.isInfinite) return 0.08;
-    final normalized = ((decibels + 48) / 48).clamp(0.0, 1.0);
-    return 0.08 + normalized * 0.92;
+    const silenceFloor = -55.0;
+    const speechCeiling = -8.0;
+    final normalized = ((decibels - silenceFloor) /
+            (speechCeiling - silenceFloor))
+        .clamp(0.0, 1.0);
+    return pow(normalized, 1.25).toDouble();
   }
 
   Future<void> _submitEditedComment(PostCommentModel editingTarget) async {

@@ -1123,7 +1123,7 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
       return Align(
         alignment: Alignment.topLeft,
         child: SizedBox(
-          width: 286,
+          width: 268,
           height: 48,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -1135,7 +1135,7 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
                   compact: true,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _RemoveMediaButton(onTap: onRemove),
             ],
           ),
@@ -1221,7 +1221,7 @@ class _DraftMediaPreviewCard extends StatelessWidget {
       return Align(
         alignment: Alignment.topLeft,
         child: SizedBox(
-          width: 286,
+          width: 268,
           height: 48,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -1234,7 +1234,7 @@ class _DraftMediaPreviewCard extends StatelessWidget {
                   compact: true,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _RemoveMediaButton(onTap: onRemove),
             ],
           ),

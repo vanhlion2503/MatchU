@@ -332,16 +332,22 @@ class _ThreadsVoiceRecordingIndicatorState
                 },
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             SizedBox(
-              width: 40,
-              child: Text(
-                formatVoiceDurationFromSeconds(elapsedSeconds),
-                textAlign: TextAlign.right,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+              width: widget.compact ? 48 : 52,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  formatVoiceDurationFromSeconds(elapsedSeconds),
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ),
@@ -484,7 +490,7 @@ class _RecordingWaveformPainter extends CustomPainter {
   }
 
   double _heightFromAmplitude(double amplitude) {
-    final eased = math.pow(amplitude.clamp(0.0, 1.0), 0.72).toDouble();
+    final eased = math.pow(amplitude.clamp(0.0, 1.0), 1.35).toDouble();
     return minBarHeight + (maxBarHeight - minBarHeight) * eased;
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -268,8 +269,12 @@ class PostComposerController extends GetxController {
 
   double _normalizeVoiceAmplitude(double decibels) {
     if (decibels.isNaN || decibels.isInfinite) return 0.08;
-    final normalized = ((decibels + 48) / 48).clamp(0.0, 1.0);
-    return 0.08 + normalized * 0.92;
+    const silenceFloor = -55.0;
+    const speechCeiling = -8.0;
+    final normalized = ((decibels - silenceFloor) /
+            (speechCeiling - silenceFloor))
+        .clamp(0.0, 1.0);
+    return math.pow(normalized, 1.25).toDouble();
   }
 
   void removeMedia(PostMediaDraft draft) {
