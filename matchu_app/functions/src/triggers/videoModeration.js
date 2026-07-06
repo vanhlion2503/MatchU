@@ -19,7 +19,13 @@ const {
   toMillis,
 } = require("../../reputation/types");
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const DEFAULT_GEMINI_MODELS = Object.freeze([
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+]);
+const GEMINI_MODEL = DEFAULT_GEMINI_MODELS[0];
 const MAX_VIDEO_BYTES = 150 * 1024 * 1024;
 const GEMINI_FILE_WAIT_MS = 3 * 60 * 1000;
 const GEMINI_FILE_POLL_MS = 3000;
@@ -136,6 +142,13 @@ Schema JSON bắt buộc:
   "userMessageVi": "Thông báo ngắn bằng tiếng Việt để hiển thị cho người dùng nếu bị từ chối hoặc cần xem xét",
   "policyVersion": "video_moderation_v1"
 }`;
+
+const VIDEO_MODERATION_DECISION_GUIDANCE = `Additional decision guidance:
+- The post caption is provided as context. It may already have passed text moderation before this video check.
+- Other attached images, if any, are moderated separately before upload. Do not require human review only because a post has both video, text, and images.
+- Return approved when the video and caption context show no clear policy risk, even if the content is ordinary, short, low-context, or visually simple.
+- Use review_required only when there is a concrete uncertainty, medium/high risk signal, unclear possible violation, or explicit need for human review.
+- Confidence means confidence in your decision. For clearly safe ordinary content, use 0.85 to 1.0, not 0.0.`;
 
 const VIDEO_MODERATION_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -268,6 +281,62 @@ function safeMap(value) {
     : {};
 }
 
+function getGeminiModelCandidates() {
+  const configured = String(process.env.GEMINI_VIDEO_MODERATION_MODELS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const models = configured.length > 0 ? configured : DEFAULT_GEMINI_MODELS;
+  return Array.from(new Set(models));
+}
+
+function errorMessage(error) {
+  return error?.message || String(error || "");
+}
+
+function parseGeminiErrorPayload(error) {
+  const message = errorMessage(error);
+  try {
+    return JSON.parse(message);
+  } catch (_) {
+    return null;
+  }
+}
+
+function isGeminiRateLimitError(error) {
+  const payload = parseGeminiErrorPayload(error);
+  const status = error?.status || error?.code || payload?.error?.code;
+  const text = errorMessage(error).toLowerCase();
+  return (
+    status === 429 ||
+    payload?.error?.status === "RESOURCE_EXHAUSTED" ||
+    text.includes("resource_exhausted") ||
+    text.includes("quota exceeded") ||
+    text.includes("rate limit")
+  );
+}
+
+function isDailyGeminiQuotaError(error) {
+  const text = errorMessage(error).toLowerCase();
+  return (
+    text.includes("requestsperday") ||
+    text.includes("requests per day") ||
+    text.includes("_rpd") ||
+    text.includes("perday")
+  );
+}
+
+function retryDelayMsFromGeminiError(error) {
+  const payload = parseGeminiErrorPayload(error);
+  const details = Array.isArray(payload?.error?.details)
+    ? payload.error.details
+    : [];
+  const retryInfo = details.find((item) => item?.retryDelay);
+  const match = /^(\d+(?:\.\d+)?)s$/i.exec(String(retryInfo?.retryDelay || ""));
+  if (!match) return 0;
+  return Math.ceil(Number(match[1]) * 1000);
+}
+
 function stripJsonFence(text) {
   return String(text || "")
     .trim()
@@ -347,6 +416,29 @@ function hasChildSafetyBlock(primaryCategory, violations) {
   );
 }
 
+function hasElevatedFindingRisk(findings) {
+  if (!Array.isArray(findings)) return false;
+  return findings.some((item) => {
+    const risk = normalizeRisk(item?.risk);
+    return risk === "medium" || risk === "high";
+  });
+}
+
+function hasMeaningfulModerationRisk(result) {
+  return (
+    result.overallSeverity >= 2 ||
+    result.violations.some(
+      (item) =>
+        item.severity >= 2 ||
+        item.recommendedAction === "reject" ||
+        item.recommendedAction === "human_review"
+    ) ||
+    hasElevatedFindingRisk(result.visualFindings) ||
+    hasElevatedFindingRisk(result.audioFindings) ||
+    hasElevatedFindingRisk(result.textOverlayFindings)
+  );
+}
+
 function sanitizeChildSafetyResult(result) {
   return {
     ...result,
@@ -384,7 +476,30 @@ function enforceDecisionRules(result) {
 
   if (childSafetyBlock) {
     normalized = sanitizeChildSafetyResult(normalized);
+  } else if (
+    normalized.decision === "review_required" &&
+    !hasMeaningfulModerationRisk(normalized)
+  ) {
+    normalized.decision = "approved";
+    normalized.confidence = Math.max(normalized.confidence, 0.7);
+    normalized.needsHumanReview = false;
+    normalized.humanReviewReason = null;
   } else if (normalized.decision === "approved") {
+    if (!hasMeaningfulModerationRisk(normalized)) {
+      normalized.confidence = Math.max(normalized.confidence, 0.7);
+      normalized.needsHumanReview = false;
+      normalized.humanReviewReason = null;
+    }
+    const hasSafeApprovedResult =
+      !hasMeaningfulModerationRisk(normalized) &&
+      normalized.needsHumanReview !== true &&
+      !normalized.humanReviewReason;
+    if (hasSafeApprovedResult && normalized.confidence < 0.7) {
+      normalized.confidence = 0.7;
+    }
+    if (!hasSafeApprovedResult && hasMeaningfulModerationRisk(normalized)) {
+      normalized.overallSeverity = Math.max(normalized.overallSeverity, 2);
+    }
     const hasMeaningfulRisk =
       normalized.overallSeverity >= 2 ||
       normalized.violations.some((item) => item.severity >= 2);
@@ -464,6 +579,7 @@ function normalizeModerationResult(raw) {
     humanReviewReason: safeText(safeRaw.humanReviewReason, 300) || null,
     reputationPenalty: safeMap(safeRaw.reputationPenalty),
     userMessageVi: safeText(safeRaw.userMessageVi, 300),
+    geminiModel: safeText(safeRaw.geminiModel, 80) || null,
     policyVersion: POLICY_VERSION,
   };
 
@@ -754,6 +870,7 @@ async function applyFinalModerationResult({ object, uid, postId, result }) {
       humanReviewReason: result.humanReviewReason,
       reputationPenalty,
       userMessageVi: result.userMessageVi,
+      geminiModel: result.geminiModel || null,
       policyVersion: POLICY_VERSION,
       storageBucket: object.bucket || null,
       storagePath: object.name,
@@ -805,6 +922,83 @@ async function waitForActiveGeminiFile(ai, fileName) {
   throw new Error("Timed out waiting for Gemini file to become ACTIVE.");
 }
 
+async function callGeminiVideoModerationModel({ ai, model, contents }) {
+  const response = await ai.models.generateContent({
+    model,
+    contents,
+    config: {
+      temperature: 0,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+      responseSchema: VIDEO_MODERATION_RESPONSE_SCHEMA,
+    },
+  });
+  const result = parseGeminiResult(response.text);
+  result.geminiModel = model;
+  return result;
+}
+
+async function generateVideoModerationResult({ ai, activeFile, object, caption }) {
+  const contents = [
+    createPartFromUri(
+      activeFile.uri,
+      activeFile.mimeType || object.contentType || "video/mp4"
+    ),
+    `${VIDEO_MODERATION_SYSTEM_PROMPT}
+
+${VIDEO_MODERATION_DECISION_GUIDANCE}
+
+Caption bÃ i viáº¿t náº¿u cÃ³:
+"""
+${safeText(caption, 1000)}
+"""`,
+  ];
+  const models = getGeminiModelCandidates();
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      return await callGeminiVideoModerationModel({ ai, model, contents });
+    } catch (error) {
+      lastError = error;
+      if (!isGeminiRateLimitError(error)) {
+        throw error;
+      }
+
+      const retryDelayMs = retryDelayMsFromGeminiError(error);
+      const shouldRetrySameModel =
+        retryDelayMs > 0 &&
+        retryDelayMs <= 60000 &&
+        !isDailyGeminiQuotaError(error);
+
+      console.warn("Gemini video moderation model rate limited:", {
+        model,
+        retryDelayMs,
+        fallbackAvailable: models.indexOf(model) < models.length - 1,
+        error: errorMessage(error).slice(0, 600),
+      });
+
+      if (!shouldRetrySameModel) continue;
+
+      await sleep(retryDelayMs);
+      try {
+        return await callGeminiVideoModerationModel({ ai, model, contents });
+      } catch (retryError) {
+        lastError = retryError;
+        if (!isGeminiRateLimitError(retryError)) {
+          throw retryError;
+        }
+        console.warn("Gemini video moderation retry was rate limited:", {
+          model,
+          error: errorMessage(retryError).slice(0, 600),
+        });
+      }
+    }
+  }
+
+  throw lastError || new Error("All Gemini video moderation models failed.");
+}
+
 async function moderateVideoWithGemini({ object, localPath, caption }) {
   const apiKey = (GEMINI_API_KEY.value() || "").trim();
   if (!apiKey) {
@@ -824,6 +1018,13 @@ async function moderateVideoWithGemini({ object, localPath, caption }) {
   const activeFile = await waitForActiveGeminiFile(ai, uploadedFile.name);
 
   try {
+    return await generateVideoModerationResult({
+      ai,
+      activeFile,
+      object,
+      caption,
+    });
+
     const response = await ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: [
@@ -832,6 +1033,8 @@ async function moderateVideoWithGemini({ object, localPath, caption }) {
           activeFile.mimeType || object.contentType || "video/mp4"
         ),
         `${VIDEO_MODERATION_SYSTEM_PROMPT}
+
+${VIDEO_MODERATION_DECISION_GUIDANCE}
 
 Caption bài viết nếu có:
 """
@@ -867,6 +1070,7 @@ const moderateUploadedPostVideo = onObjectFinalized(
     secrets: [GEMINI_API_KEY],
     timeoutSeconds: 540,
     memory: "1GiB",
+    maxInstances: 2,
   },
   async (event) => {
     const object = event.data || {};
