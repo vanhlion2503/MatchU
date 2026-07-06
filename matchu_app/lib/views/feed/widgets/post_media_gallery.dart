@@ -134,10 +134,15 @@ class PostMediaGallery extends StatelessWidget {
                 );
               }
 
-              final height =
-                  item.isVideo
-                      ? math.min(constraints.maxWidth * 0.72, 320.0)
-                      : math.min(constraints.maxWidth * 1.02, 380.0);
+              if (item.isVideo) {
+                return _MediaTile(
+                  media: item,
+                  borderRadius: BorderRadius.zero,
+                  useIntrinsicVideoAspectRatio: true,
+                );
+              }
+
+              final height = math.min(constraints.maxWidth * 1.02, 380.0);
 
               return SizedBox(
                 height: height,

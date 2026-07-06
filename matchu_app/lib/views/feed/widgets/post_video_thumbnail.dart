@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:video_player/video_player.dart';
@@ -18,13 +20,10 @@ class PostVideoThumbnail extends StatefulWidget {
   State<PostVideoThumbnail> createState() => _PostVideoThumbnailState();
 }
 
-class _PostVideoThumbnailState extends State<PostVideoThumbnail>
-    with AutomaticKeepAliveClientMixin {
+class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
   VideoPlayerController? _controller;
   Future<void>? _initializeFuture;
-
-  @override
-  bool get wantKeepAlive => true;
+  bool _isMuted = true;
 
   @override
   void initState() {
@@ -37,6 +36,7 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
       _disposeController();
+      _isMuted = true;
       _setupController();
     }
   }
@@ -73,12 +73,50 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
     final isCompleted =
         controller.value.duration > Duration.zero &&
         controller.value.position >= controller.value.duration;
-
     if (isCompleted) {
       await controller.seekTo(Duration.zero);
     }
 
     await controller.play();
+  }
+
+  Future<void> _toggleMute() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    final nextMuted = !_isMuted;
+    await controller.setVolume(nextMuted ? 0 : 1);
+    if (!mounted) return;
+
+    setState(() {
+      _isMuted = nextMuted;
+    });
+  }
+
+  Future<void> _openFullscreen() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    final wasPlaying = controller.value.isPlaying;
+    final initialPosition = controller.value.position;
+    await controller.pause();
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (_) => _PostVideoFullscreenView(
+              url: widget.url,
+              initialPosition: initialPosition,
+              initiallyMuted: _isMuted,
+            ),
+      ),
+    );
+
+    if (!mounted || !_isControllerReady(controller)) return;
+    if (wasPlaying) {
+      await controller.play();
+    }
   }
 
   void _disposeController() {
@@ -95,7 +133,16 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
       return SizedBox.expand(child: child);
     }
 
-    return AspectRatio(aspectRatio: fallbackAspectRatio, child: child);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width =
+            constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : MediaQuery.sizeOf(context).width;
+        final height = _heightForAspectRatio(width, fallbackAspectRatio);
+        return SizedBox(width: double.infinity, height: height, child: child);
+      },
+    );
   }
 
   @override
@@ -106,8 +153,6 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-
     return ClipRRect(
       borderRadius: widget.borderRadius,
       child: FutureBuilder<void>(
@@ -135,7 +180,7 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
               return Material(
                 color: Colors.black,
                 child: InkWell(
-                  onTap: _togglePlay,
+                  onTap: _openFullscreen,
                   child: _wrapContent(
                     fallbackAspectRatio: aspectRatio,
                     child: Stack(
@@ -162,30 +207,49 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
                           ),
                         ),
                         if (!value.isPlaying)
-                          const Center(
-                            child: Icon(
-                              Iconsax.play_circle,
-                              size: 62,
-                              color: Colors.white,
+                          Center(
+                            child: InkResponse(
+                              onTap: _togglePlay,
+                              radius: 40,
+                              child: const Icon(
+                                Iconsax.play_circle,
+                                size: 62,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         Positioned(
                           right: 12,
                           bottom: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.55),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              value.isPlaying ? 'Đang phát' : 'Video',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _VideoPillButton(
+                                icon:
+                                    _isMuted
+                                        ? Iconsax.volume_slash
+                                        : Iconsax.volume_high,
+                                onTap: _toggleMute,
+                              ),
+                              const SizedBox(width: 8),
+                              _VideoPillButton(
+                                icon: Iconsax.maximize_4,
+                                onTap: _openFullscreen,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: IgnorePointer(
+                            child: LinearProgressIndicator(
+                              value: _progressOf(value),
+                              minHeight: 2,
+                              backgroundColor: Colors.white24,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.white,
                               ),
                             ),
                           ),
@@ -198,6 +262,346 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail>
             },
           );
         },
+      ),
+    );
+  }
+}
+
+bool _isControllerReady(VideoPlayerController controller) {
+  return controller.value.isInitialized;
+}
+
+double _heightForAspectRatio(double width, double aspectRatio) {
+  final resolvedAspectRatio =
+      aspectRatio.isFinite && aspectRatio > 0
+          ? aspectRatio.clamp(0.72, 2.0).toDouble()
+          : 16 / 9;
+  final rawHeight = width / resolvedAspectRatio;
+  final minHeight = width * 0.56;
+  final maxHeight = math.min(width * 1.28, 420.0);
+  return rawHeight.clamp(minHeight, maxHeight).toDouble();
+}
+
+double _progressOf(VideoPlayerValue value) {
+  final durationMs = value.duration.inMilliseconds;
+  if (durationMs <= 0) return 0;
+  return (value.position.inMilliseconds / durationMs).clamp(0.0, 1.0);
+}
+
+String _formatDuration(Duration duration) {
+  final totalSeconds = duration.inSeconds;
+  final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+  final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
+}
+
+class _VideoPillButton extends StatelessWidget {
+  const _VideoPillButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(999),
+      child: InkResponse(
+        onTap: onTap,
+        radius: 19,
+        child: SizedBox(
+          width: 34,
+          height: 34,
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
+class _PostVideoFullscreenView extends StatefulWidget {
+  const _PostVideoFullscreenView({
+    required this.url,
+    required this.initialPosition,
+    required this.initiallyMuted,
+  });
+
+  final String url;
+  final Duration initialPosition;
+  final bool initiallyMuted;
+
+  @override
+  State<_PostVideoFullscreenView> createState() =>
+      _PostVideoFullscreenViewState();
+}
+
+class _PostVideoFullscreenViewState extends State<_PostVideoFullscreenView> {
+  VideoPlayerController? _controller;
+  Future<void>? _initializeFuture;
+  late bool _isMuted;
+
+  @override
+  void initState() {
+    super.initState();
+    _isMuted = widget.initiallyMuted;
+    _setupController();
+  }
+
+  void _setupController() {
+    final uri = Uri.tryParse(widget.url);
+    if (uri == null) {
+      _initializeFuture = Future<void>.error(
+        const FormatException('Invalid video url'),
+      );
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(uri);
+    _controller = controller;
+    _initializeFuture = controller.initialize().then((_) async {
+      await controller.setLooping(false);
+      await controller.setVolume(_isMuted ? 0 : 1);
+      if (widget.initialPosition > Duration.zero &&
+          widget.initialPosition < controller.value.duration) {
+        await controller.seekTo(widget.initialPosition);
+      }
+      await controller.play();
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  Future<void> _togglePlay() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    if (controller.value.isPlaying) {
+      await controller.pause();
+      return;
+    }
+
+    final isCompleted =
+        controller.value.duration > Duration.zero &&
+        controller.value.position >= controller.value.duration;
+    if (isCompleted) {
+      await controller.seekTo(Duration.zero);
+    }
+
+    await controller.play();
+  }
+
+  Future<void> _toggleMute() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    final nextMuted = !_isMuted;
+    await controller.setVolume(nextMuted ? 0 : 1);
+    if (!mounted) return;
+
+    setState(() {
+      _isMuted = nextMuted;
+    });
+  }
+
+  @override
+  void dispose() {
+    final controller = _controller;
+    _controller = null;
+    controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: FutureBuilder<void>(
+          future: _initializeFuture,
+          builder: (context, snapshot) {
+            final controller = _controller;
+            final isReady = controller?.value.isInitialized ?? false;
+
+            if (!isReady) {
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: _VideoPlaceholder(
+                      isLoading:
+                          snapshot.connectionState == ConnectionState.waiting,
+                      hasError: snapshot.hasError,
+                    ),
+                  ),
+                  _FullscreenTopBar(onClose: () => Navigator.of(context).pop()),
+                ],
+              );
+            }
+
+            return ValueListenableBuilder<VideoPlayerValue>(
+              valueListenable: controller!,
+              builder: (context, value, _) {
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _togglePlay,
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio:
+                                value.aspectRatio > 0
+                                    ? value.aspectRatio
+                                    : 16 / 9,
+                            child: VideoPlayer(controller),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _FullscreenTopBar(
+                      onClose: () => Navigator.of(context).pop(),
+                    ),
+                    if (!value.isPlaying)
+                      Center(
+                        child: InkResponse(
+                          onTap: _togglePlay,
+                          radius: 44,
+                          child: const Icon(
+                            Iconsax.play_circle,
+                            size: 72,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                      child: _FullscreenControls(
+                        controller: controller,
+                        value: value,
+                        isMuted: _isMuted,
+                        onTogglePlay: _togglePlay,
+                        onToggleMute: _toggleMute,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _FullscreenTopBar extends StatelessWidget {
+  const _FullscreenTopBar({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 8,
+      left: 8,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.5),
+        shape: const CircleBorder(),
+        child: InkResponse(
+          onTap: onClose,
+          radius: 22,
+          child: const SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(Icons.close, color: Colors.white, size: 22),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FullscreenControls extends StatelessWidget {
+  const _FullscreenControls({
+    required this.controller,
+    required this.value,
+    required this.isMuted,
+    required this.onTogglePlay,
+    required this.onToggleMute,
+  });
+
+  final VideoPlayerController controller;
+  final VideoPlayerValue value;
+  final bool isMuted;
+  final VoidCallback onTogglePlay;
+  final VoidCallback onToggleMute;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                InkResponse(
+                  onTap: onTogglePlay,
+                  radius: 22,
+                  child: SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: Icon(
+                      value.isPlaying ? Iconsax.pause : Iconsax.play,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${_formatDuration(value.position)} / '
+                  '${_formatDuration(value.duration)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                InkResponse(
+                  onTap: onToggleMute,
+                  radius: 22,
+                  child: SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: Icon(
+                      isMuted ? Iconsax.volume_slash : Iconsax.volume_high,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            VideoProgressIndicator(
+              controller,
+              allowScrubbing: true,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              colors: const VideoProgressColors(
+                playedColor: Colors.white,
+                bufferedColor: Colors.white38,
+                backgroundColor: Colors.white24,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
