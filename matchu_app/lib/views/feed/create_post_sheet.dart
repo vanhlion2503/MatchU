@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -13,6 +15,7 @@ import 'package:matchu_app/views/feed/widgets/post_media_gallery.dart';
 import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:video_player/video_player.dart';
 
 class CreatePostSheet extends StatefulWidget {
   const CreatePostSheet({
@@ -840,7 +843,9 @@ class _BottomToolbar extends StatelessWidget {
             _ToolbarIconButton(
               icon: Iconsax.video_add,
               onTap:
-                  controller.isPickingMedia.value ? null : controller.pickVideo,
+                  controller.isPickingMedia.value
+                      ? null
+                      : () => _showVideoLibrary(context),
               palette: palette,
             ),
             const SizedBox(width: 14),
@@ -897,6 +902,29 @@ class _BottomToolbar extends StatelessWidget {
     if (selections == null || selections.isEmpty) return;
 
     controller.addImageFiles(
+      selections.map((selection) => selection.file).toList(growable: false),
+    );
+  }
+
+  Future<void> _showVideoLibrary(BuildContext context) async {
+    final remainingSlots = controller.remainingMediaSlots;
+    if (remainingSlots <= 0) {
+      controller.showMediaLimitNotice();
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    final selections = await PhotoLibraryBottomSheet.show(
+      context,
+      maxSelection: remainingSlots,
+      mediaType: PhotoLibraryMediaType.video,
+      title: 'Thư viện video',
+      heightFactor: 0.5,
+    );
+    if (!context.mounted) return;
+    if (selections == null || selections.isEmpty) return;
+
+    controller.addVideoFiles(
       selections.map((selection) => selection.file).toList(growable: false),
     );
   }
@@ -1169,24 +1197,9 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
                                 color: palette.iconMuted,
                               ),
                         )
-                        : DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF0F172A),
-                                palette.surfaceMuted,
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Iconsax.play_circle,
-                              color: Colors.white,
-                              size: 34,
-                            ),
-                          ),
+                        : _ComposerVideoPreview(
+                          url: media.url,
+                          palette: palette,
                         ),
               ),
             ),
@@ -1215,8 +1228,6 @@ class _DraftMediaPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (draft.isAudio) {
       return Align(
         alignment: Alignment.topLeft,
@@ -1260,48 +1271,9 @@ class _DraftMediaPreviewCard extends StatelessWidget {
                 child:
                     draft.isImage
                         ? Image.file(draft.file, fit: BoxFit.cover)
-                        : DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFF0F172A),
-                                palette.surfaceMuted,
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Iconsax.play_circle,
-                                  color: Colors.white,
-                                  size: 34,
-                                ),
-                                const Spacer(),
-                                Text(
-                                  'Video',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  draft.fileName,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        : _ComposerVideoPreview(
+                          localFile: draft.file,
+                          palette: palette,
                         ),
               ),
             ),
@@ -1312,6 +1284,186 @@ class _DraftMediaPreviewCard extends StatelessWidget {
             child: _RemoveMediaButton(onTap: onRemove),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ComposerVideoPreview extends StatefulWidget {
+  const _ComposerVideoPreview({
+    required this.palette,
+    this.url,
+    this.localFile,
+  });
+
+  final String? url;
+  final File? localFile;
+  final _CreatePostPalette palette;
+
+  @override
+  State<_ComposerVideoPreview> createState() => _ComposerVideoPreviewState();
+}
+
+class _ComposerVideoPreviewState extends State<_ComposerVideoPreview> {
+  VideoPlayerController? _controller;
+  Future<void>? _initializeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ComposerVideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url ||
+        oldWidget.localFile?.path != widget.localFile?.path) {
+      _disposeController();
+      _setupController();
+    }
+  }
+
+  void _setupController() {
+    final localFile = widget.localFile;
+    final url = widget.url?.trim() ?? '';
+
+    if (localFile == null && url.isEmpty) {
+      _initializeFuture = Future<void>.error(
+        const FormatException('Missing video source'),
+      );
+      return;
+    }
+
+    final uri = localFile == null ? Uri.tryParse(url) : null;
+    if (localFile == null && uri == null) {
+      _initializeFuture = Future<void>.error(
+        const FormatException('Invalid video url'),
+      );
+      return;
+    }
+
+    final controller =
+        localFile != null
+            ? VideoPlayerController.file(localFile)
+            : VideoPlayerController.networkUrl(uri!);
+    _controller = controller;
+    _initializeFuture = controller.initialize().then((_) async {
+      await controller.setLooping(false);
+      await controller.setVolume(0);
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  void _disposeController() {
+    final controller = _controller;
+    _controller = null;
+    controller?.dispose();
+  }
+
+  @override
+  void dispose() {
+    _disposeController();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initializeFuture,
+      builder: (context, snapshot) {
+        final controller = _controller;
+        final isReady = controller?.value.isInitialized ?? false;
+
+        if (!isReady) {
+          return _ComposerVideoPlaceholder(
+            palette: widget.palette,
+            isLoading: snapshot.connectionState == ConnectionState.waiting,
+            hasError: snapshot.hasError,
+          );
+        }
+
+        return ValueListenableBuilder<VideoPlayerValue>(
+          valueListenable: controller!,
+          builder: (context, value, _) {
+            final videoSize = value.size;
+            final hasSize = videoSize.width > 0 && videoSize.height > 0;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: hasSize ? videoSize.width : 160,
+                    height: hasSize ? videoSize.height : 200,
+                    child: VideoPlayer(controller),
+                  ),
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.24),
+                      ],
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.42),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Iconsax.play_circle,
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ComposerVideoPlaceholder extends StatelessWidget {
+  const _ComposerVideoPlaceholder({
+    required this.palette,
+    required this.isLoading,
+    required this.hasError,
+  });
+
+  final _CreatePostPalette palette;
+  final bool isLoading;
+  final bool hasError;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: palette.surfaceMuted,
+      child: Center(
+        child:
+            hasError
+                ? Icon(Iconsax.video_slash, color: palette.iconMuted, size: 32)
+                : isLoading
+                ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                : Icon(Iconsax.play_circle, color: palette.iconMuted, size: 32),
       ),
     );
   }

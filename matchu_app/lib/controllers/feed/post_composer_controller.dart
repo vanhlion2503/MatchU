@@ -128,6 +128,22 @@ class PostComposerController extends GetxController {
     _appendMedia(drafts);
   }
 
+  void addVideoFiles(List<File> files) {
+    if (files.isEmpty) return;
+
+    final drafts = files
+        .map(
+          (file) => PostMediaDraft(
+            file: file,
+            type: PostMediaType.video,
+            fileName: _fileNameFromPath(file.path),
+          ),
+        )
+        .toList(growable: false);
+
+    _appendMedia(drafts);
+  }
+
   Future<void> pickCameraImage() async {
     if (isPickingMedia.value) return;
 

@@ -13,10 +13,13 @@ class PhotoLibrarySelection {
   final String fileName;
 }
 
+enum PhotoLibraryMediaType { image, video }
+
 class PhotoLibraryBottomSheet extends StatefulWidget {
   const PhotoLibraryBottomSheet({
     super.key,
     required this.maxSelection,
+    this.mediaType = PhotoLibraryMediaType.image,
     this.title = 'Chọn ảnh',
     this.heightFactor = 0.5,
     this.showCameraTile = false,
@@ -24,6 +27,7 @@ class PhotoLibraryBottomSheet extends StatefulWidget {
   });
 
   final int maxSelection;
+  final PhotoLibraryMediaType mediaType;
   final String title;
   final double heightFactor;
   final bool showCameraTile;
@@ -32,6 +36,7 @@ class PhotoLibraryBottomSheet extends StatefulWidget {
   static Future<List<PhotoLibrarySelection>?> show(
     BuildContext context, {
     required int maxSelection,
+    PhotoLibraryMediaType mediaType = PhotoLibraryMediaType.image,
     String title = 'Chọn ảnh',
     double heightFactor = 0.5,
     bool showCameraTile = false,
@@ -49,6 +54,7 @@ class PhotoLibraryBottomSheet extends StatefulWidget {
       builder:
           (_) => PhotoLibraryBottomSheet(
             maxSelection: maxSelection,
+            mediaType: mediaType,
             title: title,
             heightFactor: heightFactor,
             showCameraTile: showCameraTile,
@@ -106,7 +112,7 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
     }
 
     final paths = await PhotoManager.getAssetPathList(
-      type: RequestType.image,
+      type: widget.mediaType.requestType,
       onlyAll: true,
       filterOption: FilterOptionGroup(
         imageOption: const FilterOption(
@@ -230,7 +236,7 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
     if (slashIndex >= 0 && slashIndex < normalized.length - 1) {
       return normalized.substring(slashIndex + 1);
     }
-    return 'image_${asset.id}.jpg';
+    return '${widget.mediaType.filePrefix}_${asset.id}.${widget.mediaType.fallbackExtension}';
   }
 
   @override
@@ -297,7 +303,7 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
     }
 
     if (_assets.isEmpty && !widget.showCameraTile) {
-      return _EmptyStateView(palette: palette);
+      return _EmptyStateView(palette: palette, mediaType: widget.mediaType);
     }
 
     return GridView.builder(
@@ -339,6 +345,7 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
           asset: asset,
           selectionIndex: selectedIndex,
           palette: palette,
+          mediaType: widget.mediaType,
           onTap: () => _toggleSelection(asset),
         );
       },
@@ -461,12 +468,14 @@ class _PhotoTile extends StatelessWidget {
     required this.asset,
     required this.selectionIndex,
     required this.palette,
+    required this.mediaType,
     required this.onTap,
   });
 
   final AssetEntity asset;
   final int selectionIndex;
   final _PhotoLibraryPalette palette;
+  final PhotoLibraryMediaType mediaType;
   final VoidCallback onTap;
 
   @override
@@ -481,6 +490,12 @@ class _PhotoTile extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             _AssetThumbnail(asset: asset, palette: palette),
+            if (mediaType == PhotoLibraryMediaType.video)
+              Positioned(
+                left: 6,
+                bottom: 6,
+                child: _VideoDurationBadge(durationSeconds: asset.duration),
+              ),
             AnimatedOpacity(
               duration: const Duration(milliseconds: 140),
               opacity: isSelected ? 1 : 0,
@@ -504,6 +519,38 @@ class _PhotoTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VideoDurationBadge extends StatelessWidget {
+  const _VideoDurationBadge({required this.durationSeconds});
+
+  final int durationSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Iconsax.play, color: Colors.white, size: 10),
+          const SizedBox(width: 3),
+          Text(
+            _formatAssetDuration(durationSeconds),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -630,9 +677,10 @@ class _PermissionStateView extends StatelessWidget {
 }
 
 class _EmptyStateView extends StatelessWidget {
-  const _EmptyStateView({required this.palette});
+  const _EmptyStateView({required this.palette, required this.mediaType});
 
   final _PhotoLibraryPalette palette;
+  final PhotoLibraryMediaType mediaType;
 
   @override
   Widget build(BuildContext context) {
@@ -645,13 +693,22 @@ class _EmptyStateView extends StatelessWidget {
         children: [
           Icon(Iconsax.gallery, size: 40, color: palette.icon),
           const SizedBox(height: 10),
-          Text(
-            'Thư viện chưa có ảnh',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: palette.textPrimary,
+          if (mediaType == PhotoLibraryMediaType.video)
+            Text(
+              'Thư viện chưa có video',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: palette.textPrimary,
+              ),
+            )
+          else
+            Text(
+              'Thư viện chưa có ảnh',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: palette.textPrimary,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -692,4 +749,40 @@ class _PhotoLibraryPalette {
       textSecondary: theme.colorScheme.onSurface.withValues(alpha: 0.68),
     );
   }
+}
+
+extension on PhotoLibraryMediaType {
+  RequestType get requestType {
+    switch (this) {
+      case PhotoLibraryMediaType.image:
+        return RequestType.image;
+      case PhotoLibraryMediaType.video:
+        return RequestType.video;
+    }
+  }
+
+  String get filePrefix {
+    switch (this) {
+      case PhotoLibraryMediaType.image:
+        return 'image';
+      case PhotoLibraryMediaType.video:
+        return 'video';
+    }
+  }
+
+  String get fallbackExtension {
+    switch (this) {
+      case PhotoLibraryMediaType.image:
+        return 'jpg';
+      case PhotoLibraryMediaType.video:
+        return 'mp4';
+    }
+  }
+}
+
+String _formatAssetDuration(int seconds) {
+  if (seconds <= 0) return '00:00';
+  final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
+  final remainingSeconds = (seconds % 60).toString().padLeft(2, '0');
+  return '$minutes:$remainingSeconds';
 }
