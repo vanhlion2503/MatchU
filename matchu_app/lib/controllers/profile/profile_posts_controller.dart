@@ -63,6 +63,7 @@ class ProfilePostsController extends GetxController {
   final RxBool isRefreshing = false.obs;
   final RxBool isLoadingMore = false.obs;
   final RxBool hasMore = true.obs;
+  final RxInt postSubmissionCount = 0.obs;
   final RxnString errorMessage = RxnString();
 
   final Map<String, bool> _likeCache = <String, bool>{};
@@ -88,6 +89,16 @@ class ProfilePostsController extends GetxController {
   _lastDocumentsByScope = <String, DocumentSnapshot<Map<String, dynamic>>>{};
   String get currentUserId => _service.uid;
   Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
+  bool get isPostSubmissionPending => postSubmissionCount.value > 0;
+
+  void beginPostSubmission() {
+    postSubmissionCount.value = postSubmissionCount.value + 1;
+  }
+
+  void endPostSubmission() {
+    if (postSubmissionCount.value <= 0) return;
+    postSubmissionCount.value = postSubmissionCount.value - 1;
+  }
 
   bool isPostRemoving(String postId) {
     final normalizedPostId = postId.trim();

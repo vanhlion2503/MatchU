@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
@@ -115,6 +116,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           .toList(growable: false);
       final savedStatus = savedController?.status.value;
       final savedPosts = savedController?.posts.toList(growable: false);
+      final isPostSubmitting =
+          widget.isOwnerView && postsController.isPostSubmissionPending;
       final tabIndex = _tabController.index;
       final resolvedSavedController = savedController;
       final resolvedSavedControllerTag = savedControllerTag;
@@ -201,6 +204,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
               controller: _tabController,
               showSavedTab: canShowSavedTab,
             ),
+            _ProfilePostSubmissionStatusBar(isVisible: isPostSubmitting),
             AnimatedSize(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
@@ -614,14 +618,23 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
   }
 
   void _handleDetachedPostSubmission(Future<PostModel?> submitFuture) {
-    unawaited(_resolveDetachedPostSubmission(submitFuture));
+    final controller = Get.find<ProfilePostsController>(
+      tag: widget.controllerTag,
+    );
+    controller.beginPostSubmission();
+    unawaited(_resolveDetachedPostSubmission(submitFuture, controller));
   }
 
   Future<void> _resolveDetachedPostSubmission(
     Future<PostModel?> submitFuture,
+    ProfilePostsController controller,
   ) async {
-    final createdPost = await submitFuture;
-    _handlePostCreated(createdPost);
+    try {
+      final createdPost = await submitFuture;
+      _handlePostCreated(createdPost);
+    } finally {
+      controller.endPostSubmission();
+    }
   }
 
   Future<void> _editPost(BuildContext context, PostModel post) async {
@@ -667,8 +680,8 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     PostCreationSync.sync(createdPost);
     if (createdPost.isModerationPending) {
       Get.snackbar(
-        'Äang kiá»ƒm duyá»‡t video',
-        'BÃ i viáº¿t sáº½ hiá»ƒn thá»‹ theo quyá»n riÃªng tÆ° Ä‘Ã£ chá»n sau khi video Ä‘Æ°á»£c duyá»‡t.',
+        'Đang kiểm duyệt video',
+        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -820,6 +833,82 @@ class _ProfilePostsTabBar extends StatelessWidget {
           if (showSavedTab) const Tab(text: 'Lưu trữ'),
         ],
       ),
+    );
+  }
+}
+
+class _ProfilePostSubmissionStatusBar extends StatelessWidget {
+  const _ProfilePostSubmissionStatusBar({required this.isVisible});
+
+  final bool isVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return SizeTransition(
+          sizeFactor: animation,
+          axisAlignment: -1,
+          child: FadeTransition(opacity: animation, child: child),
+        );
+      },
+      child:
+          isVisible
+              ? DecoratedBox(
+                key: const ValueKey<String>(
+                  'profile_post_submission_status_visible',
+                ),
+                decoration: BoxDecoration(
+                  color: palette.surface,
+                  border: Border(bottom: BorderSide(color: palette.border)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(
+                      minHeight: 3,
+                      color: theme.colorScheme.primary,
+                      backgroundColor: theme.colorScheme.primary.withValues(
+                        alpha: 0.12,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Iconsax.clock,
+                            size: 18,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Đang xử lý bài viết...',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: palette.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              : const SizedBox(
+                key: ValueKey<String>('profile_post_submission_status_hidden'),
+              ),
     );
   }
 }

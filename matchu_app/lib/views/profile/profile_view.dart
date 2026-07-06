@@ -35,14 +35,33 @@ class ProfileView extends StatelessWidget {
   }
 
   void _handleDetachedPostSubmission(Future<PostModel?> submitFuture) {
-    unawaited(_resolveDetachedPostSubmission(submitFuture));
+    final postsController = _ownerPostsController();
+    postsController?.beginPostSubmission();
+    unawaited(_resolveDetachedPostSubmission(submitFuture, postsController));
   }
 
   Future<void> _resolveDetachedPostSubmission(
     Future<PostModel?> submitFuture,
+    ProfilePostsController? postsController,
   ) async {
-    final createdPost = await submitFuture;
-    _handlePostCreated(createdPost);
+    try {
+      final createdPost = await submitFuture;
+      _handlePostCreated(createdPost);
+    } finally {
+      postsController?.endPostSubmission();
+    }
+  }
+
+  ProfilePostsController? _ownerPostsController() {
+    if (!Get.isRegistered<ProfileController>()) return null;
+
+    final userId = Get.find<ProfileController>().user.value?.uid.trim() ?? '';
+    if (userId.isEmpty) return null;
+
+    final tag = ProfilePostsController.ownerProfileTag(userId);
+    if (!Get.isRegistered<ProfilePostsController>(tag: tag)) return null;
+
+    return Get.find<ProfilePostsController>(tag: tag);
   }
 
   void _handlePostCreated(PostModel? createdPost) {
@@ -51,8 +70,8 @@ class ProfileView extends StatelessWidget {
     PostCreationSync.sync(createdPost);
     if (createdPost.isModerationPending) {
       Get.snackbar(
-        'Äang kiá»ƒm duyá»‡t video',
-        'BÃ i viáº¿t sáº½ hiá»ƒn thá»‹ theo quyá»n riÃªng tÆ° Ä‘Ã£ chá»n sau khi video Ä‘Æ°á»£c duyá»‡t.',
+        'Đang kiểm duyệt video',
+        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
