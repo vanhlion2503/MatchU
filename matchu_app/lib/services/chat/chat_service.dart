@@ -212,6 +212,83 @@ class ChatService {
     await batch.commit();
   }
 
+  Future<void> sendVoiceMessage({
+    required String roomId,
+    required File file,
+    required String fileName,
+    required int durationMs,
+    String? replyToId,
+    String? replyText,
+    void Function(double progress)? onUploadProgress,
+  }) async {
+    final roomRef = _db.collection("chatRooms").doc(roomId);
+    final msgRef = roomRef.collection("messages").doc();
+
+    final roomSnap = await roomRef.get();
+    final participants = List<String>.from(roomSnap["participants"]);
+    final otherUid = participants.firstWhere((e) => e != uid);
+    await _ensureCanMessage(otherUid);
+
+    final voicePath =
+        "chatRooms/$roomId/voices/${msgRef.id}.${_fileExtension(fileName)}";
+    final storageRef = _storage.ref(voicePath);
+
+    final uploadTask = storageRef.putFile(
+      file,
+      SettableMetadata(
+        contentType: _voiceContentType(fileName),
+        cacheControl: "no-store",
+      ),
+    );
+
+    StreamSubscription<TaskSnapshot>? uploadSub;
+    if (onUploadProgress != null) {
+      uploadSub = uploadTask.snapshotEvents.listen((snapshot) {
+        if (snapshot.totalBytes > 0) {
+          onUploadProgress(snapshot.bytesTransferred / snapshot.totalBytes);
+        }
+      });
+    }
+
+    try {
+      await uploadTask;
+      onUploadProgress?.call(1.0);
+    } finally {
+      await uploadSub?.cancel();
+    }
+
+    final voiceUrl = await storageRef.getDownloadURL();
+    final batch = _db.batch();
+
+    batch.set(msgRef, {
+      "senderId": uid,
+      "text": "Ghi am",
+      "type": "voice",
+      "notificationPreview": "Da gui mot ghi am",
+      "voiceUrl": voiceUrl,
+      "voicePath": voicePath,
+      "voiceDurationMs": durationMs,
+      "replyToId": replyToId,
+      "replyText": replyText,
+      "createdAt": FieldValue.serverTimestamp(),
+    });
+
+    batch.update(roomRef, {
+      "lastMessage": "Ghi am",
+      "lastMessageType": "voice",
+      "lastMessageCipher": FieldValue.delete(),
+      "lastMessageIv": FieldValue.delete(),
+      "lastMessageKeyId": 0,
+      "lastSenderId": uid,
+      "lastMessageAt": FieldValue.serverTimestamp(),
+      "deletedFor.$otherUid": FieldValue.delete(),
+      "unread.$otherUid": FieldValue.increment(1),
+      "unread.$uid": 0,
+    });
+
+    await batch.commit();
+  }
+
   Future<void> markAsRead(String roomId) async {
     await _db.collection("chatRooms").doc(roomId).update({"unread.$uid": 0});
   }
@@ -367,5 +444,26 @@ class ChatService {
 
   String _buildImageNotificationPreview() {
     return "Đã gửi một ảnh";
+  }
+
+  String _fileExtension(String fileName) {
+    final normalized = fileName.split('?').first.toLowerCase();
+    final parts = normalized.split('.');
+    if (parts.length < 2) return 'm4a';
+    final extension = parts.last.trim();
+    return extension.isEmpty ? 'm4a' : extension;
+  }
+
+  String _voiceContentType(String fileName) {
+    switch (_fileExtension(fileName)) {
+      case 'aac':
+        return 'audio/aac';
+      case 'wav':
+        return 'audio/wav';
+      case 'mp3':
+        return 'audio/mpeg';
+      default:
+        return 'audio/mp4';
+    }
   }
 }

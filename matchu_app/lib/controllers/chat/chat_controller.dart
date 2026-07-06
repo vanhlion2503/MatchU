@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -19,6 +20,8 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 class ChatController extends GetxController {
   final String roomId;
@@ -48,6 +51,7 @@ class ChatController extends GetxController {
   final RxList<PendingImageMessage> pendingImageMessages =
       <PendingImageMessage>[].obs;
   final ImagePicker _picker = ImagePicker();
+  final AudioRecorder _audioRecorder = AudioRecorder();
 
   // ================= STATE =================
   final RxnString otherUid;
@@ -55,6 +59,9 @@ class ChatController extends GetxController {
   final isTyping = false.obs;
   final otherTyping = false.obs;
   final showEmoji = false.obs;
+  final isRecordingVoice = false.obs;
+  final voiceRecordingSeconds = 0.obs;
+  final RxList<double> voiceRecordingAmplitudes = <double>[].obs;
 
   /// 👉 user có đang đọc lịch sử hay không
   final RxBool userScrolledUp = false.obs;
@@ -88,6 +95,9 @@ class ChatController extends GetxController {
 
   StreamSubscription? _roomSub;
   Timer? _typingTimer;
+  Timer? _voiceTimer;
+  StreamSubscription<Amplitude>? _voiceAmplitudeSubscription;
+  DateTime? _voiceStartedAt;
   String? tempRoomId;
   late final PresenceController _presence;
 
@@ -745,6 +755,158 @@ class ChatController extends GetxController {
     }
   }
 
+  Future<void> startVoiceRecording() async {
+    if (editingMessage.value != null ||
+        isRecordingVoice.value ||
+        pendingImageMessages.any((pending) => pending.type == "voice")) {
+      return;
+    }
+
+    try {
+      hideEmoji();
+      inputFocusNode.unfocus();
+
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        Get.snackbar("Loi", "Can quyen microphone de ghi am.");
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final path =
+          '${tempDir.path}/chat_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+
+      await _audioRecorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc),
+        path: path,
+      );
+
+      _voiceStartedAt = DateTime.now();
+      voiceRecordingSeconds.value = 0;
+      voiceRecordingAmplitudes.clear();
+      isRecordingVoice.value = true;
+
+      _voiceAmplitudeSubscription?.cancel();
+      _voiceAmplitudeSubscription = _audioRecorder
+          .onAmplitudeChanged(const Duration(milliseconds: 80))
+          .listen(_appendVoiceAmplitude);
+
+      _voiceTimer?.cancel();
+      _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        final startedAt = _voiceStartedAt;
+        if (startedAt == null) return;
+        voiceRecordingSeconds.value =
+            DateTime.now().difference(startedAt).inSeconds;
+      });
+    } catch (error) {
+      Get.snackbar("Loi", "Khong the bat dau ghi am luc nay.");
+    }
+  }
+
+  Future<void> stopAndSendVoiceRecording({bool send = true}) async {
+    if (!isRecordingVoice.value) return;
+
+    String? path;
+    var durationMs = voiceRecordingSeconds.value * 1000;
+
+    try {
+      final startedAt = _voiceStartedAt;
+      path = await _audioRecorder.stop();
+      if (startedAt != null) {
+        durationMs = DateTime.now().difference(startedAt).inMilliseconds;
+      }
+    } catch (_) {
+      Get.snackbar("Loi", "Khong the luu ghi am luc nay.");
+    } finally {
+      _voiceAmplitudeSubscription?.cancel();
+      _voiceAmplitudeSubscription = null;
+      _voiceTimer?.cancel();
+      _voiceTimer = null;
+      _voiceStartedAt = null;
+      voiceRecordingSeconds.value = 0;
+      voiceRecordingAmplitudes.clear();
+      isRecordingVoice.value = false;
+    }
+
+    if (!send || path == null || durationMs < 1000) return;
+    await sendVoiceFile(File(path), durationMs: durationMs);
+  }
+
+  Future<void> sendVoiceFile(File voiceFile, {required int durationMs}) async {
+    if (editingMessage.value != null) return;
+
+    _justSentMessage = true;
+    _typingTimer?.cancel();
+    isTyping.value = false;
+    await _service.setTyping(roomId: roomId, isTyping: false);
+
+    final reply = replyingMessage.value;
+    final pending = PendingImageMessage(
+      id: "local_voice_${DateTime.now().microsecondsSinceEpoch}",
+      type: "voice",
+      localPath: voiceFile.path,
+      durationMs: durationMs,
+    );
+    pendingImageMessages.insert(0, pending);
+
+    try {
+      await _service.sendVoiceMessage(
+        roomId: roomId,
+        file: voiceFile,
+        fileName: _fileNameFromPath(voiceFile.path),
+        durationMs: durationMs,
+        replyToId: reply?["id"],
+        replyText: reply?["text"],
+        onUploadProgress: (progress) {
+          pending.progress.value = progress.clamp(0.0, 1.0);
+        },
+      );
+      if (pendingImageMessages.contains(pending)) {
+        pendingImageMessages.remove(pending);
+      }
+      replyingMessage.value = null;
+    } catch (error) {
+      pending.failed.value = true;
+      Get.snackbar(
+        "Loi",
+        error is StateError ? error.message : "Khong the gui ghi am.",
+      );
+      Future.delayed(const Duration(seconds: 2), () {
+        pendingImageMessages.remove(pending);
+      });
+    }
+  }
+
+  void _appendVoiceAmplitude(Amplitude amplitude) {
+    if (!isRecordingVoice.value) return;
+
+    final normalized = _normalizeVoiceAmplitude(amplitude.current);
+    voiceRecordingAmplitudes.add(normalized);
+    const maxSamples = 96;
+    if (voiceRecordingAmplitudes.length > maxSamples) {
+      voiceRecordingAmplitudes.removeRange(
+        0,
+        voiceRecordingAmplitudes.length - maxSamples,
+      );
+    }
+  }
+
+  double _normalizeVoiceAmplitude(double decibels) {
+    if (decibels.isNaN || decibels.isInfinite) return 0.08;
+    const silenceFloor = -55.0;
+    const speechCeiling = -8.0;
+    final normalized = ((decibels - silenceFloor) /
+            (speechCeiling - silenceFloor))
+        .clamp(0.0, 1.0);
+    return math.pow(normalized, 1.25).toDouble();
+  }
+
+  String _fileNameFromPath(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    final index = normalized.lastIndexOf('/');
+    return index == -1 ? normalized : normalized.substring(index + 1);
+  }
+
   bool _isLatestMessage(String messageId) {
     final index = _messageIndexMap[messageId];
     return index == 0;
@@ -1368,6 +1530,12 @@ class ChatController extends GetxController {
   @override
   void onClose() {
     _typingTimer?.cancel();
+    _voiceAmplitudeSubscription?.cancel();
+    _voiceTimer?.cancel();
+    if (isRecordingVoice.value) {
+      unawaited(_audioRecorder.cancel());
+    }
+    unawaited(_audioRecorder.dispose());
     _roomSub?.cancel();
     dismissFocusedInputUi();
     inputController.dispose();
@@ -1383,6 +1551,7 @@ class ChatController extends GetxController {
     _decrypting.clear();
     deletedMessageIds.clear();
     pendingImageMessages.clear();
+    voiceRecordingAmplitudes.clear();
     allMessages.clear();
     if (Get.isRegistered<NotificationController>()) {
       Get.find<NotificationController>().restoreAfterChatClosed(roomId);
@@ -1393,8 +1562,16 @@ class ChatController extends GetxController {
 
 class PendingImageMessage {
   final String id;
+  final String type;
+  final String? localPath;
+  final int? durationMs;
   final RxDouble progress = 0.0.obs;
   final RxBool failed = false.obs;
 
-  PendingImageMessage({required this.id});
+  PendingImageMessage({
+    required this.id,
+    this.type = "image",
+    this.localPath,
+    this.durationMs,
+  });
 }

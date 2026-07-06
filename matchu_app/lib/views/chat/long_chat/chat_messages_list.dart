@@ -17,6 +17,7 @@ import 'package:matchu_app/views/chat/long_chat/chat_row_permanent.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 
 class ChatMessagesList extends StatefulWidget {
   final ChatController controller;
@@ -191,6 +192,17 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                         ? "deleted"
                         : messageType;
                 final isDeleted = effectiveType == "deleted";
+                final voiceUrl =
+                    data["voiceUrl"] is String
+                        ? data["voiceUrl"] as String
+                        : "";
+                final voiceDurationRaw = data["voiceDurationMs"];
+                final int? voiceDurationMs =
+                    voiceDurationRaw is int
+                        ? voiceDurationRaw
+                        : (voiceDurationRaw is num
+                            ? voiceDurationRaw.toInt()
+                            : null);
 
                 // ✅ Lưu bubbleKey để không bị tạo lại mỗi lần rebuild
                 final bubbleKey = _bubbleKeys.putIfAbsent(
@@ -330,6 +342,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                   callStatus: callStatus,
                                   callType: callType,
                                   callDurationSeconds: callDurationSeconds,
+                                  voiceUrl: voiceUrl,
+                                  voiceDurationMs: voiceDurationMs,
                                   onRecallPressed:
                                       effectiveType == "call"
                                           ? () {
@@ -412,8 +426,12 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     return Obx(() {
       final progress = pending.progress.value;
       final failed = pending.failed.value;
+      final isVoice = pending.type == "voice";
 
-      final label = failed ? "Gửi ảnh" : "Đang gửi ảnh...";
+      final label =
+          failed
+              ? (isVoice ? "Gui ghi am" : "Gửi ảnh")
+              : (isVoice ? "Dang gui ghi am..." : "Đang gửi ảnh...");
 
       return Padding(
         padding: const EdgeInsets.only(top: 10),
@@ -437,23 +455,51 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Iconsax.gallery, size: 20, color: textColor),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  label,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: textColor,
-                                    fontWeight: FontWeight.w600,
+                          if (isVoice) ...[
+                            PostVoicePlayer(
+                              url: '',
+                              localPath: pending.localPath,
+                              durationMs: pending.durationMs,
+                              compact: true,
+                              backgroundColor: Colors.transparent,
+                              borderColor: textColor.withValues(alpha: 0.16),
+                              activeColor: textColor,
+                              inactiveColor: textColor.withValues(alpha: 0.32),
+                              iconColor: textColor,
+                              textColor: textColor.withValues(alpha: 0.78),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              label,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: textColor.withValues(alpha: 0.86),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ] else ...[
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Iconsax.gallery,
+                                  size: 20,
+                                  color: textColor,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    label,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: textColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
                             value:

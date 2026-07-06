@@ -13,12 +13,24 @@ class PostVoicePlayer extends StatefulWidget {
     this.localPath,
     this.durationMs,
     this.compact = false,
+    this.backgroundColor,
+    this.borderColor,
+    this.activeColor,
+    this.inactiveColor,
+    this.iconColor,
+    this.textColor,
   });
 
   final String url;
   final String? localPath;
   final int? durationMs;
   final bool compact;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? activeColor;
+  final Color? inactiveColor;
+  final Color? iconColor;
+  final Color? textColor;
 
   @override
   State<PostVoicePlayer> createState() => _PostVoicePlayerState();
@@ -29,6 +41,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
   StreamSubscription<PlayerState>? _stateSubscription;
   StreamSubscription<Duration>? _positionSubscription;
   bool _isLoading = false;
+  bool _cancelPlaybackRequest = false;
   Duration _position = Duration.zero;
   Duration? _duration;
 
@@ -70,9 +83,19 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
   }
 
   Future<void> _togglePlayback() async {
-    if (_isLoading) return;
-
     try {
+      if (_isLoading) {
+        _cancelPlaybackRequest = true;
+        await _player.stop();
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _position = Duration.zero;
+          });
+        }
+        return;
+      }
+
       if (_player.playing) {
         await _player.pause();
         return;
@@ -80,9 +103,15 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
 
       if (_player.duration == null) {
         setState(() => _isLoading = true);
+        _cancelPlaybackRequest = false;
         final source = _resolveSource();
         if (source == null) return;
         _duration = await _player.setAudioSource(source);
+        if (_cancelPlaybackRequest) {
+          await _player.pause();
+          await _player.seek(Duration.zero);
+          return;
+        }
       }
 
       await _player.play();
@@ -93,7 +122,10 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
       );
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _cancelPlaybackRequest = false;
+        });
       }
     }
   }
@@ -128,12 +160,20 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
     final hasPlayableSource =
         widget.url.trim().isNotEmpty ||
         (widget.localPath?.trim().isNotEmpty ?? false);
+    final backgroundColor = widget.backgroundColor ?? palette.surfaceMuted;
+    final borderColor =
+        widget.borderColor ?? palette.border.withValues(alpha: 0.9);
+    final iconColor = widget.iconColor ?? palette.iconPrimary;
+    final activeColor = widget.activeColor ?? palette.textPrimary;
+    final inactiveColor =
+        widget.inactiveColor ?? palette.border.withValues(alpha: 0.9);
+    final textColor = widget.textColor ?? palette.textSecondary;
     final radius = BorderRadius.circular(10);
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: widget.compact ? 280 : 420),
       child: Material(
-        color: palette.surfaceMuted,
+        color: backgroundColor,
         borderRadius: radius,
         child: InkWell(
           onTap: hasPlayableSource ? _togglePlayback : null,
@@ -146,7 +186,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
             ),
             decoration: BoxDecoration(
               borderRadius: radius,
-              border: Border.all(color: palette.border.withValues(alpha: 0.9)),
+              border: Border.all(color: borderColor),
             ),
             child: Row(
               children: [
@@ -161,13 +201,13 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
                               height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.iconPrimary,
+                                color: iconColor,
                               ),
                             )
                             : Icon(
                               _player.playing ? Iconsax.pause : Iconsax.play,
                               size: 20,
-                              color: palette.iconPrimary,
+                              color: iconColor,
                             ),
                   ),
                 ),
@@ -176,8 +216,8 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
                   child: VoiceWaveform(
                     progress: progress,
                     seed: _waveformSeed(widget.url, widget.localPath),
-                    activeColor: palette.textPrimary,
-                    inactiveColor: palette.border.withValues(alpha: 0.9),
+                    activeColor: activeColor,
+                    inactiveColor: inactiveColor,
                     barCount: widget.compact ? 34 : 44,
                     maxBarHeight: widget.compact ? 22 : 26,
                   ),
@@ -186,7 +226,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
                 Text(
                   _formatDuration(duration ?? _position),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: palette.textSecondary,
+                    color: textColor,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

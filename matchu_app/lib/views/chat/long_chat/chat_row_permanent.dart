@@ -8,6 +8,7 @@ import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
 import 'package:matchu_app/views/chat/long_chat/call_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
 import 'package:matchu_app/views/chat/long_chat/seen_avatar_animated.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 
 class ChatRowPermanent extends StatelessWidget {
   final String messageId;
@@ -36,6 +37,9 @@ class ChatRowPermanent extends StatelessWidget {
   final String? callStatus;
   final String? callType;
   final int? callDurationSeconds;
+  final String? voiceUrl;
+  final String? localVoicePath;
+  final int? voiceDurationMs;
   final VoidCallback? onLongPress;
   final VoidCallback? onDoubleTap;
   final VoidCallback? onTapMessage;
@@ -66,6 +70,9 @@ class ChatRowPermanent extends StatelessWidget {
     this.callStatus,
     this.callType,
     this.callDurationSeconds,
+    this.voiceUrl,
+    this.localVoicePath,
+    this.voiceDurationMs,
     this.onLongPress,
     this.onDoubleTap,
     this.onTapMessage,
@@ -138,6 +145,10 @@ class ChatRowPermanent extends StatelessWidget {
 
     if (type == "call") {
       return _buildCallMessage(context, bubbleColor);
+    }
+
+    if (type == "voice") {
+      return _buildVoiceMessage(context, bubbleColor, textColor);
     }
 
     // ================= TEXT MESSAGE =================
@@ -406,6 +417,156 @@ class ChatRowPermanent extends StatelessWidget {
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoiceMessage(
+    BuildContext context,
+    Color bubbleColor,
+    Color textColor,
+  ) {
+    final theme = Theme.of(context);
+    final mutedTextColor = textColor.withValues(alpha: 0.78);
+    final borderColor = textColor.withValues(alpha: 0.16);
+    final inactiveColor = textColor.withValues(alpha: 0.32);
+
+    return Padding(
+      padding: EdgeInsets.only(top: smallMargin ? 6 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe)
+            SizedBox(
+              width: 36,
+              child:
+                  showAvatar ? UserAvatar(userId: senderId) : const SizedBox(),
+            ),
+          if (!isMe) const SizedBox(width: 6),
+          Flexible(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.72,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                        isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (replyText != null && replyToId != null)
+                        GestureDetector(
+                          onTap: onTapReply,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  theme.brightness == Brightness.dark
+                                      ? const Color.fromARGB(255, 77, 76, 76)
+                                      : const Color(
+                                        0xFFF4F6F8,
+                                      ).withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border(
+                                left: BorderSide(
+                                  color: theme.colorScheme.primary,
+                                  width: 4,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              replyText!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        ),
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          GestureDetector(
+                            onLongPress: onLongPress,
+                            onDoubleTap: onDoubleTap,
+                            child: Container(
+                              key: bubbleKey,
+                              child: AnimatedBubble(
+                                isMe: isMe,
+                                highlighted: highlighted,
+                                pressed: isPressed,
+                                bubbleColor: bubbleColor,
+                                child: PostVoicePlayer(
+                                  url: voiceUrl ?? '',
+                                  localPath: localVoicePath,
+                                  durationMs: voiceDurationMs,
+                                  compact: true,
+                                  backgroundColor: Colors.transparent,
+                                  borderColor: borderColor,
+                                  activeColor: textColor,
+                                  inactiveColor: inactiveColor,
+                                  iconColor: textColor,
+                                  textColor: mutedTextColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (reactions != null && reactions!.isNotEmpty)
+                            Positioned(
+                              bottom: -10,
+                              right: isMe ? -6 : null,
+                              left: isMe ? null : -6,
+                              child: _MessengerReactionBadge(
+                                reactions: reactions!,
+                                isMe: isMe,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      if (showTime && time.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            time,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                        ),
+                      if (isMe && status != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (status == MessageStatus.seen)
+                                SeenAvatarAnimated(userId: seenByUid, size: 14)
+                              else if (status == MessageStatus.sent)
+                                Text(
+                                  "ÄÃ£ gá»­i",
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
                                   ),

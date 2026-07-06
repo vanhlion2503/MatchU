@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 class ChatBottomBar extends StatefulWidget {
@@ -275,6 +276,8 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
         final isTyping = controller.isTyping.value;
         final isEditing = controller.editingMessage.value != null;
         final isInputFocused = controller.inputFocusNode.hasFocus;
+        final isRecordingVoice = controller.isRecordingVoice.value;
+        final hasText = controller.inputController.text.trim().isNotEmpty;
 
         return Listener(
           behavior: HitTestBehavior.translucent,
@@ -408,6 +411,17 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                   ),
                 );
               }),
+              if (isRecordingVoice)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: ThreadsVoiceRecordingIndicator(
+                    seconds: controller.voiceRecordingSeconds.value,
+                    amplitudes: controller.voiceRecordingAmplitudes.toList(
+                      growable: false,
+                    ),
+                    compact: true,
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(
@@ -424,6 +438,7 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                         child: TextField(
                           controller: controller.inputController,
                           focusNode: controller.inputFocusNode,
+                          enabled: !isRecordingVoice,
                           minLines: 1,
                           maxLines: null,
                           onChanged: (value) {
@@ -461,18 +476,33 @@ class _ChatBottomBarState extends State<ChatBottomBar> {
                     const SizedBox(width: 6),
                     IconButton(
                       icon: Icon(
-                        isEditing ? Icons.check : Iconsax.send_1,
+                        isEditing
+                            ? Icons.check
+                            : isRecordingVoice
+                            ? Iconsax.stop_circle
+                            : hasText
+                            ? Iconsax.send_1
+                            : Iconsax.microphone_2,
                         color:
-                            (isTyping || isEditing)
+                            (isTyping ||
+                                    isEditing ||
+                                    isRecordingVoice ||
+                                    !hasText)
                                 ? color.primary
                                 : color.outline,
                         size: 26,
                       ),
                       onPressed: () {
                         final text = controller.inputController.text.trim();
-                        if (text.isEmpty) return;
-
                         HapticFeedback.lightImpact();
+                        if (controller.isRecordingVoice.value) {
+                          controller.stopAndSendVoiceRecording();
+                          return;
+                        }
+                        if (text.isEmpty) {
+                          controller.startVoiceRecording();
+                          return;
+                        }
                         controller.sendMessage();
                         controller.hideEmoji();
                       },
