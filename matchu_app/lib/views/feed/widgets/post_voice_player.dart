@@ -209,6 +209,8 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
             ? null
             : Duration(milliseconds: widget.durationMs!);
     final duration = _duration ?? _player.duration ?? fallbackDuration;
+    final displayDuration =
+        _position > Duration.zero ? _position : (duration ?? _position);
     final progress =
         duration == null || duration.inMilliseconds <= 0
             ? 0.0
@@ -290,7 +292,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerRight,
                       child: Text(
-                        _formatDuration(duration ?? _position),
+                        _formatDuration(displayDuration),
                         maxLines: 1,
                         softWrap: false,
                         style: theme.textTheme.bodySmall?.copyWith(
