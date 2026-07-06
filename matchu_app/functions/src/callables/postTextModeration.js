@@ -486,7 +486,7 @@ function getFallbackResult({ cacheKey, content, request, error, logLevel }) {
 const moderatePostText = onCall(
   {
     secrets: [GEMINI_API_KEY],
-    timeoutSeconds: 10,
+    timeoutSeconds: 15,
     memory: "256MiB",
   },
   async (request) => {

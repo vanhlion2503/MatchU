@@ -6,7 +6,7 @@ class PostTextModerationService {
   PostTextModerationService({FirebaseFunctions? functions})
     : _functions = functions ?? FirebaseFunctions.instance;
 
-  static const Duration timeout = Duration(seconds: 6);
+  static const Duration timeout = Duration(seconds: 15);
 
   final FirebaseFunctions _functions;
 

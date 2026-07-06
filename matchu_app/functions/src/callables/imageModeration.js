@@ -233,7 +233,7 @@ async function runLabelDetection(base64Image) {
 
 const moderateImageContent = onCall(
   {
-    timeoutSeconds: 20,
+    timeoutSeconds: 30,
     memory: "512MiB",
   },
   async (request) => {

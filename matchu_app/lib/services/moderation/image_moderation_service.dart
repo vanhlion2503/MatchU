@@ -8,7 +8,7 @@ class ImageModerationService {
   ImageModerationService({FirebaseFunctions? functions})
     : _functions = functions ?? FirebaseFunctions.instance;
 
-  static const Duration timeout = Duration(seconds: 18);
+  static const Duration timeout = Duration(seconds: 25);
 
   final FirebaseFunctions _functions;
 

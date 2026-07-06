@@ -98,6 +98,19 @@ class PostService {
     return latestUid;
   }
 
+  Future<String> _requireAuthenticatedUid({
+    bool forceRefresh = false,
+    required String actionMessage,
+  }) async {
+    final authenticatedUid = await _resolveAuthenticatedUid(
+      forceRefresh: forceRefresh,
+    );
+    if (authenticatedUid == null) {
+      throw StateError(actionMessage);
+    }
+    return authenticatedUid;
+  }
+
   Future<T> _runSavedReadsWithAuthRetry<T>({
     required Future<T> Function(String authenticatedUid) action,
     required T fallbackValue,
@@ -584,6 +597,10 @@ class PostService {
       throw StateError('Bạn cần đăng nhập để chỉnh sửa bài viết.');
     }
 
+    await _requireAuthenticatedUid(
+      actionMessage: 'Bạn cần đăng nhập để chỉnh sửa bài viết.',
+    );
+
     final normalizedPostId = post.postId.trim();
     if (normalizedPostId.isEmpty) {
       throw StateError('Không tìm thấy bài viết để chỉnh sửa.');
@@ -960,6 +977,9 @@ class PostService {
     PostReferenceModel? referencePost,
     DocumentReference<Map<String, dynamic>>? explicitPostRef,
   }) async {
+    await _requireAuthenticatedUid(
+      actionMessage: 'Bạn cần đăng nhập để đăng bài viết.',
+    );
     if (uid.isEmpty) {
       throw StateError('Bạn cần đăng nhập để đăng bài viết.');
     }
@@ -1527,7 +1547,7 @@ class PostService {
     if (content.trim().isEmpty) return;
 
     try {
-      final result = await _textModerationService.moderate(content);
+      final result = await _moderateTextWithAuthRetry(content);
       if (!result.isViolation) return;
 
       final reason = result.reason?.trim();
@@ -1563,7 +1583,7 @@ class PostService {
 
   Future<void> _ensureImageContentAllowed(File imageFile) async {
     try {
-      final result = await _imageModerationService.moderate(
+      final result = await _moderateImageWithAuthRetry(
         imageFile,
         context: 'post',
       );
@@ -1623,6 +1643,42 @@ class PostService {
     throw StateError(
       'Điểm uy tín dưới $minReputationToCreatePost nên bạn không thể đăng bài viết.',
     );
+  }
+
+  Future<PostTextModerationResult> _moderateTextWithAuthRetry(
+    String content,
+  ) async {
+    try {
+      return await _textModerationService.moderate(content);
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code != 'unauthenticated') rethrow;
+
+      await _requireAuthenticatedUid(
+        forceRefresh: true,
+        actionMessage: 'Bạn cần đăng nhập để đăng bài viết.',
+      );
+      return _textModerationService.moderate(content);
+    }
+  }
+
+  Future<ImageModerationResult> _moderateImageWithAuthRetry(
+    File imageFile, {
+    String? context,
+  }) async {
+    try {
+      return await _imageModerationService.moderate(
+        imageFile,
+        context: context,
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code != 'unauthenticated') rethrow;
+
+      await _requireAuthenticatedUid(
+        forceRefresh: true,
+        actionMessage: 'Bạn cần đăng nhập để đăng bài viết.',
+      );
+      return _imageModerationService.moderate(imageFile, context: context);
+    }
   }
 
   List<String> _normalizeTags(List<String> tags) {
