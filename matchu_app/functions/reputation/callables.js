@@ -103,6 +103,8 @@ function taskHistoryTitle(taskId) {
       return "Match va chuyen sang chat dai";
     case "receivedFiveStarRating":
       return "Nhan danh gia 5 sao";
+    case "qualifiedDailyPost":
+      return "Dang bai viet chat luong";
     default:
       return "Nhiem vu uy tin";
   }

@@ -10,6 +10,7 @@ const {
   DEFAULT_REPUTATION_TIMEZONE,
   FIVE_STAR_RATING_TASK_ID,
   MUTUAL_LIKE_LONG_CHAT_TASK_ID,
+  QUALIFIED_DAILY_POST_TASK_ID,
   getTaskConfig,
 } = require("./taskConfig");
 const {
@@ -29,6 +30,10 @@ const FIVE_STAR_RATING_COMPLETION_LOGS_SUBCOLLECTION =
 const FIVE_STAR_RATING_MIN_SCORE = 5;
 const MUTUAL_LIKE_LONG_CHAT_COMPLETION_LOGS_SUBCOLLECTION =
   "mutualLikeLongChatCompletionLogs";
+const QUALIFIED_DAILY_POST_COMPLETION_LOGS_SUBCOLLECTION =
+  "qualifiedDailyPostCompletionLogs";
+const QUALIFIED_DAILY_POST_MIN_CONTENT_LENGTH = 16;
+const QUALIFIED_DAILY_POST_MEDIA_TYPES = new Set(["image", "video", "audio"]);
 
 function normalizeParticipants(rawParticipants, userA, userB) {
   const participants = [];
@@ -117,6 +122,40 @@ function serializeTasksForWrite(tasks) {
   }
 
   return out;
+}
+
+function hasQualifiedPostContent(content) {
+  if (typeof content !== "string") return false;
+  return content.trim().length >= QUALIFIED_DAILY_POST_MIN_CONTENT_LENGTH;
+}
+
+function hasQualifiedPostMedia(media) {
+  if (!Array.isArray(media)) return false;
+
+  return media.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const url = typeof item.url === "string" ? item.url.trim() : "";
+    const type =
+      typeof item.type === "string" ? item.type.trim().toLowerCase() : "";
+    return url.length > 0 && QUALIFIED_DAILY_POST_MEDIA_TYPES.has(type);
+  });
+}
+
+function isQualifiedDailyPost(post) {
+  if (!post || typeof post !== "object") return false;
+  if (post.deletedAt != null) return false;
+
+  const authorId = toSafeUid(post.authorId);
+  if (!authorId) return false;
+
+  const postType =
+    typeof post.postType === "string" ? post.postType.trim().toLowerCase() : "";
+  if (postType === "repost") return false;
+
+  return (
+    hasQualifiedPostContent(post.content) &&
+    hasQualifiedPostMedia(post.media)
+  );
 }
 
 function buildDailyWritePayload({ daily, includeCreatedAt }) {
@@ -370,6 +409,84 @@ async function applyReceivedFiveStarRatingProgress({
   });
 }
 
+async function applyQualifiedDailyPostProgress({ uid, postId, postedAtMs }) {
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) return;
+
+    const userData = userSnap.data() || {};
+    const timezone = normalizeTimezone(
+      userData?.reputationTimezone,
+      DEFAULT_REPUTATION_TIMEZONE
+    );
+    const postedAt = new Date(postedAtMs);
+    const dateKey = resolveDateKey({ timeZone: timezone, now: postedAt });
+    const dailyRef = buildDailyRef(uid, dateKey);
+    const completionLogRef = dailyRef
+      .collection(QUALIFIED_DAILY_POST_COMPLETION_LOGS_SUBCOLLECTION)
+      .doc(postId);
+
+    const [dailySnap, completionLogSnap] = await Promise.all([
+      tx.get(dailyRef),
+      tx.get(completionLogRef),
+    ]);
+
+    if (completionLogSnap.exists) return;
+
+    const rawDaily = dailySnap.exists ? dailySnap.data() : null;
+    let daily = normalizeDailyDoc(rawDaily, { dateKey, timezone });
+
+    const task = daily.tasks[QUALIFIED_DAILY_POST_TASK_ID];
+    if (!task) return;
+
+    const nextProgress = Math.min(task.target, task.progress + 1);
+    const didIncrement = nextProgress !== task.progress;
+
+    if (didIncrement) {
+      daily = {
+        ...daily,
+        tasks: {
+          ...daily.tasks,
+          [QUALIFIED_DAILY_POST_TASK_ID]: {
+            ...task,
+            progress: nextProgress,
+          },
+        },
+      };
+    }
+
+    tx.set(
+      dailyRef,
+      buildDailyWritePayload({
+        daily,
+        includeCreatedAt: !dailySnap.exists,
+      }),
+      { merge: true }
+    );
+
+    tx.set(completionLogRef, {
+      postId,
+      uid,
+      taskId: QUALIFIED_DAILY_POST_TASK_ID,
+      counted: didIncrement,
+      postedAtMillis: postedAtMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+function resolvePostCreatedAtMillis(event, postData) {
+  const postCreatedAtMs = toMillis(postData?.createdAt);
+  if (postCreatedAtMs != null) return postCreatedAtMs;
+
+  const snapshotCreatedAtMs = toMillis(event?.data?.createTime);
+  if (snapshotCreatedAtMs != null) return snapshotCreatedAtMs;
+
+  return Date.now();
+}
+
 const progressTempChat3Rooms3MinutesTask = onDocumentUpdated(
   "tempChats/{roomId}",
   async (event) => {
@@ -467,6 +584,29 @@ const progressReceivedFiveStarRatingTask = onDocumentCreated(
   }
 );
 
+const progressQualifiedDailyPostTask = onDocumentCreated(
+  "posts/{postId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const post = snap.data() || {};
+    if (!isQualifiedDailyPost(post)) return;
+
+    const uid = toSafeUid(post.authorId);
+    if (!uid) return;
+
+    const postId = event.params.postId;
+    const postedAtMs = resolvePostCreatedAtMillis(event, post);
+
+    await applyQualifiedDailyPostProgress({
+      uid,
+      postId,
+      postedAtMs,
+    });
+  }
+);
+
 const ensureUserReputationDailyDefaults = onDocumentCreated(
   "users/{uid}",
   async (event) => {
@@ -527,4 +667,5 @@ module.exports = {
   progressTempChat3Rooms3MinutesTask,
   progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
+  progressQualifiedDailyPostTask,
 };

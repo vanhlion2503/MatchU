@@ -99,6 +99,8 @@ class ReputationDailyState {
       tasks["mutualLikeLongChat5Times"];
   ReputationDailyTask? get receivedFiveStarRatingTask =>
       tasks["receivedFiveStarRating"];
+  ReputationDailyTask? get qualifiedDailyPostTask =>
+      tasks["qualifiedDailyPost"];
 
   int get todayRemaining => (dailyCap - todayClaimed).clamp(0, dailyCap);
 

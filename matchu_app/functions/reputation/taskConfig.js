@@ -7,6 +7,7 @@ const FIVE_STAR_RATING_TASK_ID = "receivedFiveStarRating";
 const FIVE_STAR_RATING_DAILY_LIMIT = 5;
 const MUTUAL_LIKE_LONG_CHAT_TASK_ID = "mutualLikeLongChat5Times";
 const MUTUAL_LIKE_LONG_CHAT_DAILY_TARGET = 5;
+const QUALIFIED_DAILY_POST_TASK_ID = "qualifiedDailyPost";
 
 const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
   loginDaily: Object.freeze({
@@ -37,6 +38,12 @@ const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
   [MUTUAL_LIKE_LONG_CHAT_TASK_ID]: Object.freeze({
     target: MUTUAL_LIKE_LONG_CHAT_DAILY_TARGET,
     reward: 3,
+    claimMode: "manual",
+    repeatable: false,
+  }),
+  [QUALIFIED_DAILY_POST_TASK_ID]: Object.freeze({
+    target: 1,
+    reward: 1,
     claimMode: "manual",
     repeatable: false,
   }),
@@ -79,6 +86,7 @@ module.exports = {
   FIVE_STAR_RATING_DAILY_LIMIT,
   MUTUAL_LIKE_LONG_CHAT_TASK_ID,
   MUTUAL_LIKE_LONG_CHAT_DAILY_TARGET,
+  QUALIFIED_DAILY_POST_TASK_ID,
   REPUTATION_DAILY_TASK_CONFIG,
   getTaskConfig,
   buildDefaultTaskState,
