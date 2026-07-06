@@ -389,24 +389,9 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                     if (isRecordingVoice)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Iconsax.microphone_2,
-                              size: 18,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              formatVoiceDurationFromSeconds(
-                                _controller.voiceRecordingSeconds.value,
-                              ),
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                        child: ThreadsVoiceRecordingIndicator(
+                          seconds: _controller.voiceRecordingSeconds.value,
+                          compact: true,
                         ),
                       ),
                     TextFieldTapRegion(

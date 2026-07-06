@@ -698,30 +698,9 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                 borderColor: palette.border.withValues(alpha: 0.72),
                 shadowColor: palette.shadowColor.withValues(alpha: 0.08),
                 blurSigma: 0,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Iconsax.microphone_2,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        formatVoiceDurationFromSeconds(
-                          commentsController.voiceRecordingSeconds.value,
-                        ),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: ThreadsVoiceRecordingIndicator(
+                  seconds: commentsController.voiceRecordingSeconds.value,
+                  compact: true,
                 ),
               ),
               const SizedBox(height: 8),

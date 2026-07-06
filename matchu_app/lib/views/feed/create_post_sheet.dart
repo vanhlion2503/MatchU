@@ -465,6 +465,17 @@ class _ComposerLayout extends StatelessWidget {
                 ),
               ),
               Obx(
+                () =>
+                    controller.isRecordingVoice.value
+                        ? Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: ThreadsVoiceRecordingIndicator(
+                            seconds: controller.voiceRecordingSeconds.value,
+                          ),
+                        )
+                        : const SizedBox.shrink(),
+              ),
+              Obx(
                 () => AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   child:
@@ -1106,6 +1117,30 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (media.isAudio) {
+      return SizedBox(
+        width: 280,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: PostVoicePlayer(
+                url: media.url,
+                durationMs: media.durationMs,
+                compact: true,
+              ),
+            ),
+            Positioned(
+              top: 2,
+              right: -4,
+              child: _RemoveMediaButton(onTap: onRemove),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       width: 160,
       child: Stack(
@@ -1122,18 +1157,7 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child:
-                    media.isAudio
-                        ? Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Center(
-                            child: PostVoicePlayer(
-                              url: media.url,
-                              durationMs: media.durationMs,
-                              compact: true,
-                            ),
-                          ),
-                        )
-                        : media.isImage
+                    media.isImage
                         ? CachedNetworkImage(
                           imageUrl: media.url,
                           fit: BoxFit.cover,
@@ -1191,6 +1215,31 @@ class _DraftMediaPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    if (draft.isAudio) {
+      return SizedBox(
+        width: 280,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: PostVoicePlayer(
+                url: '',
+                localPath: draft.file.path,
+                durationMs: draft.durationMs,
+                compact: true,
+              ),
+            ),
+            Positioned(
+              top: 2,
+              right: -4,
+              child: _RemoveMediaButton(onTap: onRemove),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       width: 160,
       child: Stack(
@@ -1207,19 +1256,7 @@ class _DraftMediaPreviewCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(18),
                 child:
-                    draft.isAudio
-                        ? Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Center(
-                            child: PostVoicePlayer(
-                              url: '',
-                              localPath: draft.file.path,
-                              durationMs: draft.durationMs,
-                              compact: true,
-                            ),
-                          ),
-                        )
-                        : draft.isImage
+                    draft.isImage
                         ? Image.file(draft.file, fit: BoxFit.cover)
                         : DecoratedBox(
                           decoration: BoxDecoration(

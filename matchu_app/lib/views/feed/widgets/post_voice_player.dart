@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
@@ -88,7 +89,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể phát ghi âm lúc này.')),
+        const SnackBar(content: Text('Khong the phat ghi am luc nay.')),
       );
     } finally {
       if (mounted) {
@@ -124,105 +125,293 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
               0.0,
               1.0,
             );
-    final isPlaying = _player.playing;
     final hasPlayableSource =
         widget.url.trim().isNotEmpty ||
         (widget.localPath?.trim().isNotEmpty ?? false);
-    final isPendingLocal = !hasPlayableSource;
+    final radius = BorderRadius.circular(10);
 
     return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: widget.compact ? 260 : 420),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: palette.surfaceMuted,
-          borderRadius: BorderRadius.circular(widget.compact ? 16 : 18),
-          border: Border.all(color: palette.border),
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: widget.compact ? 10 : 12,
-            vertical: widget.compact ? 8 : 10,
-          ),
-          child: Row(
-            children: [
-              Material(
-                color: theme.colorScheme.primary,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: isPendingLocal ? null : _togglePlayback,
-                  child: SizedBox(
-                    width: widget.compact ? 34 : 38,
-                    height: widget.compact ? 34 : 38,
-                    child: Center(
-                      child:
-                          _isLoading || isPendingLocal
-                              ? SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.colorScheme.onPrimary,
-                                ),
-                              )
-                              : Icon(
-                                isPlaying ? Iconsax.pause : Iconsax.play,
-                                size: 18,
-                                color: theme.colorScheme.onPrimary,
+      constraints: BoxConstraints(maxWidth: widget.compact ? 280 : 420),
+      child: Material(
+        color: palette.surfaceMuted,
+        borderRadius: radius,
+        child: InkWell(
+          onTap: hasPlayableSource ? _togglePlayback : null,
+          borderRadius: radius,
+          child: Container(
+            height: widget.compact ? 48 : 54,
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.compact ? 10 : 12,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: palette.border.withValues(alpha: 0.9)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Center(
+                    child:
+                        _isLoading || !hasPlayableSource
+                            ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: palette.iconPrimary,
                               ),
-                    ),
+                            )
+                            : Icon(
+                              _player.playing ? Iconsax.pause : Iconsax.play,
+                              size: 20,
+                              color: palette.iconPrimary,
+                            ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Iconsax.microphone_2,
-                          size: 15,
-                          color: palette.iconMuted,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          'Ghi âm',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: palette.textSecondary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _formatDuration(duration ?? _position),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: palette.textTertiary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 7),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        minHeight: 5,
-                        value: progress,
-                        backgroundColor: palette.border.withValues(alpha: 0.6),
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: VoiceWaveform(
+                    progress: progress,
+                    seed: _waveformSeed(widget.url, widget.localPath),
+                    activeColor: palette.textPrimary,
+                    inactiveColor: palette.border.withValues(alpha: 0.9),
+                    barCount: widget.compact ? 34 : 44,
+                    maxBarHeight: widget.compact ? 22 : 26,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  _formatDuration(duration ?? _position),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class VoiceWaveform extends StatelessWidget {
+  const VoiceWaveform({
+    super.key,
+    required this.progress,
+    required this.seed,
+    required this.activeColor,
+    required this.inactiveColor,
+    this.barCount = 42,
+    this.minBarHeight = 4,
+    this.maxBarHeight = 26,
+  });
+
+  final double progress;
+  final int seed;
+  final Color activeColor;
+  final Color inactiveColor;
+  final int barCount;
+  final double minBarHeight;
+  final double maxBarHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _VoiceWaveformPainter(
+        progress: progress.clamp(0.0, 1.0),
+        seed: seed,
+        activeColor: activeColor,
+        inactiveColor: inactiveColor,
+        barCount: barCount,
+        minBarHeight: minBarHeight,
+        maxBarHeight: maxBarHeight,
+      ),
+      child: SizedBox(height: maxBarHeight),
+    );
+  }
+}
+
+class ThreadsVoiceRecordingIndicator extends StatefulWidget {
+  const ThreadsVoiceRecordingIndicator({
+    super.key,
+    required this.seconds,
+    this.compact = false,
+  });
+
+  final int seconds;
+  final bool compact;
+
+  @override
+  State<ThreadsVoiceRecordingIndicator> createState() =>
+      _ThreadsVoiceRecordingIndicatorState();
+}
+
+class _ThreadsVoiceRecordingIndicatorState
+    extends State<ThreadsVoiceRecordingIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = FeedPalette.of(context);
+    final radius = BorderRadius.circular(10);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.surfaceMuted,
+        borderRadius: radius,
+        border: Border.all(color: palette.border.withValues(alpha: 0.9)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.compact ? 10 : 12,
+          vertical: widget.compact ? 8 : 10,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Iconsax.microphone_2,
+                size: 16,
+                color: theme.colorScheme.onError,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) {
+                  return VoiceWaveform(
+                    progress: 0.72,
+                    seed: 37 + (_controller.value * 100).round(),
+                    activeColor: palette.textPrimary,
+                    inactiveColor: palette.border.withValues(alpha: 0.8),
+                    barCount: widget.compact ? 34 : 46,
+                    maxBarHeight: widget.compact ? 22 : 28,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              formatVoiceDurationFromSeconds(widget.seconds),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceWaveformPainter extends CustomPainter {
+  const _VoiceWaveformPainter({
+    required this.progress,
+    required this.seed,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.barCount,
+    required this.minBarHeight,
+    required this.maxBarHeight,
+  });
+
+  final double progress;
+  final int seed;
+  final Color activeColor;
+  final Color inactiveColor;
+  final int barCount;
+  final double minBarHeight;
+  final double maxBarHeight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (barCount <= 0 || size.width <= 0) return;
+
+    final gap = size.width < 180 ? 2.0 : 2.4;
+    final barWidth = math.max(
+      2.0,
+      (size.width - gap * (barCount - 1)) / barCount,
+    );
+    final centerY = size.height / 2;
+    final activeIndex = (barCount * progress).floor();
+    final activePaint =
+        Paint()
+          ..color = activeColor
+          ..style = PaintingStyle.fill;
+    final inactivePaint =
+        Paint()
+          ..color = inactiveColor
+          ..style = PaintingStyle.fill;
+
+    for (var index = 0; index < barCount; index++) {
+      final noise = _noise(index, seed);
+      final envelope = math.sin((index / math.max(1, barCount - 1)) * math.pi);
+      final height =
+          minBarHeight +
+          (maxBarHeight - minBarHeight) *
+              (0.25 + noise * 0.55 + envelope * 0.2);
+      final clampedHeight = height.clamp(minBarHeight, maxBarHeight);
+      final left = index * (barWidth + gap);
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          left,
+          centerY - clampedHeight / 2,
+          barWidth,
+          clampedHeight,
+        ),
+        Radius.circular(barWidth),
+      );
+      canvas.drawRRect(
+        rect,
+        index <= activeIndex ? activePaint : inactivePaint,
+      );
+    }
+  }
+
+  double _noise(int index, int seed) {
+    final value = math.sin((index + 1) * 12.9898 + seed * 78.233) * 43758.5453;
+    return value - value.floorToDouble();
+  }
+
+  @override
+  bool shouldRepaint(covariant _VoiceWaveformPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.seed != seed ||
+        oldDelegate.activeColor != activeColor ||
+        oldDelegate.inactiveColor != inactiveColor ||
+        oldDelegate.barCount != barCount ||
+        oldDelegate.minBarHeight != minBarHeight ||
+        oldDelegate.maxBarHeight != maxBarHeight;
   }
 }
 
@@ -234,4 +423,10 @@ String _formatDuration(Duration duration) {
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
+}
+
+int _waveformSeed(String url, String? localPath) {
+  final source = url.trim().isNotEmpty ? url.trim() : localPath?.trim() ?? '';
+  if (source.isEmpty) return 11;
+  return source.codeUnits.fold<int>(0, (value, unit) => value + unit);
 }
