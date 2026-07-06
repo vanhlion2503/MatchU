@@ -17,6 +17,7 @@ import 'package:matchu_app/services/feed/post_text_moderation_service.dart';
 import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 class PostService {
   PostService({
@@ -684,6 +685,14 @@ class PostService {
     final requiresVideoModeration = newVideoDrafts.isNotEmpty;
     final effectiveVisibility =
         requiresVideoModeration ? PostVisibility.private : visibility;
+    final videoThumbnailUrl =
+        requiresVideoModeration
+            ? await _uploadVideoThumbnail(
+              postId: normalizedPostId,
+              draft: newVideoDrafts.single,
+              uploadedRefs: uploadedRefs,
+            )
+            : null;
     var didUpdatePost = false;
 
     try {
@@ -700,6 +709,7 @@ class PostService {
           _pendingModerationVideoMedia(
             postId: normalizedPostId,
             draft: newVideoDrafts.single,
+            thumbnailUrl: videoThumbnailUrl,
           ),
       ];
       final normalizedTags = _normalizeTags(tags);
@@ -752,6 +762,7 @@ class PostService {
           postId: normalizedPostId,
           draft: newVideoDrafts.single,
           uploadedRefs: uploadedRefs,
+          thumbnailUrl: videoThumbnailUrl,
         );
         finalMedia = <MediaModel>[
           ...normalizedRetainedMedia,
@@ -1130,6 +1141,14 @@ class PostService {
     final requestedVisibility = hasVideoModeration ? visibility : null;
     final videoStoragePath =
         hasVideoModeration ? _moderatedVideoStoragePath(postRef.id) : null;
+    final videoThumbnailUrl =
+        hasVideoModeration
+            ? await _uploadVideoThumbnail(
+              postId: postRef.id,
+              draft: videoDrafts.single,
+              uploadedRefs: uploadedRefs,
+            )
+            : null;
     final createdAt = DateTime.now();
     var didCreatePost = false;
 
@@ -1145,6 +1164,7 @@ class PostService {
           _pendingModerationVideoMedia(
             postId: postRef.id,
             draft: videoDrafts.single,
+            thumbnailUrl: videoThumbnailUrl,
           ),
       ];
 
@@ -1205,6 +1225,7 @@ class PostService {
           postId: postRef.id,
           draft: videoDrafts.single,
           uploadedRefs: uploadedRefs,
+          thumbnailUrl: videoThumbnailUrl,
         );
         finalMedia = <MediaModel>[...uploadedMedia, uploadedVideo];
         await postRef.update({
@@ -1525,6 +1546,7 @@ class PostService {
   MediaModel _pendingModerationVideoMedia({
     required String postId,
     required PostMediaDraft draft,
+    String? thumbnailUrl,
   }) {
     return MediaModel(
       url: '',
@@ -1532,6 +1554,7 @@ class PostService {
       durationMs: draft.durationMs,
       storagePath: _moderatedVideoStoragePath(postId),
       mimeType: _contentTypeForDraft(draft),
+      thumbnailUrl: thumbnailUrl,
     );
   }
 
@@ -1539,6 +1562,7 @@ class PostService {
     required String postId,
     required PostMediaDraft draft,
     required List<Reference> uploadedRefs,
+    String? thumbnailUrl,
   }) async {
     final ref = _storage.ref(_moderatedVideoStoragePath(postId));
     final contentType = _contentTypeForDraft(draft);
@@ -1563,7 +1587,40 @@ class PostService {
       durationMs: draft.durationMs,
       storagePath: ref.fullPath,
       mimeType: contentType,
+      thumbnailUrl: thumbnailUrl,
     );
+  }
+
+  Future<String?> _uploadVideoThumbnail({
+    required String postId,
+    required PostMediaDraft draft,
+    required List<Reference> uploadedRefs,
+  }) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final thumbnailPath = await VideoThumbnail.thumbnailFile(
+        video: draft.file.path,
+        thumbnailPath: tempDir.path,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 720,
+        timeMs: 0,
+        quality: 82,
+      );
+      if (thumbnailPath == null || thumbnailPath.trim().isEmpty) {
+        return null;
+      }
+
+      final ref = _storage.ref(_moderatedVideoThumbnailStoragePath(postId));
+      await ref.putFile(
+        File(thumbnailPath),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      uploadedRefs.add(ref);
+      return ref.getDownloadURL();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _deleteUploadedRefs(List<Reference> refs) async {
@@ -1627,12 +1684,14 @@ class PostService {
 
   Future<void> _deleteRemovedMediaFiles(List<MediaModel> removedMedia) async {
     for (final media in removedMedia) {
-      final url = media.url.trim();
-      if (url.isEmpty) continue;
+      final urls = <String>{media.url.trim(), media.thumbnailUrl?.trim() ?? ''}
+        ..removeWhere((url) => url.isEmpty);
 
-      try {
-        await _storage.refFromURL(url).delete();
-      } catch (_) {}
+      for (final url in urls) {
+        try {
+          await _storage.refFromURL(url).delete();
+        } catch (_) {}
+      }
     }
   }
 
@@ -1670,6 +1729,10 @@ class PostService {
 
   String _moderatedVideoStoragePath(String postId) {
     return 'user_uploads/$uid/videos/$postId/source.mp4';
+  }
+
+  String _moderatedVideoThumbnailStoragePath(String postId) {
+    return 'user_uploads/$uid/videos/$postId/thumbnail.jpg';
   }
 
   String _contentTypeForDraft(PostMediaDraft draft) {

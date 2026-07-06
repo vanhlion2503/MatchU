@@ -254,6 +254,7 @@ class _MediaTile extends StatelessWidget {
     if (media.isVideo) {
       return PostVideoThumbnail(
         url: media.url,
+        thumbnailUrl: media.thumbnailUrl,
         borderRadius: borderRadius,
         useIntrinsicAspectRatio: useIntrinsicVideoAspectRatio,
       );

@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:video_player/video_player.dart';
+
+const double _defaultFeedVideoAspectRatio = 4 / 5;
 
 class PostVideoThumbnail extends StatefulWidget {
   const PostVideoThumbnail({
@@ -10,11 +13,15 @@ class PostVideoThumbnail extends StatefulWidget {
     required this.url,
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
     this.useIntrinsicAspectRatio = true,
+    this.reservedAspectRatio = _defaultFeedVideoAspectRatio,
+    this.thumbnailUrl,
   });
 
   final String url;
   final BorderRadius borderRadius;
   final bool useIntrinsicAspectRatio;
+  final double? reservedAspectRatio;
+  final String? thumbnailUrl;
 
   @override
   State<PostVideoThumbnail> createState() => _PostVideoThumbnailState();
@@ -139,7 +146,12 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
             constraints.maxWidth.isFinite
                 ? constraints.maxWidth
                 : MediaQuery.sizeOf(context).width;
-        final height = _heightForAspectRatio(width, fallbackAspectRatio);
+        final reservedAspectRatio = widget.reservedAspectRatio;
+        final aspectRatio =
+            reservedAspectRatio != null && reservedAspectRatio > 0
+                ? reservedAspectRatio
+                : fallbackAspectRatio;
+        final height = _heightForAspectRatio(width, aspectRatio);
         return SizedBox(width: double.infinity, height: height, child: child);
       },
     );
@@ -165,6 +177,7 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
             return _wrapContent(
               fallbackAspectRatio: 16 / 9,
               child: _VideoPlaceholder(
+                thumbnailUrl: widget.thumbnailUrl,
                 isLoading: snapshot.connectionState == ConnectionState.waiting,
                 hasError: snapshot.hasError,
               ),
@@ -428,6 +441,7 @@ class _PostVideoFullscreenViewState extends State<_PostVideoFullscreenView> {
                 children: [
                   Positioned.fill(
                     child: _VideoPlaceholder(
+                      thumbnailUrl: null,
                       isLoading:
                           snapshot.connectionState == ConnectionState.waiting,
                       hasError: snapshot.hasError,
@@ -608,38 +622,73 @@ class _FullscreenControls extends StatelessWidget {
 }
 
 class _VideoPlaceholder extends StatelessWidget {
-  const _VideoPlaceholder({required this.isLoading, required this.hasError});
+  const _VideoPlaceholder({
+    required this.isLoading,
+    required this.hasError,
+    this.thumbnailUrl,
+  });
 
   final bool isLoading;
   final bool hasError;
+  final String? thumbnailUrl;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF111827),
-      child: Center(
-        child:
-            hasError
-                ? const Icon(
-                  Iconsax.video_slash,
-                  color: Colors.white70,
-                  size: 40,
-                )
-                : isLoading
-                ? const SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: Colors.white,
+    final normalizedThumbnailUrl = thumbnailUrl?.trim() ?? '';
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (normalizedThumbnailUrl.isNotEmpty)
+          CachedNetworkImage(
+            imageUrl: normalizedThumbnailUrl,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => const ColoredBox(color: Color(0xFF111827)),
+            errorWidget:
+                (_, __, ___) => const ColoredBox(color: Color(0xFF111827)),
+          )
+        else
+          const ColoredBox(color: Color(0xFF111827)),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(
+              alpha: normalizedThumbnailUrl.isNotEmpty ? 0.18 : 0,
+            ),
+          ),
+        ),
+        Center(
+          child:
+              hasError
+                  ? const Icon(
+                    Iconsax.video_slash,
+                    color: Colors.white70,
+                    size: 40,
+                  )
+                  : isLoading
+                  ? Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.38),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                  : const Icon(
+                    Iconsax.play_circle,
+                    color: Colors.white70,
+                    size: 40,
                   ),
-                )
-                : const Icon(
-                  Iconsax.play_circle,
-                  color: Colors.white70,
-                  size: 40,
-                ),
-      ),
+        ),
+      ],
     );
   }
 }

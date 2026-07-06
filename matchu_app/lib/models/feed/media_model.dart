@@ -7,6 +7,7 @@ class MediaModel {
     this.durationMs,
     this.storagePath,
     this.mimeType,
+    this.thumbnailUrl,
   });
 
   final String url;
@@ -14,6 +15,7 @@ class MediaModel {
   final int? durationMs;
   final String? storagePath;
   final String? mimeType;
+  final String? thumbnailUrl;
 
   bool get isImage => type == PostMediaType.image;
   bool get isVideo => type == PostMediaType.video;
@@ -26,6 +28,7 @@ class MediaModel {
       durationMs: _parseDurationMs(json['durationMs']),
       storagePath: _parseNullableString(json['storagePath']),
       mimeType: _parseNullableString(json['mimeType']),
+      thumbnailUrl: _parseNullableString(json['thumbnailUrl']),
     );
   }
 
@@ -37,6 +40,8 @@ class MediaModel {
       if (storagePath?.trim().isNotEmpty == true)
         'storagePath': storagePath!.trim(),
       if (mimeType?.trim().isNotEmpty == true) 'mimeType': mimeType!.trim(),
+      if (thumbnailUrl?.trim().isNotEmpty == true)
+        'thumbnailUrl': thumbnailUrl!.trim(),
     };
   }
 
@@ -46,6 +51,7 @@ class MediaModel {
     int? durationMs,
     String? storagePath,
     String? mimeType,
+    String? thumbnailUrl,
   }) {
     return MediaModel(
       url: url ?? this.url,
@@ -53,6 +59,7 @@ class MediaModel {
       durationMs: durationMs ?? this.durationMs,
       storagePath: storagePath ?? this.storagePath,
       mimeType: mimeType ?? this.mimeType,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
     );
   }
 
