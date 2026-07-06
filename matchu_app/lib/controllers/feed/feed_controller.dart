@@ -413,7 +413,11 @@ class FeedController extends GetxController {
   }
 
   void prependPost(PostModel post) {
-    if (!post.isPublic || post.postType.isRepostOnly) return;
+    if (!post.isPublic ||
+        !post.isModerationApproved ||
+        post.postType.isRepostOnly) {
+      return;
+    }
     if (_shouldHidePost(post)) return;
 
     final targetPostId = _repostTargetPostIdOf(post);
@@ -646,11 +650,13 @@ class FeedController extends GetxController {
     final isHidden = _shouldHidePost(hydratedPost);
     final isFeedEligible =
         hydratedPost.isPublic &&
+        hydratedPost.isModerationApproved &&
         !hydratedPost.postType.isRepostOnly &&
         !isHidden;
     final authorId = hydratedPost.authorId.trim();
     final isFollowingEligible =
         !hydratedPost.postType.isRepostOnly &&
+        hydratedPost.isModerationApproved &&
         !isHidden &&
         (hydratedPost.isPublic ||
             (hydratedPost.isFollowersOnly &&

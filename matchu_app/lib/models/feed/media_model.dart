@@ -1,11 +1,19 @@
 enum PostMediaType { image, video, audio }
 
 class MediaModel {
-  const MediaModel({required this.url, required this.type, this.durationMs});
+  const MediaModel({
+    required this.url,
+    required this.type,
+    this.durationMs,
+    this.storagePath,
+    this.mimeType,
+  });
 
   final String url;
   final PostMediaType type;
   final int? durationMs;
+  final String? storagePath;
+  final String? mimeType;
 
   bool get isImage => type == PostMediaType.image;
   bool get isVideo => type == PostMediaType.video;
@@ -16,6 +24,8 @@ class MediaModel {
       url: (json['url'] ?? '').toString().trim(),
       type: _parseType(json['type']),
       durationMs: _parseDurationMs(json['durationMs']),
+      storagePath: _parseNullableString(json['storagePath']),
+      mimeType: _parseNullableString(json['mimeType']),
     );
   }
 
@@ -24,14 +34,25 @@ class MediaModel {
       'url': url,
       'type': type.name,
       if (durationMs != null) 'durationMs': durationMs,
+      if (storagePath?.trim().isNotEmpty == true)
+        'storagePath': storagePath!.trim(),
+      if (mimeType?.trim().isNotEmpty == true) 'mimeType': mimeType!.trim(),
     };
   }
 
-  MediaModel copyWith({String? url, PostMediaType? type, int? durationMs}) {
+  MediaModel copyWith({
+    String? url,
+    PostMediaType? type,
+    int? durationMs,
+    String? storagePath,
+    String? mimeType,
+  }) {
     return MediaModel(
       url: url ?? this.url,
       type: type ?? this.type,
       durationMs: durationMs ?? this.durationMs,
+      storagePath: storagePath ?? this.storagePath,
+      mimeType: mimeType ?? this.mimeType,
     );
   }
 
@@ -55,5 +76,10 @@ class MediaModel {
       return parsed > 0 ? parsed : null;
     }
     return null;
+  }
+
+  static String? _parseNullableString(dynamic value) {
+    final normalized = value?.toString().trim() ?? '';
+    return normalized.isEmpty ? null : normalized;
   }
 }

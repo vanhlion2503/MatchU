@@ -771,6 +771,7 @@ class ProfilePostsController extends GetxController {
 
   bool _canIncludeAuthoredPost(PostModel post) {
     if (includePrivate) return true;
+    if (!post.isModerationApproved) return false;
     if (post.isPublic) return true;
     return includeFollowersOnly && post.isFollowersOnly;
   }

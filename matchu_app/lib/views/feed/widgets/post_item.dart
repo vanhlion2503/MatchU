@@ -78,6 +78,10 @@ class PostItem extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (!post.isModerationApproved) ...[
+                      const SizedBox(height: 10),
+                      PostModerationNotice(post: post),
+                    ],
                     if (post.hasContent) ...[
                       const SizedBox(height: 8),
                       Text(

@@ -82,6 +82,52 @@ enum PostVisibility {
   }
 }
 
+enum PostModerationStatus {
+  pendingModeration,
+  approved,
+  rejected,
+  reviewRequired;
+
+  String get firestoreValue {
+    switch (this) {
+      case PostModerationStatus.pendingModeration:
+        return 'pending_moderation';
+      case PostModerationStatus.approved:
+        return 'approved';
+      case PostModerationStatus.rejected:
+        return 'rejected';
+      case PostModerationStatus.reviewRequired:
+        return 'review_required';
+    }
+  }
+
+  bool get isPendingModeration =>
+      this == PostModerationStatus.pendingModeration;
+  bool get isApproved => this == PostModerationStatus.approved;
+  bool get isRejected => this == PostModerationStatus.rejected;
+  bool get isReviewRequired => this == PostModerationStatus.reviewRequired;
+  bool get isFinalDecision => isApproved || isRejected || isReviewRequired;
+
+  static PostModerationStatus fromFirestoreValue(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'pending_moderation':
+      case 'pending':
+      case 'processing':
+        return PostModerationStatus.pendingModeration;
+      case 'rejected':
+        return PostModerationStatus.rejected;
+      case 'review_required':
+      case 'needs_review':
+      case 'human_review':
+        return PostModerationStatus.reviewRequired;
+      case 'approved':
+      default:
+        return PostModerationStatus.approved;
+    }
+  }
+}
+
 class PostAuthorModel {
   const PostAuthorModel({
     required this.id,
@@ -213,7 +259,11 @@ class PostReferenceModel {
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .map(MediaModel.fromJson)
-          .where((item) => item.url.isNotEmpty)
+          .where(
+            (item) =>
+                item.url.isNotEmpty ||
+                (item.storagePath?.trim().isNotEmpty ?? false),
+          )
           .toList(growable: false),
       tags: ((json['tags'] as List<dynamic>?) ?? const [])
           .map((tag) => tag.toString().trim())
@@ -306,6 +356,13 @@ class PostModel {
     required this.author,
     PostVisibility? visibility,
     bool? isPublic,
+    this.requestedVisibility,
+    PostModerationStatus? moderationStatus,
+    this.moderationSource,
+    this.moderationMessageVi,
+    this.moderationPolicyVersion,
+    this.videoStoragePath,
+    this.videoModeration,
     this.referencePostId,
     this.referencePost,
     this.createdAt,
@@ -319,7 +376,8 @@ class PostModel {
     this.isSavePending = false,
   }) : visibility =
            visibility ??
-           (isPublic == false ? PostVisibility.private : PostVisibility.public);
+           (isPublic == false ? PostVisibility.private : PostVisibility.public),
+       moderationStatus = moderationStatus ?? PostModerationStatus.approved;
 
   final String postId;
   final String authorId;
@@ -328,6 +386,13 @@ class PostModel {
   final List<MediaModel> media;
   final List<String> tags;
   final PostVisibility visibility;
+  final PostVisibility? requestedVisibility;
+  final PostModerationStatus moderationStatus;
+  final String? moderationSource;
+  final String? moderationMessageVi;
+  final String? moderationPolicyVersion;
+  final String? videoStoragePath;
+  final Map<String, dynamic>? videoModeration;
   final StatsModel stats;
   final double trendScore;
   final int trendBucket;
@@ -349,8 +414,19 @@ class PostModel {
   bool get isPublic => visibility.isPublic;
   bool get isFollowersOnly => visibility.isFollowersOnly;
   bool get isPrivate => visibility.isPrivate;
+  bool get isModerationPending => moderationStatus.isPendingModeration;
+  bool get isModerationApproved => moderationStatus.isApproved;
+  bool get isRejectedByModeration => moderationStatus.isRejected;
+  bool get isReviewRequiredByModeration => moderationStatus.isReviewRequired;
+  bool get isHiddenByModeration =>
+      isModerationPending ||
+      isRejectedByModeration ||
+      isReviewRequiredByModeration;
   bool get hasContent => content.trim().isNotEmpty;
   bool get hasMedia => media.isNotEmpty;
+  bool get hasVideoMedia =>
+      media.any((item) => item.isVideo) ||
+      (videoStoragePath?.trim().isNotEmpty ?? false);
   bool get hasReferencePost => referencePost != null;
   bool get isQuotePost => postType == PostType.quote && referencePost != null;
   bool get isRepostOnly => postType == PostType.repost && referencePost != null;
@@ -376,7 +452,11 @@ class PostModel {
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .map(MediaModel.fromJson)
-          .where((item) => item.url.isNotEmpty)
+          .where(
+            (item) =>
+                item.url.isNotEmpty ||
+                (item.storagePath?.trim().isNotEmpty ?? false),
+          )
           .toList(growable: false),
       tags: ((json['tags'] as List<dynamic>?) ?? const [])
           .map((tag) => tag.toString().trim())
@@ -386,6 +466,19 @@ class PostModel {
         json['visibility'],
         legacyIsPublic: json['isPublic'],
       ),
+      requestedVisibility: _parseOptionalVisibility(
+        json['requestedVisibility'],
+      ),
+      moderationStatus: PostModerationStatus.fromFirestoreValue(
+        json['moderationStatus'],
+      ),
+      moderationSource: _parseNullableString(json['moderationSource']),
+      moderationMessageVi: _parseNullableString(json['moderationMessageVi']),
+      moderationPolicyVersion: _parseNullableString(
+        json['moderationPolicyVersion'],
+      ),
+      videoStoragePath: _parseNullableString(json['videoStoragePath']),
+      videoModeration: _asMap(json['videoModeration']),
       stats: StatsModel.fromJson(_asMap(json['stats'])),
       trendScore: _parseDouble(json['trendScore']),
       trendBucket: _parseInt(json['trendBucket']),
@@ -408,6 +501,13 @@ class PostModel {
       'tags': tags,
       'visibility': visibility.firestoreValue,
       'isPublic': isPublic,
+      'requestedVisibility': requestedVisibility?.firestoreValue,
+      'moderationStatus': moderationStatus.firestoreValue,
+      'moderationSource': moderationSource,
+      'moderationMessageVi': moderationMessageVi,
+      'moderationPolicyVersion': moderationPolicyVersion,
+      'videoStoragePath': videoStoragePath,
+      'videoModeration': videoModeration,
       'stats': stats.toJson(),
       'trendScore': trendScore,
       'trendBucket': trendBucket,
@@ -429,6 +529,13 @@ class PostModel {
     List<String>? tags,
     PostVisibility? visibility,
     bool? isPublic,
+    PostVisibility? requestedVisibility,
+    PostModerationStatus? moderationStatus,
+    String? moderationSource,
+    String? moderationMessageVi,
+    String? moderationPolicyVersion,
+    String? videoStoragePath,
+    Map<String, dynamic>? videoModeration,
     StatsModel? stats,
     double? trendScore,
     int? trendBucket,
@@ -457,6 +564,14 @@ class PostModel {
           (isPublic == null
               ? this.visibility
               : PostVisibility.fromLegacyIsPublic(isPublic)),
+      requestedVisibility: requestedVisibility ?? this.requestedVisibility,
+      moderationStatus: moderationStatus ?? this.moderationStatus,
+      moderationSource: moderationSource ?? this.moderationSource,
+      moderationMessageVi: moderationMessageVi ?? this.moderationMessageVi,
+      moderationPolicyVersion:
+          moderationPolicyVersion ?? this.moderationPolicyVersion,
+      videoStoragePath: videoStoragePath ?? this.videoStoragePath,
+      videoModeration: videoModeration ?? this.videoModeration,
       stats: stats ?? this.stats,
       trendScore: trendScore ?? this.trendScore,
       trendBucket: trendBucket ?? this.trendBucket,
@@ -500,5 +615,24 @@ class PostModel {
       return Map<String, dynamic>.from(value);
     }
     return null;
+  }
+
+  static String? _parseNullableString(dynamic value) {
+    final normalized = value?.toString().trim() ?? '';
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  static PostVisibility? _parseOptionalVisibility(dynamic value) {
+    final normalized = value?.toString().trim().toLowerCase();
+    switch (normalized) {
+      case 'public':
+      case 'followers':
+      case 'followers_only':
+      case 'followersonly':
+      case 'private':
+        return PostVisibility.fromFirestoreValue(normalized);
+      default:
+        return null;
+    }
   }
 }

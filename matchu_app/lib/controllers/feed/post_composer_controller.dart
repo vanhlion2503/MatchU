@@ -53,6 +53,9 @@ class PostComposerController extends GetxController {
   DateTime? _voiceStartedAt;
   int get remainingMediaSlots =>
       maxMediaItems - existingMedia.length - mediaDrafts.length;
+  bool get _hasVideoMedia =>
+      existingMedia.any((media) => media.isVideo) ||
+      mediaDrafts.any((draft) => draft.isVideo);
 
   PostModel? get previewReferencePost {
     if (quotedPost != null) return quotedPost;
@@ -133,9 +136,18 @@ class PostComposerController extends GetxController {
 
   Future<void> addVideoFiles(List<File> files) async {
     if (files.isEmpty) return;
+    if (_hasVideoMedia) {
+      _showError('Mỗi bài viết chỉ có thể đăng 1 video.');
+      return;
+    }
+    if (files.length > 1) {
+      _showError(
+        'Mỗi bài viết chỉ có thể đăng 1 video. Chỉ video đầu tiên được thêm.',
+      );
+    }
 
     final drafts = <PostMediaDraft>[];
-    for (final file in files) {
+    for (final file in files.take(1)) {
       final draft = await _videoDraftFromFile(file);
       if (draft != null) drafts.add(draft);
     }
@@ -181,6 +193,10 @@ class PostComposerController extends GetxController {
 
       final draft = await _videoDraftFromFile(File(picked.path), picked.name);
       if (draft == null) return;
+      if (_hasVideoMedia) {
+        _showError('Mỗi bài viết chỉ có thể đăng 1 video.');
+        return;
+      }
 
       _appendMedia([draft]);
     } catch (error) {
@@ -203,6 +219,10 @@ class PostComposerController extends GetxController {
 
       final draft = await _videoDraftFromFile(File(picked.path), picked.name);
       if (draft == null) return;
+      if (_hasVideoMedia) {
+        _showError('Mỗi bài viết chỉ có thể đăng 1 video.');
+        return;
+      }
 
       _appendMedia([draft]);
     } catch (error) {

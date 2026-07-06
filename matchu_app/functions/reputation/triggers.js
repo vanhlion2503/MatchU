@@ -1,6 +1,7 @@
 const {
   onDocumentCreated,
   onDocumentUpdated,
+  onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 
 const { admin, db } = require("../src/shared/firebase");
@@ -144,6 +145,7 @@ function hasQualifiedPostMedia(media) {
 function isQualifiedDailyPost(post) {
   if (!post || typeof post !== "object") return false;
   if (post.deletedAt != null) return false;
+  if (!isModerationApproved(post)) return false;
 
   const authorId = toSafeUid(post.authorId);
   if (!authorId) return false;
@@ -156,6 +158,14 @@ function isQualifiedDailyPost(post) {
     hasQualifiedPostContent(post.content) &&
     hasQualifiedPostMedia(post.media)
   );
+}
+
+function isModerationApproved(post) {
+  const status =
+    typeof post?.moderationStatus === "string"
+      ? post.moderationStatus.trim().toLowerCase()
+      : "";
+  return !status || status === "approved";
 }
 
 function buildDailyWritePayload({ daily, includeCreatedAt }) {
@@ -584,14 +594,19 @@ const progressReceivedFiveStarRatingTask = onDocumentCreated(
   }
 );
 
-const progressQualifiedDailyPostTask = onDocumentCreated(
+const progressQualifiedDailyPostTask = onDocumentWritten(
   "posts/{postId}",
   async (event) => {
-    const snap = event.data;
-    if (!snap) return;
+    const afterSnap = event.data?.after;
+    if (!afterSnap?.exists) return;
 
-    const post = snap.data() || {};
+    const post = afterSnap.data() || {};
     if (!isQualifiedDailyPost(post)) return;
+
+    const beforeSnap = event.data?.before;
+    if (beforeSnap?.exists && isQualifiedDailyPost(beforeSnap.data() || {})) {
+      return;
+    }
 
     const uid = toSafeUid(post.authorId);
     if (!uid) return;

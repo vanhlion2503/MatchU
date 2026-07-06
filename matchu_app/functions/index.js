@@ -37,6 +37,9 @@ const {
   validateWordChainDictionary,
 } = require("./src/triggers/wordChainValidation");
 const {
+  moderateUploadedPostVideo,
+} = require("./src/triggers/videoModeration");
+const {
   ensureTempChatModerationFields,
   ensureUserReputationDefault,
   moderateTempChatMessage,
@@ -67,6 +70,7 @@ exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;
 exports.validateWordChainDictionary = validateWordChainDictionary;
+exports.moderateUploadedPostVideo = moderateUploadedPostVideo;
 exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
 exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;

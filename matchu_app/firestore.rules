@@ -13,8 +13,23 @@ service cloud.firestore {
         : (data.isPublic == true ? "public" : "private");
     }
 
+    function postModerationStatus(data) {
+      return data.moderationStatus is string
+        ? data.moderationStatus
+        : "approved";
+    }
+
     function isValidPostVisibilityValue(value) {
       return value in ["public", "followers", "private"];
+    }
+
+    function isValidPostModerationStatusValue(value) {
+      return value in [
+        "pending_moderation",
+        "approved",
+        "rejected",
+        "review_required"
+      ];
     }
 
     function hasValidPostVisibilityForWrite(data) {
@@ -30,6 +45,36 @@ service cloud.firestore {
           || (data.visibility != "public" && data.isPublic == false)
         )
       );
+    }
+
+    function hasValidRequestedPostVisibilityForWrite(data) {
+      return !("requestedVisibility" in data)
+        || data.requestedVisibility == null
+        || (
+          data.requestedVisibility is string
+          && isValidPostVisibilityValue(data.requestedVisibility)
+        );
+    }
+
+    function hasValidPostModerationForWrite(data) {
+      let status = postModerationStatus(data);
+      return isValidPostModerationStatusValue(status)
+        && hasValidRequestedPostVisibilityForWrite(data)
+        && (
+          status != "pending_moderation"
+          || (
+            postVisibility(data) == "private"
+            && data.isPublic == false
+            && data.requestedVisibility is string
+            && isValidPostVisibilityValue(data.requestedVisibility)
+          )
+        );
+    }
+
+    function hasValidPostModerationForCreate(data) {
+      let status = postModerationStatus(data);
+      return hasValidPostModerationForWrite(data)
+        && status in ["approved", "pending_moderation"];
     }
 
     function isPostPublic(data) {
@@ -633,13 +678,46 @@ service cloud.firestore {
           );
       }
 
+      function changedPostKeys() {
+        return request.resource.data.diff(resource.data).changedKeys();
+      }
+
+      function touchesRestrictedPostModerationFields() {
+        return changedPostKeys().hasAny([
+          "moderationStatus",
+          "moderationMessageVi",
+          "videoModeration",
+          "videoModerationProcessedAt"
+        ]);
+      }
+
+      function isAllowedAuthorPostModerationUpdate() {
+        let status = postModerationStatus(request.resource.data);
+        return !touchesRestrictedPostModerationFields()
+          || (
+            status == "pending_moderation"
+            && postVisibility(request.resource.data) == "private"
+            && request.resource.data.isPublic == false
+            && request.resource.data.requestedVisibility is string
+            && isValidPostVisibilityValue(request.resource.data.requestedVisibility)
+            && !changedPostKeys().hasAny([
+              "moderationMessageVi",
+              "videoModeration",
+              "videoModerationProcessedAt"
+            ])
+          );
+      }
+
       allow read: if canReadPost();
       allow create: if isAuthorCreate()
         && canCreatePostByReputation()
-        && hasValidPostVisibilityForWrite(request.resource.data);
+        && hasValidPostVisibilityForWrite(request.resource.data)
+        && hasValidPostModerationForCreate(request.resource.data);
       allow update: if (
           isAuthor()
           && hasValidPostVisibilityForWrite(request.resource.data)
+          && hasValidPostModerationForWrite(request.resource.data)
+          && isAllowedAuthorPostModerationUpdate()
         ) || isStatsCounterOnlyUpdate();
       allow delete: if isAuthor();
 

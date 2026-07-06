@@ -1,14 +1,25 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/services/feed/post_service.dart';
 
 class PostCreationSync {
   const PostCreationSync._();
 
+  static final Map<String, StreamSubscription<PostModel?>>
+  _moderationSubscriptions = <String, StreamSubscription<PostModel?>>{};
+
   static void sync(PostModel post) {
-    if (post.isPublic && Get.isRegistered<FeedController>()) {
+    _watchModerationIfNeeded(post);
+
+    if (post.isPublic &&
+        post.isModerationApproved &&
+        Get.isRegistered<FeedController>()) {
       Get.find<FeedController>().prependPost(post);
     }
 
@@ -34,6 +45,7 @@ class PostCreationSync {
   }
 
   static void syncPostDeleted(PostModel post) {
+    _cancelModerationWatch(post.postId);
     _removePostFromFeedAndProfiles(post);
     if (post.postType.requiresReference) {
       _syncShareCount(post, delta: -1);
@@ -44,6 +56,8 @@ class PostCreationSync {
   }
 
   static void syncPostUpdated(PostModel post) {
+    _watchModerationIfNeeded(post);
+
     if (Get.isRegistered<FeedController>()) {
       Get.find<FeedController>().applyPostUpdate(post);
     }
@@ -77,6 +91,59 @@ class PostCreationSync {
     if (Get.isRegistered<PostDetailController>()) {
       Get.find<PostDetailController>().applyPostUpdate(post);
     }
+  }
+
+  static void _watchModerationIfNeeded(PostModel post) {
+    final postId = post.postId.trim();
+    if (postId.isEmpty || !post.isModerationPending) return;
+    if (_moderationSubscriptions.containsKey(postId)) return;
+
+    _moderationSubscriptions[postId] = PostService().watchPost(postId).listen((
+      updatedPost,
+    ) {
+      if (updatedPost == null) {
+        _cancelModerationWatch(postId);
+        return;
+      }
+
+      syncPostUpdated(updatedPost);
+      if (!updatedPost.moderationStatus.isFinalDecision) return;
+
+      _cancelModerationWatch(postId);
+      _notifyModerationDecision(updatedPost);
+    });
+  }
+
+  static void _cancelModerationWatch(String postId) {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return;
+
+    final subscription = _moderationSubscriptions.remove(normalizedPostId);
+    unawaited(subscription?.cancel());
+  }
+
+  static void _notifyModerationDecision(PostModel post) {
+    if (post.isModerationApproved) {
+      Get.snackbar(
+        'Thông báo',
+        'Video đã được duyệt và bài viết có thể hiển thị theo quyền riêng tư đã chọn.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return;
+    }
+
+    final message = post.moderationMessageVi?.trim();
+    Get.snackbar(
+      post.isRejectedByModeration ? 'Bài viết bị từ chối' : 'Cần xem xét',
+      message?.isNotEmpty == true
+          ? message!
+          : post.isRejectedByModeration
+          ? 'Video vi phạm tiêu chuẩn cộng đồng nên bài viết đã bị ẩn.'
+          : 'Video cần được quản trị viên xem xét trước khi hiển thị.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
   }
 
   static void _removePostFromFeedAndProfiles(PostModel post) {

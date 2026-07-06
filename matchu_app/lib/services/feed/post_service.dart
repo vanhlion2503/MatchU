@@ -167,7 +167,9 @@ class PostService {
 
       for (final doc in docs) {
         final post = PostModel.fromDoc(doc);
-        if (post.deletedAt != null || post.postType.isRepostOnly) {
+        if (post.deletedAt != null ||
+            post.postType.isRepostOnly ||
+            !post.isModerationApproved) {
           continue;
         }
         collectedPosts.add(post);
@@ -253,7 +255,9 @@ class PostService {
 
         for (final doc in docs) {
           final post = PostModel.fromDoc(doc);
-          if (post.deletedAt != null || post.postType.isRepostOnly) {
+          if (post.deletedAt != null ||
+              post.postType.isRepostOnly ||
+              !post.isModerationApproved) {
             continue;
           }
           collectedPosts.add(post);
@@ -342,6 +346,9 @@ class PostService {
         if (post.deletedAt != null) {
           continue;
         }
+        if (publicOnly && !post.isModerationApproved) {
+          continue;
+        }
         collectedPosts.add(post);
         if (collectedPosts.length == limit) {
           break;
@@ -402,6 +409,7 @@ class PostService {
     for (final doc in [...publicSnapshot.docs, ...followersSnapshot.docs]) {
       final post = PostModel.fromDoc(doc);
       if (post.deletedAt != null) continue;
+      if (!post.isModerationApproved) continue;
       mergedPosts[post.postId] = post;
     }
 
@@ -440,6 +448,18 @@ class PostService {
     final post = PostModel.fromDoc(doc);
     if (post.deletedAt != null) return null;
     return post;
+  }
+
+  Stream<PostModel?> watchPost(String postId) {
+    final normalizedPostId = postId.trim();
+    if (normalizedPostId.isEmpty) return const Stream<PostModel?>.empty();
+
+    return _postsRef.doc(normalizedPostId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      final post = PostModel.fromDoc(doc);
+      if (post.deletedAt != null) return null;
+      return post;
+    });
   }
 
   Future<PostPageResult> fetchSavedPosts({
@@ -647,17 +667,40 @@ class PostService {
     await _ensureTextContentAllowed(normalizedContent);
 
     final uploadedRefs = <Reference>[];
+    final newVideoDrafts = newMediaDrafts
+        .where((draft) => draft.isVideo)
+        .toList(growable: false);
+    final newNonVideoDrafts = newMediaDrafts
+        .where((draft) => !draft.isVideo)
+        .toList(growable: false);
+    final retainedVideoCount =
+        normalizedRetainedMedia.where((media) => media.isVideo).length;
+    _ensureSupportedVideoDrafts(newVideoDrafts);
+    if (retainedVideoCount + newVideoDrafts.length > 1) {
+      throw StateError(
+        'Mỗi bài viết chỉ có thể có 1 video. Hãy gỡ video cũ trước khi thêm video mới.',
+      );
+    }
+    final requiresVideoModeration = newVideoDrafts.isNotEmpty;
+    final effectiveVisibility =
+        requiresVideoModeration ? PostVisibility.private : visibility;
+    var didUpdatePost = false;
 
     try {
       final uploadedMedia = await _uploadMedia(
         postId: normalizedPostId,
-        mediaDrafts: newMediaDrafts,
+        mediaDrafts: newNonVideoDrafts,
         uploadedRefs: uploadedRefs,
         startIndex: existingPost.media.length,
       );
       final nextMedia = <MediaModel>[
         ...normalizedRetainedMedia,
         ...uploadedMedia,
+        if (requiresVideoModeration)
+          _pendingModerationVideoMedia(
+            postId: normalizedPostId,
+            draft: newVideoDrafts.single,
+          ),
       ];
       final normalizedTags = _normalizeTags(tags);
 
@@ -677,17 +720,51 @@ class PostService {
           requestedVisibility: visibility,
         );
 
-        transaction.update(postRef, {
+        final updatePayload = <String, dynamic>{
           'content': normalizedContent,
           'media': nextMedia
               .map((item) => item.toJson())
               .toList(growable: false),
           'tags': normalizedTags,
-          'visibility': visibility.firestoreValue,
-          'isPublic': visibility.isPublic,
+          'visibility': effectiveVisibility.firestoreValue,
+          'isPublic': effectiveVisibility.isPublic,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        if (requiresVideoModeration) {
+          updatePayload.addAll({
+            'requestedVisibility': visibility.firestoreValue,
+            'moderationStatus':
+                PostModerationStatus.pendingModeration.firestoreValue,
+            'moderationSource': 'gemini_video',
+            'moderationPolicyVersion': 'video_moderation_v1',
+            'videoStoragePath': _moderatedVideoStoragePath(normalizedPostId),
+          });
+        }
+
+        transaction.update(postRef, updatePayload);
+      });
+      didUpdatePost = true;
+
+      var finalMedia = nextMedia;
+      if (requiresVideoModeration) {
+        final uploadedVideo = await _uploadVideoForModeration(
+          postId: normalizedPostId,
+          draft: newVideoDrafts.single,
+          uploadedRefs: uploadedRefs,
+        );
+        finalMedia = <MediaModel>[
+          ...normalizedRetainedMedia,
+          ...uploadedMedia,
+          uploadedVideo,
+        ];
+        await postRef.update({
+          'media': finalMedia
+              .map((item) => item.toJson())
+              .toList(growable: false),
           'updatedAt': FieldValue.serverTimestamp(),
         });
-      });
+      }
 
       await _deleteRemovedMediaFiles(
         _removedMediaFiles(
@@ -698,12 +775,42 @@ class PostService {
 
       return existingPost.copyWith(
         content: normalizedContent,
-        media: nextMedia,
+        media: finalMedia,
         tags: normalizedTags,
-        visibility: visibility,
+        visibility: effectiveVisibility,
+        requestedVisibility:
+            requiresVideoModeration
+                ? visibility
+                : existingPost.requestedVisibility,
+        moderationStatus:
+            requiresVideoModeration
+                ? PostModerationStatus.pendingModeration
+                : existingPost.moderationStatus,
+        moderationSource:
+            requiresVideoModeration
+                ? 'gemini_video'
+                : existingPost.moderationSource,
+        moderationMessageVi:
+            requiresVideoModeration ? null : existingPost.moderationMessageVi,
+        moderationPolicyVersion:
+            requiresVideoModeration
+                ? 'video_moderation_v1'
+                : existingPost.moderationPolicyVersion,
+        videoStoragePath:
+            requiresVideoModeration
+                ? _moderatedVideoStoragePath(normalizedPostId)
+                : existingPost.videoStoragePath,
+        videoModeration:
+            requiresVideoModeration ? null : existingPost.videoModeration,
         updatedAt: DateTime.now(),
       );
     } catch (_) {
+      if (didUpdatePost && requiresVideoModeration) {
+        await _restorePostAfterFailedVideoUpdate(
+          postRef: postRef,
+          existingPost: existingPost,
+        );
+      }
       await _deleteUploadedRefs(uploadedRefs);
       rethrow;
     }
@@ -1010,26 +1117,59 @@ class PostService {
         postType == PostType.repost ? const <String>[] : _normalizeTags(tags);
     final postRef = explicitPostRef ?? _postsRef.doc();
     final uploadedRefs = <Reference>[];
+    final videoDrafts = mediaDrafts
+        .where((draft) => draft.isVideo)
+        .toList(growable: false);
+    final nonVideoDrafts = mediaDrafts
+        .where((draft) => !draft.isVideo)
+        .toList(growable: false);
+    _ensureSupportedVideoDrafts(videoDrafts);
+    final hasVideoModeration = videoDrafts.isNotEmpty;
+    final effectiveVisibility =
+        hasVideoModeration ? PostVisibility.private : visibility;
+    final requestedVisibility = hasVideoModeration ? visibility : null;
+    final videoStoragePath =
+        hasVideoModeration ? _moderatedVideoStoragePath(postRef.id) : null;
     final createdAt = DateTime.now();
+    var didCreatePost = false;
 
     try {
       final uploadedMedia = await _uploadMedia(
         postId: postRef.id,
-        mediaDrafts: mediaDrafts,
+        mediaDrafts: nonVideoDrafts,
         uploadedRefs: uploadedRefs,
       );
+      final initialMedia = <MediaModel>[
+        ...uploadedMedia,
+        if (hasVideoModeration)
+          _pendingModerationVideoMedia(
+            postId: postRef.id,
+            draft: videoDrafts.single,
+          ),
+      ];
 
       final payload = {
         'postId': postRef.id,
         'authorId': uid,
         'postType': postType.firestoreValue,
         'content': normalizedContent,
-        'media': uploadedMedia
+        'media': initialMedia
             .map((item) => item.toJson())
             .toList(growable: false),
         'tags': normalizedTags,
-        'visibility': visibility.firestoreValue,
-        'isPublic': visibility.isPublic,
+        'visibility': effectiveVisibility.firestoreValue,
+        'isPublic': effectiveVisibility.isPublic,
+        'requestedVisibility': requestedVisibility?.firestoreValue,
+        'moderationStatus':
+            hasVideoModeration
+                ? PostModerationStatus.pendingModeration.firestoreValue
+                : PostModerationStatus.approved.firestoreValue,
+        'moderationSource': hasVideoModeration ? 'gemini_video' : null,
+        'moderationMessageVi': null,
+        'moderationPolicyVersion':
+            hasVideoModeration ? 'video_moderation_v1' : null,
+        'videoStoragePath': videoStoragePath,
+        'videoModeration': null,
         'stats': const StatsModel().toJson(),
         'trendScore': 0,
         'trendBucket': 0,
@@ -1057,15 +1197,41 @@ class PostService {
       }
 
       await batch.commit();
+      didCreatePost = true;
+
+      var finalMedia = initialMedia;
+      if (hasVideoModeration) {
+        final uploadedVideo = await _uploadVideoForModeration(
+          postId: postRef.id,
+          draft: videoDrafts.single,
+          uploadedRefs: uploadedRefs,
+        );
+        finalMedia = <MediaModel>[...uploadedMedia, uploadedVideo];
+        await postRef.update({
+          'media': finalMedia
+              .map((item) => item.toJson())
+              .toList(growable: false),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       return PostModel(
         postId: postRef.id,
         authorId: uid,
         postType: postType,
         content: normalizedContent,
-        media: uploadedMedia,
+        media: finalMedia,
         tags: normalizedTags,
-        visibility: visibility,
+        visibility: effectiveVisibility,
+        requestedVisibility: requestedVisibility,
+        moderationStatus:
+            hasVideoModeration
+                ? PostModerationStatus.pendingModeration
+                : PostModerationStatus.approved,
+        moderationSource: hasVideoModeration ? 'gemini_video' : null,
+        moderationPolicyVersion:
+            hasVideoModeration ? 'video_moderation_v1' : null,
+        videoStoragePath: videoStoragePath,
         stats: const StatsModel(),
         trendScore: 0,
         trendBucket: 0,
@@ -1079,6 +1245,12 @@ class PostService {
         isLikePending: false,
       );
     } catch (_) {
+      if (didCreatePost) {
+        await _rollbackCreatedPost(
+          postRef: postRef,
+          referencePostId: referencePost?.postId.trim() ?? '',
+        );
+      }
       for (final ref in uploadedRefs) {
         try {
           await ref.delete();
@@ -1343,12 +1515,114 @@ class PostService {
     return uploaded;
   }
 
+  void _ensureSupportedVideoDrafts(List<PostMediaDraft> videoDrafts) {
+    if (videoDrafts.length <= 1) return;
+    throw StateError(
+      'Mỗi bài viết chỉ có thể đăng 1 video để kiểm duyệt tự động.',
+    );
+  }
+
+  MediaModel _pendingModerationVideoMedia({
+    required String postId,
+    required PostMediaDraft draft,
+  }) {
+    return MediaModel(
+      url: '',
+      type: PostMediaType.video,
+      durationMs: draft.durationMs,
+      storagePath: _moderatedVideoStoragePath(postId),
+      mimeType: _contentTypeForDraft(draft),
+    );
+  }
+
+  Future<MediaModel> _uploadVideoForModeration({
+    required String postId,
+    required PostMediaDraft draft,
+    required List<Reference> uploadedRefs,
+  }) async {
+    final ref = _storage.ref(_moderatedVideoStoragePath(postId));
+    final contentType = _contentTypeForDraft(draft);
+
+    await ref.putFile(
+      draft.file,
+      SettableMetadata(
+        contentType: contentType,
+        customMetadata: {
+          'uid': uid,
+          'postId': postId,
+          'moderationPolicyVersion': 'video_moderation_v1',
+        },
+      ),
+    );
+
+    uploadedRefs.add(ref);
+    final url = await ref.getDownloadURL();
+    return MediaModel(
+      url: url,
+      type: PostMediaType.video,
+      durationMs: draft.durationMs,
+      storagePath: ref.fullPath,
+      mimeType: contentType,
+    );
+  }
+
   Future<void> _deleteUploadedRefs(List<Reference> refs) async {
     for (final ref in refs) {
       try {
         await ref.delete();
       } catch (_) {}
     }
+  }
+
+  Future<void> _rollbackCreatedPost({
+    required DocumentReference<Map<String, dynamic>> postRef,
+    required String referencePostId,
+  }) async {
+    try {
+      final batch = _firestore.batch();
+      batch.update(postRef, {
+        'deletedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      batch.set(_firestore.collection('users').doc(uid), {
+        'totalPosts': FieldValue.increment(-1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (referencePostId.isNotEmpty) {
+        batch.update(_postsRef.doc(referencePostId), {
+          'stats.shareCount': FieldValue.increment(-1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+    } catch (_) {}
+  }
+
+  Future<void> _restorePostAfterFailedVideoUpdate({
+    required DocumentReference<Map<String, dynamic>> postRef,
+    required PostModel existingPost,
+  }) async {
+    try {
+      await postRef.update({
+        'content': existingPost.content,
+        'media': existingPost.media
+            .map((item) => item.toJson())
+            .toList(growable: false),
+        'tags': existingPost.tags,
+        'visibility': existingPost.visibility.firestoreValue,
+        'isPublic': existingPost.isPublic,
+        'requestedVisibility': existingPost.requestedVisibility?.firestoreValue,
+        'moderationStatus': existingPost.moderationStatus.firestoreValue,
+        'moderationSource': existingPost.moderationSource,
+        'moderationMessageVi': existingPost.moderationMessageVi,
+        'moderationPolicyVersion': existingPost.moderationPolicyVersion,
+        'videoStoragePath': existingPost.videoStoragePath,
+        'videoModeration': existingPost.videoModeration,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
   }
 
   Future<void> _deleteRemovedMediaFiles(List<MediaModel> removedMedia) async {
@@ -1391,7 +1665,11 @@ class PostService {
     if (draft.isAudio) {
       return 'posts/$uid/$postId/voice_$index.$extension';
     }
-    return 'posts/$uid/$postId/video_$index.$extension';
+    return _moderatedVideoStoragePath(postId);
+  }
+
+  String _moderatedVideoStoragePath(String postId) {
+    return 'user_uploads/$uid/videos/$postId/source.mp4';
   }
 
   String _contentTypeForDraft(PostMediaDraft draft) {

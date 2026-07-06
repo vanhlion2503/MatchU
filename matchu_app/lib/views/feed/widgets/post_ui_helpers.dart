@@ -64,6 +64,92 @@ class FeedAvatar extends StatelessWidget {
   }
 }
 
+class PostModerationNotice extends StatelessWidget {
+  const PostModerationNotice({super.key, required this.post});
+
+  final PostModel post;
+
+  @override
+  Widget build(BuildContext context) {
+    if (post.isModerationApproved) return const SizedBox.shrink();
+
+    final palette = FeedPalette.of(context);
+    final theme = Theme.of(context);
+    final details = _noticeDetails(post);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: details.color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: details.color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(details.icon, size: 18, color: details.color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              details.message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textPrimary,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _ModerationNoticeDetails _noticeDetails(PostModel post) {
+    final message = post.moderationMessageVi?.trim();
+    if (post.isRejectedByModeration) {
+      return _ModerationNoticeDetails(
+        icon: Icons.block,
+        color: Colors.redAccent,
+        message:
+            message?.isNotEmpty == true
+                ? message!
+                : 'Video vi phạm tiêu chuẩn cộng đồng nên bài viết đã bị ẩn.',
+      );
+    }
+
+    if (post.isReviewRequiredByModeration) {
+      return _ModerationNoticeDetails(
+        icon: Icons.manage_search,
+        color: Colors.orangeAccent,
+        message:
+            message?.isNotEmpty == true
+                ? message!
+                : 'Video cần được quản trị viên xem xét trước khi hiển thị.',
+      );
+    }
+
+    return const _ModerationNoticeDetails(
+      icon: Icons.hourglass_empty,
+      color: Colors.blueAccent,
+      message:
+          'Video đang được kiểm duyệt. Bài viết sẽ hiển thị sau khi được duyệt.',
+    );
+  }
+}
+
+class _ModerationNoticeDetails {
+  const _ModerationNoticeDetails({
+    required this.icon,
+    required this.color,
+    required this.message,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String message;
+}
+
 String postAuthorName(PostModel post) {
   final trimmedName = post.author.name.trim();
   if (trimmedName.isNotEmpty) return trimmedName;

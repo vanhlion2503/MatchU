@@ -175,6 +175,16 @@ class _PostDetailViewState extends State<PostDetailView> {
     if (createdPost == null) return;
 
     PostCreationSync.sync(createdPost);
+    if (createdPost.isModerationPending) {
+      Get.snackbar(
+        'Đang kiểm duyệt video',
+        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return;
+    }
+
     if (createdPost.isPublic) return;
 
     Get.snackbar(

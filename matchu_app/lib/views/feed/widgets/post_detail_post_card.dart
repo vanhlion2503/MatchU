@@ -142,6 +142,10 @@ class PostDetailPostCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (!post.isModerationApproved) ...[
+                const SizedBox(height: 14),
+                PostModerationNotice(post: post),
+              ],
               if (post.hasContent) ...[
                 const SizedBox(height: 14),
                 Text(
