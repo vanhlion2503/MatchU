@@ -441,9 +441,8 @@ class ChatRowPermanent extends StatelessWidget {
     Color textColor,
   ) {
     final theme = Theme.of(context);
-    final mutedTextColor = textColor.withValues(alpha: 0.86);
-    final playerBackgroundColor = textColor.withValues(alpha: 0.12);
-    final borderColor = textColor.withValues(alpha: 0.28);
+    final mutedTextColor = textColor.withValues(alpha: 0.9);
+    final borderColor = textColor.withValues(alpha: 0.22);
     final inactiveColor = textColor.withValues(alpha: 0.48);
 
     return Padding(
@@ -511,25 +510,19 @@ class ChatRowPermanent extends StatelessWidget {
                           GestureDetector(
                             onLongPress: onLongPress,
                             onDoubleTap: onDoubleTap,
-                            child: Container(
+                            child: SizedBox(
                               key: bubbleKey,
-                              child: AnimatedBubble(
-                                isMe: isMe,
-                                highlighted: highlighted,
-                                pressed: isPressed,
-                                bubbleColor: bubbleColor,
-                                child: PostVoicePlayer(
-                                  url: voiceUrl ?? '',
-                                  localPath: localVoicePath,
-                                  durationMs: voiceDurationMs,
-                                  compact: true,
-                                  backgroundColor: playerBackgroundColor,
-                                  borderColor: borderColor,
-                                  activeColor: textColor,
-                                  inactiveColor: inactiveColor,
-                                  iconColor: textColor,
-                                  textColor: mutedTextColor,
-                                ),
+                              child: PostVoicePlayer(
+                                url: voiceUrl ?? '',
+                                localPath: localVoicePath,
+                                durationMs: voiceDurationMs,
+                                compact: true,
+                                backgroundColor: bubbleColor,
+                                borderColor: borderColor,
+                                activeColor: textColor,
+                                inactiveColor: inactiveColor,
+                                iconColor: textColor,
+                                textColor: mutedTextColor,
                               ),
                             ),
                           ),

@@ -218,23 +218,27 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
                     seed: _waveformSeed(widget.url, widget.localPath),
                     activeColor: activeColor,
                     inactiveColor: inactiveColor,
-                    barCount: widget.compact ? 28 : 44,
+                    barCount: widget.compact ? 22 : 44,
                     maxBarHeight: widget.compact ? 22 : 26,
                   ),
                 ),
                 SizedBox(width: widget.compact ? 8 : 10),
                 SizedBox(
-                  width: widget.compact ? 42 : 48,
+                  width: widget.compact ? 52 : 48,
                   child: Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      _formatDuration(duration ?? _position),
-                      maxLines: 1,
-                      softWrap: false,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: textColor,
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        _formatDuration(duration ?? _position),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: textColor,
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
                   ),

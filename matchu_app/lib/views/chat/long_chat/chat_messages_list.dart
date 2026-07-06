@@ -446,77 +446,68 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                     constraints: BoxConstraints(
                       maxWidth: constraints.maxWidth * 0.65,
                     ),
-                    child: AnimatedBubble(
-                      isMe: true,
-                      highlighted: false,
-                      pressed: false,
-                      bubbleColor: bubbleColor,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isVoice) ...[
-                            PostVoicePlayer(
+                    child:
+                        isVoice
+                            ? PostVoicePlayer(
                               url: '',
                               localPath: pending.localPath,
                               durationMs: pending.durationMs,
                               compact: true,
-                              backgroundColor: textColor.withValues(
-                                alpha: 0.12,
-                              ),
-                              borderColor: textColor.withValues(alpha: 0.28),
+                              backgroundColor: bubbleColor,
+                              borderColor: textColor.withValues(alpha: 0.22),
                               activeColor: textColor,
                               inactiveColor: textColor.withValues(alpha: 0.48),
                               iconColor: textColor,
-                              textColor: textColor.withValues(alpha: 0.86),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              label,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: textColor.withValues(alpha: 0.86),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ] else ...[
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Iconsax.gallery,
-                                  size: 20,
-                                  color: textColor,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    label,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: textColor,
-                                      fontWeight: FontWeight.w600,
+                              textColor: textColor.withValues(alpha: 0.9),
+                            )
+                            : AnimatedBubble(
+                              isMe: true,
+                              highlighted: false,
+                              pressed: false,
+                              bubbleColor: bubbleColor,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Iconsax.gallery,
+                                        size: 20,
+                                        color: textColor,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Flexible(
+                                        child: Text(
+                                          label,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color: textColor,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  LinearProgressIndicator(
+                                    value:
+                                        failed
+                                            ? null
+                                            : (progress > 0 ? progress : null),
+                                    minHeight: 3,
+                                    backgroundColor: textColor.withValues(
+                                      alpha: 0.2,
+                                    ),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      textColor,
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ],
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value:
-                                failed
-                                    ? null
-                                    : (progress > 0 ? progress : null),
-                            minHeight: 3,
-                            backgroundColor: textColor.withValues(alpha: 0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              textColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   );
                 },
               ),
