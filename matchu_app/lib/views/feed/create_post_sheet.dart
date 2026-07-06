@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_composer_controller.dart';
@@ -74,17 +75,11 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
       ),
       tag: _tag,
     );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 180), () {
-        if (!mounted) return;
-        _contentFocusNode.requestFocus();
-      });
-    });
   }
 
   @override
   void dispose() {
+    _dismissKeyboard();
     _contentFocusNode.dispose();
     _tagFocusNode.dispose();
 
@@ -104,18 +99,27 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
     }
   }
 
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _contentFocusNode.unfocus();
+    _tagFocusNode.unfocus();
+    SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+  }
+
   Future<void> _submitPost() async {
     if (widget.closeOnSubmitStarted) {
       final submitFuture = _controller.submit();
       _detachedSubmitFuture = submitFuture;
       widget.onSubmitStarted?.call(submitFuture);
       if (!mounted) return;
+      _dismissKeyboard();
       Get.back<PostModel?>();
       return;
     }
 
     final created = await _controller.submit();
     if (!mounted || created == null) return;
+    _dismissKeyboard();
     Get.back<PostModel?>(result: created);
   }
 
@@ -163,7 +167,10 @@ class _CreatePostSheetState extends State<CreatePostSheet> {
                 _SheetHeader(
                   controller: _controller,
                   palette: palette,
-                  onCancel: () => Navigator.of(context).pop(),
+                  onCancel: () {
+                    _dismissKeyboard();
+                    Navigator.of(context).pop();
+                  },
                   onSubmit: _submitPost,
                 ),
                 Expanded(
@@ -920,11 +927,13 @@ class _BottomToolbar extends StatelessWidget {
       mediaType: PhotoLibraryMediaType.video,
       title: 'Thư viện video',
       heightFactor: 0.5,
+      showCameraTile: true,
+      onCameraTap: controller.pickCameraVideo,
     );
     if (!context.mounted) return;
     if (selections == null || selections.isEmpty) return;
 
-    controller.addVideoFiles(
+    await controller.addVideoFiles(
       selections.map((selection) => selection.file).toList(growable: false),
     );
   }

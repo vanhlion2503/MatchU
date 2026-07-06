@@ -11,6 +11,7 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:video_player/video_player.dart';
 
 class PostComposerController extends GetxController {
   PostComposerController({
@@ -21,6 +22,8 @@ class PostComposerController extends GetxController {
        _service = service ?? PostService();
 
   static const int maxMediaItems = PostService.maxMediaItems;
+  static const int maxVideoDurationSeconds = 60;
+  static const int maxVideoBytes = 150 * 1024 * 1024;
 
   final PostService _service;
   final ImagePicker _picker = ImagePicker();
@@ -128,18 +131,14 @@ class PostComposerController extends GetxController {
     _appendMedia(drafts);
   }
 
-  void addVideoFiles(List<File> files) {
+  Future<void> addVideoFiles(List<File> files) async {
     if (files.isEmpty) return;
 
-    final drafts = files
-        .map(
-          (file) => PostMediaDraft(
-            file: file,
-            type: PostMediaType.video,
-            fileName: _fileNameFromPath(file.path),
-          ),
-        )
-        .toList(growable: false);
+    final drafts = <PostMediaDraft>[];
+    for (final file in files) {
+      final draft = await _videoDraftFromFile(file);
+      if (draft != null) drafts.add(draft);
+    }
 
     _appendMedia(drafts);
   }
@@ -169,21 +168,43 @@ class PostComposerController extends GetxController {
     }
   }
 
+  Future<void> pickCameraVideo() async {
+    if (isPickingMedia.value) return;
+
+    try {
+      isPickingMedia.value = true;
+      final picked = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: maxVideoDurationSeconds),
+      );
+      if (picked == null) return;
+
+      final draft = await _videoDraftFromFile(File(picked.path), picked.name);
+      if (draft == null) return;
+
+      _appendMedia([draft]);
+    } catch (error) {
+      _showError('Không thể quay video lúc này: $error');
+    } finally {
+      isPickingMedia.value = false;
+    }
+  }
+
   Future<void> pickVideo() async {
     if (isPickingMedia.value) return;
 
     try {
       isPickingMedia.value = true;
-      final picked = await _picker.pickVideo(source: ImageSource.gallery);
+      final picked = await _picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: maxVideoDurationSeconds),
+      );
       if (picked == null) return;
 
-      _appendMedia([
-        PostMediaDraft(
-          file: File(picked.path),
-          type: PostMediaType.video,
-          fileName: picked.name,
-        ),
-      ]);
+      final draft = await _videoDraftFromFile(File(picked.path), picked.name);
+      if (draft == null) return;
+
+      _appendMedia([draft]);
     } catch (error) {
       _showError('Không thể chọn video lúc này: $error');
     } finally {
@@ -355,6 +376,8 @@ class PostComposerController extends GetxController {
   }
 
   void _appendMedia(List<PostMediaDraft> drafts) {
+    if (drafts.isEmpty) return;
+
     final availableDraftSlots = maxMediaItems - existingMedia.length;
     if (availableDraftSlots <= 0) {
       _showMaxMediaNotice();
@@ -371,6 +394,51 @@ class PostComposerController extends GetxController {
       next.take(availableDraftSlots).toList(growable: false),
     );
     _showMaxMediaNotice();
+  }
+
+  Future<PostMediaDraft?> _videoDraftFromFile(
+    File file, [
+    String? fileName,
+  ]) async {
+    final sizeBytes = await _safeFileLength(file);
+    if (sizeBytes > maxVideoBytes) {
+      _showError('Video không được nặng quá 150MB.');
+      return null;
+    }
+
+    final duration = await _readVideoDuration(file);
+    if (duration > const Duration(seconds: maxVideoDurationSeconds)) {
+      _showError('Video chỉ được dài tối đa 1 phút.');
+      return null;
+    }
+
+    return PostMediaDraft(
+      file: file,
+      type: PostMediaType.video,
+      fileName:
+          fileName?.trim().isNotEmpty == true
+              ? fileName!.trim()
+              : _fileNameFromPath(file.path),
+      durationMs: duration.inMilliseconds,
+    );
+  }
+
+  Future<int> _safeFileLength(File file) async {
+    try {
+      return await file.length();
+    } catch (_) {
+      return maxVideoBytes + 1;
+    }
+  }
+
+  Future<Duration> _readVideoDuration(File file) async {
+    final controller = VideoPlayerController.file(file);
+    try {
+      await controller.initialize();
+      return controller.value.duration;
+    } finally {
+      await controller.dispose();
+    }
   }
 
   void _appendTagsFromRaw(String rawText, {required bool clearInput}) {

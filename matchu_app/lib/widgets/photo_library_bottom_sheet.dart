@@ -319,7 +319,11 @@ class _PhotoLibraryBottomSheetState extends State<PhotoLibraryBottomSheet> {
       itemBuilder: (context, index) {
         if (widget.showCameraTile) {
           if (index == 0) {
-            return _CameraTile(palette: palette, onTap: _handleCameraTap);
+            return _CameraTile(
+              palette: palette,
+              mediaType: widget.mediaType,
+              onTap: _handleCameraTap,
+            );
           }
           index -= 1;
         }
@@ -428,9 +432,14 @@ class _Header extends StatelessWidget {
 }
 
 class _CameraTile extends StatelessWidget {
-  const _CameraTile({required this.palette, required this.onTap});
+  const _CameraTile({
+    required this.palette,
+    required this.mediaType,
+    required this.onTap,
+  });
 
   final _PhotoLibraryPalette palette;
+  final PhotoLibraryMediaType mediaType;
   final VoidCallback onTap;
 
   @override
@@ -446,10 +455,18 @@ class _CameraTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Iconsax.camera, size: 28, color: theme.colorScheme.primary),
+              Icon(
+                mediaType == PhotoLibraryMediaType.video
+                    ? Iconsax.video
+                    : Iconsax.camera,
+                size: 28,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(height: 6),
               Text(
-                'Chụp ảnh',
+                mediaType == PhotoLibraryMediaType.video
+                    ? 'Quay video'
+                    : 'Chụp ảnh',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: palette.textSecondary,
                   fontWeight: FontWeight.w700,
