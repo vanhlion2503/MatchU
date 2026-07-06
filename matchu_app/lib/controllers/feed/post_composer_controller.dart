@@ -38,12 +38,14 @@ class PostComposerController extends GetxController {
   final RxBool isPickingMedia = false.obs;
   final RxBool isRecordingVoice = false.obs;
   final RxInt voiceRecordingSeconds = 0.obs;
+  final RxList<double> voiceRecordingAmplitudes = <double>[].obs;
   final Rx<PostVisibility> visibility = PostVisibility.public.obs;
   final RxBool isTagEditorVisible = false.obs;
 
   bool get isEditComposer => editingPost != null;
   bool get isQuoteComposer => quotedPost != null;
   Timer? _voiceTimer;
+  StreamSubscription<Amplitude>? _voiceAmplitudeSubscription;
   DateTime? _voiceStartedAt;
   int get remainingMediaSlots =>
       maxMediaItems - existingMedia.length - mediaDrafts.length;
@@ -198,7 +200,12 @@ class PostComposerController extends GetxController {
       );
       _voiceStartedAt = DateTime.now();
       voiceRecordingSeconds.value = 0;
+      voiceRecordingAmplitudes.clear();
       isRecordingVoice.value = true;
+      _voiceAmplitudeSubscription?.cancel();
+      _voiceAmplitudeSubscription = _audioRecorder
+          .onAmplitudeChanged(const Duration(milliseconds: 80))
+          .listen(_appendVoiceAmplitude);
       _voiceTimer?.cancel();
       _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         final startedAt = _voiceStartedAt;
@@ -234,12 +241,35 @@ class PostComposerController extends GetxController {
     } catch (error) {
       _showError('Không thể lưu ghi âm lúc này: $error');
     } finally {
+      _voiceAmplitudeSubscription?.cancel();
+      _voiceAmplitudeSubscription = null;
       _voiceTimer?.cancel();
       _voiceTimer = null;
       _voiceStartedAt = null;
       voiceRecordingSeconds.value = 0;
+      voiceRecordingAmplitudes.clear();
       isRecordingVoice.value = false;
     }
+  }
+
+  void _appendVoiceAmplitude(Amplitude amplitude) {
+    if (!isRecordingVoice.value) return;
+
+    final normalized = _normalizeVoiceAmplitude(amplitude.current);
+    voiceRecordingAmplitudes.add(normalized);
+    const maxSamples = 96;
+    if (voiceRecordingAmplitudes.length > maxSamples) {
+      voiceRecordingAmplitudes.removeRange(
+        0,
+        voiceRecordingAmplitudes.length - maxSamples,
+      );
+    }
+  }
+
+  double _normalizeVoiceAmplitude(double decibels) {
+    if (decibels.isNaN || decibels.isInfinite) return 0.08;
+    final normalized = ((decibels + 48) / 48).clamp(0.0, 1.0);
+    return 0.08 + normalized * 0.92;
   }
 
   void removeMedia(PostMediaDraft draft) {
@@ -443,6 +473,7 @@ class PostComposerController extends GetxController {
   void onClose() {
     contentController.removeListener(_handleContentChanged);
     tagInputController.removeListener(_handleTagInputChanged);
+    _voiceAmplitudeSubscription?.cancel();
     _voiceTimer?.cancel();
     if (isRecordingVoice.value) {
       unawaited(_audioRecorder.cancel());

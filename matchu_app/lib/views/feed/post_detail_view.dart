@@ -690,7 +690,7 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                 ),
               ),
             if (editingComment != null || replyingTo != null)
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
             if (isRecordingVoice) ...[
               _ComposerSurface(
                 borderRadius: BorderRadius.circular(16),
@@ -700,10 +700,12 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                 blurSigma: 0,
                 child: ThreadsVoiceRecordingIndicator(
                   seconds: commentsController.voiceRecordingSeconds.value,
+                  amplitudes: commentsController.voiceRecordingAmplitudes
+                      .toList(growable: false),
                   compact: true,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
             ],
             TextFieldTapRegion(
               child: _ComposerSurface(

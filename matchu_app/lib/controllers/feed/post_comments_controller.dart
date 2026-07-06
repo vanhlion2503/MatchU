@@ -61,6 +61,7 @@ class PostCommentsController extends GetxController {
   final RxBool isPickingImage = false.obs;
   final RxBool isRecordingVoice = false.obs;
   final RxInt voiceRecordingSeconds = 0.obs;
+  final RxList<double> voiceRecordingAmplitudes = <double>[].obs;
   final RxBool hasInputText = false.obs;
   final RxBool isLoadingMoreComments = false.obs;
   final RxBool hasMoreComments = true.obs;
@@ -83,6 +84,7 @@ class PostCommentsController extends GetxController {
   final Map<String, int> _topLevelOrderRanks = <String, int>{};
   int _optimisticCommentSequence = 0;
   Timer? _voiceTimer;
+  StreamSubscription<Amplitude>? _voiceAmplitudeSubscription;
   DateTime? _voiceStartedAt;
 
   DocumentSnapshot<Map<String, dynamic>>? _topLevelCursor;
@@ -570,7 +572,12 @@ class PostCommentsController extends GetxController {
 
       _voiceStartedAt = DateTime.now();
       voiceRecordingSeconds.value = 0;
+      voiceRecordingAmplitudes.clear();
       isRecordingVoice.value = true;
+      _voiceAmplitudeSubscription?.cancel();
+      _voiceAmplitudeSubscription = _audioRecorder
+          .onAmplitudeChanged(const Duration(milliseconds: 80))
+          .listen(_appendVoiceAmplitude);
       _voiceTimer?.cancel();
       _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         final startedAt = _voiceStartedAt;
@@ -597,10 +604,13 @@ class PostCommentsController extends GetxController {
     } catch (error) {
       _showError('Không thể lưu ghi âm lúc này: $error');
     } finally {
+      _voiceAmplitudeSubscription?.cancel();
+      _voiceAmplitudeSubscription = null;
       _voiceTimer?.cancel();
       _voiceTimer = null;
       _voiceStartedAt = null;
       voiceRecordingSeconds.value = 0;
+      voiceRecordingAmplitudes.clear();
       isRecordingVoice.value = false;
     }
 
@@ -667,6 +677,26 @@ class PostCommentsController extends GetxController {
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  void _appendVoiceAmplitude(Amplitude amplitude) {
+    if (!isRecordingVoice.value) return;
+
+    final normalized = _normalizeVoiceAmplitude(amplitude.current);
+    voiceRecordingAmplitudes.add(normalized);
+    const maxSamples = 96;
+    if (voiceRecordingAmplitudes.length > maxSamples) {
+      voiceRecordingAmplitudes.removeRange(
+        0,
+        voiceRecordingAmplitudes.length - maxSamples,
+      );
+    }
+  }
+
+  double _normalizeVoiceAmplitude(double decibels) {
+    if (decibels.isNaN || decibels.isInfinite) return 0.08;
+    final normalized = ((decibels + 48) / 48).clamp(0.0, 1.0);
+    return 0.08 + normalized * 0.92;
   }
 
   Future<void> _submitEditedComment(PostCommentModel editingTarget) async {
@@ -1569,6 +1599,7 @@ class PostCommentsController extends GetxController {
   @override
   void onClose() {
     inputController.removeListener(_handleInputChanged);
+    _voiceAmplitudeSubscription?.cancel();
     _voiceTimer?.cancel();
     if (isRecordingVoice.value) {
       unawaited(_audioRecorder.cancel());

@@ -240,11 +240,15 @@ class ThreadsVoiceRecordingIndicator extends StatefulWidget {
   const ThreadsVoiceRecordingIndicator({
     super.key,
     required this.seconds,
+    required this.amplitudes,
     this.compact = false,
+    this.visibleSeconds = 42,
   });
 
   final int seconds;
+  final List<double> amplitudes;
   final bool compact;
+  final int visibleSeconds;
 
   @override
   State<ThreadsVoiceRecordingIndicator> createState() =>
@@ -261,8 +265,16 @@ class _ThreadsVoiceRecordingIndicatorState
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 80),
     )..repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant ThreadsVoiceRecordingIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.amplitudes.length != widget.amplitudes.length) {
+      _controller.forward(from: 0);
+    }
   }
 
   @override
@@ -276,6 +288,7 @@ class _ThreadsVoiceRecordingIndicatorState
     final theme = Theme.of(context);
     final palette = FeedPalette.of(context);
     final radius = BorderRadius.circular(10);
+    final elapsedSeconds = widget.seconds <= 0 ? 1 : widget.seconds;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -291,8 +304,8 @@ class _ThreadsVoiceRecordingIndicatorState
         child: Row(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: widget.compact ? 26 : 28,
+              height: widget.compact ? 26 : 28,
               decoration: BoxDecoration(
                 color: theme.colorScheme.error,
                 shape: BoxShape.circle,
@@ -308,29 +321,182 @@ class _ThreadsVoiceRecordingIndicatorState
               child: AnimatedBuilder(
                 animation: _controller,
                 builder: (context, _) {
-                  return VoiceWaveform(
-                    progress: 0.72,
-                    seed: 37 + (_controller.value * 100).round(),
+                  return RecordingWaveform(
+                    amplitudes: widget.amplitudes,
+                    sampleProgress: _controller.value,
+                    visibleSeconds: widget.visibleSeconds,
                     activeColor: palette.textPrimary,
                     inactiveColor: palette.border.withValues(alpha: 0.8),
-                    barCount: widget.compact ? 34 : 46,
                     maxBarHeight: widget.compact ? 22 : 28,
                   );
                 },
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              formatVoiceDurationFromSeconds(widget.seconds),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: palette.textPrimary,
-                fontWeight: FontWeight.w800,
+            SizedBox(
+              width: 40,
+              child: Text(
+                formatVoiceDurationFromSeconds(elapsedSeconds),
+                textAlign: TextAlign.right,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+}
+
+class RecordingWaveform extends StatelessWidget {
+  const RecordingWaveform({
+    super.key,
+    required this.amplitudes,
+    required this.sampleProgress,
+    required this.visibleSeconds,
+    required this.activeColor,
+    required this.inactiveColor,
+    this.minBarHeight = 4,
+    this.maxBarHeight = 28,
+  });
+
+  final List<double> amplitudes;
+  final double sampleProgress;
+  final int visibleSeconds;
+  final Color activeColor;
+  final Color inactiveColor;
+  final double minBarHeight;
+  final double maxBarHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _RecordingWaveformPainter(
+        amplitudes: amplitudes,
+        sampleProgress: sampleProgress.clamp(0.0, 1.0),
+        visibleSeconds: visibleSeconds,
+        activeColor: activeColor,
+        inactiveColor: inactiveColor,
+        minBarHeight: minBarHeight,
+        maxBarHeight: maxBarHeight,
+      ),
+      child: SizedBox(height: maxBarHeight),
+    );
+  }
+}
+
+class _RecordingWaveformPainter extends CustomPainter {
+  const _RecordingWaveformPainter({
+    required this.amplitudes,
+    required this.sampleProgress,
+    required this.visibleSeconds,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.minBarHeight,
+    required this.maxBarHeight,
+  });
+
+  final List<double> amplitudes;
+  final double sampleProgress;
+  final int visibleSeconds;
+  final Color activeColor;
+  final Color inactiveColor;
+  final double minBarHeight;
+  final double maxBarHeight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final barCount = math.max(12, visibleSeconds);
+    if (size.width <= 0) return;
+
+    final gap = size.width < 180 ? 2.0 : 2.4;
+    final barWidth = math.max(
+      2.0,
+      (size.width - gap * (barCount - 1)) / barCount,
+    );
+    final step = barWidth + gap;
+    final centerY = size.height / 2;
+    final samples = amplitudes.isEmpty ? const <double>[0.08] : amplitudes;
+    final totalSamples = samples.length;
+    final progress = sampleProgress.clamp(0.0, 1.0);
+    final trailingGhostCount = totalSamples < barCount ? 1 : 0;
+    final totalWithFraction = totalSamples + progress;
+    final visibleCapacity = barCount - trailingGhostCount;
+    final shouldScroll = totalWithFraction > visibleCapacity;
+    final scrollOffset =
+        shouldScroll ? (totalWithFraction - visibleCapacity) : 0.0;
+    final activePaint =
+        Paint()
+          ..color = activeColor
+          ..style = PaintingStyle.fill;
+    final inactivePaint =
+        Paint()
+          ..color = inactiveColor
+          ..style = PaintingStyle.fill;
+
+    canvas
+      ..save()
+      ..clipRect(Offset.zero & size);
+
+    final firstSample = math.max(0, scrollOffset.floor());
+    final lastSample = math.min(totalSamples - 1, firstSample + barCount + 1);
+    for (var index = firstSample; index <= lastSample; index++) {
+      final x = (index - scrollOffset) * step;
+      if (x + barWidth < 0 || x > size.width) continue;
+
+      final sample = samples[index].clamp(0.0, 1.0);
+      final height = _heightFromAmplitude(sample);
+      final clampedHeight = height.clamp(minBarHeight, maxBarHeight);
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, centerY - clampedHeight / 2, barWidth, clampedHeight),
+        Radius.circular(barWidth),
+      );
+
+      canvas.drawRRect(rect, activePaint);
+    }
+
+    if (trailingGhostCount > 0) {
+      final x = (totalSamples - scrollOffset) * step;
+      if (x <= size.width) {
+        final latestAmplitude = samples.last.clamp(0.0, 1.0);
+        final nextHeight =
+            _heightFromAmplitude(latestAmplitude) *
+            math.max(0.16, progress.clamp(0.0, 1.0));
+        final clampedHeight = nextHeight.clamp(minBarHeight, maxBarHeight);
+        final rect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            x,
+            centerY - clampedHeight / 2,
+            barWidth,
+            clampedHeight,
+          ),
+          Radius.circular(barWidth),
+        );
+        canvas.drawRRect(rect, inactivePaint);
+      }
+    }
+
+    canvas.restore();
+  }
+
+  double _heightFromAmplitude(double amplitude) {
+    final eased = math.pow(amplitude.clamp(0.0, 1.0), 0.72).toDouble();
+    return minBarHeight + (maxBarHeight - minBarHeight) * eased;
+  }
+
+  @override
+  bool shouldRepaint(covariant _RecordingWaveformPainter oldDelegate) {
+    return oldDelegate.amplitudes != amplitudes ||
+        oldDelegate.sampleProgress != sampleProgress ||
+        oldDelegate.visibleSeconds != visibleSeconds ||
+        oldDelegate.activeColor != activeColor ||
+        oldDelegate.inactiveColor != inactiveColor ||
+        oldDelegate.minBarHeight != minBarHeight ||
+        oldDelegate.maxBarHeight != maxBarHeight;
   }
 }
 

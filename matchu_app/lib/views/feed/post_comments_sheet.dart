@@ -388,9 +388,11 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                       ),
                     if (isRecordingVoice)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                         child: ThreadsVoiceRecordingIndicator(
                           seconds: _controller.voiceRecordingSeconds.value,
+                          amplitudes: _controller.voiceRecordingAmplitudes
+                              .toList(growable: false),
                           compact: true,
                         ),
                       ),

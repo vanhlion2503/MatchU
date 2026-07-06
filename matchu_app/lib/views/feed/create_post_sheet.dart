@@ -468,9 +468,11 @@ class _ComposerLayout extends StatelessWidget {
                 () =>
                     controller.isRecordingVoice.value
                         ? Padding(
-                          padding: const EdgeInsets.only(top: 10),
+                          padding: const EdgeInsets.only(top: 6),
                           child: ThreadsVoiceRecordingIndicator(
                             seconds: controller.voiceRecordingSeconds.value,
+                            amplitudes: controller.voiceRecordingAmplitudes
+                                .toList(growable: false),
                           ),
                         )
                         : const SizedBox.shrink(),
@@ -1118,25 +1120,25 @@ class _ExistingMediaPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (media.isAudio) {
-      return SizedBox(
-        width: 280,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: PostVoicePlayer(
-                url: media.url,
-                durationMs: media.durationMs,
-                compact: true,
+      return Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: 286,
+          height: 48,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: PostVoicePlayer(
+                  url: media.url,
+                  durationMs: media.durationMs,
+                  compact: true,
+                ),
               ),
-            ),
-            Positioned(
-              top: 2,
-              right: -4,
-              child: _RemoveMediaButton(onTap: onRemove),
-            ),
-          ],
+              const SizedBox(width: 8),
+              _RemoveMediaButton(onTap: onRemove),
+            ],
+          ),
         ),
       );
     }
@@ -1216,26 +1218,26 @@ class _DraftMediaPreviewCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     if (draft.isAudio) {
-      return SizedBox(
-        width: 280,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: PostVoicePlayer(
-                url: '',
-                localPath: draft.file.path,
-                durationMs: draft.durationMs,
-                compact: true,
+      return Align(
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: 286,
+          height: 48,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: PostVoicePlayer(
+                  url: '',
+                  localPath: draft.file.path,
+                  durationMs: draft.durationMs,
+                  compact: true,
+                ),
               ),
-            ),
-            Positioned(
-              top: 2,
-              right: -4,
-              child: _RemoveMediaButton(onTap: onRemove),
-            ),
-          ],
+              const SizedBox(width: 8),
+              _RemoveMediaButton(onTap: onRemove),
+            ],
+          ),
         ),
       );
     }
@@ -1334,11 +1336,7 @@ class _RemoveMediaButton extends StatelessWidget {
             color: Colors.black.withValues(alpha: 0.52),
             shape: BoxShape.circle,
           ),
-          child: const Icon(
-            Iconsax.close_circle,
-            size: 16,
-            color: Colors.white,
-          ),
+          child: const Icon(Icons.close, size: 16, color: Colors.white),
         ),
       ),
     );
