@@ -41,7 +41,10 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
   StreamSubscription<PlayerState>? _stateSubscription;
   StreamSubscription<Duration>? _positionSubscription;
   bool _isLoading = false;
-  bool _cancelPlaybackRequest = false;
+  bool _cancelLoadRequest = false;
+  int _loadGeneration = 0;
+  Future<void>? _loadInFlight;
+  String? _loadedSourceKey;
   Duration _position = Duration.zero;
   Duration? _duration;
 
@@ -54,6 +57,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
       if (state.processingState == ProcessingState.completed) {
         unawaited(_player.seek(Duration.zero));
         unawaited(_player.pause());
+        _position = Duration.zero;
       }
       setState(() {});
     });
@@ -70,6 +74,9 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
         oldWidget.localPath != widget.localPath) {
       _duration = null;
       _position = Duration.zero;
+      _loadedSourceKey = null;
+      _cancelLoadRequest = true;
+      _loadGeneration++;
       unawaited(_player.stop());
     }
   }
@@ -83,15 +90,16 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
   }
 
   Future<void> _togglePlayback() async {
+    final sourceKey = _sourceKey();
+    if (sourceKey == null) return;
+
     try {
       if (_isLoading) {
-        _cancelPlaybackRequest = true;
-        await _player.stop();
+        _cancelLoadRequest = true;
+        _loadGeneration++;
+        await _player.pause();
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _position = Duration.zero;
-          });
+          setState(() => _isLoading = false);
         }
         return;
       }
@@ -101,20 +109,15 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
         return;
       }
 
-      if (_player.duration == null) {
-        setState(() => _isLoading = true);
-        _cancelPlaybackRequest = false;
-        final source = _resolveSource();
-        if (source == null) return;
-        _duration = await _player.setAudioSource(source);
-        if (_cancelPlaybackRequest) {
-          await _player.pause();
-          await _player.seek(Duration.zero);
-          return;
-        }
+      if (_player.processingState == ProcessingState.completed) {
+        await _player.seek(Duration.zero);
       }
 
-      await _player.play();
+      _cancelLoadRequest = false;
+      await _ensureSourceLoaded(sourceKey);
+      if (!mounted || _cancelLoadRequest) return;
+      if (mounted) setState(() => _isLoading = false);
+      unawaited(_playLoadedSource());
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -122,23 +125,79 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _cancelPlaybackRequest = false;
-        });
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _playLoadedSource() async {
+    try {
+      await _player.play();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể phát ghi âm lúc này.')),
+      );
+    }
+  }
+
+  Future<void> _ensureSourceLoaded(String sourceKey) async {
+    final previousLoad = _loadInFlight;
+    if (previousLoad != null) {
+      if (mounted) setState(() => _isLoading = true);
+      await previousLoad;
+      if (!mounted) return;
+    }
+
+    if (_loadedSourceKey == sourceKey &&
+        _player.processingState != ProcessingState.idle) {
+      return;
+    }
+
+    final source = _resolveSource();
+    if (source == null) return;
+
+    final generation = ++_loadGeneration;
+    _cancelLoadRequest = false;
+    if (mounted) setState(() => _isLoading = true);
+
+    final loadFuture = _player.setAudioSource(source, preload: true);
+    final inFlight = loadFuture.then((_) {});
+    _loadInFlight = inFlight;
+    try {
+      final duration = await loadFuture;
+      if (!mounted || generation != _loadGeneration) return;
+      _duration = duration;
+      _loadedSourceKey = sourceKey;
+    } finally {
+      if (identical(_loadInFlight, inFlight)) {
+        _loadInFlight = null;
       }
     }
   }
 
   AudioSource? _resolveSource() {
+    final url = widget.url.trim();
+    if (url.isNotEmpty) {
+      return AudioSource.uri(Uri.parse(url));
+    }
+
     final localPath = widget.localPath?.trim() ?? '';
     if (localPath.isNotEmpty) {
       return AudioSource.uri(Uri.file(localPath));
     }
 
+    return null;
+  }
+
+  String? _sourceKey() {
     final url = widget.url.trim();
-    if (url.isEmpty) return null;
-    return AudioSource.uri(Uri.parse(url));
+    if (url.isNotEmpty) return 'url:$url';
+
+    final localPath = widget.localPath?.trim() ?? '';
+    if (localPath.isNotEmpty) return 'file:$localPath';
+
+    return null;
   }
 
   @override
