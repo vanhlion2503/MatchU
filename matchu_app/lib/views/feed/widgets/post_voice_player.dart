@@ -118,7 +118,7 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Khong the phat ghi am luc nay.')),
+        const SnackBar(content: Text('Không thể phát ghi âm lúc này.')),
       );
     } finally {
       if (mounted) {
@@ -218,16 +218,25 @@ class _PostVoicePlayerState extends State<PostVoicePlayer> {
                     seed: _waveformSeed(widget.url, widget.localPath),
                     activeColor: activeColor,
                     inactiveColor: inactiveColor,
-                    barCount: widget.compact ? 34 : 44,
+                    barCount: widget.compact ? 28 : 44,
                     maxBarHeight: widget.compact ? 22 : 26,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  _formatDuration(duration ?? _position),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: textColor,
-                    fontWeight: FontWeight.w700,
+                SizedBox(width: widget.compact ? 8 : 10),
+                SizedBox(
+                  width: widget.compact ? 42 : 48,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      _formatDuration(duration ?? _position),
+                      maxLines: 1,
+                      softWrap: false,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: textColor,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                   ),
                 ),
               ],

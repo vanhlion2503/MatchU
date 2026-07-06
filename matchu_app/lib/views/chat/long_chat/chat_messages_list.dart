@@ -430,8 +430,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
 
       final label =
           failed
-              ? (isVoice ? "Gui ghi am" : "Gửi ảnh")
-              : (isVoice ? "Dang gui ghi am..." : "Đang gửi ảnh...");
+              ? (isVoice ? "Gửi ghi âm" : "Gửi ảnh")
+              : (isVoice ? "Đang gửi ghi âm..." : "Đang gửi ảnh...");
 
       return Padding(
         padding: const EdgeInsets.only(top: 10),
@@ -461,12 +461,14 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                               localPath: pending.localPath,
                               durationMs: pending.durationMs,
                               compact: true,
-                              backgroundColor: Colors.transparent,
-                              borderColor: textColor.withValues(alpha: 0.16),
+                              backgroundColor: textColor.withValues(
+                                alpha: 0.12,
+                              ),
+                              borderColor: textColor.withValues(alpha: 0.28),
                               activeColor: textColor,
-                              inactiveColor: textColor.withValues(alpha: 0.32),
+                              inactiveColor: textColor.withValues(alpha: 0.48),
                               iconColor: textColor,
-                              textColor: textColor.withValues(alpha: 0.78),
+                              textColor: textColor.withValues(alpha: 0.86),
                             ),
                             const SizedBox(height: 8),
                             Text(

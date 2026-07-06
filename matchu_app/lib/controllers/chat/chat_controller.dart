@@ -768,7 +768,7 @@ class ChatController extends GetxController {
 
       final hasPermission = await _audioRecorder.hasPermission();
       if (!hasPermission) {
-        Get.snackbar("Loi", "Can quyen microphone de ghi am.");
+        Get.snackbar("Lỗi", "Cần quyền microphone để ghi âm.");
         return;
       }
 
@@ -799,7 +799,7 @@ class ChatController extends GetxController {
             DateTime.now().difference(startedAt).inSeconds;
       });
     } catch (error) {
-      Get.snackbar("Loi", "Khong the bat dau ghi am luc nay.");
+      Get.snackbar("Lỗi", "Không thể bắt đầu ghi âm lúc này.");
     }
   }
 
@@ -816,7 +816,7 @@ class ChatController extends GetxController {
         durationMs = DateTime.now().difference(startedAt).inMilliseconds;
       }
     } catch (_) {
-      Get.snackbar("Loi", "Khong the luu ghi am luc nay.");
+      Get.snackbar("Lỗi", "Không thể lưu ghi âm lúc này.");
     } finally {
       _voiceAmplitudeSubscription?.cancel();
       _voiceAmplitudeSubscription = null;
@@ -868,8 +868,8 @@ class ChatController extends GetxController {
     } catch (error) {
       pending.failed.value = true;
       Get.snackbar(
-        "Loi",
-        error is StateError ? error.message : "Khong the gui ghi am.",
+        "Lỗi",
+        error is StateError ? error.message : "Không thể gửi ghi âm.",
       );
       Future.delayed(const Duration(seconds: 2), () {
         pendingImageMessages.remove(pending);

@@ -262,9 +262,9 @@ class ChatService {
 
     batch.set(msgRef, {
       "senderId": uid,
-      "text": "Ghi am",
+      "text": "Ghi âm",
       "type": "voice",
-      "notificationPreview": "Da gui mot ghi am",
+      "notificationPreview": "Đã gửi một ghi âm",
       "voiceUrl": voiceUrl,
       "voicePath": voicePath,
       "voiceDurationMs": durationMs,
@@ -274,7 +274,7 @@ class ChatService {
     });
 
     batch.update(roomRef, {
-      "lastMessage": "Ghi am",
+      "lastMessage": "Ghi âm",
       "lastMessageType": "voice",
       "lastMessageCipher": FieldValue.delete(),
       "lastMessageIv": FieldValue.delete(),

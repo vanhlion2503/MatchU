@@ -441,9 +441,10 @@ class ChatRowPermanent extends StatelessWidget {
     Color textColor,
   ) {
     final theme = Theme.of(context);
-    final mutedTextColor = textColor.withValues(alpha: 0.78);
-    final borderColor = textColor.withValues(alpha: 0.16);
-    final inactiveColor = textColor.withValues(alpha: 0.32);
+    final mutedTextColor = textColor.withValues(alpha: 0.86);
+    final playerBackgroundColor = textColor.withValues(alpha: 0.12);
+    final borderColor = textColor.withValues(alpha: 0.28);
+    final inactiveColor = textColor.withValues(alpha: 0.48);
 
     return Padding(
       padding: EdgeInsets.only(top: smallMargin ? 6 : 10),
@@ -522,7 +523,7 @@ class ChatRowPermanent extends StatelessWidget {
                                   localPath: localVoicePath,
                                   durationMs: voiceDurationMs,
                                   compact: true,
-                                  backgroundColor: Colors.transparent,
+                                  backgroundColor: playerBackgroundColor,
                                   borderColor: borderColor,
                                   activeColor: textColor,
                                   inactiveColor: inactiveColor,
@@ -566,9 +567,10 @@ class ChatRowPermanent extends StatelessWidget {
                                 SeenAvatarAnimated(userId: seenByUid, size: 14)
                               else if (status == MessageStatus.sent)
                                 Text(
-                                  "ÄÃ£ gá»­i",
+                                  "Đã gửi",
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.outline,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                             ],
