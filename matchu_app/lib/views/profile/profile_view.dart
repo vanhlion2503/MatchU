@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
+import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
@@ -25,10 +26,39 @@ class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
 
   Future<void> _openCreatePostSheet(BuildContext context) async {
-    final createdPost = await CreatePostSheet.show(context);
+    final createdPost = await CreatePostSheet.show(
+      context,
+      closeOnSubmitStarted: true,
+      onSubmitStarted: _handleDetachedPostSubmission,
+    );
+    _handlePostCreated(createdPost);
+  }
+
+  void _handleDetachedPostSubmission(Future<PostModel?> submitFuture) {
+    unawaited(_resolveDetachedPostSubmission(submitFuture));
+  }
+
+  Future<void> _resolveDetachedPostSubmission(
+    Future<PostModel?> submitFuture,
+  ) async {
+    final createdPost = await submitFuture;
+    _handlePostCreated(createdPost);
+  }
+
+  void _handlePostCreated(PostModel? createdPost) {
     if (createdPost == null) return;
 
     PostCreationSync.sync(createdPost);
+    if (createdPost.isModerationPending) {
+      Get.snackbar(
+        'Äang kiá»ƒm duyá»‡t video',
+        'BÃ i viáº¿t sáº½ hiá»ƒn thá»‹ theo quyá»n riÃªng tÆ° Ä‘Ã£ chá»n sau khi video Ä‘Æ°á»£c duyá»‡t.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return;
+    }
+
     if (createdPost.isPublic) return;
 
     Get.snackbar(

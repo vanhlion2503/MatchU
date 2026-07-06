@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
@@ -605,7 +607,20 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     final createdPost = await CreatePostSheet.show(
       context,
       quotedPost: sourcePost,
+      closeOnSubmitStarted: true,
+      onSubmitStarted: _handleDetachedPostSubmission,
     );
+    _handlePostCreated(createdPost);
+  }
+
+  void _handleDetachedPostSubmission(Future<PostModel?> submitFuture) {
+    unawaited(_resolveDetachedPostSubmission(submitFuture));
+  }
+
+  Future<void> _resolveDetachedPostSubmission(
+    Future<PostModel?> submitFuture,
+  ) async {
+    final createdPost = await submitFuture;
     _handlePostCreated(createdPost);
   }
 
@@ -650,6 +665,16 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     if (createdPost == null) return;
 
     PostCreationSync.sync(createdPost);
+    if (createdPost.isModerationPending) {
+      Get.snackbar(
+        'Äang kiá»ƒm duyá»‡t video',
+        'BÃ i viáº¿t sáº½ hiá»ƒn thá»‹ theo quyá»n riÃªng tÆ° Ä‘Ã£ chá»n sau khi video Ä‘Æ°á»£c duyá»‡t.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return;
+    }
+
     if (createdPost.isPublic) return;
 
     Get.snackbar(
