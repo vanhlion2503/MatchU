@@ -5,6 +5,9 @@ const {
   moderatePostText,
 } = require("./src/callables/postTextModeration");
 const {
+  moderateCommentText,
+} = require("./src/callables/commentTextModeration");
+const {
   moderateImageContent,
 } = require("./src/callables/imageModeration");
 const {
@@ -54,6 +57,7 @@ const {
 
 exports.getTurnCredentials = getTurnCredentials;
 exports.moderatePostText = moderatePostText;
+exports.moderateCommentText = moderateCommentText;
 exports.moderateImageContent = moderateImageContent;
 exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
 exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;

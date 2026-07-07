@@ -948,7 +948,7 @@ async function generateVideoModerationResult({ ai, activeFile, object, caption }
 
 ${VIDEO_MODERATION_DECISION_GUIDANCE}
 
-Caption bÃ i viáº¿t náº¿u cÃ³:
+Caption bài viết nếu có:
 """
 ${safeText(caption, 1000)}
 """`,

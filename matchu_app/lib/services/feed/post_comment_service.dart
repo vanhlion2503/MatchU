@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
+import 'package:matchu_app/services/feed/comment_text_moderation_service.dart';
 import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:path_provider/path_provider.dart';
@@ -30,11 +31,14 @@ class PostCommentService {
     FirebaseAuth? auth,
     FirebaseStorage? storage,
     UserService? userService,
+    CommentTextModerationService? textModerationService,
     ImageModerationService? imageModerationService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
        _userService = userService ?? UserService(),
+       _textModerationService =
+           textModerationService ?? CommentTextModerationService(),
        _imageModerationService =
            imageModerationService ?? ImageModerationService();
 
@@ -46,6 +50,7 @@ class PostCommentService {
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
   final UserService _userService;
+  final CommentTextModerationService _textModerationService;
   final ImageModerationService _imageModerationService;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
@@ -151,6 +156,8 @@ class PostCommentService {
     if (normalizedContent.length > maxCommentLength) {
       throw StateError('Bình luận không được vượt quá 300 ký tự.');
     }
+
+    await _ensureTextContentAllowed(normalizedContent);
 
     final author = PostCommentAuthorModel.fromUser(
       await _userService.getUser(uid),
@@ -294,6 +301,8 @@ class PostCommentService {
     if (normalizedContent.length > maxCommentLength) {
       throw StateError('Bình luận không được vượt quá 300 ký tự.');
     }
+
+    await _ensureTextContentAllowed(normalizedContent);
 
     final postRef = _postsRef.doc(normalizedPostId);
     final commentRef = postRef.collection('comments').doc(normalizedCommentId);
@@ -600,7 +609,10 @@ class PostCommentService {
 
   Future<void> _ensureImageContentAllowed(File imageFile) async {
     try {
-      final result = await _imageModerationService.moderate(imageFile);
+      final result = await _moderateImageWithAuthRetry(
+        imageFile,
+        context: 'comment',
+      );
       if (!result.isViolation) return;
 
       final reason = result.reason?.trim();
@@ -632,6 +644,81 @@ class PostCommentService {
         'Không thể kiểm duyệt hình ảnh lúc này. Vui lòng thử lại sau.',
       );
     }
+  }
+
+  Future<void> _ensureTextContentAllowed(String content) async {
+    if (content.trim().isEmpty) return;
+
+    try {
+      final result = await _moderateTextWithAuthRetry(content);
+      if (!result.isViolation) return;
+
+      final reason = result.reason?.trim();
+      throw StateError(
+        reason == null || reason.isEmpty
+            ? 'Nội dung bình luận vi phạm tiêu chuẩn cộng đồng.'
+            : 'Nội dung bình luận vi phạm tiêu chuẩn cộng đồng: $reason',
+      );
+    } on StateError {
+      rethrow;
+    } on TimeoutException {
+      throw StateError(
+        'Không thể kiểm duyệt bình luận lúc này. Vui lòng thử lại sau.',
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'unauthenticated') {
+        throw StateError('Bạn cần đăng nhập để bình luận.');
+      }
+
+      if (error.code == 'invalid-argument') {
+        throw StateError('Nội dung bình luận không hợp lệ.');
+      }
+
+      throw StateError(
+        'Không thể kiểm duyệt bình luận lúc này. Vui lòng thử lại sau.',
+      );
+    } catch (_) {
+      throw StateError(
+        'Không thể kiểm duyệt bình luận lúc này. Vui lòng thử lại sau.',
+      );
+    }
+  }
+
+  Future<CommentTextModerationResult> _moderateTextWithAuthRetry(
+    String content,
+  ) async {
+    try {
+      return await _textModerationService.moderate(content);
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code != 'unauthenticated') rethrow;
+      await _refreshAuthenticatedUser();
+      return _textModerationService.moderate(content);
+    }
+  }
+
+  Future<ImageModerationResult> _moderateImageWithAuthRetry(
+    File imageFile, {
+    String? context,
+  }) async {
+    try {
+      return await _imageModerationService.moderate(
+        imageFile,
+        context: context,
+      );
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code != 'unauthenticated') rethrow;
+      await _refreshAuthenticatedUser();
+      return _imageModerationService.moderate(imageFile, context: context);
+    }
+  }
+
+  Future<void> _refreshAuthenticatedUser() async {
+    final user = _auth.currentUser;
+    if (user == null || user.uid.trim().isEmpty) {
+      throw StateError('Bạn cần đăng nhập để bình luận.');
+    }
+
+    await user.getIdToken(true);
   }
 
   String _fileExtension(String fileName) {

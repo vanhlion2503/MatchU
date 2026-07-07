@@ -1974,9 +1974,7 @@ class PostService {
   Future<void> _ensureCanCreatePostByReputation() async {
     final user = await _userService.getUser(uid);
     if (user == null) {
-      throw StateError(
-        'KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin ngÆ°á»i dÃ¹ng hiá»‡n táº¡i.',
-      );
+      throw StateError('Không tìm thấy thông tin người dùng hiện tại.');
     }
 
     if (user.reputationScore >= minReputationToCreatePost) return;
