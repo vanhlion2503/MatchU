@@ -53,6 +53,8 @@ const {
   progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
   progressQualifiedDailyPostTask,
+  progressLike5PostsComment5TimesOnPostLike,
+  progressLike5PostsComment5TimesOnComment,
 } = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
@@ -83,4 +85,8 @@ exports.progressMutualLikeLongChat5TimesTask =
   progressMutualLikeLongChat5TimesTask;
 exports.progressReceivedFiveStarRatingTask = progressReceivedFiveStarRatingTask;
 exports.progressQualifiedDailyPostTask = progressQualifiedDailyPostTask;
+exports.progressLike5PostsComment5TimesOnPostLike =
+  progressLike5PostsComment5TimesOnPostLike;
+exports.progressLike5PostsComment5TimesOnComment =
+  progressLike5PostsComment5TimesOnComment;
 exports.moderateTempChatMessage = moderateTempChatMessage;

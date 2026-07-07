@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/views/reputation/widget/build_app_usage_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_daily_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_mutual_like_long_chat_task_card.dart';
+import 'package:matchu_app/views/reputation/widget/build_post_engagement_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_qualified_daily_post_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_received_fire_star_task_card.dart';
 import 'package:matchu_app/views/reputation/widget/build_temp_chat_task_card.dart';
@@ -69,6 +70,7 @@ class ReputationView extends StatelessWidget {
         final mutualLikeLongChatTask = dailyState?.mutualLikeLongChat5TimesTask;
         final receivedFiveStarTask = dailyState?.receivedFiveStarRatingTask;
         final qualifiedDailyPostTask = dailyState?.qualifiedDailyPostTask;
+        final postEngagementTask = dailyState?.like5PostsComment5TimesTask;
         final isClaimingLoginTask =
             reputationController.isClaimingTaskId.value == "loginDaily";
         final isClaimingAppUsageTask =
@@ -84,6 +86,9 @@ class ReputationView extends StatelessWidget {
             "mutualLikeLongChat5Times";
         final isClaimingQualifiedDailyPostTask =
             reputationController.isClaimingTaskId.value == "qualifiedDailyPost";
+        final isClaimingPostEngagementTask =
+            reputationController.isClaimingTaskId.value ==
+            "like5PostsComment5Times";
         final hasReachedMax =
             dailyState?.hasReachedMax ?? (reputationScore >= 100);
         final canEarnMore =
@@ -177,6 +182,18 @@ class ReputationView extends StatelessWidget {
                 isClaiming: isClaimingQualifiedDailyPostTask,
                 onClaim:
                     () => reputationController.claimTask("qualifiedDailyPost"),
+              ),
+              const SizedBox(height: 12),
+              buildPostEngagementTaskCard(
+                context: context,
+                textTheme: textTheme,
+                task: postEngagementTask,
+                hasReachedMax: hasReachedMax,
+                isClaiming: isClaimingPostEngagementTask,
+                onClaim:
+                    () => reputationController.claimTask(
+                      "like5PostsComment5Times",
+                    ),
               ),
               const SizedBox(height: 12),
               buildMutualLikeLongChatTaskCard(

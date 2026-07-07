@@ -8,6 +8,11 @@ const FIVE_STAR_RATING_DAILY_LIMIT = 5;
 const MUTUAL_LIKE_LONG_CHAT_TASK_ID = "mutualLikeLongChat5Times";
 const MUTUAL_LIKE_LONG_CHAT_DAILY_TARGET = 5;
 const QUALIFIED_DAILY_POST_TASK_ID = "qualifiedDailyPost";
+const POST_ENGAGEMENT_DAILY_TASK_ID = "like5PostsComment5Times";
+const POST_ENGAGEMENT_DAILY_LIKE_TARGET = 5;
+const POST_ENGAGEMENT_DAILY_COMMENT_TARGET = 5;
+const POST_ENGAGEMENT_DAILY_TARGET =
+  POST_ENGAGEMENT_DAILY_LIKE_TARGET + POST_ENGAGEMENT_DAILY_COMMENT_TARGET;
 
 const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
   loginDaily: Object.freeze({
@@ -47,6 +52,16 @@ const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
     claimMode: "manual",
     repeatable: false,
   }),
+  [POST_ENGAGEMENT_DAILY_TASK_ID]: Object.freeze({
+    target: POST_ENGAGEMENT_DAILY_TARGET,
+    reward: 3,
+    claimMode: "manual",
+    repeatable: false,
+    breakdown: Object.freeze({
+      likes: Object.freeze({ target: POST_ENGAGEMENT_DAILY_LIKE_TARGET }),
+      comments: Object.freeze({ target: POST_ENGAGEMENT_DAILY_COMMENT_TARGET }),
+    }),
+  }),
 });
 
 function getTaskConfig(taskId) {
@@ -65,6 +80,16 @@ function buildDefaultTaskState(taskId) {
     claimed: false,
     claimedReward: 0,
     claimedAt: null,
+    ...(config.breakdown
+      ? {
+        breakdown: Object.fromEntries(
+          Object.entries(config.breakdown).map(([key, value]) => [
+            key,
+            { target: value.target, progress: 0 },
+          ])
+        ),
+      }
+      : {}),
   };
 }
 
@@ -87,6 +112,10 @@ module.exports = {
   MUTUAL_LIKE_LONG_CHAT_TASK_ID,
   MUTUAL_LIKE_LONG_CHAT_DAILY_TARGET,
   QUALIFIED_DAILY_POST_TASK_ID,
+  POST_ENGAGEMENT_DAILY_TASK_ID,
+  POST_ENGAGEMENT_DAILY_LIKE_TARGET,
+  POST_ENGAGEMENT_DAILY_COMMENT_TARGET,
+  POST_ENGAGEMENT_DAILY_TARGET,
   REPUTATION_DAILY_TASK_CONFIG,
   getTaskConfig,
   buildDefaultTaskState,

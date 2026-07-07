@@ -79,6 +79,26 @@ function resolveTaskProgressCap(taskConfig, target) {
   return configuredCap;
 }
 
+function normalizeTaskBreakdown(taskConfig, rawBreakdown) {
+  if (!isPlainObject(taskConfig?.breakdown)) return null;
+
+  const safeRawBreakdown = isPlainObject(rawBreakdown) ? rawBreakdown : {};
+  const normalized = {};
+
+  for (const [key, config] of Object.entries(taskConfig.breakdown)) {
+    const safeRawItem = isPlainObject(safeRawBreakdown[key])
+      ? safeRawBreakdown[key]
+      : {};
+    const target = Math.max(1, toInt(safeRawItem.target, config.target));
+    normalized[key] = {
+      target,
+      progress: clamp(toInt(safeRawItem.progress, 0), 0, target),
+    };
+  }
+
+  return normalized;
+}
+
 function normalizeTaskState(taskId, rawTask) {
   const config = REPUTATION_DAILY_TASK_CONFIG[taskId];
   if (!config) return null;
@@ -96,6 +116,7 @@ function normalizeTaskState(taskId, rawTask) {
       ? Math.max(0, toInt(safeTask.claimedReward, reward))
       : 0;
   const claimedAtMs = toMillis(safeTask.claimedAt);
+  const breakdown = normalizeTaskBreakdown(config, safeTask.breakdown);
 
   return {
     target,
@@ -104,6 +125,7 @@ function normalizeTaskState(taskId, rawTask) {
     claimed,
     claimedReward,
     claimedAt: claimedAtMs ? new Date(claimedAtMs) : null,
+    ...(breakdown ? { breakdown } : {}),
   };
 }
 
@@ -163,6 +185,7 @@ function taskStateToClient(taskState) {
     claimedReward: taskState.claimedReward,
     isCompleted: taskState.progress >= taskState.target,
     claimedAtMillis: taskState.claimedAt ? taskState.claimedAt.getTime() : null,
+    ...(taskState.breakdown ? { breakdown: taskState.breakdown } : {}),
   };
 }
 
@@ -198,4 +221,5 @@ module.exports = {
   normalizeDailyDoc,
   buildDailyStatePayload,
   resolveTaskProgressCap,
+  normalizeTaskBreakdown,
 };

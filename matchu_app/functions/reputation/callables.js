@@ -105,6 +105,8 @@ function taskHistoryTitle(taskId) {
       return "Nhan danh gia 5 sao";
     case "qualifiedDailyPost":
       return "Dang bai viet chat luong";
+    case "like5PostsComment5Times":
+      return "Like va binh luan bai viet";
     default:
       return "Nhiem vu uy tin";
   }
@@ -203,6 +205,9 @@ function serializeTasksForWrite(tasks, claimTimestampTaskId = null) {
       claimedReward: task.claimedReward,
       claimedAt: task.claimedAt || null,
     };
+    if (task.breakdown) {
+      out[taskId].breakdown = task.breakdown;
+    }
 
     if (claimTimestampTaskId && taskId === claimTimestampTaskId) {
       out[taskId].claimedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -251,6 +256,21 @@ function isTaskDifferent(rawTask, normalizedTask, taskConfig) {
   const normalizedClaimedAtMs = normalizedTask.claimedAt
     ? normalizedTask.claimedAt.getTime()
     : null;
+  const rawBreakdown = isPlainObject(rawTask?.breakdown) ? rawTask.breakdown : {};
+  const normalizedBreakdown = normalizedTask.breakdown || null;
+  let isBreakdownDifferent = false;
+  if (normalizedBreakdown) {
+    for (const [key, item] of Object.entries(normalizedBreakdown)) {
+      const rawItem = isPlainObject(rawBreakdown[key]) ? rawBreakdown[key] : {};
+      if (
+        Math.max(1, toInt(rawItem.target, item.target)) !== item.target ||
+        clamp(toInt(rawItem.progress, 0), 0, item.target) !== item.progress
+      ) {
+        isBreakdownDifferent = true;
+        break;
+      }
+    }
+  }
 
   return (
     target !== normalizedTask.target ||
@@ -258,7 +278,8 @@ function isTaskDifferent(rawTask, normalizedTask, taskConfig) {
     progress !== normalizedTask.progress ||
     claimed !== normalizedTask.claimed ||
     claimedReward !== normalizedTask.claimedReward ||
-    claimedAtMs !== normalizedClaimedAtMs
+    claimedAtMs !== normalizedClaimedAtMs ||
+    isBreakdownDifferent
   );
 }
 

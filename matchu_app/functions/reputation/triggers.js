@@ -12,6 +12,9 @@ const {
   FIVE_STAR_RATING_TASK_ID,
   MUTUAL_LIKE_LONG_CHAT_TASK_ID,
   QUALIFIED_DAILY_POST_TASK_ID,
+  POST_ENGAGEMENT_DAILY_TASK_ID,
+  POST_ENGAGEMENT_DAILY_LIKE_TARGET,
+  POST_ENGAGEMENT_DAILY_COMMENT_TARGET,
   getTaskConfig,
 } = require("./taskConfig");
 const {
@@ -35,6 +38,8 @@ const QUALIFIED_DAILY_POST_COMPLETION_LOGS_SUBCOLLECTION =
   "qualifiedDailyPostCompletionLogs";
 const QUALIFIED_DAILY_POST_MIN_CONTENT_LENGTH = 16;
 const QUALIFIED_DAILY_POST_MEDIA_TYPES = new Set(["image", "video", "audio"]);
+const POST_ENGAGEMENT_COMPLETION_LOGS_SUBCOLLECTION =
+  "postEngagementCompletionLogs";
 
 function normalizeParticipants(rawParticipants, userA, userB) {
   const participants = [];
@@ -120,9 +125,153 @@ function serializeTasksForWrite(tasks) {
       claimedReward: task.claimedReward,
       claimedAt: task.claimedAt || null,
     };
+    if (task.breakdown) {
+      out[taskId].breakdown = task.breakdown;
+    }
   }
 
   return out;
+}
+
+function resolveSnapshotCreatedAtMillis(event, data) {
+  const createdAtMs = toMillis(data?.createdAt);
+  if (createdAtMs != null) return createdAtMs;
+
+  const snapshotCreatedAtMs = toMillis(event?.data?.createTime);
+  if (snapshotCreatedAtMs != null) return snapshotCreatedAtMs;
+
+  return Date.now();
+}
+
+function sanitizeLogDocId(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]/g, "_")
+    .slice(0, 120);
+}
+
+function resolvePostEngagementBreakdown(task) {
+  const rawBreakdown =
+    task?.breakdown && typeof task.breakdown === "object"
+      ? task.breakdown
+      : {};
+  const rawLikes =
+    rawBreakdown.likes && typeof rawBreakdown.likes === "object"
+      ? rawBreakdown.likes
+      : {};
+  const rawComments =
+    rawBreakdown.comments && typeof rawBreakdown.comments === "object"
+      ? rawBreakdown.comments
+      : {};
+
+  return {
+    likes: {
+      target: Math.max(
+        1,
+        toInt(rawLikes.target, POST_ENGAGEMENT_DAILY_LIKE_TARGET)
+      ),
+      progress: Math.max(0, toInt(rawLikes.progress, 0)),
+    },
+    comments: {
+      target: Math.max(
+        1,
+        toInt(rawComments.target, POST_ENGAGEMENT_DAILY_COMMENT_TARGET)
+      ),
+      progress: Math.max(0, toInt(rawComments.progress, 0)),
+    },
+  };
+}
+
+async function applyPostEngagementProgress({
+  uid,
+  eventKey,
+  kind,
+  occurredAtMs,
+}) {
+  if (!uid || !eventKey || !["likes", "comments"].includes(kind)) return;
+
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) return;
+
+    const userData = userSnap.data() || {};
+    const timezone = normalizeTimezone(
+      userData?.reputationTimezone,
+      DEFAULT_REPUTATION_TIMEZONE
+    );
+    const occurredAt = new Date(occurredAtMs);
+    const dateKey = resolveDateKey({ timeZone: timezone, now: occurredAt });
+    const dailyRef = buildDailyRef(uid, dateKey);
+    const completionLogRef = dailyRef
+      .collection(POST_ENGAGEMENT_COMPLETION_LOGS_SUBCOLLECTION)
+      .doc(sanitizeLogDocId(`${kind}_${eventKey}`));
+
+    const [dailySnap, completionLogSnap] = await Promise.all([
+      tx.get(dailyRef),
+      tx.get(completionLogRef),
+    ]);
+
+    if (completionLogSnap.exists) return;
+
+    const rawDaily = dailySnap.exists ? dailySnap.data() : null;
+    let daily = normalizeDailyDoc(rawDaily, { dateKey, timezone });
+
+    const task = daily.tasks[POST_ENGAGEMENT_DAILY_TASK_ID];
+    if (!task) return;
+
+    const breakdown = resolvePostEngagementBreakdown(task);
+    const currentItem = breakdown[kind];
+    const nextItemProgress = Math.min(
+      currentItem.target,
+      currentItem.progress + 1
+    );
+    const didIncrement = nextItemProgress !== currentItem.progress;
+
+    if (didIncrement) {
+      const nextBreakdown = {
+        ...breakdown,
+        [kind]: {
+          ...currentItem,
+          progress: nextItemProgress,
+        },
+      };
+      const nextProgress =
+        nextBreakdown.likes.progress + nextBreakdown.comments.progress;
+
+      daily = {
+        ...daily,
+        tasks: {
+          ...daily.tasks,
+          [POST_ENGAGEMENT_DAILY_TASK_ID]: {
+            ...task,
+            progress: Math.min(task.target, nextProgress),
+            breakdown: nextBreakdown,
+          },
+        },
+      };
+    }
+
+    tx.set(
+      dailyRef,
+      buildDailyWritePayload({
+        daily,
+        includeCreatedAt: !dailySnap.exists,
+      }),
+      { merge: true }
+    );
+
+    tx.set(completionLogRef, {
+      uid,
+      eventKey,
+      kind,
+      taskId: POST_ENGAGEMENT_DAILY_TASK_ID,
+      counted: didIncrement,
+      occurredAtMillis: occurredAtMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
 }
 
 function hasQualifiedPostContent(content) {
@@ -622,6 +771,47 @@ const progressQualifiedDailyPostTask = onDocumentWritten(
   }
 );
 
+const progressLike5PostsComment5TimesOnPostLike = onDocumentCreated(
+  "posts/{postId}/likes/{userId}",
+  async (event) => {
+    const like = event.data?.data() || {};
+    const uid = toSafeUid(like.userId) || toSafeUid(event.params.userId);
+    if (!uid) return;
+
+    const postId = toSafeUid(event.params.postId);
+    if (!postId) return;
+
+    const likedAtMs = resolveSnapshotCreatedAtMillis(event, like);
+    await applyPostEngagementProgress({
+      uid,
+      eventKey: postId,
+      kind: "likes",
+      occurredAtMs: likedAtMs,
+    });
+  }
+);
+
+const progressLike5PostsComment5TimesOnComment = onDocumentCreated(
+  "posts/{postId}/comments/{commentId}",
+  async (event) => {
+    const comment = event.data?.data() || {};
+    const uid = toSafeUid(comment.userId);
+    if (!uid) return;
+
+    const postId = toSafeUid(event.params.postId);
+    const commentId = toSafeUid(event.params.commentId);
+    if (!postId || !commentId) return;
+
+    const commentedAtMs = resolveSnapshotCreatedAtMillis(event, comment);
+    await applyPostEngagementProgress({
+      uid,
+      eventKey: `${postId}_${commentId}`,
+      kind: "comments",
+      occurredAtMs: commentedAtMs,
+    });
+  }
+);
+
 const ensureUserReputationDailyDefaults = onDocumentCreated(
   "users/{uid}",
   async (event) => {
@@ -683,4 +873,6 @@ module.exports = {
   progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
   progressQualifiedDailyPostTask,
+  progressLike5PostsComment5TimesOnPostLike,
+  progressLike5PostsComment5TimesOnComment,
 };

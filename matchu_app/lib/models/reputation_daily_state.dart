@@ -1,3 +1,21 @@
+class ReputationDailyTaskBreakdownItem {
+  final int target;
+  final int progress;
+
+  const ReputationDailyTaskBreakdownItem({
+    required this.target,
+    required this.progress,
+  });
+
+  factory ReputationDailyTaskBreakdownItem.fromMap(Map<String, dynamic> data) {
+    final target = _asInt(data["target"], fallback: 1, min: 1);
+    return ReputationDailyTaskBreakdownItem(
+      target: target,
+      progress: _asInt(data["progress"], min: 0, max: target),
+    );
+  }
+}
+
 class ReputationDailyTask {
   final String id;
   final int target;
@@ -7,6 +25,7 @@ class ReputationDailyTask {
   final int claimedReward;
   final bool isCompleted;
   final int? claimedAtMillis;
+  final Map<String, ReputationDailyTaskBreakdownItem> breakdown;
 
   const ReputationDailyTask({
     required this.id,
@@ -17,11 +36,23 @@ class ReputationDailyTask {
     required this.claimedReward,
     required this.isCompleted,
     required this.claimedAtMillis,
+    this.breakdown = const <String, ReputationDailyTaskBreakdownItem>{},
   });
 
   factory ReputationDailyTask.fromMap(String id, Map<String, dynamic> data) {
     final target = _asInt(data["target"], fallback: 1, min: 1);
     final progress = _asInt(data["progress"], min: 0);
+    final rawBreakdown = data["breakdown"];
+    final breakdown = <String, ReputationDailyTaskBreakdownItem>{};
+    if (rawBreakdown is Map) {
+      rawBreakdown.forEach((key, value) {
+        if (key is! String || value is! Map) return;
+        breakdown[key] = ReputationDailyTaskBreakdownItem.fromMap(
+          Map<String, dynamic>.from(value),
+        );
+      });
+    }
+
     return ReputationDailyTask(
       id: id,
       target: target,
@@ -31,7 +62,12 @@ class ReputationDailyTask {
       claimedReward: _asInt(data["claimedReward"], min: 0),
       isCompleted: _asBool(data["isCompleted"]) || progress >= target,
       claimedAtMillis: _asNullableInt(data["claimedAtMillis"]),
+      breakdown: breakdown,
     );
+  }
+
+  ReputationDailyTaskBreakdownItem? breakdownItem(String key) {
+    return breakdown[key];
   }
 }
 
@@ -101,6 +137,8 @@ class ReputationDailyState {
       tasks["receivedFiveStarRating"];
   ReputationDailyTask? get qualifiedDailyPostTask =>
       tasks["qualifiedDailyPost"];
+  ReputationDailyTask? get like5PostsComment5TimesTask =>
+      tasks["like5PostsComment5Times"];
 
   int get todayRemaining => (dailyCap - todayClaimed).clamp(0, dailyCap);
 

@@ -17,6 +17,9 @@ const {
   clamp,
   getCurrentReputationScore,
 } = require("../../reputation/types");
+const {
+  buildTextRuleModerationResult,
+} = require("../shared/textModerationRules");
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_POST_CONTENT_LENGTH = 300;
@@ -171,42 +174,7 @@ function violationResult(reason, severity, source = "fallback_rule") {
 }
 
 function fallbackRuleCheck(content) {
-  const normalizedText = normalizeText(content);
-  const ruleText = normalizeRuleCheckText(content);
-
-  if (!normalizedText) {
-    return { isViolation: false, reason: null, severity: null, source: "fallback_rule" };
-  }
-
-  if (containsKeyword(ruleText, DANGEROUS_KEYWORD_MATCHERS.sexual)) {
-    return violationResult(
-      "Nội dung khiêu dâm hoặc tình dục: phát hiện từ khóa nhạy cảm",
-      "severe"
-    );
-  }
-
-  if (containsKeyword(ruleText, DANGEROUS_KEYWORD_MATCHERS.hate_or_threat)) {
-    return violationResult(
-      "Đe dọa, bạo lực hoặc xúc phạm ác ý: phát hiện từ khóa nguy hiểm",
-      "critical"
-    );
-  }
-
-  if (containsKeyword(ruleText, DANGEROUS_KEYWORD_MATCHERS.grooming)) {
-    return violationResult(
-      "Nội dung không an toàn: phát hiện từ khóa nguy hiểm",
-      "critical"
-    );
-  }
-
-  if (LINK_PATTERN.test(normalizedText) || PHONE_PATTERN.test(normalizedText)) {
-    return violationResult(
-      "Thông tin sai lệch nghiêm trọng hoặc lừa đảo: phát hiện liên kết/số điện thoại",
-      "severe"
-    );
-  }
-
-  return { isViolation: false, reason: null, severity: null, source: "fallback_rule" };
+  return buildTextRuleModerationResult(content, "post");
 }
 
 function getCachedResult(key) {
@@ -298,10 +266,10 @@ ${content}
 """
 
 Violation criteria:
-1. Hate speech or discrimination.
+1. Hate speech or discrimination, including Vietnamese regional discrimination such as attacks on people from North/Central/South regions.
 2. Threats, violence, or incitement.
 3. Sexual or pornographic content.
-4. Harassment, bullying, or targeted personal insults.
+4. Harassment, bullying, targeted personal insults, toxic profanity, or demeaning abuse.
 5. Self-harm encouragement.
 6. Serious misinformation, fraud, impersonation, scam, illegal content.
 7. Spam, repeated low-quality content, or wrong category.
@@ -310,6 +278,8 @@ Context rules:
 - Distinguish malicious attacks from jokes, slang, and casual friend banter.
 - Mark violation only when the intent is clear.
 - Do not mark mild slang as violation when there is no attack, sexual content, or threat.
+- Treat obfuscated Vietnamese abuse, teencode, missing accents, and punctuation-separated insults as equivalent to the original phrase.
+- Be strict with posts that insult a region, ethnicity, origin, family, appearance, intelligence, or social class.
 
 Severity:
 - minor: wrong category, light spam, low-quality content.
@@ -513,6 +483,18 @@ const moderatePostText = onCall(
     }
 
     const cacheKey = normalizeText(normalizedContent);
+
+    // Rule-based moderation catches explicit abuse even when AI misses context.
+    const ruleResult = fallbackRuleCheck(normalizedContent);
+    if (ruleResult.isViolation) {
+      if (cacheKey) setCachedResult(cacheKey, ruleResult);
+      return applyPostViolationPenalty({
+        uid,
+        moderationResult: ruleResult,
+        content: normalizedContent,
+      });
+    }
+
     const cached = cacheKey ? getCachedResult(cacheKey) : null;
     if (cached) {
       if (!cached.isViolation) return buildAllowedResult(reputationScore);
