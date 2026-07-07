@@ -15,6 +15,7 @@ const {
   POST_ENGAGEMENT_DAILY_TASK_ID,
   POST_ENGAGEMENT_DAILY_LIKE_TARGET,
   POST_ENGAGEMENT_DAILY_COMMENT_TARGET,
+  QUOTE_OTHER_POSTS_DAILY_TASK_ID,
   getTaskConfig,
 } = require("./taskConfig");
 const {
@@ -40,6 +41,8 @@ const QUALIFIED_DAILY_POST_MIN_CONTENT_LENGTH = 16;
 const QUALIFIED_DAILY_POST_MEDIA_TYPES = new Set(["image", "video", "audio"]);
 const POST_ENGAGEMENT_COMPLETION_LOGS_SUBCOLLECTION =
   "postEngagementCompletionLogs";
+const QUOTE_OTHER_POSTS_COMPLETION_LOGS_SUBCOLLECTION =
+  "quoteOtherPostsCompletionLogs";
 
 function normalizeParticipants(rawParticipants, userA, userB) {
   const participants = [];
@@ -307,6 +310,49 @@ function isQualifiedDailyPost(post) {
     hasQualifiedPostContent(post.content) &&
     hasQualifiedPostMedia(post.media)
   );
+}
+
+function referencePostIdOf(post) {
+  const direct =
+    typeof post?.referencePostId === "string" ? post.referencePostId.trim() : "";
+  if (direct) return direct;
+
+  const referencePost =
+    post?.referencePost && typeof post.referencePost === "object"
+      ? post.referencePost
+      : {};
+  return typeof referencePost.postId === "string"
+    ? referencePost.postId.trim()
+    : "";
+}
+
+function referenceAuthorIdOf(post) {
+  const referencePost =
+    post?.referencePost && typeof post.referencePost === "object"
+      ? post.referencePost
+      : {};
+  return typeof referencePost.authorId === "string"
+    ? referencePost.authorId.trim()
+    : "";
+}
+
+function isQuoteOfOtherPost(post) {
+  if (!post || typeof post !== "object") return false;
+  if (post.deletedAt != null) return false;
+  if (!isModerationApproved(post)) return false;
+
+  const authorId = toSafeUid(post.authorId);
+  if (!authorId) return false;
+
+  const postType =
+    typeof post.postType === "string" ? post.postType.trim().toLowerCase() : "";
+  if (postType !== "quote") return false;
+
+  const referencePostId = referencePostIdOf(post);
+  const referenceAuthorId = referenceAuthorIdOf(post);
+  if (!referencePostId || !referenceAuthorId) return false;
+
+  return referenceAuthorId !== authorId;
 }
 
 function isModerationApproved(post) {
@@ -636,6 +682,80 @@ async function applyQualifiedDailyPostProgress({ uid, postId, postedAtMs }) {
   });
 }
 
+async function applyQuoteOtherPostsProgress({
+  uid,
+  postId,
+  referencePostId,
+  postedAtMs,
+}) {
+  const userRef = db.collection("users").doc(uid);
+
+  await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) return;
+
+    const userData = userSnap.data() || {};
+    const timezone = normalizeTimezone(
+      userData?.reputationTimezone,
+      DEFAULT_REPUTATION_TIMEZONE
+    );
+    const postedAt = new Date(postedAtMs);
+    const dateKey = resolveDateKey({ timeZone: timezone, now: postedAt });
+    const dailyRef = buildDailyRef(uid, dateKey);
+    const completionLogRef = dailyRef
+      .collection(QUOTE_OTHER_POSTS_COMPLETION_LOGS_SUBCOLLECTION)
+      .doc(sanitizeLogDocId(referencePostId));
+
+    const [dailySnap, completionLogSnap] = await Promise.all([
+      tx.get(dailyRef),
+      tx.get(completionLogRef),
+    ]);
+
+    if (completionLogSnap.exists) return;
+
+    const rawDaily = dailySnap.exists ? dailySnap.data() : null;
+    let daily = normalizeDailyDoc(rawDaily, { dateKey, timezone });
+
+    const task = daily.tasks[QUOTE_OTHER_POSTS_DAILY_TASK_ID];
+    if (!task) return;
+
+    const nextProgress = Math.min(task.target, task.progress + 1);
+    const didIncrement = nextProgress !== task.progress;
+
+    if (didIncrement) {
+      daily = {
+        ...daily,
+        tasks: {
+          ...daily.tasks,
+          [QUOTE_OTHER_POSTS_DAILY_TASK_ID]: {
+            ...task,
+            progress: nextProgress,
+          },
+        },
+      };
+    }
+
+    tx.set(
+      dailyRef,
+      buildDailyWritePayload({
+        daily,
+        includeCreatedAt: !dailySnap.exists,
+      }),
+      { merge: true }
+    );
+
+    tx.set(completionLogRef, {
+      postId,
+      referencePostId,
+      uid,
+      taskId: QUOTE_OTHER_POSTS_DAILY_TASK_ID,
+      counted: didIncrement,
+      postedAtMillis: postedAtMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+}
+
 function resolvePostCreatedAtMillis(event, postData) {
   const postCreatedAtMs = toMillis(postData?.createdAt);
   if (postCreatedAtMs != null) return postCreatedAtMs;
@@ -771,6 +891,36 @@ const progressQualifiedDailyPostTask = onDocumentWritten(
   }
 );
 
+const progressQuote3OtherPostsTask = onDocumentWritten(
+  "posts/{postId}",
+  async (event) => {
+    const afterSnap = event.data?.after;
+    if (!afterSnap?.exists) return;
+
+    const post = afterSnap.data() || {};
+    if (!isQuoteOfOtherPost(post)) return;
+
+    const beforeSnap = event.data?.before;
+    if (beforeSnap?.exists && isQuoteOfOtherPost(beforeSnap.data() || {})) {
+      return;
+    }
+
+    const uid = toSafeUid(post.authorId);
+    const referencePostId = referencePostIdOf(post);
+    if (!uid || !referencePostId) return;
+
+    const postId = event.params.postId;
+    const postedAtMs = resolvePostCreatedAtMillis(event, post);
+
+    await applyQuoteOtherPostsProgress({
+      uid,
+      postId,
+      referencePostId,
+      postedAtMs,
+    });
+  }
+);
+
 const progressLike5PostsComment5TimesOnPostLike = onDocumentCreated(
   "posts/{postId}/likes/{userId}",
   async (event) => {
@@ -873,6 +1023,7 @@ module.exports = {
   progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
   progressQualifiedDailyPostTask,
+  progressQuote3OtherPostsTask,
   progressLike5PostsComment5TimesOnPostLike,
   progressLike5PostsComment5TimesOnComment,
 };

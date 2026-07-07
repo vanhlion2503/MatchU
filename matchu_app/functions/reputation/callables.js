@@ -107,6 +107,8 @@ function taskHistoryTitle(taskId) {
       return "Dang bai viet chat luong";
     case "like5PostsComment5Times":
       return "Like va binh luan bai viet";
+    case "quote3OtherPosts":
+      return "Trich dan bai viet cua nguoi khac";
     default:
       return "Nhiem vu uy tin";
   }

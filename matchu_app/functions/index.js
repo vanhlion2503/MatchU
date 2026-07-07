@@ -53,6 +53,7 @@ const {
   progressMutualLikeLongChat5TimesTask,
   progressReceivedFiveStarRatingTask,
   progressQualifiedDailyPostTask,
+  progressQuote3OtherPostsTask,
   progressLike5PostsComment5TimesOnPostLike,
   progressLike5PostsComment5TimesOnComment,
 } = require("./reputation/triggers");
@@ -85,6 +86,7 @@ exports.progressMutualLikeLongChat5TimesTask =
   progressMutualLikeLongChat5TimesTask;
 exports.progressReceivedFiveStarRatingTask = progressReceivedFiveStarRatingTask;
 exports.progressQualifiedDailyPostTask = progressQualifiedDailyPostTask;
+exports.progressQuote3OtherPostsTask = progressQuote3OtherPostsTask;
 exports.progressLike5PostsComment5TimesOnPostLike =
   progressLike5PostsComment5TimesOnPostLike;
 exports.progressLike5PostsComment5TimesOnComment =

@@ -11,6 +11,7 @@ import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/create_post_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
@@ -18,6 +19,10 @@ import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:shimmer/shimmer.dart';
+
+const _profileInitialPostsShimmerHeight = 500.0;
+const _profileLoadMoreShimmerHeight = 250.0;
 
 class ProfilePostsSection extends StatefulWidget {
   const ProfilePostsSection({
@@ -235,7 +240,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     if ((status == ProfilePostsStatus.initial ||
             status == ProfilePostsStatus.loading) &&
         controller.posts.isEmpty) {
-      return 120;
+      return _profileInitialPostsShimmerHeight;
     }
 
     if (status == ProfilePostsStatus.error && controller.posts.isEmpty) {
@@ -254,7 +259,11 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     final postsHeight = visiblePosts.length * 355.0;
     final privateBannerHeight = privateCount * 28.0;
     final loadMoreHeight =
-        controller.isLoadingMore.value || controller.hasMore.value ? 56.0 : 0.0;
+        controller.isLoadingMore.value
+            ? _profileLoadMoreShimmerHeight
+            : controller.hasMore.value
+            ? 56.0
+            : 0.0;
 
     return postsHeight + privateBannerHeight + loadMoreHeight;
   }
@@ -273,15 +282,10 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     if ((status == ProfilePostsStatus.initial ||
             status == ProfilePostsStatus.loading) &&
         controller.posts.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: _SectionStateCard(
-          palette: palette,
-          child: const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        ),
+      return _ProfilePostsShimmer(
+        palette: palette,
+        itemCount: 2,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       );
     }
 
@@ -353,9 +357,10 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           ),
         ),
         if (controller.isLoadingMore.value)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
+          _ProfilePostsShimmer(
+            palette: palette,
+            itemCount: 1,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           )
         else if (controller.hasMore.value)
           Padding(
@@ -963,6 +968,211 @@ class _SectionStateCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       child: child,
+    );
+  }
+}
+
+class _ProfilePostsShimmer extends StatelessWidget {
+  const _ProfilePostsShimmer({
+    required this.palette,
+    required this.itemCount,
+    required this.padding,
+  });
+
+  final FeedPalette palette;
+  final int itemCount;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _ProfilePostsShimmerColors.of(context);
+
+    return Padding(
+      padding: padding,
+      child: Shimmer.fromColors(
+        baseColor: colors.base,
+        highlightColor: colors.highlight,
+        child: Column(
+          children: [
+            for (var index = 0; index < itemCount; index++) ...[
+              if (index > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 52, bottom: 14),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: palette.border,
+                  ),
+                ),
+              _ProfilePostSkeleton(colors: colors, showMedia: index.isEven),
+              if (index < itemCount - 1) const SizedBox(height: 18),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfilePostSkeleton extends StatelessWidget {
+  const _ProfilePostSkeleton({
+    required this.colors,
+    required this.showMedia,
+  });
+
+  final _ProfilePostsShimmerColors colors;
+  final bool showMedia;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ShimmerBlock(
+          width: 40,
+          height: 40,
+          radius: 20,
+          colors: colors,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _ShimmerBlock(
+                    width: 118,
+                    height: 14,
+                    radius: 7,
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 8),
+                  _ShimmerBlock(
+                    width: 48,
+                    height: 12,
+                    radius: 6,
+                    colors: colors,
+                  ),
+                  const Spacer(),
+                  _ShimmerBlock(
+                    width: 18,
+                    height: 18,
+                    radius: 9,
+                    colors: colors,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _ShimmerBlock(
+                width: 82,
+                height: 11,
+                radius: 6,
+                colors: colors,
+              ),
+              const SizedBox(height: 12),
+              _ShimmerBlock(
+                width: double.infinity,
+                height: 12,
+                radius: 6,
+                colors: colors,
+              ),
+              const SizedBox(height: 8),
+              _ShimmerBlock(
+                width: 220,
+                height: 12,
+                radius: 6,
+                colors: colors,
+              ),
+              if (showMedia) ...[
+                const SizedBox(height: 12),
+                _ShimmerBlock(
+                  width: double.infinity,
+                  height: 150,
+                  radius: 16,
+                  colors: colors,
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _ShimmerBlock(
+                    width: 24,
+                    height: 24,
+                    radius: 12,
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 14),
+                  _ShimmerBlock(
+                    width: 24,
+                    height: 24,
+                    radius: 12,
+                    colors: colors,
+                  ),
+                  const SizedBox(width: 14),
+                  _ShimmerBlock(
+                    width: 24,
+                    height: 24,
+                    radius: 12,
+                    colors: colors,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShimmerBlock extends StatelessWidget {
+  const _ShimmerBlock({
+    required this.width,
+    required this.height,
+    required this.radius,
+    required this.colors,
+  });
+
+  final double width;
+  final double height;
+  final double radius;
+  final _ProfilePostsShimmerColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+class _ProfilePostsShimmerColors {
+  const _ProfilePostsShimmerColors({
+    required this.base,
+    required this.highlight,
+    required this.surface,
+  });
+
+  final Color base;
+  final Color highlight;
+  final Color surface;
+
+  factory _ProfilePostsShimmerColors.of(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _ProfilePostsShimmerColors(
+      base: isDark ? AppTheme.shimmerDarkBase : AppTheme.shimmerLightBase,
+      highlight:
+          isDark
+              ? AppTheme.shimmerDarkHighlight
+              : AppTheme.shimmerLightHighlight,
+      surface: isDark ? const Color(0xFF171C27) : const Color(0xFFF5F5F5),
     );
   }
 }

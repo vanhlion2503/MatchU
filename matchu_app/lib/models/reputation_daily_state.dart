@@ -139,6 +139,7 @@ class ReputationDailyState {
       tasks["qualifiedDailyPost"];
   ReputationDailyTask? get like5PostsComment5TimesTask =>
       tasks["like5PostsComment5Times"];
+  ReputationDailyTask? get quote3OtherPostsTask => tasks["quote3OtherPosts"];
 
   int get todayRemaining => (dailyCap - todayClaimed).clamp(0, dailyCap);
 

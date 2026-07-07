@@ -13,6 +13,8 @@ const POST_ENGAGEMENT_DAILY_LIKE_TARGET = 5;
 const POST_ENGAGEMENT_DAILY_COMMENT_TARGET = 5;
 const POST_ENGAGEMENT_DAILY_TARGET =
   POST_ENGAGEMENT_DAILY_LIKE_TARGET + POST_ENGAGEMENT_DAILY_COMMENT_TARGET;
+const QUOTE_OTHER_POSTS_DAILY_TASK_ID = "quote3OtherPosts";
+const QUOTE_OTHER_POSTS_DAILY_TARGET = 3;
 
 const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
   loginDaily: Object.freeze({
@@ -61,6 +63,12 @@ const REPUTATION_DAILY_TASK_CONFIG = Object.freeze({
       likes: Object.freeze({ target: POST_ENGAGEMENT_DAILY_LIKE_TARGET }),
       comments: Object.freeze({ target: POST_ENGAGEMENT_DAILY_COMMENT_TARGET }),
     }),
+  }),
+  [QUOTE_OTHER_POSTS_DAILY_TASK_ID]: Object.freeze({
+    target: QUOTE_OTHER_POSTS_DAILY_TARGET,
+    reward: 2,
+    claimMode: "manual",
+    repeatable: false,
   }),
 });
 
@@ -116,6 +124,8 @@ module.exports = {
   POST_ENGAGEMENT_DAILY_LIKE_TARGET,
   POST_ENGAGEMENT_DAILY_COMMENT_TARGET,
   POST_ENGAGEMENT_DAILY_TARGET,
+  QUOTE_OTHER_POSTS_DAILY_TASK_ID,
+  QUOTE_OTHER_POSTS_DAILY_TARGET,
   REPUTATION_DAILY_TASK_CONFIG,
   getTaskConfig,
   buildDefaultTaskState,
