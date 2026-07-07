@@ -30,6 +30,7 @@ class AppNotificationModel {
     this.readAt,
     this.actorId,
     this.actorName,
+    this.actorNickname,
     this.actorAvatarUrl,
     this.postId,
     this.commentId,
@@ -48,6 +49,7 @@ class AppNotificationModel {
   final DateTime? readAt;
   final String? actorId;
   final String? actorName;
+  final String? actorNickname;
   final String? actorAvatarUrl;
   final String? postId;
   final String? commentId;
@@ -74,6 +76,7 @@ class AppNotificationModel {
       readAt: _parseDateTime(data['readAt']),
       actorId: _parseNullableString(data['actorId']),
       actorName: _parseNullableString(data['actorName']),
+      actorNickname: _parseNullableString(data['actorNickname']),
       actorAvatarUrl: _parseNullableString(data['actorAvatarUrl']),
       postId: _parseNullableString(data['postId']),
       commentId: _parseNullableString(data['commentId']),

@@ -49,6 +49,19 @@ function notificationRef(userId, notificationId) {
     .doc(notificationId);
 }
 
+async function isNotificationAuthorMuted(userId, actorId) {
+  if (!userId || !actorId) return false;
+
+  const snap = await db
+    .collection("users")
+    .doc(userId)
+    .collection("mutedNotificationAuthors")
+    .doc(actorId)
+    .get();
+
+  return snap.exists;
+}
+
 async function createNotification(userId, notificationId, payload) {
   if (!userId || !notificationId) return;
 
@@ -77,6 +90,7 @@ const createPostLikeNotification = onDocumentCreated(
     const post = postSnap.data() || {};
     const recipientId = toSafeUid(post.authorId);
     if (!recipientId || recipientId === actorId) return;
+    if (await isNotificationAuthorMuted(recipientId, actorId)) return;
 
     const actor = await loadActorProfile(actorId);
     await createNotification(
@@ -108,6 +122,7 @@ const createPostCommentNotification = onDocumentCreated(
     const post = postSnap.data() || {};
     const recipientId = toSafeUid(post.authorId);
     if (!recipientId || recipientId === actorId) return;
+    if (await isNotificationAuthorMuted(recipientId, actorId)) return;
 
     const actor = await loadActorProfile(actorId);
     const commentPreview =

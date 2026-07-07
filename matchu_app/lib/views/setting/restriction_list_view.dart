@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/models/feed/blocked_user_model.dart';
 import 'package:matchu_app/models/feed/hidden_post_author_model.dart';
+import 'package:matchu_app/models/notification/muted_notification_author_model.dart';
 
 class RestrictionListView extends StatefulWidget {
   const RestrictionListView({super.key});
@@ -20,7 +21,7 @@ class _RestrictionListViewState extends State<RestrictionListView>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -41,6 +42,7 @@ class _RestrictionListViewState extends State<RestrictionListView>
           tabs: const [
             Tab(text: 'B\u1ECB ch\u1EB7n'),
             Tab(text: '\u1EA8n b\u00E0i vi\u1EBFt'),
+            Tab(text: 'T\u1EAFt th\u00F4ng b\u00E1o'),
           ],
         ),
       ),
@@ -49,6 +51,7 @@ class _RestrictionListViewState extends State<RestrictionListView>
         children: [
           _BlockedUsersTab(controller: controller),
           _HiddenPostAuthorsTab(controller: controller),
+          _MutedNotificationAuthorsTab(controller: controller),
         ],
       ),
     );
@@ -335,6 +338,153 @@ class _HiddenAuthorTile extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                     : const Text('B\u1ECF \u1EA9n'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MutedNotificationAuthorsTab extends StatelessWidget {
+  const _MutedNotificationAuthorsTab({required this.controller});
+
+  final PostRestrictionsController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Obx(() {
+      final status = controller.mutedNotificationAuthorsStatus.value;
+      final items = controller.mutedNotificationAuthors.toList(growable: false);
+
+      if (status == PostRestrictionsStatus.loading && items.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (status == PostRestrictionsStatus.error && items.isEmpty) {
+        return _RestrictionState(
+          icon: Iconsax.warning_2,
+          title: 'Kh\u00F4ng th\u1EC3 t\u1EA3i danh s\u00E1ch',
+          message:
+              controller.errorMessage.value ??
+              'Vui l\u00F2ng th\u1EED l\u1EA1i sau.',
+          actionLabel: 'Th\u1EED l\u1EA1i',
+          onAction: controller.loadMutedNotificationAuthors,
+        );
+      }
+
+      if (items.isEmpty) {
+        return _RestrictionState(
+          icon: Icons.notifications_off_outlined,
+          title: 'Ch\u01B0a t\u1EAFt th\u00F4ng b\u00E1o ai',
+          message:
+              'Nh\u1EEFng ng\u01B0\u1EDDi b\u1EA1n \u0111\u00E3 t\u1EAFt th\u00F4ng b\u00E1o s\u1EBD xu\u1EA5t hi\u1EC7n \u1EDF \u0111\u00E2y.',
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: controller.loadMutedNotificationAuthors,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemBuilder: (context, index) {
+            return _MutedNotificationAuthorTile(
+              item: items[index],
+              isLoading: controller.isNotificationAuthorUnmuting(
+                items[index].authorId,
+              ),
+              onUnmute:
+                  () => controller.unmuteNotificationAuthor(
+                    items[index].authorId,
+                  ),
+            );
+          },
+          separatorBuilder:
+              (context, index) => Divider(
+                height: 1,
+                color: theme.dividerColor.withValues(alpha: 0.45),
+              ),
+          itemCount: items.length,
+        ),
+      );
+    });
+  }
+}
+
+class _MutedNotificationAuthorTile extends StatelessWidget {
+  const _MutedNotificationAuthorTile({
+    required this.item,
+    required this.isLoading,
+    required this.onUnmute,
+  });
+
+  final MutedNotificationAuthorModel item;
+  final bool isLoading;
+  final VoidCallback onUnmute;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final avatarUrl = item.avatarUrl.trim();
+    final handle = item.handle;
+    final mutedAt = item.mutedAt;
+    final mutedAtLabel =
+        mutedAt == null ? null : DateFormat('dd/MM/yyyy').format(mutedAt);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundImage:
+                avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+            child:
+                avatarUrl.isEmpty
+                    ? Text(item.title.characters.first.toUpperCase())
+                    : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    if (handle.isNotEmpty) '@$handle',
+                    if (mutedAtLabel != null)
+                      '\u0110\u00E3 t\u1EAFt t\u1EEB $mutedAtLabel',
+                  ].join(' \u2022 '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.textTheme.bodySmall?.color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton(
+            onPressed: isLoading ? null : onUnmute,
+            child:
+                isLoading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('B\u1EADt l\u1EA1i'),
           ),
         ],
       ),

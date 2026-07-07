@@ -73,7 +73,12 @@ class NotificationInboxView extends GetView<NotificationInboxController> {
                       visibleItems,
                       openingNotificationId:
                           controller.openingNotificationId.value,
+                      actingNotificationIds:
+                          controller.actingNotificationIds.toSet(),
                       onOpenNotification: controller.openNotification,
+                      onDeleteNotification: controller.deleteNotification,
+                      onToggleReadState: controller.toggleReadState,
+                      onMuteAuthor: controller.muteAuthor,
                     ),
                   _NotificationListFooter(
                     hasMore: controller.hasMoreNotifications,
@@ -91,7 +96,11 @@ class NotificationInboxView extends GetView<NotificationInboxController> {
   List<Widget> _buildNotificationSections(
     List<AppNotificationModel> items, {
     required String? openingNotificationId,
+    required Set<String> actingNotificationIds,
     required ValueChanged<AppNotificationModel> onOpenNotification,
+    required ValueChanged<AppNotificationModel> onDeleteNotification,
+    required ValueChanged<AppNotificationModel> onToggleReadState,
+    required ValueChanged<AppNotificationModel> onMuteAuthor,
   }) {
     final sections = _groupNotifications(items);
 
@@ -101,8 +110,13 @@ class NotificationInboxView extends GetView<NotificationInboxController> {
         for (final notification in section.items)
           _NotificationCard(
             notification: notification,
-            isOpening: openingNotificationId == notification.id,
+            isOpening:
+                openingNotificationId == notification.id ||
+                actingNotificationIds.contains(notification.id),
             onTap: () => onOpenNotification(notification),
+            onDelete: () => onDeleteNotification(notification),
+            onToggleReadState: () => onToggleReadState(notification),
+            onMuteAuthor: () => onMuteAuthor(notification),
           ),
       ],
     ];
@@ -176,11 +190,17 @@ class _NotificationCard extends StatelessWidget {
     required this.notification,
     required this.isOpening,
     required this.onTap,
+    required this.onDelete,
+    required this.onToggleReadState,
+    required this.onMuteAuthor,
   });
 
   final AppNotificationModel notification;
   final bool isOpening;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final VoidCallback onToggleReadState;
+  final VoidCallback onMuteAuthor;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +304,12 @@ class _NotificationCard extends StatelessWidget {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                          : const _NotificationMoreMenu(),
+                          : _NotificationMoreMenu(
+                            notification: notification,
+                            onDelete: onDelete,
+                            onToggleReadState: onToggleReadState,
+                            onMuteAuthor: onMuteAuthor,
+                          ),
                 ),
               ],
             ),
@@ -320,21 +345,44 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-enum _NotificationMenuAction { delete, markAsRead, muteAuthor }
+enum _NotificationMenuAction { delete, toggleReadState, muteAuthor }
 
 class _NotificationMoreMenu extends StatelessWidget {
-  const _NotificationMoreMenu();
+  const _NotificationMoreMenu({
+    required this.notification,
+    required this.onDelete,
+    required this.onToggleReadState,
+    required this.onMuteAuthor,
+  });
+
+  final AppNotificationModel notification;
+  final VoidCallback onDelete;
+  final VoidCallback onToggleReadState;
+  final VoidCallback onMuteAuthor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final canMuteAuthor = (notification.actorId ?? '').trim().isNotEmpty;
 
     return PopupMenuButton<_NotificationMenuAction>(
       tooltip: 'Tùy chọn thông báo',
       icon: Icon(Icons.more_horiz, color: theme.iconTheme.color, size: 22),
       padding: EdgeInsets.zero,
       position: PopupMenuPosition.under,
-      onSelected: (_) {},
+      onSelected: (action) {
+        switch (action) {
+          case _NotificationMenuAction.delete:
+            onDelete();
+            break;
+          case _NotificationMenuAction.toggleReadState:
+            onToggleReadState();
+            break;
+          case _NotificationMenuAction.muteAuthor:
+            onMuteAuthor();
+            break;
+        }
+      },
       itemBuilder:
           (context) => [
             const PopupMenuItem(
@@ -344,18 +392,28 @@ class _NotificationMoreMenu extends StatelessWidget {
                 label: 'Xóa thông báo',
               ),
             ),
-            const PopupMenuItem(
-              value: _NotificationMenuAction.markAsRead,
+            PopupMenuItem(
+              value: _NotificationMenuAction.toggleReadState,
               child: _NotificationMenuItem(
-                icon: Iconsax.tick_circle,
-                label: 'Đánh dấu đã đọc',
+                icon:
+                    notification.isUnread
+                        ? Iconsax.tick_circle
+                        : Iconsax.sms_notification,
+                label:
+                    notification.isUnread
+                        ? 'Đánh dấu đã đọc'
+                        : 'Đánh dấu chưa đọc',
               ),
             ),
-            const PopupMenuItem(
+            PopupMenuItem(
               value: _NotificationMenuAction.muteAuthor,
+              enabled: canMuteAuthor,
               child: _NotificationMenuItem(
                 icon: Icons.notifications_off_outlined,
-                label: 'Tắt thông báo của người viết này',
+                label:
+                    canMuteAuthor
+                        ? 'Tắt thông báo của người viết này'
+                        : 'Không có người viết để tắt',
               ),
             ),
           ],

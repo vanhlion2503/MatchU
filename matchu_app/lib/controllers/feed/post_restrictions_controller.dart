@@ -11,36 +11,49 @@ import 'package:matchu_app/controllers/profile/following_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
 import 'package:matchu_app/models/feed/blocked_user_model.dart';
 import 'package:matchu_app/models/feed/hidden_post_author_model.dart';
+import 'package:matchu_app/models/notification/muted_notification_author_model.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
+import 'package:matchu_app/services/notification/notification_repository.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 enum PostRestrictionsStatus { initial, loading, success, empty, error }
 
 class PostRestrictionsController extends GetxController {
-  PostRestrictionsController({PostRestrictionService? restrictionService})
-    : _restrictionService = restrictionService ?? PostRestrictionService();
+  PostRestrictionsController({
+    PostRestrictionService? restrictionService,
+    NotificationRepository? notificationRepository,
+  }) : _restrictionService = restrictionService ?? PostRestrictionService(),
+       _notificationRepository =
+           notificationRepository ?? NotificationRepository();
 
   final PostRestrictionService _restrictionService;
+  final NotificationRepository _notificationRepository;
 
   final RxList<HiddenPostAuthorModel> hiddenPostAuthors =
       <HiddenPostAuthorModel>[].obs;
   final RxList<BlockedUserModel> blockedUsers = <BlockedUserModel>[].obs;
+  final RxList<MutedNotificationAuthorModel> mutedNotificationAuthors =
+      <MutedNotificationAuthorModel>[].obs;
   final RxSet<String> blockedUserIds = <String>{}.obs;
   final Rx<PostRestrictionsStatus> hiddenAuthorsStatus =
       PostRestrictionsStatus.initial.obs;
   final Rx<PostRestrictionsStatus> blockedUsersStatus =
       PostRestrictionsStatus.initial.obs;
+  final Rx<PostRestrictionsStatus> mutedNotificationAuthorsStatus =
+      PostRestrictionsStatus.initial.obs;
   final RxnString errorMessage = RxnString();
   final RxSet<String> unhidingAuthorIds = <String>{}.obs;
   final RxSet<String> blockingUserIds = <String>{}.obs;
   final RxSet<String> unblockingUserIds = <String>{}.obs;
+  final RxSet<String> unmutingAuthorIds = <String>{}.obs;
 
   @override
   void onInit() {
     super.onInit();
     unawaited(loadBlockedUsers());
     unawaited(loadHiddenPostAuthors());
+    unawaited(loadMutedNotificationAuthors());
   }
 
   bool isUserBlocked(String userId) {
@@ -65,6 +78,12 @@ class PostRestrictionsController extends GetxController {
     final normalizedUserId = userId.trim();
     if (normalizedUserId.isEmpty) return false;
     return unblockingUserIds.contains(normalizedUserId);
+  }
+
+  bool isNotificationAuthorUnmuting(String authorId) {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) return false;
+    return unmutingAuthorIds.contains(normalizedAuthorId);
   }
 
   Future<void> loadBlockedUsers() async {
@@ -106,6 +125,28 @@ class PostRestrictionsController extends GetxController {
     } catch (error) {
       errorMessage.value = _mapError(error);
       hiddenAuthorsStatus.value = PostRestrictionsStatus.error;
+    }
+  }
+
+  Future<void> loadMutedNotificationAuthors() async {
+    if (mutedNotificationAuthorsStatus.value ==
+        PostRestrictionsStatus.loading) {
+      return;
+    }
+
+    mutedNotificationAuthorsStatus.value = PostRestrictionsStatus.loading;
+    errorMessage.value = null;
+
+    try {
+      final items = await _notificationRepository.fetchMutedAuthors();
+      mutedNotificationAuthors.assignAll(items);
+      mutedNotificationAuthorsStatus.value =
+          items.isEmpty
+              ? PostRestrictionsStatus.empty
+              : PostRestrictionsStatus.success;
+    } catch (error) {
+      errorMessage.value = _mapError(error);
+      mutedNotificationAuthorsStatus.value = PostRestrictionsStatus.error;
     }
   }
 
@@ -222,6 +263,39 @@ class PostRestrictionsController extends GetxController {
       _showError(_mapError(error));
     } finally {
       unhidingAuthorIds.remove(normalizedAuthorId);
+    }
+  }
+
+  Future<void> unmuteNotificationAuthor(String authorId) async {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty ||
+        unmutingAuthorIds.contains(normalizedAuthorId)) {
+      return;
+    }
+
+    unmutingAuthorIds.add(normalizedAuthorId);
+
+    try {
+      await _notificationRepository.unmuteAuthor(normalizedAuthorId);
+      mutedNotificationAuthors.removeWhere(
+        (item) => item.authorId.trim() == normalizedAuthorId,
+      );
+
+      mutedNotificationAuthorsStatus.value =
+          mutedNotificationAuthors.isEmpty
+              ? PostRestrictionsStatus.empty
+              : PostRestrictionsStatus.success;
+
+      Get.snackbar(
+        'Th\u00F4ng b\u00E1o',
+        '\u0110\u00E3 b\u1EADt l\u1EA1i th\u00F4ng b\u00E1o t\u1EEB ng\u01B0\u1EDDi n\u00E0y.',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+    } catch (error) {
+      _showError(_mapError(error));
+    } finally {
+      unmutingAuthorIds.remove(normalizedAuthorId);
     }
   }
 

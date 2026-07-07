@@ -476,12 +476,48 @@ service cloud.firestore {
       function isReadStateOnlyUpdate() {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(["readAt"])
-          && request.resource.data.readAt is timestamp;
+          && (
+            request.resource.data.readAt is timestamp
+            || request.resource.data.readAt == null
+          );
       }
 
       allow get, list: if isOwner();
       allow update: if isOwner() && isReadStateOnlyUpdate();
-      allow create, delete: if false;
+      allow create: if false;
+      allow delete: if isOwner();
+    }
+
+    match /users/{userId}/mutedNotificationAuthors/{authorId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function hasValidMutedNotificationAuthorData() {
+        return request.resource.data.keys().hasOnly([
+          "userId",
+          "authorId",
+          "displayName",
+          "nickname",
+          "avatarUrl",
+          "sourceNotificationId",
+          "mutedAt",
+          "updatedAt"
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.authorId == authorId
+        && request.resource.data.authorId != userId
+        && request.resource.data.displayName is string
+        && request.resource.data.nickname is string
+        && request.resource.data.avatarUrl is string
+        && request.resource.data.sourceNotificationId is string
+        && request.resource.data.mutedAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      }
+
+      allow read: if isOwner();
+      allow create, update: if isOwner() && hasValidMutedNotificationAuthorData();
+      allow delete: if isOwner();
     }
 
     match /users/{userId}/hiddenPostAuthors/{authorId} {
