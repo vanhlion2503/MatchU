@@ -1,6 +1,7 @@
 const { GoogleGenAI, Type } = require("@google/genai");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
+const { admin, db } = require("../shared/firebase");
 const { GEMINI_API_KEY } = require("../shared/secrets");
 const {
   AI_MODERATION_CACHE_MAX_ENTRIES,
@@ -11,10 +12,18 @@ const {
   LINK_PATTERN,
   PHONE_PATTERN,
 } = require("../shared/moderationConstants");
+const { REPUTATION_MAX_SCORE } = require("../../reputation/taskConfig");
+const {
+  clamp,
+  getCurrentReputationScore,
+} = require("../../reputation/types");
+const { calculatePenalty } = require("./postTextModeration");
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const MAX_COMMENT_LENGTH = 300;
 const KEYWORD_MIN_LENGTH = 3;
+const VIOLATION_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const USERS_COLLECTION = db.collection("users");
 const CACHE = new Map();
 
 function normalizeText(value) {
@@ -169,6 +178,9 @@ function allowedResult(source = "comment_text_moderation") {
     isViolation: false,
     reason: null,
     severity: null,
+    penalty: 0,
+    reputationBefore: null,
+    reputationAfter: null,
     source,
   };
 }
@@ -345,6 +357,83 @@ function getFallbackResult({ cacheKey, content, request, error, logLevel }) {
   return fallbackResult;
 }
 
+async function applyCommentViolationPenalty({ uid, moderationResult, content }) {
+  const userRef = USERS_COLLECTION.doc(uid);
+  const violationsRef = userRef.collection("commentModerationViolations");
+  const nowMs = Date.now();
+  const cutoffMs = nowMs - VIOLATION_LOOKBACK_MS;
+  const violationRef = violationsRef.doc();
+  let penaltyResult = null;
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, recentViolationsSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(
+        violationsRef
+          .where("createdAtMillis", ">=", cutoffMs)
+          .limit(3)
+      ),
+    ]);
+
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    const userData = userSnap.data() || {};
+    const reputationBefore = getCurrentReputationScore(userData);
+    const penaltyMeta = calculatePenalty(
+      moderationResult.severity,
+      recentViolationsSnap.size
+    );
+    const reputationAfter = clamp(
+      reputationBefore - penaltyMeta.penalty,
+      0,
+      REPUTATION_MAX_SCORE
+    );
+
+    tx.set(userRef, {
+      reputationScore: reputationAfter,
+      reputation: reputationAfter,
+      commentModerationViolationCount1d: penaltyMeta.violationNumber,
+      commentModerationViolationCount7d: penaltyMeta.violationNumber,
+      lastCommentViolationAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    tx.set(violationRef, {
+      uid,
+      contentType: "text",
+      contentPreview: String(content || "").slice(0, 300),
+      reason: moderationResult.reason || null,
+      severity: penaltyMeta.severity,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      penalty: penaltyMeta.penalty,
+      violationNumber1d: penaltyMeta.violationNumber,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+      source: moderationResult.source || null,
+      createdAtMillis: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    penaltyResult = {
+      ...moderationResult,
+      severity: penaltyMeta.severity,
+      penalty: penaltyMeta.penalty,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      violationNumber1d: penaltyMeta.violationNumber,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+    };
+  });
+
+  return penaltyResult;
+}
+
 const moderateCommentText = onCall(
   {
     secrets: [GEMINI_API_KEY],
@@ -367,22 +456,37 @@ const moderateCommentText = onCall(
       );
     }
 
+    const uid = request.auth.uid;
+
     if (shouldFastApprove(normalizedContent)) {
       return allowedResult();
     }
 
     const cacheKey = normalizeText(normalizedContent);
     const cached = cacheKey ? getCachedResult(cacheKey) : null;
-    if (cached) return cached;
+    if (cached) {
+      if (!cached.isViolation) return cached;
+      return applyCommentViolationPenalty({
+        uid,
+        moderationResult: cached,
+        content: normalizedContent,
+      });
+    }
 
     const apiKey = (GEMINI_API_KEY.value() || "").trim();
     if (!apiKey) {
-      return getFallbackResult({
+      const fallbackResult = getFallbackResult({
         cacheKey,
         content: normalizedContent,
         request,
         error: new Error("Gemini API key is not configured."),
         logLevel: "warn",
+      });
+      if (!fallbackResult.isViolation) return fallbackResult;
+      return applyCommentViolationPenalty({
+        uid,
+        moderationResult: fallbackResult,
+        content: normalizedContent,
       });
     }
 
@@ -417,16 +521,27 @@ const moderateCommentText = onCall(
         setCachedResult(cacheKey, moderationResult);
       }
 
-      return moderationResult;
+      if (!moderationResult.isViolation) return moderationResult;
+      return applyCommentViolationPenalty({
+        uid,
+        moderationResult,
+        content: normalizedContent,
+      });
     } catch (error) {
       if (error instanceof HttpsError) throw error;
 
-      return getFallbackResult({
+      const fallbackResult = getFallbackResult({
         cacheKey,
         content: normalizedContent,
         request,
         error,
         logLevel: isGeminiQuotaOrBillingError(error) ? "warn" : "error",
+      });
+      if (!fallbackResult.isViolation) return fallbackResult;
+      return applyCommentViolationPenalty({
+        uid,
+        moderationResult: fallbackResult,
+        content: normalizedContent,
       });
     }
   }

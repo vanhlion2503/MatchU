@@ -18,6 +18,7 @@ const MAX_IMAGE_BASE64_LENGTH = 9 * 1024 * 1024;
 const MIN_REPUTATION_TO_MODERATE_POST_IMAGE = MIN_REPUTATION_TO_POST;
 const VIOLATION_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const USERS_COLLECTION = db.collection("users");
+const MODERATION_CONTEXTS_WITH_PENALTY = new Set(["post", "comment"]);
 const REJECT_LEVELS = new Set(["LIKELY", "VERY_LIKELY"]);
 const CONTEXT_ALLOWED_LABELS = new Set([
   "beach",
@@ -92,6 +93,11 @@ function buildAllowedResult(safeSearch, labels = []) {
 
 function shouldApplyPostPenalty(request) {
   return String(request.data?.context || "").trim().toLowerCase() === "post";
+}
+
+function moderationPenaltyContext(request) {
+  const context = String(request.data?.context || "").trim().toLowerCase();
+  return MODERATION_CONTEXTS_WITH_PENALTY.has(context) ? context : null;
 }
 
 async function assertCanPostImage(uid) {
@@ -206,6 +212,97 @@ async function applyPostImageViolationPenalty({ uid, moderationResult }) {
   return penaltyResult;
 }
 
+async function applyCommentImageViolationPenalty({ uid, moderationResult }) {
+  const userRef = USERS_COLLECTION.doc(uid);
+  const violationsRef = userRef.collection("commentModerationViolations");
+  const nowMs = Date.now();
+  const cutoffMs = nowMs - VIOLATION_LOOKBACK_MS;
+  const violationRef = violationsRef.doc();
+  let penaltyResult = null;
+
+  await db.runTransaction(async (tx) => {
+    const [userSnap, recentViolationsSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(
+        violationsRef
+          .where("createdAtMillis", ">=", cutoffMs)
+          .limit(3)
+      ),
+    ]);
+
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    const userData = userSnap.data() || {};
+    const reputationBefore = getCurrentReputationScore(userData);
+    const penaltyMeta = calculatePenalty(
+      moderationResult.severity,
+      recentViolationsSnap.size
+    );
+    const reputationAfter = clamp(
+      reputationBefore - penaltyMeta.penalty,
+      0,
+      REPUTATION_MAX_SCORE
+    );
+
+    tx.set(userRef, {
+      reputationScore: reputationAfter,
+      reputation: reputationAfter,
+      commentModerationViolationCount1d: penaltyMeta.violationNumber,
+      commentModerationViolationCount7d: penaltyMeta.violationNumber,
+      lastCommentViolationAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    tx.set(violationRef, {
+      uid,
+      contentType: "image",
+      reason: moderationResult.reason || null,
+      severity: penaltyMeta.severity,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      penalty: penaltyMeta.penalty,
+      violationNumber1d: penaltyMeta.violationNumber,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+      safeSearch: summarizeSafeSearch(moderationResult.safeSearch),
+      labels: Array.isArray(moderationResult.labels)
+        ? moderationResult.labels.slice(0, 10)
+        : [],
+      createdAtMillis: nowMs,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    penaltyResult = {
+      ...moderationResult,
+      severity: penaltyMeta.severity,
+      penalty: penaltyMeta.penalty,
+      basePenalty: penaltyMeta.basePenalty,
+      multiplier: penaltyMeta.multiplier,
+      violationNumber1d: penaltyMeta.violationNumber,
+      violationNumber7d: penaltyMeta.violationNumber,
+      reputationBefore,
+      reputationAfter,
+    };
+  });
+
+  return penaltyResult;
+}
+
+function applyImageViolationPenalty({ uid, context, moderationResult }) {
+  if (context === "post") {
+    return applyPostImageViolationPenalty({ uid, moderationResult });
+  }
+
+  if (context === "comment") {
+    return applyCommentImageViolationPenalty({ uid, moderationResult });
+  }
+
+  return moderationResult;
+}
+
 async function runSafeSearch(base64Image) {
   const [result] = await client.safeSearchDetection({
     image: { content: base64Image },
@@ -255,6 +352,7 @@ const moderateImageContent = onCall(
     }
 
     const applyPostPenalty = shouldApplyPostPenalty(request);
+    const penaltyContext = moderationPenaltyContext(request);
     if (applyPostPenalty) {
       await assertCanPostImage(request.auth.uid);
     }
@@ -280,9 +378,10 @@ const moderateImageContent = onCall(
       }
 
       if (moderationResult) {
-        if (!applyPostPenalty) return moderationResult;
-        return applyPostImageViolationPenalty({
+        if (!penaltyContext) return moderationResult;
+        return applyImageViolationPenalty({
           uid: request.auth.uid,
+          context: penaltyContext,
           moderationResult,
         });
       }
@@ -299,9 +398,10 @@ const moderateImageContent = onCall(
         labels
       );
 
-      if (!applyPostPenalty) return moderationResult;
-      return applyPostImageViolationPenalty({
+      if (!penaltyContext) return moderationResult;
+      return applyImageViolationPenalty({
         uid: request.auth.uid,
+        context: penaltyContext,
         moderationResult,
       });
     } catch (error) {

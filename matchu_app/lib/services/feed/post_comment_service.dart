@@ -616,10 +616,11 @@ class PostCommentService {
       if (!result.isViolation) return;
 
       final reason = result.reason?.trim();
+      final penaltyMessage = _buildReputationPenaltyMessage(result.penalty);
       throw StateError(
         reason == null || reason.isEmpty
-            ? 'Hình ảnh bình luận vi phạm tiêu chuẩn cộng đồng.'
-            : 'Hình ảnh bình luận vi phạm tiêu chuẩn cộng đồng: $reason',
+            ? 'Hình ảnh bình luận vi phạm tiêu chuẩn cộng đồng.$penaltyMessage'
+            : 'Hình ảnh bình luận vi phạm tiêu chuẩn cộng đồng: $reason.$penaltyMessage',
       );
     } on StateError {
       rethrow;
@@ -654,10 +655,11 @@ class PostCommentService {
       if (!result.isViolation) return;
 
       final reason = result.reason?.trim();
+      final penaltyMessage = _buildReputationPenaltyMessage(result.penalty);
       throw StateError(
         reason == null || reason.isEmpty
-            ? 'Nội dung bình luận vi phạm tiêu chuẩn cộng đồng.'
-            : 'Nội dung bình luận vi phạm tiêu chuẩn cộng đồng: $reason',
+            ? 'Nội dung bình luận vi phạm tiêu chuẩn cộng đồng.$penaltyMessage'
+            : 'Nội dung bình luận vi phạm tiêu chuẩn cộng đồng: $reason.$penaltyMessage',
       );
     } on StateError {
       rethrow;
@@ -719,6 +721,11 @@ class PostCommentService {
     }
 
     await user.getIdToken(true);
+  }
+
+  String _buildReputationPenaltyMessage(int penalty) {
+    if (penalty <= 0) return '';
+    return ' Bạn bị trừ $penalty điểm uy tín.';
   }
 
   String _fileExtension(String fileName) {

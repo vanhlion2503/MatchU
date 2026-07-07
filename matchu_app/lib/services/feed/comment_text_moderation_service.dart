@@ -24,11 +24,17 @@ class CommentTextModerationService {
     final data = Map<String, dynamic>.from(result.data);
     final reason = (data['reason'] ?? '').toString().trim();
     final severity = (data['severity'] ?? '').toString().trim();
+    final penalty = (data['penalty'] as num?)?.toInt() ?? 0;
+    final reputationBefore = (data['reputationBefore'] as num?)?.toInt();
+    final reputationAfter = (data['reputationAfter'] as num?)?.toInt();
 
     return CommentTextModerationResult(
       isViolation: data['isViolation'] == true,
       reason: reason.isNotEmpty ? reason : null,
       severity: severity.isNotEmpty ? severity : null,
+      penalty: penalty,
+      reputationBefore: reputationBefore,
+      reputationAfter: reputationAfter,
     );
   }
 }
@@ -38,14 +44,23 @@ class CommentTextModerationResult {
     required this.isViolation,
     required this.reason,
     required this.severity,
+    required this.penalty,
+    required this.reputationBefore,
+    required this.reputationAfter,
   });
 
   const CommentTextModerationResult.allowed()
     : isViolation = false,
       reason = null,
-      severity = null;
+      severity = null,
+      penalty = 0,
+      reputationBefore = null,
+      reputationAfter = null;
 
   final bool isViolation;
   final String? reason;
   final String? severity;
+  final int penalty;
+  final int? reputationBefore;
+  final int? reputationAfter;
 }
