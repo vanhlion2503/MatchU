@@ -37,35 +37,126 @@ class NotificationInboxView extends GetView<NotificationInboxController> {
         }
 
         final visibleItems = controller.visibleNotifications;
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-          itemCount: visibleItems.isEmpty ? 2 : visibleItems.length + 1,
-          itemBuilder: (context, index) {
-            if (visibleItems.isEmpty && index == 0) {
-              return const _InlineEmptyState();
-            }
-
-            final footerIndex = visibleItems.isEmpty ? 1 : visibleItems.length;
-            if (index == footerIndex) {
-              return _NotificationFooter(
-                totalCount: allItems.length,
-                unreadCount: controller.unreadCount.value,
-                selectedFilter: controller.selectedFilter.value,
-                onSelectFilter: controller.selectFilter,
-                onMarkAllAsRead: controller.markAllAsRead,
-              );
-            }
-
-            final notification = visibleItems[index];
-            return _NotificationCard(
-              notification: notification,
-              isOpening:
-                  controller.openingNotificationId.value == notification.id,
-              onTap: () => controller.openNotification(notification),
-            );
-          },
+        return Column(
+          children: [
+            _NotificationFilterBar(
+              totalCount: allItems.length,
+              unreadCount: controller.unreadCount.value,
+              selectedFilter: controller.selectedFilter.value,
+              onSelectFilter: controller.selectFilter,
+            ),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+                children: [
+                  if (visibleItems.isEmpty)
+                    const _InlineEmptyState()
+                  else
+                    ..._buildNotificationSections(
+                      visibleItems,
+                      openingNotificationId:
+                          controller.openingNotificationId.value,
+                      onOpenNotification: controller.openNotification,
+                    ),
+                  _NotificationListFooter(
+                    hasMore: controller.hasMoreNotifications,
+                    unreadCount: controller.unreadCount.value,
+                    onShowMore: controller.showMoreNotifications,
+                    onMarkAllAsRead: controller.markAllAsRead,
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       }),
+    );
+  }
+
+  List<Widget> _buildNotificationSections(
+    List<AppNotificationModel> items, {
+    required String? openingNotificationId,
+    required ValueChanged<AppNotificationModel> onOpenNotification,
+  }) {
+    final sections = _groupNotifications(items);
+
+    return [
+      for (final section in sections) ...[
+        _NotificationSectionHeader(title: section.title),
+        for (final notification in section.items)
+          _NotificationCard(
+            notification: notification,
+            isOpening: openingNotificationId == notification.id,
+            onTap: () => onOpenNotification(notification),
+          ),
+      ],
+    ];
+  }
+
+  List<_NotificationSection> _groupNotifications(
+    List<AppNotificationModel> items,
+  ) {
+    final today = <AppNotificationModel>[];
+    final yesterday = <AppNotificationModel>[];
+    final recent = <AppNotificationModel>[];
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+
+    for (final item in items) {
+      final createdAt = item.createdAt?.toLocal();
+      if (createdAt == null) {
+        recent.add(item);
+        continue;
+      }
+
+      if (!createdAt.isBefore(todayStart)) {
+        today.add(item);
+      } else if (!createdAt.isBefore(yesterdayStart)) {
+        yesterday.add(item);
+      } else {
+        recent.add(item);
+      }
+    }
+
+    return [
+      if (today.isNotEmpty) _NotificationSection('Hôm nay', today),
+      if (yesterday.isNotEmpty) _NotificationSection('Hôm qua', yesterday),
+      if (recent.isNotEmpty) _NotificationSection('Gần đây', recent),
+    ];
+  }
+}
+
+class _NotificationSection {
+  const _NotificationSection(this.title, this.items);
+
+  final String title;
+  final List<AppNotificationModel> items;
+}
+
+class _NotificationSectionHeader extends StatelessWidget {
+  const _NotificationSectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
+      child: Text(
+        title,
+        style: theme.textTheme.titleSmall?.copyWith(
+          color: theme.colorScheme.onSurface,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
@@ -182,7 +273,7 @@ class _NotificationCard extends StatelessWidget {
                           width: isUnread ? 10 : 0,
                           height: isUnread ? 10 : 0,
                           decoration: BoxDecoration(
-                            color: colorScheme.primary,
+                            color: colorScheme.error,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -207,64 +298,42 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-class _NotificationFooter extends StatelessWidget {
-  const _NotificationFooter({
+class _NotificationFilterBar extends StatelessWidget {
+  const _NotificationFilterBar({
     required this.totalCount,
     required this.unreadCount,
     required this.selectedFilter,
     required this.onSelectFilter,
-    required this.onMarkAllAsRead,
   });
 
   final int totalCount;
   final int unreadCount;
   final NotificationInboxFilter selectedFilter;
   final ValueChanged<NotificationInboxFilter> onSelectFilter;
-  final VoidCallback onMarkAllAsRead;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _FooterFilterButton(
-                  label: 'Tất cả',
-                  count: totalCount,
-                  icon: Iconsax.notification,
-                  isSelected: selectedFilter == NotificationInboxFilter.all,
-                  onPressed: () => onSelectFilter(NotificationInboxFilter.all),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _FooterFilterButton(
-                  label: 'Chưa đọc',
-                  count: unreadCount,
-                  icon: Iconsax.sms_notification,
-                  isSelected: selectedFilter == NotificationInboxFilter.unread,
-                  onPressed:
-                      () => onSelectFilter(NotificationInboxFilter.unread),
-                ),
-              ),
-            ],
+          Expanded(
+            child: _FilterButton(
+              label: 'Tất cả',
+              count: totalCount,
+              icon: Iconsax.notification,
+              isSelected: selectedFilter == NotificationInboxFilter.all,
+              onPressed: () => onSelectFilter(NotificationInboxFilter.all),
+            ),
           ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: unreadCount == 0 ? null : onMarkAllAsRead,
-            icon: const Icon(Iconsax.tick_circle, size: 19),
-            label: const Text('Đọc tất cả'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              textStyle: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _FilterButton(
+              label: 'Chưa đọc',
+              count: unreadCount,
+              icon: Iconsax.sms_notification,
+              isSelected: selectedFilter == NotificationInboxFilter.unread,
+              onPressed: () => onSelectFilter(NotificationInboxFilter.unread),
             ),
           ),
         ],
@@ -273,8 +342,8 @@ class _NotificationFooter extends StatelessWidget {
   }
 }
 
-class _FooterFilterButton extends StatelessWidget {
-  const _FooterFilterButton({
+class _FilterButton extends StatelessWidget {
+  const _FilterButton({
     required this.label,
     required this.count,
     required this.icon,
@@ -312,6 +381,64 @@ class _FooterFilterButton extends StatelessWidget {
         textStyle: theme.textTheme.labelLarge?.copyWith(
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _NotificationListFooter extends StatelessWidget {
+  const _NotificationListFooter({
+    required this.hasMore,
+    required this.unreadCount,
+    required this.onShowMore,
+    required this.onMarkAllAsRead,
+  });
+
+  final bool hasMore;
+  final int unreadCount;
+  final VoidCallback onShowMore;
+  final VoidCallback onMarkAllAsRead;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasMore)
+            OutlinedButton.icon(
+              onPressed: onShowMore,
+              icon: const Icon(Iconsax.arrow_down_1, size: 18),
+              label: const Text('Xem thêm thông báo'),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                'Không còn thông báo mới',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.hintColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: unreadCount == 0 ? null : onMarkAllAsRead,
+            icon: const Icon(Iconsax.tick_circle, size: 19),
+            label: const Text('Đọc tất cả'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              textStyle: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

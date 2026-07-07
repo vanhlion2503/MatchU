@@ -26,16 +26,25 @@ class NotificationInboxController extends GetxController {
   final errorMessage = RxnString();
   final openingNotificationId = RxnString();
   final selectedFilter = NotificationInboxFilter.all.obs;
+  final visibleLimit = 10.obs;
 
   StreamSubscription<List<AppNotificationModel>>? _notificationsSub;
   StreamSubscription<int>? _unreadSub;
 
-  List<AppNotificationModel> get visibleNotifications {
+  static const int _pageSize = 10;
+
+  List<AppNotificationModel> get filteredNotifications {
     if (selectedFilter.value == NotificationInboxFilter.unread) {
       return notifications.where((item) => item.isUnread).toList();
     }
     return notifications;
   }
+
+  List<AppNotificationModel> get visibleNotifications =>
+      filteredNotifications.take(visibleLimit.value).toList();
+
+  bool get hasMoreNotifications =>
+      visibleLimit.value < filteredNotifications.length;
 
   @override
   void onInit() {
@@ -66,6 +75,11 @@ class NotificationInboxController extends GetxController {
 
   void selectFilter(NotificationInboxFilter filter) {
     selectedFilter.value = filter;
+    visibleLimit.value = _pageSize;
+  }
+
+  void showMoreNotifications() {
+    visibleLimit.value += _pageSize;
   }
 
   Future<void> openNotification(AppNotificationModel notification) async {
