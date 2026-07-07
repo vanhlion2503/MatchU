@@ -12,6 +12,18 @@ class NotificationInboxView extends GetView<NotificationInboxController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Thông báo'), centerTitle: false),
+      bottomNavigationBar: Obx(() {
+        if (controller.isLoading.value ||
+            controller.errorMessage.value != null ||
+            controller.notifications.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return _MarkAllAsReadBottomBar(
+          unreadCount: controller.unreadCount.value,
+          onMarkAllAsRead: controller.markAllAsRead,
+        );
+      }),
       body: Obx(() {
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
@@ -65,9 +77,7 @@ class NotificationInboxView extends GetView<NotificationInboxController> {
                     ),
                   _NotificationListFooter(
                     hasMore: controller.hasMoreNotifications,
-                    unreadCount: controller.unreadCount.value,
                     onShowMore: controller.showMoreNotifications,
-                    onMarkAllAsRead: controller.markAllAsRead,
                   ),
                 ],
               ),
@@ -182,106 +192,118 @@ class _NotificationCard extends StatelessWidget {
             ? colorScheme.primary.withValues(alpha: 0.45)
             : colorScheme.outlineVariant.withValues(alpha: 0.9);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color:
-          isUnread
-              ? colorScheme.primary.withValues(alpha: 0.08)
-              : theme.cardTheme.color,
-      elevation: theme.cardTheme.elevation ?? 0,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: borderColor),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: isOpening ? null : onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Stack(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _NotificationAvatar(notification: notification),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            right: isUnread || isOpening ? 28 : 0,
-                          ),
-                          child: Text(
-                            notification.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: colorScheme.onSurface,
-                              fontWeight:
-                                  isUnread ? FontWeight.w800 : FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          notification.body,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodySmall?.color,
-                            height: 1.35,
-                          ),
-                        ),
-                        if (_penaltyLabel(notification).isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          _PenaltyChip(label: _penaltyLabel(notification)),
-                        ],
-                        const SizedBox(height: 10),
-                        Row(
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          color:
+              isUnread
+                  ? colorScheme.primary.withValues(alpha: 0.08)
+                  : theme.cardTheme.color,
+          elevation: theme.cardTheme.elevation ?? 0,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: isOpening ? null : onTap,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _NotificationAvatar(notification: notification),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Iconsax.clock,
-                              size: 14,
-                              color: theme.hintColor,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              formatRelativeTime(notification.createdAt),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.hintColor,
-                                fontWeight: FontWeight.w600,
+                            Padding(
+                              padding: EdgeInsets.only(
+                                right: isOpening ? 28 : 42,
                               ),
+                              child: Text(
+                                notification.title,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: colorScheme.onSurface,
+                                  fontWeight:
+                                      isUnread
+                                          ? FontWeight.w800
+                                          : FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              notification.body,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.textTheme.bodySmall?.color,
+                                height: 1.35,
+                              ),
+                            ),
+                            if (_penaltyLabel(notification).isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              _PenaltyChip(label: _penaltyLabel(notification)),
+                            ],
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Icon(
+                                  Iconsax.clock,
+                                  size: 14,
+                                  color: theme.hintColor,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  formatRelativeTime(notification.createdAt),
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.hintColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              Positioned(
-                right: 0,
-                top: 0,
-                child:
-                    isOpening
-                        ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                        : AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: isUnread ? 10 : 0,
-                          height: isUnread ? 10 : 0,
-                          decoration: BoxDecoration(
-                            color: colorScheme.error,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-              ),
-            ],
+                ),
+                Positioned(
+                  right: 6,
+                  top: 10,
+                  child:
+                      isOpening
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const _NotificationMoreMenu(),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
+        if (isUnread && !isOpening)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -295,6 +317,77 @@ class _NotificationCard extends StatelessWidget {
     }
     if (penalty > 0) return 'Bị trừ $penalty điểm uy tín';
     return 'Cảnh báo tiêu chuẩn cộng đồng';
+  }
+}
+
+enum _NotificationMenuAction { delete, markAsRead, muteAuthor }
+
+class _NotificationMoreMenu extends StatelessWidget {
+  const _NotificationMoreMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return PopupMenuButton<_NotificationMenuAction>(
+      tooltip: 'Tùy chọn thông báo',
+      icon: Icon(Icons.more_horiz, color: theme.iconTheme.color, size: 22),
+      padding: EdgeInsets.zero,
+      position: PopupMenuPosition.under,
+      onSelected: (_) {},
+      itemBuilder:
+          (context) => [
+            const PopupMenuItem(
+              value: _NotificationMenuAction.delete,
+              child: _NotificationMenuItem(
+                icon: Iconsax.trash,
+                label: 'Xóa thông báo',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _NotificationMenuAction.markAsRead,
+              child: _NotificationMenuItem(
+                icon: Iconsax.tick_circle,
+                label: 'Đánh dấu đã đọc',
+              ),
+            ),
+            const PopupMenuItem(
+              value: _NotificationMenuAction.muteAuthor,
+              child: _NotificationMenuItem(
+                icon: Icons.notifications_off_outlined,
+                label: 'Tắt thông báo của người viết này',
+              ),
+            ),
+          ],
+    );
+  }
+}
+
+class _NotificationMenuItem extends StatelessWidget {
+  const _NotificationMenuItem({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: theme.iconTheme.color),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -389,15 +482,11 @@ class _FilterButton extends StatelessWidget {
 class _NotificationListFooter extends StatelessWidget {
   const _NotificationListFooter({
     required this.hasMore,
-    required this.unreadCount,
     required this.onShowMore,
-    required this.onMarkAllAsRead,
   });
 
   final bool hasMore;
-  final int unreadCount;
   final VoidCallback onShowMore;
-  final VoidCallback onMarkAllAsRead;
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +516,38 @@ class _NotificationListFooter extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          FilledButton.icon(
+        ],
+      ),
+    );
+  }
+}
+
+class _MarkAllAsReadBottomBar extends StatelessWidget {
+  const _MarkAllAsReadBottomBar({
+    required this.unreadCount,
+    required this.onMarkAllAsRead,
+  });
+
+  final int unreadCount;
+  final VoidCallback onMarkAllAsRead;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding > 0 ? 12 : 16),
+          child: FilledButton.icon(
             onPressed: unreadCount == 0 ? null : onMarkAllAsRead,
             icon: const Icon(Iconsax.tick_circle, size: 19),
             label: const Text('Đọc tất cả'),
@@ -438,7 +558,7 @@ class _NotificationListFooter extends StatelessWidget {
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
