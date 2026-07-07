@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/bindings/feed/post_detail_binding.dart';
+import 'package:matchu_app/bindings/notification/notification_inbox_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
@@ -25,6 +26,7 @@ import 'package:matchu_app/views/chat/call/screens/call_view.dart';
 import 'package:matchu_app/views/chat/call/screens/incoming_call_view.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/matching/matching_view.dart';
+import 'package:matchu_app/views/notification/notification_inbox_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
 import 'package:matchu_app/views/reputation/reputation_view.dart';
 import 'package:matchu_app/views/qr/profile_qr_view.dart';
@@ -97,6 +99,13 @@ class AppPages {
       name: AppRouter.postDetail,
       page: () => const PostDetailView(),
       binding: PostDetailBinding(),
+    ),
+    GetPage(
+      name: AppRouter.notifications,
+      page: () => const NotificationInboxView(),
+      binding: NotificationInboxBinding(),
+      transition: Transition.cupertino,
+      transitionDuration: const Duration(milliseconds: 240),
     ),
     GetPage(
       name: AppRouter.main,

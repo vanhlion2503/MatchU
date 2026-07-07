@@ -468,6 +468,22 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    match /users/{userId}/notifications/{notificationId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function isReadStateOnlyUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["readAt"])
+          && request.resource.data.readAt is timestamp;
+      }
+
+      allow get, list: if isOwner();
+      allow update: if isOwner() && isReadStateOnlyUpdate();
+      allow create, delete: if false;
+    }
+
     match /users/{userId}/hiddenPostAuthors/{authorId} {
       function isOwner() {
         return request.auth != null && request.auth.uid == userId;

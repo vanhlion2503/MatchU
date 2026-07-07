@@ -31,6 +31,11 @@ const {
   dispatchQueuedChatNotification,
 } = require("./src/triggers/chatMessageNotifications");
 const {
+  createPostLikeNotification,
+  createPostCommentNotification,
+  createModerationPenaltyNotification,
+} = require("./src/triggers/socialNotifications");
+const {
   cleanupStaleUserDevices,
 } = require("./src/triggers/deviceMaintenance");
 const {
@@ -72,6 +77,10 @@ exports.claimReputationTask = claimReputationTask;
 exports.getReputationHistory = getReputationHistory;
 exports.queueChatMessageNotification = queueChatMessageNotification;
 exports.dispatchQueuedChatNotification = dispatchQueuedChatNotification;
+exports.createPostLikeNotification = createPostLikeNotification;
+exports.createPostCommentNotification = createPostCommentNotification;
+exports.createModerationPenaltyNotification =
+  createModerationPenaltyNotification;
 exports.cleanupStaleUserDevices = cleanupStaleUserDevices;
 exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
