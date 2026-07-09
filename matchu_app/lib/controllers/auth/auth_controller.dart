@@ -38,6 +38,8 @@ class RememberedLoginAccount {
   final String avatarUrl;
   final String phoneNumber;
 
+  String get normalizedEmail => email.trim().toLowerCase();
+
   String get displayName {
     final nameFromProfile = fullname.trim();
     if (nameFromProfile.isNotEmpty) return nameFromProfile;
@@ -73,7 +75,10 @@ class RememberedLoginAccount {
 class AuthController extends GetxController {
   final AuthService _auth = AuthService();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
-  static const String _rememberedLoginAccountKey = 'auth_remembered_login';
+  static const String _legacyRememberedLoginAccountKey =
+      'auth_remembered_login';
+  static const String _rememberedLoginAccountsKey =
+      'auth_remembered_login_accounts';
   static const String _loginPhoneCacheKey = 'auth_login_phone_cache';
 
   // ========= INPUT CONTROLLERS =========
@@ -96,7 +101,7 @@ class AuthController extends GetxController {
   final isLoadingRegister = false.obs;
   final isLoadingLogin = false.obs;
   final rememberLoginAccount = false.obs;
-  final rememberedLoginAccount = Rxn<RememberedLoginAccount>();
+  final rememberedLoginAccounts = <RememberedLoginAccount>[].obs;
   final isLoadingRememberedAccount = false.obs;
 
   final resendEmailSeconds = 60.obs;
@@ -165,51 +170,85 @@ class AuthController extends GetxController {
 
     isLoadingRememberedAccount.value = true;
     try {
-      final raw = await _secureStorage.read(key: _rememberedLoginAccountKey);
-      if (raw == null || raw.isEmpty) {
-        rememberedLoginAccount.value = null;
-        rememberLoginAccount.value = false;
-        return;
-      }
-
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
-        await _clearRememberedLoginAccount();
-        return;
-      }
-
-      final account = RememberedLoginAccount.fromJson(decoded);
-      if (account.email.trim().isEmpty || account.password.isEmpty) {
-        await _clearRememberedLoginAccount();
-        return;
-      }
-
-      rememberedLoginAccount.value = account;
-      rememberLoginAccount.value = true;
+      final accounts = await _loadRememberedLoginAccountsFromStorage();
+      rememberedLoginAccounts.assignAll(accounts);
+      rememberLoginAccount.value = accounts.isNotEmpty;
     } catch (_) {
-      rememberedLoginAccount.value = null;
+      rememberedLoginAccounts.clear();
       rememberLoginAccount.value = false;
     } finally {
       isLoadingRememberedAccount.value = false;
     }
   }
 
-  Future<void> loginWithRememberedAccount() async {
-    if (isLoadingLogin.value) return;
+  Future<List<RememberedLoginAccount>>
+  _loadRememberedLoginAccountsFromStorage() async {
+    final accounts = <RememberedLoginAccount>[];
+    final raw = await _secureStorage.read(key: _rememberedLoginAccountsKey);
 
-    var account = rememberedLoginAccount.value;
-    if (account == null) {
-      await loadRememberedLoginAccount();
-      account = rememberedLoginAccount.value;
+    if (raw != null && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        await _clearAllRememberedLoginAccounts();
+        return accounts;
+      }
+
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        final account = RememberedLoginAccount.fromJson(
+          Map<String, dynamic>.from(item),
+        );
+        if (account.normalizedEmail.isNotEmpty && account.password.isNotEmpty) {
+          _upsertRememberedAccount(accounts, account);
+        }
+      }
+
+      accounts.sort((a, b) => b.savedAt.compareTo(a.savedAt));
+      return accounts;
     }
 
-    if (account == null) {
+    final legacyRaw = await _secureStorage.read(
+      key: _legacyRememberedLoginAccountKey,
+    );
+    if (legacyRaw == null || legacyRaw.isEmpty) return accounts;
+
+    try {
+      final decoded = jsonDecode(legacyRaw);
+      if (decoded is Map<String, dynamic>) {
+        final account = RememberedLoginAccount.fromJson(decoded);
+        if (account.normalizedEmail.isNotEmpty && account.password.isNotEmpty) {
+          accounts.add(account);
+          await _writeRememberedLoginAccounts(accounts);
+        }
+      }
+    } finally {
+      await _secureStorage.delete(key: _legacyRememberedLoginAccountKey);
+    }
+
+    return accounts;
+  }
+
+  Future<void> loginWithRememberedAccount(
+    RememberedLoginAccount account,
+  ) async {
+    if (isLoadingLogin.value) return;
+
+    var selectedAccount = account;
+    if (selectedAccount.normalizedEmail.isEmpty ||
+        selectedAccount.password.isEmpty) {
+      await loadRememberedLoginAccount();
+      selectedAccount =
+          _findRememberedAccountByEmail(account.email) ?? selectedAccount;
+    }
+
+    if (selectedAccount.normalizedEmail.isEmpty ||
+        selectedAccount.password.isEmpty) {
       Get.snackbar("Lỗi", "Không tìm thấy tài khoản đã lưu");
       return;
     }
 
-    emailC.text = account.email;
-    passwordC.text = account.password;
+    emailC.text = selectedAccount.email;
+    passwordC.text = selectedAccount.password;
     rememberLoginAccount.value = true;
     await loginC();
   }
@@ -218,20 +257,17 @@ class AuthController extends GetxController {
     required String email,
     required String password,
   }) async {
+    final existingAccount = _findRememberedAccountByEmail(email);
     final fallbackAccount = RememberedLoginAccount(
       email: email.trim(),
       password: password,
       savedAt: DateTime.now(),
-      fullname: rememberedLoginAccount.value?.fullname ?? '',
-      avatarUrl: rememberedLoginAccount.value?.avatarUrl ?? '',
-      phoneNumber: rememberedLoginAccount.value?.phoneNumber ?? '',
+      fullname: existingAccount?.fullname ?? '',
+      avatarUrl: existingAccount?.avatarUrl ?? '',
+      phoneNumber: existingAccount?.phoneNumber ?? '',
     );
 
-    await _secureStorage.write(
-      key: _rememberedLoginAccountKey,
-      value: jsonEncode(fallbackAccount.toJson()),
-    );
-    rememberedLoginAccount.value = fallbackAccount;
+    await _saveRememberedLoginAccountToList(fallbackAccount);
 
     final profile = await _loadCurrentRememberedProfile();
     final account = RememberedLoginAccount(
@@ -243,12 +279,48 @@ class AuthController extends GetxController {
       phoneNumber: profile.phoneNumber,
     );
 
-    await _secureStorage.write(
-      key: _rememberedLoginAccountKey,
-      value: jsonEncode(account.toJson()),
-    );
+    await _saveRememberedLoginAccountToList(account);
     await _saveLoginPhoneCache(email: email, phoneNumber: profile.phoneNumber);
-    rememberedLoginAccount.value = account;
+  }
+
+  Future<void> _saveRememberedLoginAccountToList(
+    RememberedLoginAccount account,
+  ) async {
+    final accounts = rememberedLoginAccounts.toList(growable: true);
+    _upsertRememberedAccount(accounts, account);
+    accounts.sort((a, b) => b.savedAt.compareTo(a.savedAt));
+    await _writeRememberedLoginAccounts(accounts);
+    rememberedLoginAccounts.assignAll(accounts);
+  }
+
+  Future<void> _writeRememberedLoginAccounts(
+    List<RememberedLoginAccount> accounts,
+  ) async {
+    await _secureStorage.write(
+      key: _rememberedLoginAccountsKey,
+      value: jsonEncode(accounts.map((account) => account.toJson()).toList()),
+    );
+  }
+
+  void _upsertRememberedAccount(
+    List<RememberedLoginAccount> accounts,
+    RememberedLoginAccount account,
+  ) {
+    final normalizedEmail = account.normalizedEmail;
+    if (normalizedEmail.isEmpty || account.password.isEmpty) return;
+
+    accounts.removeWhere((item) => item.normalizedEmail == normalizedEmail);
+    accounts.insert(0, account);
+  }
+
+  RememberedLoginAccount? _findRememberedAccountByEmail(String email) {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) return null;
+
+    for (final account in rememberedLoginAccounts) {
+      if (account.normalizedEmail == normalizedEmail) return account;
+    }
+    return null;
   }
 
   Future<Map<String, String>> _loadLoginPhoneCache() async {
@@ -293,14 +365,35 @@ class AuthController extends GetxController {
     );
   }
 
-  Future<void> removeRememberedLoginAccount() async {
-    await _clearRememberedLoginAccount();
+  Future<void> removeRememberedLoginAccount(
+    RememberedLoginAccount account,
+  ) async {
+    await _removeRememberedLoginAccount(account.email);
     Get.snackbar("Đã xóa", "Tài khoản này sẽ không còn được lưu");
   }
 
-  Future<void> _clearRememberedLoginAccount() async {
-    await _secureStorage.delete(key: _rememberedLoginAccountKey);
-    rememberedLoginAccount.value = null;
+  Future<void> _removeRememberedLoginAccount(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) return;
+
+    final accounts = rememberedLoginAccounts
+        .where((account) => account.normalizedEmail != normalizedEmail)
+        .toList(growable: false);
+
+    if (accounts.isEmpty) {
+      await _clearAllRememberedLoginAccounts();
+      return;
+    }
+
+    await _writeRememberedLoginAccounts(accounts);
+    rememberedLoginAccounts.assignAll(accounts);
+    rememberLoginAccount.value = true;
+  }
+
+  Future<void> _clearAllRememberedLoginAccounts() async {
+    await _secureStorage.delete(key: _rememberedLoginAccountsKey);
+    await _secureStorage.delete(key: _legacyRememberedLoginAccountKey);
+    rememberedLoginAccounts.clear();
     rememberLoginAccount.value = false;
   }
 
@@ -353,8 +446,8 @@ class AuthController extends GetxController {
 
     if (rememberLoginAccount.value) {
       await _saveRememberedLoginAccount(email: email, password: password);
-    } else if (rememberedLoginAccount.value != null) {
-      await _clearRememberedLoginAccount();
+    } else {
+      await _removeRememberedLoginAccount(email);
     }
   }
 
@@ -929,7 +1022,8 @@ class AuthController extends GetxController {
         break;
       }
     }
-    final savedPhone = rememberedLoginAccount.value?.phoneNumber.trim() ?? '';
+    final savedPhone =
+        _findRememberedAccountByEmail(emailC.text)?.phoneNumber.trim() ?? '';
     final cachedPhone = await _getCachedLoginPhone(emailC.text);
     final hintPhone = phoneHint?.phoneNumber.trim() ?? '';
     if (savedPhone.isNotEmpty &&

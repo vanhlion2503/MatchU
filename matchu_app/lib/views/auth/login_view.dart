@@ -49,6 +49,86 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
+  Widget _rememberedAccountTile({
+    required BuildContext context,
+    required RememberedLoginAccount account,
+    required Color borderColor,
+    required bool isLoading,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: isLoading ? null : () => c.loginWithRememberedAccount(account),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              _savedAccountAvatar(context, account),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  account.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 12),
+              if (isLoading)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                )
+              else
+                PopupMenuButton<String>(
+                  tooltip: 'Tùy chọn',
+                  onSelected: (value) {
+                    if (value == 'remove') {
+                      c.removeRememberedLoginAccount(account);
+                    }
+                  },
+                  itemBuilder:
+                      (context) => const [
+                        PopupMenuItem(
+                          value: 'remove',
+                          child: Row(
+                            children: [
+                              Icon(Iconsax.trash, color: Colors.red, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Gỡ',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                  icon: Icon(
+                    Icons.more_horiz,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -283,8 +363,8 @@ class _LoginViewState extends State<LoginView> {
                 ),
                 const SizedBox(height: 24),
                 Obx(() {
-                  final account = c.rememberedLoginAccount.value;
-                  if (account == null) return const SizedBox.shrink();
+                  final accounts = c.rememberedLoginAccounts;
+                  if (accounts.isEmpty) return const SizedBox.shrink();
 
                   final isLoading = c.isLoadingLogin.value;
                   final isDark =
@@ -293,78 +373,19 @@ class _LoginViewState extends State<LoginView> {
                       isDark ? AppTheme.darkBorder : AppTheme.lightBorder;
 
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: isLoading ? null : c.loginWithRememberedAccount,
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Row(
-                          children: [
-                            _savedAccountAvatar(context, account),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                account.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            if (isLoading)
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(context).colorScheme.primary,
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Column(
+                      children:
+                          accounts
+                              .map(
+                                (account) => _rememberedAccountTile(
+                                  context: context,
+                                  account: account,
+                                  borderColor: borderColor,
+                                  isLoading: isLoading,
                                 ),
                               )
-                            else
-                              PopupMenuButton<String>(
-                                tooltip: 'Tùy chọn',
-                                onSelected: (value) {
-                                  if (value == 'remove') {
-                                    c.removeRememberedLoginAccount();
-                                  }
-                                },
-                                itemBuilder:
-                                    (context) => const [
-                                      PopupMenuItem(
-                                        value: 'remove',
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Iconsax.trash,
-                                              color: Colors.red,
-                                              size: 20,
-                                            ),
-                                            SizedBox(width: 8),
-                                            Text(
-                                              'Gỡ',
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                icon: Icon(
-                                  Icons.more_horiz,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
+                              .toList(),
                     ),
                   );
                 }),
