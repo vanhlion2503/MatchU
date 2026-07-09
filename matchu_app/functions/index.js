@@ -2,6 +2,10 @@ require("./src/shared/firebase");
 
 const { getTurnCredentials } = require("./src/callables/getTurnCredentials");
 const {
+  sendEncryptedChatMessage,
+  publishWrappedRoomKeys,
+} = require("./src/callables/chatMessages");
+const {
   moderatePostText,
 } = require("./src/callables/postTextModeration");
 const {
@@ -64,6 +68,8 @@ const {
 } = require("./reputation/triggers");
 
 exports.getTurnCredentials = getTurnCredentials;
+exports.sendEncryptedChatMessage = sendEncryptedChatMessage;
+exports.publishWrappedRoomKeys = publishWrappedRoomKeys;
 exports.moderatePostText = moderatePostText;
 exports.moderateCommentText = moderateCommentText;
 exports.moderateImageContent = moderateImageContent;

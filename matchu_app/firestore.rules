@@ -1270,6 +1270,9 @@ service cloud.firestore {
             ])
           )
           && request.resource.data.userId is string
+          && request.resource.data.userId in
+              get(/databases/$(database)/documents/chatRooms/$(roomId))
+                .data.participants
           && request.resource.data.encryptedKey is string
           && (
             !("keyId" in request.resource.data)
@@ -1301,6 +1304,7 @@ service cloud.firestore {
             get(/databases/$(database)/documents/chatRooms/$(roomId)).data
           )
           && request.resource.data.senderId is string
+          && request.resource.data.senderId == request.auth.uid
           && request.resource.data.createdAt != null;
 
         function viewedByMap() {

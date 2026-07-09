@@ -4,7 +4,9 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:matchu_app/services/security/device_service.dart';
 import 'package:pointycastle/asn1/primitives/asn1_integer.dart';
@@ -19,6 +21,7 @@ class SessionKeyService {
   static final _db = FirebaseFirestore.instance;
   static final _auth = FirebaseAuth.instance;
   static final _storage = FlutterSecureStorage();
+  static final _functions = FirebaseFunctions.instance;
   static const int _keyCreationLockTtlMs = 20000;
   static const int _activeDeviceWindowDays = 60;
   static const int _maxSessionKeyDevicesPerUser = 5;
@@ -711,21 +714,7 @@ class SessionKeyService {
     final uniqueParticipants = participantUids.toSet();
     int distributedCount = 0;
     int skippedCount = 0;
-    WriteBatch batch = _db.batch();
-    int pendingWrites = 0;
-
-    Future<void> commitPendingWrites() async {
-      if (pendingWrites == 0) return;
-
-      try {
-        await batch.commit();
-      } catch (e) {
-        print("🔒 sessionKey batch write error: $e");
-      } finally {
-        batch = _db.batch();
-        pendingWrites = 0;
-      }
-    }
+    final pendingWrites = <_WrappedSessionKeyWrite>[];
 
     for (final participantUid in uniqueParticipants) {
       final devices = await _getDevices(participantUid);
@@ -761,23 +750,20 @@ class SessionKeyService {
         }
 
         try {
-          batch.set(docRef, {
-            "userId": participantUid,
-            "encryptedKey": base64Encode(
-              _rsaEncrypt(sessionKey, _decodePublicKeyFromPem(publicKeyPem)),
+          pendingWrites.add(
+            _WrappedSessionKeyWrite(
+              docRef: docRef,
+              userId: participantUid,
+              deviceId: deviceId,
+              encryptedKey: base64Encode(
+                _rsaEncrypt(sessionKey, _decodePublicKeyFromPem(publicKeyPem)),
+              ),
             ),
-            "keyId": keyId,
-            "createdAt": FieldValue.serverTimestamp(),
-          });
-          pendingWrites++;
+          );
           distributedCount++;
           print(
             "🔒 Distributed session key to device $deviceId (user: $participantUid)",
           );
-
-          if (pendingWrites >= 400) {
-            await commitPendingWrites();
-          }
         } catch (e) {
           // Log error nhưng không throw - tiếp tục với device khác
           print("🔒 sessionKey write error for $deviceId: $e");
@@ -785,13 +771,90 @@ class SessionKeyService {
       }
     }
 
-    await commitPendingWrites();
+    if (pendingWrites.isNotEmpty) {
+      final publishedByFunction = await _publishWrappedSessionKeys(
+        roomId: roomId,
+        keyId: keyId,
+        writes: pendingWrites,
+      );
+      if (!publishedByFunction) {
+        await _writeWrappedSessionKeysDirect(pendingWrites, keyId: keyId);
+      }
+    }
 
     if (distributedCount > 0 || skippedCount > 0) {
       print(
         "🔒 Distribution summary: $distributedCount distributed, $skippedCount skipped",
       );
     }
+  }
+
+  static Future<bool> _publishWrappedSessionKeys({
+    required String roomId,
+    required int keyId,
+    required List<_WrappedSessionKeyWrite> writes,
+  }) async {
+    const chunkSize = 20;
+    try {
+      final callable = _functions.httpsCallable('publishWrappedRoomKeys');
+      for (var i = 0; i < writes.length; i += chunkSize) {
+        final chunk = writes.skip(i).take(chunkSize).toList(growable: false);
+        await callable.call(<String, dynamic>{
+          'roomId': roomId,
+          'keyId': keyId,
+          'keys': chunk
+              .map(
+                (write) => <String, dynamic>{
+                  'userId': write.userId,
+                  'deviceId': write.deviceId,
+                  'encryptedKey': write.encryptedKey,
+                },
+              )
+              .toList(growable: false),
+        });
+      }
+      return true;
+    } catch (e) {
+      debugPrint("publishWrappedRoomKeys failed, using direct fallback: $e");
+      return false;
+    }
+  }
+
+  static Future<void> _writeWrappedSessionKeysDirect(
+    List<_WrappedSessionKeyWrite> writes, {
+    required int keyId,
+  }) async {
+    WriteBatch batch = _db.batch();
+    var pendingWrites = 0;
+
+    Future<void> commitPendingWrites() async {
+      if (pendingWrites == 0) return;
+
+      try {
+        await batch.commit();
+      } catch (e) {
+        debugPrint("sessionKey batch write error: $e");
+      } finally {
+        batch = _db.batch();
+        pendingWrites = 0;
+      }
+    }
+
+    for (final write in writes) {
+      batch.set(write.docRef, {
+        "userId": write.userId,
+        "encryptedKey": write.encryptedKey,
+        "keyId": keyId,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+      pendingWrites++;
+
+      if (pendingWrites >= 400) {
+        await commitPendingWrites();
+      }
+    }
+
+    await commitPendingWrites();
   }
 
   static Future<List<_SessionDeviceInfo>> _getDevices(
@@ -963,4 +1026,18 @@ class _SessionDeviceInfo {
   final String publicKeyPem;
   final DateTime? lastActiveAt;
   final bool isCurrentDevice;
+}
+
+class _WrappedSessionKeyWrite {
+  const _WrappedSessionKeyWrite({
+    required this.docRef,
+    required this.userId,
+    required this.deviceId,
+    required this.encryptedKey,
+  });
+
+  final DocumentReference<Map<String, dynamic>> docRef;
+  final String userId;
+  final String deviceId;
+  final String encryptedKey;
 }

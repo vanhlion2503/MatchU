@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
@@ -9,10 +10,23 @@ import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 
 class ChatService {
-  final _db = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
-  final _storage = FirebaseStorage.instance;
-  final _restrictionService = PostRestrictionService();
+  ChatService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    FirebaseStorage? storage,
+    FirebaseFunctions? functions,
+    PostRestrictionService? restrictionService,
+  }) : _db = firestore ?? FirebaseFirestore.instance,
+       _auth = auth ?? FirebaseAuth.instance,
+       _storage = storage ?? FirebaseStorage.instance,
+       _functions = functions ?? FirebaseFunctions.instance,
+       _restrictionService = restrictionService ?? PostRestrictionService();
+
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
+  final FirebaseStorage _storage;
+  final FirebaseFunctions _functions;
+  final PostRestrictionService _restrictionService;
 
   String get uid => _auth.currentUser!.uid;
 
@@ -108,6 +122,17 @@ class ChatService {
       keyId: keyId,
     );
 
+    if (await _sendMessageWithCallable(
+      roomId: roomId,
+      encrypted: encrypted,
+      type: type,
+      replyToId: replyToId,
+      replyText: replyText,
+      keyId: keyId,
+    )) {
+      return;
+    }
+
     final batch = _db.batch();
 
     // 1️⃣ message
@@ -140,6 +165,35 @@ class ChatService {
     });
 
     await batch.commit();
+  }
+
+  Future<bool> _sendMessageWithCallable({
+    required String roomId,
+    required Map<String, String> encrypted,
+    required String type,
+    required String? replyToId,
+    required String? replyText,
+    required int keyId,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('sendEncryptedChatMessage');
+      await callable.call(<String, dynamic>{
+        'roomId': roomId,
+        'ciphertext': encrypted['ciphertext'],
+        'iv': encrypted['iv'],
+        'keyId': keyId,
+        'type': type,
+        'replyToId': replyToId,
+        'replyText': replyText,
+      });
+      return true;
+    } on FirebaseFunctionsException catch (error) {
+      // Keep old clients usable while the new function is being deployed.
+      if (error.code == 'not-found' || error.code == 'unimplemented') {
+        return false;
+      }
+      rethrow;
+    }
   }
 
   Future<void> sendImageMessage({
