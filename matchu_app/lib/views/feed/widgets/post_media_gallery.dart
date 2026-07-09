@@ -112,6 +112,21 @@ class PostMediaGallery extends StatelessWidget {
       );
     }
 
+    if (_shouldUseMixedMediaCardScroll) {
+      return _MixedMediaCardScroll(
+        media: media,
+        imageUrls: imageUrls,
+        borderRadius: borderRadius,
+        imageIndexForMediaPosition: _imageIndexForMediaPosition,
+        onOpenImageViewer:
+            (initialIndex) => _openImageViewer(
+              context,
+              imageUrls: imageUrls,
+              initialIndex: initialIndex,
+            ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: palette.surfaceMuted,
@@ -174,6 +189,7 @@ class PostMediaGallery extends StatelessWidget {
             return GridView.builder(
               shrinkWrap: true,
               itemCount: media.length,
+              padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
@@ -201,6 +217,12 @@ class PostMediaGallery extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  bool get _shouldUseMixedMediaCardScroll {
+    if (media.length != 2) return false;
+    return media.any((item) => item.isVideo) &&
+        media.any((item) => item.isImage);
   }
 
   int _imageIndexForMediaPosition(int mediaIndex) {
@@ -234,6 +256,79 @@ class PostMediaGallery extends StatelessWidget {
   }
 }
 
+class _MixedMediaCardScroll extends StatelessWidget {
+  const _MixedMediaCardScroll({
+    required this.media,
+    required this.imageUrls,
+    required this.borderRadius,
+    required this.imageIndexForMediaPosition,
+    required this.onOpenImageViewer,
+  });
+
+  final List<MediaModel> media;
+  final List<String> imageUrls;
+  final BorderRadius borderRadius;
+  final int Function(int mediaIndex) imageIndexForMediaPosition;
+  final ValueChanged<int> onOpenImageViewer;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth =
+            constraints.maxWidth.isFinite
+                ? constraints.maxWidth
+                : MediaQuery.sizeOf(context).width;
+        final cardHeight = (maxWidth * 0.68).clamp(184.0, 260.0).toDouble();
+        final imageCardWidth = (cardHeight * 0.76).clamp(136.0, 190.0);
+        final videoCardWidth = (maxWidth * 0.72).clamp(204.0, 280.0);
+
+        return SizedBox(
+          height: cardHeight,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: media.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final item = media[index];
+              final palette = FeedPalette.of(context);
+              final cardWidth = item.isVideo ? videoCardWidth : imageCardWidth;
+
+              return SizedBox(
+                width: cardWidth,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: palette.surfaceMuted,
+                    borderRadius: borderRadius,
+                    border: Border.all(color: palette.border),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: borderRadius,
+                    child: _MediaTile(
+                      media: item,
+                      borderRadius: BorderRadius.zero,
+                      useIntrinsicVideoAspectRatio: false,
+                      onTap:
+                          item.isImage &&
+                                  item.url.isNotEmpty &&
+                                  imageUrls.isNotEmpty
+                              ? () => onOpenImageViewer(
+                                imageIndexForMediaPosition(index),
+                              )
+                              : null,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _MediaTile extends StatelessWidget {
   const _MediaTile({
     required this.media,
@@ -257,6 +352,7 @@ class _MediaTile extends StatelessWidget {
         thumbnailUrl: media.thumbnailUrl,
         borderRadius: borderRadius,
         useIntrinsicAspectRatio: useIntrinsicVideoAspectRatio,
+        compactControls: !useIntrinsicVideoAspectRatio,
       );
     }
 

@@ -13,6 +13,7 @@ class PostVideoThumbnail extends StatefulWidget {
     required this.url,
     this.borderRadius = const BorderRadius.all(Radius.circular(20)),
     this.useIntrinsicAspectRatio = true,
+    this.compactControls = false,
     this.reservedAspectRatio = _defaultFeedVideoAspectRatio,
     this.thumbnailUrl,
   });
@@ -20,6 +21,7 @@ class PostVideoThumbnail extends StatefulWidget {
   final String url;
   final BorderRadius borderRadius;
   final bool useIntrinsicAspectRatio;
+  final bool compactControls;
   final double? reservedAspectRatio;
   final String? thumbnailUrl;
 
@@ -219,54 +221,68 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
                             ),
                           ),
                         ),
+                        if (widget.compactControls)
+                          const Positioned(
+                            top: 10,
+                            right: 10,
+                            child: _VideoTypeBadge(),
+                          ),
                         if (!value.isPlaying)
                           Center(
                             child: InkResponse(
-                              onTap: _togglePlay,
-                              radius: 40,
-                              child: const Icon(
-                                Iconsax.play_circle,
-                                size: 62,
-                                color: Colors.white,
+                              onTap:
+                                  widget.compactControls
+                                      ? _openFullscreen
+                                      : _togglePlay,
+                              radius: widget.compactControls ? 30 : 40,
+                              child:
+                                  widget.compactControls
+                                      ? const _CompactPlayButton()
+                                      : const Icon(
+                                        Iconsax.play_circle,
+                                        size: 62,
+                                        color: Colors.white,
+                                      ),
+                            ),
+                          ),
+                        if (!widget.compactControls) ...[
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _VideoPillButton(
+                                  icon:
+                                      _isMuted
+                                          ? Iconsax.volume_slash
+                                          : Iconsax.volume_high,
+                                  onTap: _toggleMute,
+                                ),
+                                const SizedBox(width: 8),
+                                _VideoPillButton(
+                                  icon: Iconsax.maximize_4,
+                                  onTap: _openFullscreen,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: IgnorePointer(
+                              child: LinearProgressIndicator(
+                                value: _progressOf(value),
+                                minHeight: 2,
+                                backgroundColor: Colors.white24,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             ),
                           ),
-                        Positioned(
-                          right: 12,
-                          bottom: 12,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _VideoPillButton(
-                                icon:
-                                    _isMuted
-                                        ? Iconsax.volume_slash
-                                        : Iconsax.volume_high,
-                                onTap: _toggleMute,
-                              ),
-                              const SizedBox(width: 8),
-                              _VideoPillButton(
-                                icon: Iconsax.maximize_4,
-                                onTap: _openFullscreen,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: IgnorePointer(
-                            child: LinearProgressIndicator(
-                              value: _progressOf(value),
-                              minHeight: 2,
-                              backgroundColor: Colors.white24,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -306,6 +322,43 @@ String _formatDuration(Duration duration) {
   final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
   final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
+}
+
+class _CompactPlayButton extends StatelessWidget {
+  const _CompactPlayButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 48,
+      height: 48,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+      ),
+      child: const Icon(Iconsax.play, color: Colors.white, size: 24),
+    );
+  }
+}
+
+class _VideoTypeBadge extends StatelessWidget {
+  const _VideoTypeBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Icon(Iconsax.video_play, color: Colors.white, size: 15),
+      ),
+    );
+  }
 }
 
 class _VideoPillButton extends StatelessWidget {
