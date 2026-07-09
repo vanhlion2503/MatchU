@@ -79,6 +79,8 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             final pending = widget.controller.pendingImageMessages;
             final pendingTextCount = pendingText.length;
             final pendingCount = pending.length;
+            final hasLocalOutgoingPending =
+                pendingTextCount > 0 || pendingCount > 0;
             const bottomPadding = 10.0;
 
             if (docs.isEmpty && !snap.hasData) {
@@ -274,7 +276,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                 final otherUid =
                                     widget.controller.otherUid.value;
                                 final isMyLastMessage =
-                                    isMe && messageIndex == 0;
+                                    isMe &&
+                                    messageIndex == 0 &&
+                                    !hasLocalOutgoingPending;
 
                                 final rawText = data["text"];
                                 final fallbackText =
