@@ -1,28 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/utils/otp_phone_formatter.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:pinput/pinput.dart';
 
 class OtpLoginView extends StatelessWidget {
   const OtpLoginView({super.key});
-
-  String maskPhone(String phone) {
-    final value = phone.trim();
-    if (value.isEmpty) return value;
-    if (value.length <= 8) return value;
-
-    final prefixLength = value.startsWith('+') ? 3 : 2;
-    final safePrefixLength = prefixLength.clamp(0, value.length - 4).toInt();
-    final hiddenCount = value.length - safePrefixLength - 4;
-    if (hiddenCount <= 0) return value;
-
-    final start = value.substring(0, safePrefixLength);
-    final end = value.substring(value.length - 4);
-    final stars = List.filled(hiddenCount, '*').join();
-
-    return '$start$stars$end';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,72 +39,70 @@ class OtpLoginView extends StatelessWidget {
                 const Icon(Icons.verified, size: 80),
                 const SizedBox(height: 24),
                 Center(
-                  child: RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                        color: Theme.of(context).textTheme.bodySmall?.color,
+                  child: Obx(
+                    () => RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'Mã xác thực đã được gửi đến số \n',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          TextSpan(
+                            text: maskOtpPhoneNumber(c.fullPhoneNumber.value),
+                            style: Theme.of(context).textTheme.bodyLarge!
+                                .copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                      children: [
-                        TextSpan(
-                          text: 'Mã xác thực đã được gửi đến số \n',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        TextSpan(
-                          text: maskPhone(c.fullPhoneNumber.value.trim()),
-                          style: Theme.of(context).textTheme.bodyLarge!
-                              .copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                Pinput(
-                  length: 6, // ✅ 6 ô
-                  controller: c.otpC,
-                  keyboardType: TextInputType.number,
-
-                  defaultPinTheme: PinTheme(
-                    width: 56,
-                    height: 56,
-                    textStyle: Theme.of(context).textTheme.headlineSmall,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.3),
-                        width: 2,
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final pinSize = ((constraints.maxWidth - 40) / 6).clamp(
+                      46.0,
+                      52.0,
+                    );
+                    final pinTheme = PinTheme(
+                      width: pinSize,
+                      height: 58,
+                      textStyle: Theme.of(context).textTheme.headlineSmall,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.3),
+                          width: 2,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
 
-                  focusedPinTheme: PinTheme(
-                    width: 56,
-                    height: 56,
-                    textStyle: Theme.of(context).textTheme.headlineSmall,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 2,
+                    return Pinput(
+                      length: 6,
+                      controller: c.otpC,
+                      keyboardType: TextInputType.number,
+                      separatorBuilder: (_) => const SizedBox(width: 8),
+                      defaultPinTheme: pinTheme,
+                      focusedPinTheme: pinTheme.copyDecorationWith(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
                       ),
-                    ),
-                  ),
-
-                  submittedPinTheme: PinTheme(
-                    width: 56,
-                    height: 56,
-                    textStyle: Theme.of(context).textTheme.headlineSmall,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 2,
+                      submittedPinTheme: pinTheme.copyDecorationWith(
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
 

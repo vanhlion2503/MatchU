@@ -28,6 +28,7 @@ class RememberedLoginAccount {
     required this.savedAt,
     this.fullname = '',
     this.avatarUrl = '',
+    this.phoneNumber = '',
   });
 
   final String email;
@@ -35,6 +36,7 @@ class RememberedLoginAccount {
   final DateTime savedAt;
   final String fullname;
   final String avatarUrl;
+  final String phoneNumber;
 
   String get displayName {
     final nameFromProfile = fullname.trim();
@@ -50,6 +52,7 @@ class RememberedLoginAccount {
     'savedAt': savedAt.toIso8601String(),
     'fullname': fullname,
     'avatarUrl': avatarUrl,
+    'phoneNumber': phoneNumber,
   };
 
   factory RememberedLoginAccount.fromJson(Map<String, dynamic> json) {
@@ -61,6 +64,8 @@ class RememberedLoginAccount {
           DateTime.fromMillisecondsSinceEpoch(0),
       fullname: (json['fullname'] ?? '').toString(),
       avatarUrl: (json['avatarUrl'] ?? '').toString(),
+      phoneNumber:
+          (json['phoneNumber'] ?? json['phonenumber'] ?? '').toString(),
     );
   }
 }
@@ -69,6 +74,7 @@ class AuthController extends GetxController {
   final AuthService _auth = AuthService();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   static const String _rememberedLoginAccountKey = 'auth_remembered_login';
+  static const String _loginPhoneCacheKey = 'auth_login_phone_cache';
 
   // ========= INPUT CONTROLLERS =========
   final emailC = TextEditingController();
@@ -218,6 +224,7 @@ class AuthController extends GetxController {
       savedAt: DateTime.now(),
       fullname: rememberedLoginAccount.value?.fullname ?? '',
       avatarUrl: rememberedLoginAccount.value?.avatarUrl ?? '',
+      phoneNumber: rememberedLoginAccount.value?.phoneNumber ?? '',
     );
 
     await _secureStorage.write(
@@ -233,13 +240,57 @@ class AuthController extends GetxController {
       savedAt: DateTime.now(),
       fullname: profile.fullname,
       avatarUrl: profile.avatarUrl,
+      phoneNumber: profile.phoneNumber,
     );
 
     await _secureStorage.write(
       key: _rememberedLoginAccountKey,
       value: jsonEncode(account.toJson()),
     );
+    await _saveLoginPhoneCache(email: email, phoneNumber: profile.phoneNumber);
     rememberedLoginAccount.value = account;
+  }
+
+  Future<Map<String, String>> _loadLoginPhoneCache() async {
+    final raw = await _secureStorage.read(key: _loginPhoneCacheKey);
+    if (raw == null || raw.isEmpty) return {};
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return {};
+      return decoded.map(
+        (key, value) => MapEntry(key.toString(), value.toString()),
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<String> _getCachedLoginPhone(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) return '';
+
+    final cache = await _loadLoginPhoneCache();
+    return cache[normalizedEmail]?.trim() ?? '';
+  }
+
+  Future<void> _saveLoginPhoneCache({
+    required String email,
+    required String phoneNumber,
+  }) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedEmail.isEmpty ||
+        !RegExp(r'^\+\d{9,15}$').hasMatch(normalizedPhone)) {
+      return;
+    }
+
+    final cache = await _loadLoginPhoneCache();
+    cache[normalizedEmail] = normalizedPhone;
+    await _secureStorage.write(
+      key: _loginPhoneCacheKey,
+      value: jsonEncode(cache),
+    );
   }
 
   Future<void> removeRememberedLoginAccount() async {
@@ -253,12 +304,12 @@ class AuthController extends GetxController {
     rememberLoginAccount.value = false;
   }
 
-  Future<({String fullname, String avatarUrl})>
+  Future<({String fullname, String avatarUrl, String phoneNumber})>
   _loadCurrentRememberedProfile() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     final uid = currentUser?.uid.trim() ?? '';
     if (uid.isEmpty) {
-      return (fullname: '', avatarUrl: '');
+      return (fullname: '', avatarUrl: '', phoneNumber: '');
     }
 
     try {
@@ -268,6 +319,7 @@ class AuthController extends GetxController {
         return (
           fullname: currentUser?.displayName?.trim() ?? '',
           avatarUrl: currentUser?.photoURL?.trim() ?? '',
+          phoneNumber: currentUser?.phoneNumber?.trim() ?? '',
         );
       }
 
@@ -275,12 +327,21 @@ class AuthController extends GetxController {
           (data['fullname'] ?? data['displayName'] ?? '').toString().trim();
       final avatarUrl =
           (data['avatarUrl'] ?? data['avatar'] ?? '').toString().trim();
+      final phoneNumber =
+          (data['phonenumber'] ?? currentUser?.phoneNumber ?? '')
+              .toString()
+              .trim();
 
-      return (fullname: fullname, avatarUrl: avatarUrl);
+      return (
+        fullname: fullname,
+        avatarUrl: avatarUrl,
+        phoneNumber: phoneNumber,
+      );
     } catch (_) {
       return (
         fullname: currentUser?.displayName?.trim() ?? '',
         avatarUrl: currentUser?.photoURL?.trim() ?? '',
+        phoneNumber: currentUser?.phoneNumber?.trim() ?? '',
       );
     }
   }
@@ -868,8 +929,18 @@ class AuthController extends GetxController {
         break;
       }
     }
-    final hintPhone = phoneHint?.phoneNumber.trim();
-    if (hintPhone != null && hintPhone.isNotEmpty) {
+    final savedPhone = rememberedLoginAccount.value?.phoneNumber.trim() ?? '';
+    final cachedPhone = await _getCachedLoginPhone(emailC.text);
+    final hintPhone = phoneHint?.phoneNumber.trim() ?? '';
+    if (savedPhone.isNotEmpty &&
+        !savedPhone.contains('*') &&
+        RegExp(r'^\+\d{9,15}$').hasMatch(savedPhone)) {
+      fullPhoneNumber.value = savedPhone;
+    } else if (cachedPhone.isNotEmpty &&
+        !cachedPhone.contains('*') &&
+        RegExp(r'^\+\d{9,15}$').hasMatch(cachedPhone)) {
+      fullPhoneNumber.value = cachedPhone;
+    } else if (hintPhone.isNotEmpty) {
       fullPhoneNumber.value = hintPhone;
     }
 
@@ -1054,6 +1125,10 @@ class AuthController extends GetxController {
         gender: selectedGender.value,
         interests: InterestTags.normalizeList(selectedInterests),
         avatarUrl: avatarUrl,
+      );
+      await _saveLoginPhoneCache(
+        email: FirebaseAuth.instance.currentUser?.email ?? emailC.text,
+        phoneNumber: fullPhoneNumber.value,
       );
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
