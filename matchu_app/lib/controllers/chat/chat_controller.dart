@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:matchu_app/models/message_status.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
@@ -50,6 +51,8 @@ class ChatController extends GetxController {
 
   final RxList<PendingImageMessage> pendingImageMessages =
       <PendingImageMessage>[].obs;
+  final RxList<PendingTextMessage> pendingTextMessages =
+      <PendingTextMessage>[].obs;
   final ImagePicker _picker = ImagePicker();
   final AudioRecorder _audioRecorder = AudioRecorder();
 
@@ -352,6 +355,24 @@ class ChatController extends GetxController {
     unawaited(getDecryptedText(doc.id, data));
   }
 
+  void _removePendingTextMessageFor(Map<String, dynamic> data) {
+    final clientMessageId = data["clientMessageId"];
+    if (clientMessageId is String && clientMessageId.isNotEmpty) {
+      pendingTextMessages.removeWhere(
+        (pending) => pending.id == clientMessageId,
+      );
+      return;
+    }
+
+    // Backward compatible path for the deployed callable before it stores
+    // clientMessageId: one real outgoing text message replaces one local bubble.
+    if (data["senderId"] == uid && data["type"] == "text") {
+      if (pendingTextMessages.isNotEmpty) {
+        pendingTextMessages.removeAt(0);
+      }
+    }
+  }
+
   void _queueDecrypt(String messageId, Map<String, dynamic> data) {
     if (decryptedCache.containsKey(messageId) ||
         _decrypting.contains(messageId)) {
@@ -449,6 +470,7 @@ class ChatController extends GetxController {
     for (final snap in docs) {
       final id = snap.id;
       final data = snap.data();
+      _removePendingTextMessageFor(data);
       final index = _messageIndexMap[id];
 
       if (index == null) {
@@ -585,7 +607,11 @@ class ChatController extends GetxController {
             .reduce((a, b) => a > b ? a : b);
 
         // Khi scroll đến 90% của list hiện tại (gần đầu), load more
-        final totalItems = allMessages.length + 1 + pendingImageMessages.length;
+        final totalItems =
+            allMessages.length +
+            1 +
+            pendingTextMessages.length +
+            pendingImageMessages.length;
         if (maxIndex >= totalItems * 0.9) {
           // Gọi method trực tiếp để tránh lỗi lookup
           Future.microtask(() => loadMoreMessages());
@@ -664,9 +690,20 @@ class ChatController extends GetxController {
     _justSentMessage = true;
     _typingTimer?.cancel();
     isTyping.value = false;
-    await _service.setTyping(roomId: roomId, isTyping: false);
-
     final reply = replyingMessage.value;
+    final pending = PendingTextMessage(
+      id: "local_text_${DateTime.now().microsecondsSinceEpoch}",
+      text: text,
+      replyToId: reply?["id"],
+      replyText: reply?["text"],
+    );
+
+    pendingTextMessages.insert(0, pending);
+    inputController.clear();
+    replyingMessage.value = null;
+    _scrollToBottom(0);
+
+    unawaited(_service.setTyping(roomId: roomId, isTyping: false));
 
     var hasKey = await SessionKeyService.hasLocalSessionKey(
       roomId,
@@ -681,6 +718,7 @@ class ChatController extends GetxController {
     }
     if (!hasKey) {
       Get.snackbar("🔐", "Đang thiết lập mã hóa, vui lòng đợi...");
+      pendingTextMessages.remove(pending);
       return;
     }
 
@@ -691,12 +729,24 @@ class ChatController extends GetxController {
         type: type,
         replyToId: reply?["id"],
         replyText: reply?["text"],
+        clientMessageId: pending.id,
         keyId: _currentKeyId,
       );
 
-      replyingMessage.value = null;
-      inputController.clear();
+      // Keep showing "Đang gửi" until the realtime message replaces this
+      // local bubble. Switching the local bubble to "Đã gửi" can briefly show
+      // both local and Firestore bubbles at the same time.
+      unawaited(
+        Future.delayed(const Duration(seconds: 8), () {
+          if (!isClosed) pendingTextMessages.remove(pending);
+        }),
+      );
     } catch (error) {
+      pendingTextMessages.remove(pending);
+      if (inputController.text.trim().isEmpty) {
+        inputController.text = text;
+      }
+      replyingMessage.value = reply;
       Get.snackbar(
         "L\u1ED7i",
         error is StateError
@@ -1551,6 +1601,7 @@ class ChatController extends GetxController {
     _decrypting.clear();
     deletedMessageIds.clear();
     pendingImageMessages.clear();
+    pendingTextMessages.clear();
     voiceRecordingAmplitudes.clear();
     allMessages.clear();
     if (Get.isRegistered<NotificationController>()) {
@@ -1574,4 +1625,21 @@ class PendingImageMessage {
     this.localPath,
     this.durationMs,
   });
+}
+
+class PendingTextMessage {
+  final String id;
+  final String text;
+  final String? replyToId;
+  final String? replyText;
+  final DateTime createdAt;
+  final Rx<MessageStatus> status = MessageStatus.sending.obs;
+
+  PendingTextMessage({
+    required this.id,
+    required this.text,
+    this.replyToId,
+    this.replyText,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 }

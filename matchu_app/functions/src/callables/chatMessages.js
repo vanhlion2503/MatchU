@@ -120,6 +120,7 @@ const sendEncryptedChatMessage = onCall(async (request) => {
   const messageRef = roomRef.collection("messages").doc();
   const replyToId = cleanNullableString(request.data?.replyToId, 160);
   const replyText = cleanNullableString(request.data?.replyText, MAX_REPLY_TEXT_LENGTH);
+  const clientMessageId = cleanNullableString(request.data?.clientMessageId, 120);
 
   const batch = db.batch();
   batch.set(messageRef, {
@@ -130,6 +131,7 @@ const sendEncryptedChatMessage = onCall(async (request) => {
     type,
     replyToId,
     replyText,
+    ...(clientMessageId ? { clientMessageId } : {}),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 

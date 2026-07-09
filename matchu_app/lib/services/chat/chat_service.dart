@@ -106,6 +106,7 @@ class ChatService {
     String type = "text",
     String? replyToId,
     String? replyText,
+    String? clientMessageId,
     int keyId = 0,
   }) async {
     final roomRef = _db.collection("chatRooms").doc(roomId);
@@ -128,6 +129,7 @@ class ChatService {
       type: type,
       replyToId: replyToId,
       replyText: replyText,
+      clientMessageId: clientMessageId,
       keyId: keyId,
     )) {
       return;
@@ -145,6 +147,7 @@ class ChatService {
       "notificationPreview": _buildNotificationPreview(text),
       "replyToId": replyToId,
       "replyText": replyText,
+      if (clientMessageId != null) "clientMessageId": clientMessageId,
       "createdAt": FieldValue.serverTimestamp(),
     });
 
@@ -173,6 +176,7 @@ class ChatService {
     required String type,
     required String? replyToId,
     required String? replyText,
+    required String? clientMessageId,
     required int keyId,
   }) async {
     try {
@@ -185,6 +189,7 @@ class ChatService {
         'type': type,
         'replyToId': replyToId,
         'replyText': replyText,
+        'clientMessageId': clientMessageId,
       });
       return true;
     } on FirebaseFunctionsException catch (error) {

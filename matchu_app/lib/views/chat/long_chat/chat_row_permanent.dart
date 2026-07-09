@@ -282,6 +282,8 @@ class ChatRowPermanent extends StatelessWidget {
                               // ===== SEEN / SENT =====
                               if (status == MessageStatus.seen)
                                 SeenAvatarAnimated(userId: seenByUid, size: 14)
+                              else if (status == MessageStatus.sending)
+                                _SendingStatusText()
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
@@ -414,6 +416,8 @@ class ChatRowPermanent extends StatelessWidget {
                             children: [
                               if (status == MessageStatus.seen)
                                 SeenAvatarAnimated(userId: seenByUid, size: 14)
+                              else if (status == MessageStatus.sending)
+                                _SendingStatusText()
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
@@ -558,6 +562,8 @@ class ChatRowPermanent extends StatelessWidget {
                             children: [
                               if (status == MessageStatus.seen)
                                 SeenAvatarAnimated(userId: seenByUid, size: 14)
+                              else if (status == MessageStatus.sending)
+                                _SendingStatusText()
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
@@ -737,6 +743,8 @@ class ChatRowPermanent extends StatelessWidget {
                             children: [
                               if (status == MessageStatus.seen)
                                 SeenAvatarAnimated(userId: seenByUid, size: 14)
+                              else if (status == MessageStatus.sending)
+                                _SendingStatusText()
                               else if (status == MessageStatus.sent)
                                 Text(
                                   "Đã gửi",
@@ -840,6 +848,18 @@ class _MessengerReactionBadge extends StatelessWidget {
               ),
             );
           }).toList(),
+    );
+  }
+}
+
+class _SendingStatusText extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      "Đang gửi",
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.outline,
+      ),
     );
   }
 }

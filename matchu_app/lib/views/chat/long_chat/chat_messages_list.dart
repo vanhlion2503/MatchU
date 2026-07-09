@@ -75,7 +75,9 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
           // Sử dụng allMessages từ controller
           return Obx(() {
             final docs = widget.controller.allMessages;
+            final pendingText = widget.controller.pendingTextMessages;
             final pending = widget.controller.pendingImageMessages;
+            final pendingTextCount = pendingText.length;
             final pendingCount = pending.length;
             const bottomPadding = 10.0;
 
@@ -87,6 +89,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             // +1 cho typing slot, +1 cho loading indicator nếu đang load more
             final itemCount =
                 docs.length +
+                pendingTextCount +
                 pendingCount +
                 1 +
                 (widget.controller.isLoadingMore ? 1 : 0);
@@ -111,11 +114,19 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                   });
                 }
 
-                if (pendingCount > 0 && i <= pendingCount) {
-                  if (i - 1 < 0 || i - 1 >= pending.length) {
+                if (pendingTextCount > 0 && i <= pendingTextCount) {
+                  final pendingItem = pendingText[i - 1];
+                  return _buildPendingTextBubble(context, pendingItem);
+                }
+
+                if (pendingCount > 0 &&
+                    i > pendingTextCount &&
+                    i <= pendingTextCount + pendingCount) {
+                  final pendingIndex = i - 1 - pendingTextCount;
+                  if (pendingIndex < 0 || pendingIndex >= pending.length) {
                     return const SizedBox.shrink();
                   }
-                  final pendingItem = pending[i - 1];
+                  final pendingItem = pending[pendingIndex];
                   return _buildPendingImageBubble(context, pendingItem);
                 }
 
@@ -137,7 +148,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                 /// ================= MESSAGE =================
                 // Với reverse: true, index 0 là typing, index 1+ là messages
                 // docs[0] là tin mới nhất
-                final messageIndex = i - 1 - pendingCount;
+                final messageIndex = i - 1 - pendingTextCount - pendingCount;
 
                 // ✅ Kiểm tra bounds để tránh RangeError
                 if (messageIndex < 0 || messageIndex >= docs.length) {
@@ -411,6 +422,36 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             );
           });
         },
+      );
+    });
+  }
+
+  Widget _buildPendingTextBubble(
+    BuildContext context,
+    PendingTextMessage pending,
+  ) {
+    final bubbleKey = _bubbleKeys.putIfAbsent(pending.id, () => GlobalKey());
+
+    return Obx(() {
+      return AnimatedMessageBubble(
+        child: ChatRowPermanent(
+          key: ValueKey(pending.id),
+          messageId: pending.id,
+          senderId: widget.controller.uid,
+          text: pending.text,
+          type: "text",
+          isMe: true,
+          showAvatar: false,
+          smallMargin: false,
+          showTime: false,
+          time: "",
+          replyText: pending.replyText,
+          replyToId: pending.replyToId,
+          highlighted: false,
+          isPressed: false,
+          status: pending.status.value,
+          bubbleKey: bubbleKey,
+        ),
       );
     });
   }

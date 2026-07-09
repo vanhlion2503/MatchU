@@ -26,7 +26,6 @@ class SessionKeyService {
   static const int _activeDeviceWindowDays = 60;
   static const int _maxSessionKeyDevicesPerUser = 5;
   static const String _activeDeviceStatus = 'active';
-  static const String _inactiveDeviceStatus = 'inactive';
   static const String _revokedDeviceStatus = 'revoked';
   static const String _staleDeviceStatus = 'stale';
 
@@ -931,9 +930,11 @@ class SessionKeyService {
   }
 
   static bool _isDeviceStatusBlocked(String? status) {
-    return status == _inactiveDeviceStatus ||
-        status == _revokedDeviceStatus ||
-        status == _staleDeviceStatus;
+    // Inactive means the account signed out, not that the device key is
+    // invalid. Keep recent inactive devices eligible as fallback so first
+    // messages sent while the recipient is signed out remain decryptable when
+    // that account logs back into the same device.
+    return status == _revokedDeviceStatus || status == _staleDeviceStatus;
   }
 
   static DateTime? _readDeviceLastActiveAt(Map<String, dynamic> data) {

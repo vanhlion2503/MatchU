@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,7 +19,6 @@ import '../../services/security/message_crypto_service.dart';
 
 class LogoutService {
   static final _auth = FirebaseAuth.instance;
-  static final _storage = FlutterSecureStorage();
 
   /// 🔥 LOGOUT CHUẨN – DÙNG CHO TOÀN APP
   static Future<bool> logout() async {
@@ -171,14 +169,11 @@ class LogoutService {
         } catch (_) {}
       }
 
-      // 8️⃣ ❗ CLEAR SESSION KEYS (KHÔNG XOÁ IDENTITY KEY)
+      // 8️⃣ ❗ CLEAR SESSION KEY MEMORY CACHE (KHÔNG XOÁ IDENTITY KEY)
       try {
-        final keys = await _storage.readAll();
-        for (final k in keys.keys) {
-          if (k.startsWith("chat_") && k.contains("_session_key")) {
-            await _storage.delete(key: k);
-          }
-        }
+        // Keep room session keys in secure storage. When two participants use
+        // the same physical device, the next account can still decrypt its
+        // existing room after account switching.
         MessageCryptoService.clearSessionKeyCache();
       } catch (e) {
         // Ignore errors - continue with logout
