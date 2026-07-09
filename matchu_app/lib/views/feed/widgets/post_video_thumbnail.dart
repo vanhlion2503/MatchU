@@ -195,7 +195,7 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
               return Material(
                 color: Colors.black,
                 child: InkWell(
-                  onTap: _openFullscreen,
+                  onTap: widget.compactControls ? _togglePlay : _openFullscreen,
                   child: _wrapContent(
                     fallbackAspectRatio: aspectRatio,
                     child: Stack(
@@ -230,10 +230,7 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
                         if (!value.isPlaying)
                           Center(
                             child: InkResponse(
-                              onTap:
-                                  widget.compactControls
-                                      ? _openFullscreen
-                                      : _togglePlay,
+                              onTap: _togglePlay,
                               radius: widget.compactControls ? 30 : 40,
                               child:
                                   widget.compactControls
@@ -283,6 +280,22 @@ class _PostVideoThumbnailState extends State<PostVideoThumbnail> {
                             ),
                           ),
                         ],
+                        if (widget.compactControls)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: IgnorePointer(
+                              child: LinearProgressIndicator(
+                                value: _progressOf(value),
+                                minHeight: 2,
+                                backgroundColor: Colors.white24,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),

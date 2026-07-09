@@ -220,7 +220,7 @@ class PostMediaGallery extends StatelessWidget {
   }
 
   bool get _shouldUseMixedMediaCardScroll {
-    if (media.length != 2) return false;
+    if (media.length < 2) return false;
     return media.any((item) => item.isVideo) &&
         media.any((item) => item.isImage);
   }
@@ -279,19 +279,21 @@ class _MixedMediaCardScroll extends StatelessWidget {
             constraints.maxWidth.isFinite
                 ? constraints.maxWidth
                 : MediaQuery.sizeOf(context).width;
-        final cardHeight = (maxWidth * 0.68).clamp(184.0, 260.0).toDouble();
-        final imageCardWidth = (cardHeight * 0.76).clamp(136.0, 190.0);
-        final videoCardWidth = (maxWidth * 0.72).clamp(204.0, 280.0);
+        final cardHeight = (maxWidth * 0.94).clamp(240.0, 380.0).toDouble();
+        final imageCardWidth = (cardHeight * 0.72).clamp(150.0, 220.0);
+        final videoCardWidth = (cardHeight * 0.68).clamp(166.0, 238.0);
+        final orderedMedia = _videoFirstMedia;
 
         return SizedBox(
           height: cardHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            itemCount: media.length,
+            itemCount: orderedMedia.length,
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemBuilder: (context, index) {
-              final item = media[index];
+              final indexedItem = orderedMedia[index];
+              final item = indexedItem.media;
               final palette = FeedPalette.of(context);
               final cardWidth = item.isVideo ? videoCardWidth : imageCardWidth;
 
@@ -314,7 +316,7 @@ class _MixedMediaCardScroll extends StatelessWidget {
                                   item.url.isNotEmpty &&
                                   imageUrls.isNotEmpty
                               ? () => onOpenImageViewer(
-                                imageIndexForMediaPosition(index),
+                                imageIndexForMediaPosition(indexedItem.index),
                               )
                               : null,
                     ),
@@ -327,6 +329,25 @@ class _MixedMediaCardScroll extends StatelessWidget {
       },
     );
   }
+
+  List<_IndexedMedia> get _videoFirstMedia {
+    final indexedMedia = [
+      for (var index = 0; index < media.length; index++)
+        _IndexedMedia(index: index, media: media[index]),
+    ];
+
+    return [
+      ...indexedMedia.where((item) => item.media.isVideo),
+      ...indexedMedia.where((item) => !item.media.isVideo),
+    ];
+  }
+}
+
+class _IndexedMedia {
+  const _IndexedMedia({required this.index, required this.media});
+
+  final int index;
+  final MediaModel media;
 }
 
 class _MediaTile extends StatelessWidget {
