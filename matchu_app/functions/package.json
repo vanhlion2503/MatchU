@@ -6,7 +6,11 @@
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "seed:feed": "node scripts/feed-seed/index.js",
+    "seed:feed:dry-run": "node scripts/feed-seed/index.js --dry-run",
+    "seed:feed:delete": "node scripts/feed-seed/index.js --delete-batch",
+    "test:feed-seed": "node --test test/feed-seed.test.js"
   },
   "engines": {
     "node": "22"
