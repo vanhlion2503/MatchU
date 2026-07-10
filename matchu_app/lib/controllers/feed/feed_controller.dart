@@ -9,6 +9,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
+import 'package:matchu_app/services/feed/recommendation_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 
 enum FeedStatus { initial, loading, success, empty, error }
@@ -19,12 +20,6 @@ class FeedController extends GetxController {
   static const int _pageSize = 10;
   static const double _loadMoreThreshold = 640;
   static const String _hiddenPostsStorageKeyPrefix = 'feed_hidden_posts_';
-  static const int _featuredCandidateBatchSize = 24;
-  static const int _featuredScanPassesPerRequest = 4;
-  static const int _featuredShufflePoolMinSize = 15;
-  static const int _featuredShufflePoolMaxSize = 20;
-  static const double _featuredShuffleSwapChance = 0.42;
-  static const int _featuredShuffleMaxJump = 3;
   static const int _followingCandidateBatchSize = 24;
   static const int _followingScanPassesPerRequest = 6;
   static const Duration _postRemovalAnimationDuration = Duration(
@@ -32,6 +27,7 @@ class FeedController extends GetxController {
   );
 
   final PostService _service = PostService();
+  final RecommendationService _recommendationService = RecommendationService();
   final PostRestrictionService _restrictionService = PostRestrictionService();
   final GetStorage _storage = GetStorage();
 
@@ -88,9 +84,7 @@ class FeedController extends GetxController {
   final List<PostModel> _featuredBufferedPosts = <PostModel>[];
   final List<PostModel> _followingBufferedPosts = <PostModel>[];
   Set<String> _followingAuthorIds = <String>{};
-  bool _featuredSourceHasMore = true;
   bool _followingSourceHasMore = true;
-  int _featuredRefreshNonce = 0;
 
   String get currentUserId => _service.uid;
   Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
@@ -813,8 +807,6 @@ class FeedController extends GetxController {
       featuredErrorMessage.value = null;
       _featuredLastDocument = null;
       _featuredBufferedPosts.clear();
-      _featuredSourceHasMore = true;
-      _featuredRefreshNonce++;
       featuredHasMore.value = true;
     } else {
       if (featuredIsLoadingMore.value || !featuredHasMore.value) return;
@@ -826,59 +818,13 @@ class FeedController extends GetxController {
         await _loadRestrictedAuthorIds();
       }
 
-      final loadedPosts = <PostModel>[];
-      var cursor = reset ? null : _featuredLastDocument;
-      var sourceHasMore = reset ? true : _featuredSourceHasMore;
-      var scanPass = 0;
-      final existingIds = <String>{
-        if (!reset) ...featuredPosts.map((post) => post.postId.trim()),
-      };
-
-      if (!reset) {
-        loadedPosts.addAll(
-          await _takeBufferedPosts(
-            _featuredBufferedPosts,
-            limit: _pageSize,
-            excludedIds: existingIds,
-          ),
-        );
-      }
-
-      while (loadedPosts.length < _pageSize &&
-          sourceHasMore &&
-          scanPass < _featuredScanPassesPerRequest) {
-        final page = await _service.fetchLatestPosts(
-          startAfter: cursor,
-          limit: _featuredCandidateBatchSize,
-        );
-        cursor = page.lastDocument;
-        sourceHasMore = page.hasMore;
-
-        final hydratedBatch = await _hydrateFeedPosts(page.posts, reset: false);
-        final rankedBatch = _rankFeaturedCandidates(
-          hydratedBatch,
-          excludedIds: <String>{
-            ...existingIds,
-            ...loadedPosts.map((post) => post.postId),
-          },
-        );
-
-        final remaining = _pageSize - loadedPosts.length;
-        if (remaining > 0 && rankedBatch.isNotEmpty) {
-          final visiblePosts = rankedBatch
-              .take(remaining)
-              .toList(growable: false);
-          loadedPosts.addAll(visiblePosts);
-          existingIds.addAll(visiblePosts.map((post) => post.postId.trim()));
-
-          final bufferedPosts = rankedBatch
-              .skip(remaining)
-              .where((post) => post.postId.trim().isNotEmpty)
-              .toList(growable: false);
-          _featuredBufferedPosts.addAll(bufferedPosts);
-        }
-        scanPass++;
-      }
+      final page = await _recommendationService.getRecommendedPosts(
+        userId: currentUserId,
+        limit: _pageSize,
+        lastDocument: reset ? null : _featuredLastDocument,
+        forceRefresh: reset && isManualRefresh,
+      );
+      final loadedPosts = await _hydrateFeedPosts(page.posts, reset: reset);
 
       if (reset) {
         featuredPosts.assignAll(loadedPosts);
@@ -888,10 +834,8 @@ class FeedController extends GetxController {
         );
       }
 
-      _featuredLastDocument = cursor;
-      _featuredSourceHasMore = sourceHasMore;
-      featuredHasMore.value =
-          _featuredBufferedPosts.isNotEmpty || _featuredSourceHasMore;
+      _featuredLastDocument = page.lastDocument;
+      featuredHasMore.value = page.hasMore;
 
       if (featuredPosts.isEmpty) {
         featuredStatus.value = FeedStatus.empty;
@@ -1365,134 +1309,6 @@ class FeedController extends GetxController {
           );
         })
         .toList(growable: false);
-  }
-
-  List<PostModel> _rankFeaturedCandidates(
-    List<PostModel> candidates, {
-    required Set<String> excludedIds,
-  }) {
-    if (candidates.isEmpty) return const <PostModel>[];
-
-    final unique = <String, PostModel>{};
-    for (final post in candidates) {
-      final postId = post.postId.trim();
-      if (postId.isEmpty || excludedIds.contains(postId)) continue;
-      unique[postId] = post;
-    }
-
-    final now = DateTime.now();
-    final seed = Object.hash(currentUserId.trim(), _featuredRefreshNonce);
-    final ranked = unique.values.toList(growable: false);
-
-    ranked.sort((a, b) {
-      final bScore = _featuredScore(b, now: now, seed: seed);
-      final aScore = _featuredScore(a, now: now, seed: seed);
-      final scoreCompare = bScore.compareTo(aScore);
-      if (scoreCompare != 0) return scoreCompare;
-
-      final aCreatedAt = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bCreatedAt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      return bCreatedAt.compareTo(aCreatedAt);
-    });
-
-    final shufflePoolSize = _selectFeaturedShufflePoolSize(
-      candidateCount: ranked.length,
-      seed: seed,
-    );
-    if (shufflePoolSize <= 1) {
-      return ranked;
-    }
-
-    final topPool = ranked.take(shufflePoolSize).toList(growable: false);
-    final lightlyShuffledTopPool = _lightlyShuffleFeaturedPool(
-      topPool,
-      seed: Object.hash(seed, ranked.length),
-    );
-
-    if (shufflePoolSize >= ranked.length) {
-      return lightlyShuffledTopPool;
-    }
-
-    return <PostModel>[
-      ...lightlyShuffledTopPool,
-      ...ranked.skip(shufflePoolSize),
-    ];
-  }
-
-  int _selectFeaturedShufflePoolSize({
-    required int candidateCount,
-    required int seed,
-  }) {
-    if (candidateCount <= _featuredShufflePoolMinSize) {
-      return candidateCount;
-    }
-
-    final maxPoolSize = math.min(_featuredShufflePoolMaxSize, candidateCount);
-    final minPoolSize = math.min(_featuredShufflePoolMinSize, maxPoolSize);
-    if (minPoolSize >= maxPoolSize) {
-      return minPoolSize;
-    }
-
-    final range = (maxPoolSize - minPoolSize) + 1;
-    final offset = (seed & 0x7fffffff) % range;
-    return minPoolSize + offset;
-  }
-
-  List<PostModel> _lightlyShuffleFeaturedPool(
-    List<PostModel> rankedPool, {
-    required int seed,
-  }) {
-    if (rankedPool.length <= 1) return rankedPool;
-
-    final shuffled = rankedPool.toList(growable: false);
-    final random = math.Random(seed & 0x7fffffff);
-
-    for (var index = 0; index < shuffled.length - 1; index++) {
-      if (random.nextDouble() > _featuredShuffleSwapChance) {
-        continue;
-      }
-
-      final maxJump = math.min(
-        _featuredShuffleMaxJump,
-        (shuffled.length - 1) - index,
-      );
-      if (maxJump <= 0) {
-        continue;
-      }
-
-      final swapIndex = index + random.nextInt(maxJump) + 1;
-      final current = shuffled[index];
-      shuffled[index] = shuffled[swapIndex];
-      shuffled[swapIndex] = current;
-    }
-
-    return shuffled;
-  }
-
-  double _featuredScore(
-    PostModel post, {
-    required DateTime now,
-    required int seed,
-  }) {
-    final createdAt = post.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-    final ageInHours = now.difference(createdAt).inMinutes / 60;
-    final clampedAgeInHours = ageInHours.isNegative ? 0 : ageInHours;
-    final freshnessScore = 1 / (1 + (clampedAgeInHours / 24));
-
-    final engagementScore =
-        post.stats.likeCount * 1.0 +
-        post.stats.commentCount * 2.2 +
-        post.stats.shareCount * 3.0;
-    final trendScore = post.trendScore + (post.trendBucket * 0.75);
-    final jitter = _deterministicJitter(post.postId, seed) * 1.15;
-
-    return (freshnessScore * 9.5) + engagementScore + trendScore + jitter;
-  }
-
-  double _deterministicJitter(String postId, int seed) {
-    final hash = Object.hash(seed, postId.trim());
-    final normalized = (hash & 0x7fffffff) % 10000;
-    return normalized / 10000;
   }
 
   List<PostModel> _mergePosts(

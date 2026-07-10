@@ -13,6 +13,10 @@ class UserModel {
   final String bio;
   final String avatarUrl;
   final DateTime? avatarUpdatedAt;
+  final List<double> interestVector;
+  final double interestWeight;
+  final double effectiveCount;
+  final DateTime? interestUpdatedAt;
 
   final List<String> interests; // Sở thích
 
@@ -66,6 +70,10 @@ class UserModel {
     this.bio = "",
     this.avatarUrl = "",
     this.avatarUpdatedAt,
+    this.interestVector = const [],
+    this.interestWeight = 0,
+    this.effectiveCount = 0,
+    this.interestUpdatedAt,
 
     this.interests = const [],
 
@@ -123,6 +131,10 @@ class UserModel {
       "bio": bio,
       "avatarUrl": avatarUrl,
       "avatarUpdatedAt": avatarUpdatedAt?.toIso8601String(),
+      "interestVector": interestVector,
+      "interestWeight": interestWeight,
+      "effectiveCount": effectiveCount,
+      "interestUpdatedAt": interestUpdatedAt?.toIso8601String(),
 
       "interests": interests,
 
@@ -200,6 +212,10 @@ class UserModel {
       bio: json["bio"] ?? "",
       avatarUrl: json["avatarUrl"] ?? "",
       avatarUpdatedAt: parseDate(json["avatarUpdatedAt"]),
+      interestVector: _parseDoubleList(json["interestVector"]),
+      interestWeight: _parseDouble(json["interestWeight"]),
+      effectiveCount: _parseDouble(json["effectiveCount"]),
+      interestUpdatedAt: parseDate(json["interestUpdatedAt"]),
 
       interests: List<String>.from(json["interests"] ?? []),
 
@@ -263,6 +279,10 @@ class UserModel {
     String? bio,
     String? avatarUrl,
     DateTime? avatarUpdatedAt,
+    List<double>? interestVector,
+    double? interestWeight,
+    double? effectiveCount,
+    DateTime? interestUpdatedAt,
 
     List<String>? interests,
 
@@ -316,6 +336,10 @@ class UserModel {
       bio: bio ?? this.bio,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       avatarUpdatedAt: avatarUpdatedAt ?? this.avatarUpdatedAt,
+      interestVector: interestVector ?? this.interestVector,
+      interestWeight: interestWeight ?? this.interestWeight,
+      effectiveCount: effectiveCount ?? this.effectiveCount,
+      interestUpdatedAt: interestUpdatedAt ?? this.interestUpdatedAt,
 
       interests: interests ?? this.interests,
 
@@ -358,5 +382,19 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return 0;
+  }
+
+  static List<double> _parseDoubleList(dynamic value) {
+    if (value is! List) return const <double>[];
+    return value
+        .whereType<num>()
+        .map((item) => item.toDouble())
+        .toList(growable: false);
   }
 }

@@ -586,7 +586,7 @@ class PostService {
     required PostModel sourcePost,
     PostVisibility? visibility,
     bool? isPublic,
-  }) {
+  }) async {
     final resolvedVisibility = _resolveVisibility(
       visibility: visibility,
       isPublic: isPublic,

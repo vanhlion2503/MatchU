@@ -188,6 +188,7 @@ class PostReferenceModel {
     required this.content,
     required this.media,
     required this.tags,
+    this.contentVector = const <double>[],
     required this.author,
     PostVisibility? visibility,
     bool? isPublic,
@@ -203,6 +204,7 @@ class PostReferenceModel {
   final String content;
   final List<MediaModel> media;
   final List<String> tags;
+  final List<double> contentVector;
   final PostVisibility visibility;
   final PostAuthorModel author;
   final DateTime? createdAt;
@@ -223,6 +225,7 @@ class PostReferenceModel {
       content: post.content,
       media: post.media,
       tags: post.tags,
+      contentVector: post.contentVector,
       visibility: post.visibility,
       author: post.author,
       createdAt: post.createdAt,
@@ -269,6 +272,7 @@ class PostReferenceModel {
           .map((tag) => tag.toString().trim())
           .where((tag) => tag.isNotEmpty)
           .toList(growable: false),
+      contentVector: _parseDoubleList(json['contentVector']),
       visibility: PostVisibility.fromFirestoreValue(
         json['visibility'],
         legacyIsPublic: json['isPublic'],
@@ -287,6 +291,7 @@ class PostReferenceModel {
       'content': content,
       'media': media.map((item) => item.toJson()).toList(growable: false),
       'tags': tags,
+      'contentVector': contentVector,
       'visibility': visibility.firestoreValue,
       'isPublic': isPublic,
       'author': author.toJson(),
@@ -302,6 +307,7 @@ class PostReferenceModel {
     String? content,
     List<MediaModel>? media,
     List<String>? tags,
+    List<double>? contentVector,
     PostVisibility? visibility,
     bool? isPublic,
     PostAuthorModel? author,
@@ -315,6 +321,7 @@ class PostReferenceModel {
       content: content ?? this.content,
       media: media ?? this.media,
       tags: tags ?? this.tags,
+      contentVector: contentVector ?? this.contentVector,
       visibility:
           visibility ??
           (isPublic == null
@@ -340,6 +347,14 @@ class PostReferenceModel {
     }
     return null;
   }
+
+  static List<double> _parseDoubleList(dynamic value) {
+    if (value is! List) return const <double>[];
+    return value
+        .whereType<num>()
+        .map((item) => item.toDouble())
+        .toList(growable: false);
+  }
 }
 
 class PostModel {
@@ -350,6 +365,7 @@ class PostModel {
     required this.content,
     required this.media,
     required this.tags,
+    this.contentVector = const <double>[],
     required this.stats,
     required this.trendScore,
     required this.trendBucket,
@@ -385,6 +401,7 @@ class PostModel {
   final String content;
   final List<MediaModel> media;
   final List<String> tags;
+  final List<double> contentVector;
   final PostVisibility visibility;
   final PostVisibility? requestedVisibility;
   final PostModerationStatus moderationStatus;
@@ -462,6 +479,7 @@ class PostModel {
           .map((tag) => tag.toString().trim())
           .where((tag) => tag.isNotEmpty)
           .toList(growable: false),
+      contentVector: _parseDoubleList(json['contentVector']),
       visibility: PostVisibility.fromFirestoreValue(
         json['visibility'],
         legacyIsPublic: json['isPublic'],
@@ -499,6 +517,7 @@ class PostModel {
       'content': content,
       'media': media.map((item) => item.toJson()).toList(growable: false),
       'tags': tags,
+      'contentVector': contentVector,
       'visibility': visibility.firestoreValue,
       'isPublic': isPublic,
       'requestedVisibility': requestedVisibility?.firestoreValue,
@@ -527,6 +546,7 @@ class PostModel {
     String? content,
     List<MediaModel>? media,
     List<String>? tags,
+    List<double>? contentVector,
     PostVisibility? visibility,
     bool? isPublic,
     PostVisibility? requestedVisibility,
@@ -559,6 +579,7 @@ class PostModel {
       content: content ?? this.content,
       media: media ?? this.media,
       tags: tags ?? this.tags,
+      contentVector: contentVector ?? this.contentVector,
       visibility:
           visibility ??
           (isPublic == null
@@ -602,6 +623,14 @@ class PostModel {
     if (value is double) return value;
     if (value is num) return value.toDouble();
     return 0;
+  }
+
+  static List<double> _parseDoubleList(dynamic value) {
+    if (value is! List) return const <double>[];
+    return value
+        .whereType<num>()
+        .map((item) => item.toDouble())
+        .toList(growable: false);
   }
 
   static int _parseInt(dynamic value) {

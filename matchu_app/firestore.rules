@@ -248,6 +248,16 @@ service cloud.firestore {
         ]);
       }
 
+      function touchesServerManagedRecommendationFields() {
+        return request.resource.data.diff(resource.data).changedKeys().hasAny([
+          "interestVector",
+          "interestWeight",
+          "effectiveCount",
+          "interestUpdatedAt",
+          "recommendationCacheInvalidatedAt"
+        ]);
+      }
+
       function isValidReputationCreateDefaults() {
         return (
           !("reputation" in request.resource.data)
@@ -311,7 +321,8 @@ service cloud.firestore {
       function isOwnerSafeUpdate() {
         return isOwner()
           && !touchesServerManagedReputationFields()
-          && !touchesServerManagedFaceVerificationFields();
+          && !touchesServerManagedFaceVerificationFields()
+          && !touchesServerManagedRecommendationFields();
       }
 
       allow read: if isSignedIn();

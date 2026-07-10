@@ -15,6 +15,9 @@ const {
   moderateImageContent,
 } = require("./src/callables/imageModeration");
 const {
+  recommendPosts,
+} = require("./src/callables/recommendPosts");
+const {
   storeFaceRecoveryBackup,
   getFaceRecoveryBackupStatus,
   recoverBackupKeyWithFace,
@@ -52,6 +55,16 @@ const {
   moderateUploadedPostVideo,
 } = require("./src/triggers/videoModeration");
 const {
+  backfillRecentPostEmbeddings,
+  embedPostContent,
+  invalidateRecommendationCacheOnBlock,
+  invalidateRecommendationCacheOnRestrictions,
+  rebuildStaleInterestVectors,
+  updateInterestOnPostComment,
+  updateInterestOnPostLike,
+  updateInterestOnQuoteOrRepost,
+} = require("./src/triggers/recommendationEvents");
+const {
   ensureTempChatModerationFields,
   ensureUserReputationDefault,
   moderateTempChatMessage,
@@ -73,6 +86,7 @@ exports.publishWrappedRoomKeys = publishWrappedRoomKeys;
 exports.moderatePostText = moderatePostText;
 exports.moderateCommentText = moderateCommentText;
 exports.moderateImageContent = moderateImageContent;
+exports.recommendPosts = recommendPosts;
 exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
 exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;
 exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;
@@ -93,6 +107,16 @@ exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;
 exports.validateWordChainDictionary = validateWordChainDictionary;
 exports.moderateUploadedPostVideo = moderateUploadedPostVideo;
+exports.embedPostContent = embedPostContent;
+exports.backfillRecentPostEmbeddings = backfillRecentPostEmbeddings;
+exports.updateInterestOnPostLike = updateInterestOnPostLike;
+exports.updateInterestOnPostComment = updateInterestOnPostComment;
+exports.updateInterestOnQuoteOrRepost = updateInterestOnQuoteOrRepost;
+exports.rebuildStaleInterestVectors = rebuildStaleInterestVectors;
+exports.invalidateRecommendationCacheOnRestrictions =
+  invalidateRecommendationCacheOnRestrictions;
+exports.invalidateRecommendationCacheOnBlock =
+  invalidateRecommendationCacheOnBlock;
 exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
 exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;
