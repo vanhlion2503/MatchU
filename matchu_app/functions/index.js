@@ -57,11 +57,17 @@ const {
 const {
   backfillRecentPostEmbeddings,
   embedPostContent,
+  invalidateRecommendationCacheOnBlockedBy,
   invalidateRecommendationCacheOnBlock,
+  invalidateRecommendationCacheOnHiddenPost,
   invalidateRecommendationCacheOnRestrictions,
+  removeInterestOnPostCommentDelete,
+  removeInterestOnPostUnlike,
+  removeInterestOnPostUnsave,
   rebuildStaleInterestVectors,
   updateInterestOnPostComment,
   updateInterestOnPostLike,
+  updateInterestOnPostSave,
   updateInterestOnQuoteOrRepost,
 } = require("./src/triggers/recommendationEvents");
 const {
@@ -110,13 +116,21 @@ exports.moderateUploadedPostVideo = moderateUploadedPostVideo;
 exports.embedPostContent = embedPostContent;
 exports.backfillRecentPostEmbeddings = backfillRecentPostEmbeddings;
 exports.updateInterestOnPostLike = updateInterestOnPostLike;
+exports.removeInterestOnPostUnlike = removeInterestOnPostUnlike;
 exports.updateInterestOnPostComment = updateInterestOnPostComment;
+exports.removeInterestOnPostCommentDelete = removeInterestOnPostCommentDelete;
+exports.updateInterestOnPostSave = updateInterestOnPostSave;
+exports.removeInterestOnPostUnsave = removeInterestOnPostUnsave;
 exports.updateInterestOnQuoteOrRepost = updateInterestOnQuoteOrRepost;
 exports.rebuildStaleInterestVectors = rebuildStaleInterestVectors;
 exports.invalidateRecommendationCacheOnRestrictions =
   invalidateRecommendationCacheOnRestrictions;
 exports.invalidateRecommendationCacheOnBlock =
   invalidateRecommendationCacheOnBlock;
+exports.invalidateRecommendationCacheOnHiddenPost =
+  invalidateRecommendationCacheOnHiddenPost;
+exports.invalidateRecommendationCacheOnBlockedBy =
+  invalidateRecommendationCacheOnBlockedBy;
 exports.ensureTempChatModerationFields = ensureTempChatModerationFields;
 exports.ensureUserReputationDefault = ensureUserReputationDefault;
 exports.ensureUserReputationDailyDefaults = ensureUserReputationDailyDefaults;

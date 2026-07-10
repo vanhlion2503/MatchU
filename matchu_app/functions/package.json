@@ -10,7 +10,8 @@
     "seed:feed": "node scripts/feed-seed/index.js",
     "seed:feed:dry-run": "node scripts/feed-seed/index.js --dry-run",
     "seed:feed:delete": "node scripts/feed-seed/index.js --delete-batch",
-    "test:feed-seed": "node --test test/feed-seed.test.js"
+    "test:feed-seed": "node --test test/feed-seed.test.js",
+    "test:recommendation": "node --test test/recommendation-core.test.js"
   },
   "engines": {
     "node": "22"

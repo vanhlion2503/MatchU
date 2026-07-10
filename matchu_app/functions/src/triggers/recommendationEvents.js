@@ -1,26 +1,33 @@
 const {
   onDocumentCreated,
+  onDocumentDeleted,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 
 const { admin, db } = require("../shared/firebase");
 const {
+  deactivateRecommendationInteraction,
   ensurePostEmbedding,
   invalidateRecommendationCache,
   isEligiblePost,
+  isPostEmbeddingCurrent,
   rebuildUserInterestVector,
   recordRecommendationInteraction,
   toSafeUid,
 } = require("../recommendation/core");
-const { EMBEDDING_MODEL } = require("../recommendation/embedding");
-
 const REBUILD_BATCH_SIZE = 80;
 const REBUILD_STALE_DAYS = 3;
 const EMBEDDING_BACKFILL_BATCH_SIZE = 80;
+const EMBEDDING_BACKFILL_SCAN_SIZE = 240;
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function eventVersionMillis(event) {
+  const parsed = Date.parse(event?.time || "");
+  return Number.isFinite(parsed) ? parsed : Date.now();
 }
 
 function postContentSignature(data) {
@@ -48,14 +55,9 @@ const embedPostContent = onDocumentWritten(
 
     const beforeSignature = postContentSignature(before);
     const afterSignature = postContentSignature(after);
-    const existingVector = Array.isArray(after.contentVector)
-      ? after.contentVector
-      : [];
-    const modelMatches = after.contentEmbeddingModel === EMBEDDING_MODEL;
     if (
       beforeSignature === afterSignature &&
-      existingVector.length > 0 &&
-      modelMatches
+      isPostEmbeddingCurrent(after)
     ) {
       return;
     }
@@ -88,6 +90,27 @@ const updateInterestOnPostLike = onDocumentCreated(
       action: "like",
       eventId: `like_${postId}_${uid}`,
       occurredAt: event.data?.data()?.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  }
+);
+
+const removeInterestOnPostUnlike = onDocumentDeleted(
+  {
+    document: "posts/{postId}/likes/{userId}",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+  },
+  async (event) => {
+    const postId = cleanId(event.params.postId);
+    const uid = toSafeUid(event.data?.data()?.userId) || toSafeUid(event.params.userId);
+    if (!postId || !uid) return;
+    await deactivateRecommendationInteraction({
+      uid,
+      postId,
+      action: "like",
+      eventId: `like_${postId}_${uid}`,
+      eventVersionMillis: eventVersionMillis(event),
     });
   }
 );
@@ -110,11 +133,74 @@ const updateInterestOnPostComment = onDocumentCreated(
       action: "comment",
       eventId: `comment_${postId}_${commentId}`,
       occurredAt: event.data?.data()?.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+      eventVersionMillis: eventVersionMillis(event),
     });
   }
 );
 
-const updateInterestOnQuoteOrRepost = onDocumentCreated(
+const removeInterestOnPostCommentDelete = onDocumentDeleted(
+  {
+    document: "posts/{postId}/comments/{commentId}",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+  },
+  async (event) => {
+    const postId = cleanId(event.params.postId);
+    const commentId = cleanId(event.params.commentId);
+    const uid = toSafeUid(event.data?.data()?.userId);
+    if (!postId || !commentId || !uid) return;
+    await deactivateRecommendationInteraction({
+      uid,
+      postId,
+      action: "comment",
+      eventId: `comment_${postId}_${commentId}`,
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  }
+);
+
+const updateInterestOnPostSave = onDocumentCreated(
+  {
+    document: "users/{userId}/savedPosts/{postId}",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+  },
+  async (event) => {
+    const uid = toSafeUid(event.params.userId);
+    const postId = cleanId(event.params.postId);
+    if (!uid || !postId) return;
+    await recordRecommendationInteraction({
+      uid,
+      postId,
+      action: "save",
+      eventId: `save_${postId}_${uid}`,
+      occurredAt: event.data?.data()?.savedAt || admin.firestore.FieldValue.serverTimestamp(),
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  }
+);
+
+const removeInterestOnPostUnsave = onDocumentDeleted(
+  {
+    document: "users/{userId}/savedPosts/{postId}",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+  },
+  async (event) => {
+    const uid = toSafeUid(event.params.userId);
+    const postId = cleanId(event.params.postId);
+    if (!uid || !postId) return;
+    await deactivateRecommendationInteraction({
+      uid,
+      postId,
+      action: "save",
+      eventId: `save_${postId}_${uid}`,
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  }
+);
+
+const updateInterestOnQuoteOrRepost = onDocumentWritten(
   {
     document: "posts/{postId}",
     timeoutSeconds: 120,
@@ -122,7 +208,9 @@ const updateInterestOnQuoteOrRepost = onDocumentCreated(
   },
   async (event) => {
     const postId = cleanId(event.params.postId);
-    const post = event.data?.data() || {};
+    const before = event.data?.before?.exists ? event.data.before.data() || {} : {};
+    const after = event.data?.after?.exists ? event.data.after.data() || {} : {};
+    const post = event.data?.after?.exists ? after : before;
     const uid = toSafeUid(post.authorId);
     const postType = typeof post.postType === "string" ? post.postType : "";
     const referencePostId =
@@ -131,13 +219,29 @@ const updateInterestOnQuoteOrRepost = onDocumentCreated(
     if (!postId || !uid || !referencePostId) return;
     if (postType !== "quote" && postType !== "repost") return;
 
-    await recordRecommendationInteraction({
+    const wasActive = event.data?.before?.exists &&
+      !before.deletedAt &&
+      (before.postType === "quote" || before.postType === "repost");
+    const isActive = event.data?.after?.exists &&
+      !after.deletedAt &&
+      (after.postType === "quote" || after.postType === "repost");
+    if (wasActive === isActive) return;
+
+    const interaction = {
       uid,
       postId: referencePostId,
       action: "share",
       eventId: `${postType}_${postId}_${referencePostId}`,
-      occurredAt: post.createdAt || admin.firestore.FieldValue.serverTimestamp(),
-    });
+      eventVersionMillis: eventVersionMillis(event),
+    };
+    if (isActive) {
+      await recordRecommendationInteraction({
+        ...interaction,
+        occurredAt: post.createdAt || admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      await deactivateRecommendationInteraction(interaction);
+    }
   }
 );
 
@@ -191,16 +295,14 @@ const backfillRecentPostEmbeddings = onSchedule(
       .where("visibility", "==", "public")
       .where("moderationStatus", "==", "approved")
       .orderBy("createdAt", "desc")
-      .limit(EMBEDDING_BACKFILL_BATCH_SIZE)
+      .limit(EMBEDDING_BACKFILL_SCAN_SIZE)
       .get();
 
     let embeddedCount = 0;
     for (const doc of snapshot.docs) {
       const post = doc.data() || {};
-      const hasVector =
-        Array.isArray(post.contentVector) && post.contentVector.length > 0;
-      const modelMatches = post.contentEmbeddingModel === EMBEDDING_MODEL;
-      if (hasVector && modelMatches) continue;
+      if (isPostEmbeddingCurrent(post)) continue;
+      if (embeddedCount >= EMBEDDING_BACKFILL_BATCH_SIZE) break;
 
       try {
         await ensurePostEmbedding(doc.id, post);
@@ -234,13 +336,33 @@ const invalidateRecommendationCacheOnBlock = onDocumentWritten(
   }
 );
 
+const invalidateRecommendationCacheOnHiddenPost = onDocumentWritten(
+  "users/{userId}/hiddenPosts/{postId}",
+  async (event) => {
+    await invalidateRecommendationCache(event.params.userId, "hidden_post");
+  }
+);
+
+const invalidateRecommendationCacheOnBlockedBy = onDocumentWritten(
+  "users/{userId}/blockedBy/{blockerId}",
+  async (event) => {
+    await invalidateRecommendationCache(event.params.userId, "blocked_by");
+  }
+);
+
 module.exports = {
   backfillRecentPostEmbeddings,
   embedPostContent,
+  invalidateRecommendationCacheOnBlockedBy,
   invalidateRecommendationCacheOnBlock,
+  invalidateRecommendationCacheOnHiddenPost,
   invalidateRecommendationCacheOnRestrictions,
+  removeInterestOnPostCommentDelete,
+  removeInterestOnPostUnlike,
+  removeInterestOnPostUnsave,
   rebuildStaleInterestVectors,
   updateInterestOnPostComment,
   updateInterestOnPostLike,
+  updateInterestOnPostSave,
   updateInterestOnQuoteOrRepost,
 };

@@ -71,7 +71,8 @@ class RecommendationService {
           .map((item) => item.toString().trim())
           .where((item) => item.isNotEmpty)
           .toList(growable: false);
-      final posts = await _fetchPostsByIds(postIds);
+      final fetched = await _fetchPostsByIds(postIds);
+      final posts = fetched.posts;
       _lastLoadedServerPage = page;
       stopwatch.stop();
       return PaginatedRecommendations(
@@ -80,7 +81,9 @@ class RecommendationService {
         page: page,
         hasMore: data['hasMore'] == true,
         lastDocument:
-            posts.isEmpty ? lastDocument : await _snapshotFor(posts.last),
+            posts.isEmpty
+                ? lastDocument
+                : fetched.snapshotsByPostId[posts.last.postId],
         scoresByPostId: _parseScores(data['scoresByPostId']),
         metadata: Map<String, dynamic>.from(
           data['metadata'] as Map<dynamic, dynamic>? ?? const {},
@@ -89,55 +92,69 @@ class RecommendationService {
     } catch (error) {
       debugPrint('RecommendationService.getRecommendedPosts failed: $error');
       stopwatch.stop();
-      return PaginatedRecommendations(
+      rethrow;
+    }
+  }
+
+  Future<
+    ({
+      List<PostModel> posts,
+      Map<String, DocumentSnapshot<Map<String, dynamic>>> snapshotsByPostId,
+    })
+  >
+  _fetchPostsByIds(List<String> postIds) async {
+    if (postIds.isEmpty) {
+      return (
         posts: const <PostModel>[],
-        limit: limit,
-        page: lastDocument == null ? 1 : _lastLoadedServerPage,
-        hasMore: false,
-        metadata: {
-          'totalRecommended': 0,
-          'contentBasedCount': 0,
-          'trendingCount': 0,
-          'followingCount': 0,
-          'processingTimeMs': stopwatch.elapsedMilliseconds,
-          'ratio': 'error',
-        },
+        snapshotsByPostId:
+            const <String, DocumentSnapshot<Map<String, dynamic>>>{},
       );
     }
-  }
-
-  Future<List<PostModel>> _fetchPostsByIds(List<String> postIds) async {
-    if (postIds.isEmpty) return const <PostModel>[];
-
-    final entries = await Future.wait(
-      postIds.map((postId) async {
-        final snap = await _postsRef.doc(postId).get();
-        if (!snap.exists) return null;
-        final post = PostModel.fromDoc(snap);
-        if (!_isEligiblePost(post)) return null;
-        return MapEntry(postId, post);
-      }),
-    );
 
     final byPostId = <String, PostModel>{};
-    for (final entry in entries) {
-      if (entry == null) continue;
-      byPostId[entry.key] = entry.value;
+    final snapshotsByPostId =
+        <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    for (var offset = 0; offset < postIds.length; offset += 30) {
+      final end = offset + 30 < postIds.length ? offset + 30 : postIds.length;
+      final ids = postIds.sublist(offset, end);
+      try {
+        final snapshot =
+            await _postsRef.where(FieldPath.documentId, whereIn: ids).get();
+        for (final doc in snapshot.docs) {
+          final post = PostModel.fromDoc(doc);
+          if (!_isEligiblePost(post)) continue;
+          byPostId[post.postId] = post;
+          snapshotsByPostId[post.postId] = doc;
+        }
+      } on FirebaseException {
+        final fallbackDocs = await Future.wait(
+          ids.map((postId) async {
+            try {
+              return await _postsRef.doc(postId).get();
+            } on FirebaseException {
+              return null;
+            }
+          }),
+        );
+        for (final doc
+            in fallbackDocs
+                .whereType<DocumentSnapshot<Map<String, dynamic>>>()) {
+          if (!doc.exists) continue;
+          final post = PostModel.fromDoc(doc);
+          if (!_isEligiblePost(post)) continue;
+          byPostId[post.postId] = post;
+          snapshotsByPostId[post.postId] = doc;
+        }
+      }
     }
 
-    return postIds
-        .map((postId) => byPostId[postId])
-        .whereType<PostModel>()
-        .toList(growable: false);
-  }
-
-  Future<DocumentSnapshot<Map<String, dynamic>>?> _snapshotFor(
-    PostModel post,
-  ) async {
-    final postId = post.postId.trim();
-    if (postId.isEmpty) return null;
-    final snap = await _postsRef.doc(postId).get();
-    return snap.exists ? snap : null;
+    return (
+      posts: postIds
+          .map((postId) => byPostId[postId])
+          .whereType<PostModel>()
+          .toList(growable: false),
+      snapshotsByPostId: snapshotsByPostId,
+    );
   }
 
   Map<String, RecommendationScore> _parseScores(dynamic rawScores) {

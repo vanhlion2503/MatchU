@@ -33,6 +33,10 @@ class PostRestrictionService {
         .collection('blockedUsers');
   }
 
+  CollectionReference<Map<String, dynamic>> _hiddenPostsRef(String userId) {
+    return _firestore.collection('users').doc(userId).collection('hiddenPosts');
+  }
+
   CollectionReference<Map<String, dynamic>> _blockedByRef(String userId) {
     return _firestore.collection('users').doc(userId).collection('blockedBy');
   }
@@ -207,6 +211,59 @@ class PostRestrictionService {
         .map((doc) => (doc.data()['authorId'] ?? doc.id).toString().trim())
         .where((authorId) => authorId.isNotEmpty)
         .toSet();
+  }
+
+  Future<Set<String>> fetchHiddenPostIds() async {
+    final currentUid = uid;
+    if (currentUid.isEmpty) return const <String>{};
+
+    final snapshot = await _hiddenPostsRef(currentUid).get();
+    return snapshot.docs
+        .map((doc) => (doc.data()['postId'] ?? doc.id).toString().trim())
+        .where((postId) => postId.isNotEmpty)
+        .toSet();
+  }
+
+  Future<void> hidePost(PostModel post) async {
+    final currentUid = uid;
+    final postId = post.postId.trim();
+    if (currentUid.isEmpty || postId.isEmpty) return;
+
+    await _hiddenPostsRef(currentUid).doc(postId).set({
+      'userId': currentUid,
+      'postId': postId,
+      'authorId': post.authorId.trim(),
+      'hiddenAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> syncHiddenPostIds(Iterable<String> postIds) async {
+    final currentUid = uid;
+    if (currentUid.isEmpty) return;
+    final normalizedIds = postIds
+        .map((postId) => postId.trim())
+        .where((postId) => postId.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    for (var offset = 0; offset < normalizedIds.length; offset += 400) {
+      final end =
+          offset + 400 < normalizedIds.length
+              ? offset + 400
+              : normalizedIds.length;
+      final batch = _firestore.batch();
+      for (final postId in normalizedIds.sublist(offset, end)) {
+        batch.set(_hiddenPostsRef(currentUid).doc(postId), {
+          'userId': currentUid,
+          'postId': postId,
+          'authorId': '',
+          'hiddenAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+      await batch.commit();
+    }
   }
 
   Future<List<HiddenPostAuthorModel>> fetchHiddenPostAuthors() async {

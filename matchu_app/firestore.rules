@@ -253,6 +253,8 @@ service cloud.firestore {
           "interestVector",
           "interestWeight",
           "effectiveCount",
+          "interestEmbeddingModel",
+          "interestVectorDimensions",
           "interestUpdatedAt",
           "recommendationCacheInvalidatedAt"
         ]);
@@ -312,10 +314,45 @@ service cloud.firestore {
         );
       }
 
+      function isValidRecommendationCreateDefaults() {
+        return (
+          !("interestVector" in request.resource.data)
+          || (
+            request.resource.data.interestVector is list
+            && request.resource.data.interestVector.size() == 0
+          )
+        )
+        && (
+          !("interestWeight" in request.resource.data)
+          || request.resource.data.interestWeight == 0
+        )
+        && (
+          !("effectiveCount" in request.resource.data)
+          || request.resource.data.effectiveCount == 0
+        )
+        && (
+          !("interestEmbeddingModel" in request.resource.data)
+          || request.resource.data.interestEmbeddingModel == null
+        )
+        && (
+          !("interestVectorDimensions" in request.resource.data)
+          || request.resource.data.interestVectorDimensions == 0
+        )
+        && (
+          !("interestUpdatedAt" in request.resource.data)
+          || request.resource.data.interestUpdatedAt == null
+        )
+        && (
+          !("recommendationCacheInvalidatedAt" in request.resource.data)
+          || request.resource.data.recommendationCacheInvalidatedAt == null
+        );
+      }
+
       function isOwnerSafeCreate() {
         return isOwner()
           && isValidReputationCreateDefaults()
-          && isValidFaceVerificationCreateDefaults();
+          && isValidFaceVerificationCreateDefaults()
+          && isValidRecommendationCreateDefaults();
       }
 
       function isOwnerSafeUpdate() {
@@ -560,6 +597,31 @@ service cloud.firestore {
 
       allow read: if isOwner();
       allow create, update: if isOwner() && hasValidHiddenPostAuthorData();
+      allow delete: if isOwner();
+    }
+
+    match /users/{userId}/hiddenPosts/{postId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function hasValidHiddenPostData() {
+        return request.resource.data.keys().hasOnly([
+          "userId",
+          "postId",
+          "authorId",
+          "hiddenAt",
+          "updatedAt"
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.postId == postId
+        && request.resource.data.authorId is string
+        && request.resource.data.hiddenAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      }
+
+      allow get, list: if isOwner();
+      allow create, update: if isOwner() && hasValidHiddenPostData();
       allow delete: if isOwner();
     }
 

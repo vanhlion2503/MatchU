@@ -45,10 +45,11 @@ Interaction storage is:
   collection.
 - `postReports/{reportId}` stores post-report snapshots.
 - `users/{userId}/hiddenPostAuthors/{authorId}` hides an author. Individual
-  hidden post IDs are only persisted locally by `FeedController` via
-  `GetStorage`.
+  hidden post IDs are persisted in `users/{userId}/hiddenPosts/{postId}` and
+  mirrored locally by `FeedController` for immediate/offline filtering.
 - `users/{userId}/recommendationInteractions/{eventId}` is server-managed
-  history populated by like/comment/share triggers.
+  history populated by like/comment/save/share triggers. Inactive tombstones
+  make removals idempotent when Firestore events are retried or reordered.
 - `users/{userId}/recommendationCache/feed` stores a ten-minute ranked pool.
 
 Production media paths are `posts/{uid}/{postId}/image_{index}.jpg`,
@@ -65,22 +66,24 @@ configuration, selected image/video posts safely become text-only.
   it nor has a Cloud Function that does. Firestore rules also omit `saveCount`
   from client counter updates. The seed keeps its initial value equal to the
   seeded saved documents, but later app saves can make it stale.
-- Saves, views, reports and hidden-author actions do not train the current
-  recommender. Only like (1.0), comment (1.2), and share (1.5) do.
-- Ranking uses cosine similarity at `>= 0.7`, a three-day half-life with a
-  `0.6` floor, a seven-day trending window, the latest 180 candidates, a
-  140-post cached pool, and a ten-minute cache. Old popular posts therefore get
-  no trending score after seven days and posts outside the latest 180 are not
-  candidates.
+- Views, reports and hidden-author actions do not train the recommender. Like
+  (1.0), comment (1.2), save (1.3), and quote/repost share (1.5) do. Removing
+  any of these interactions rebuilds the user vector from active history.
+- Ranking uses cosine similarity at `>= 0.7`, a three-day content half-life
+  with a `0.6` floor, a seven-day trending window, the latest 180 candidates,
+  a 140-post cached pool, and a ten-minute cache. Trending uses log-scaled
+  engagement plus a small freshness baseline so new zero-engagement posts can
+  be explored. Interest-history rebuilds use a separate 30-day half-life.
 - Cold start is trending/following only. At effective count `< 10`, the system
   explores; at `>= 10`, content similarity receives 70% of the score.
-- The client hydrates recommended IDs with one post read per ID. Large pages
-  have an N-read cost.
-- The embedding dimension is not declared or validated as a schema constant.
-  Equality of vector lengths is checked only during cosine similarity. This
-  tool either leaves vectors empty for the existing trigger or calls the exact
-  configured model (`Xenova/paraphrase-multilingual-mpnet-base-v2`) and stores
-  its real output; it never synthesizes random vectors.
+- The client hydrates recommended IDs in Firestore `whereIn` batches (up to 30
+  IDs) and falls back to isolated reads if a stale or inaccessible ID makes a
+  batch fail.
+- Embeddings store their model, normalized-content SHA-256 signature and vector
+  dimensions. Edits and model changes invalidate stale vectors. This tool
+  either leaves vectors empty for the trigger or calls the configured model
+  (`Xenova/paraphrase-multilingual-mpnet-base-v2`); it never synthesizes random
+  vectors.
 - Author data is denormalized. Later profile changes do not automatically
   update old post snapshots.
 - `isPublic` and `visibility` duplicate the same state and must remain in sync.

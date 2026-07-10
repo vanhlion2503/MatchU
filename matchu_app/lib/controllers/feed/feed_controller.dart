@@ -212,6 +212,12 @@ class FeedController extends GetxController {
       await _persistHiddenPostIds();
     }
 
+    try {
+      await _restrictionService.hidePost(post);
+    } catch (error) {
+      debugPrint('Failed to sync hidden post to Firestore: $error');
+    }
+
     await _removePostByIdWithAnimation(normalizedPostId);
 
     if (visiblePosts.isEmpty && visibleHasMore) {
@@ -1502,6 +1508,22 @@ class FeedController extends GetxController {
   }
 
   Future<void> _loadRestrictedAuthorIds() async {
+    try {
+      final localHiddenPostIds = Set<String>.of(_hiddenPostIds);
+      final serverHiddenPostIds =
+          await _restrictionService.fetchHiddenPostIds();
+      _hiddenPostIds.addAll(serverHiddenPostIds);
+      if (_hiddenPostIds.length != localHiddenPostIds.length) {
+        await _persistHiddenPostIds();
+      }
+      final localOnlyIds = localHiddenPostIds.difference(serverHiddenPostIds);
+      if (localOnlyIds.isNotEmpty) {
+        await _restrictionService.syncHiddenPostIds(localOnlyIds);
+      }
+    } catch (error) {
+      debugPrint('Failed to load or migrate hidden posts: $error');
+    }
+
     try {
       final hiddenAuthorIds =
           await _restrictionService.fetchHiddenPostAuthorIds();

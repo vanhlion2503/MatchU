@@ -1,6 +1,9 @@
-const EMBEDDING_MODEL =
-  process.env.RECOMMENDATION_EMBEDDING_MODEL ||
+const crypto = require("node:crypto");
+
+const DEFAULT_EMBEDDING_MODEL =
   "Xenova/paraphrase-multilingual-mpnet-base-v2";
+const EMBEDDING_MODEL =
+  process.env.RECOMMENDATION_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
 
 let extractorPromise = null;
 
@@ -16,6 +19,18 @@ function normalizeEmbeddingText({ content, tags }) {
     : "";
 
   return [normalizedContent, normalizedTags].filter(Boolean).join("\n# ");
+}
+
+function embeddingSignatureForText(text) {
+  const normalizedText = typeof text === "string" ? text : "";
+  return crypto.createHash("sha256").update(normalizedText).digest("hex");
+}
+
+function embeddingSignatureForPost(postData) {
+  return embeddingSignatureForText(normalizeEmbeddingText({
+    content: postData?.content,
+    tags: postData?.tags,
+  }));
 }
 
 async function loadExtractor() {
@@ -54,7 +69,10 @@ async function generatePostEmbedding(postData) {
 }
 
 module.exports = {
+  DEFAULT_EMBEDDING_MODEL,
   EMBEDDING_MODEL,
+  embeddingSignatureForPost,
+  embeddingSignatureForText,
   generateEmbeddingFromText,
   generatePostEmbedding,
   normalizeEmbeddingText,
