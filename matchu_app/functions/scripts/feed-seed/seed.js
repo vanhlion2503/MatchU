@@ -952,7 +952,9 @@ function buildInteractions(options, posts, actors) {
 async function generateRealEmbeddings(options, posts) {
   if (!options.generateEmbeddings) return;
   const {
+    EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL,
+    embeddingSignatureForPost,
     generatePostEmbedding,
   } = require("../../src/recommendation/embedding");
   const eligible = posts.filter(
@@ -976,6 +978,9 @@ async function generateRealEmbeddings(options, posts) {
         }
         post.data.contentVector = vector;
         post.data.contentEmbeddingModel = EMBEDDING_MODEL;
+        post.data.contentEmbeddingSignature =
+          embeddingSignatureForPost(post.data);
+        post.data.contentVectorDimensions = EMBEDDING_DIMENSIONS;
         post.data.contentVectorUpdatedAt = admin.firestore.Timestamp.now();
         lastError = null;
         break;

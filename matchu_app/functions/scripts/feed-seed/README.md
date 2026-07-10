@@ -51,6 +51,9 @@ Interaction storage is:
   history populated by like/comment/save/share triggers. Inactive tombstones
   make removals idempotent when Firestore events are retried or reordered.
 - `users/{userId}/recommendationCache/feed` stores a ten-minute ranked pool.
+- `postRecommendationIndex/{postId}` is a server-only retrieval index. It holds
+  a Firestore-native 768-dimensional vector plus daily popularity metadata;
+  Flutter never downloads this large field.
 
 Production media paths are `posts/{uid}/{postId}/image_{index}.jpg`,
 `posts/{uid}/{postId}/voice_{index}.{extension}`, and
@@ -69,11 +72,12 @@ configuration, selected image/video posts safely become text-only.
 - Views, reports and hidden-author actions do not train the recommender. Like
   (1.0), comment (1.2), save (1.3), and quote/repost share (1.5) do. Removing
   any of these interactions rebuilds the user vector from active history.
-- Ranking uses cosine similarity at `>= 0.7`, a three-day content half-life
-  with a `0.6` floor, a seven-day trending window, the latest 180 candidates,
-  a 140-post cached pool, and a ten-minute cache. Trending uses log-scaled
-  engagement plus a small freshness baseline so new zero-engagement posts can
-  be explored. Interest-history rebuilds use a separate 30-day half-life.
+- Candidate retrieval is hybrid: up to 160 global cosine-nearest posts, 120
+  seven-day popularity candidates, 180 recent posts, and bounded public posts
+  from followed authors are merged before ranking. Similarity must be `>= 0.7`.
+  Ranking keeps a three-day content half-life with a `0.6` floor, a 140-post
+  cached pool, and a ten-minute cache. Trending uses log-scaled engagement plus
+  a freshness baseline. Interest-history rebuilds use a 30-day half-life.
 - Cold start is trending/following only. At effective count `< 10`, the system
   explores; at `>= 10`, content similarity receives 70% of the score.
 - The client hydrates recommended IDs in Firestore `whereIn` batches (up to 30
@@ -87,11 +91,25 @@ configuration, selected image/video posts safely become text-only.
 - Author data is denormalized. Later profile changes do not automatically
   update old post snapshots.
 - `isPublic` and `visibility` duplicate the same state and must remain in sync.
-- `trendScore` and `trendBucket` are ranking inputs, but no updater was found in
-  the inspected feed code.
+- `trendScore` and `trendBucket` remain optional manual boosts. The retrieval
+  index derives its normal popularity signal directly from live post counters.
 - Post creation, likes and comments also activate notification and reputation
   triggers. Development-project writes therefore require seed-only authors;
   this prevents side effects on existing accounts.
+
+### Vector index deployment and migration
+
+- Deploy `firestore.indexes.json` before expecting KNN retrieval. Until the
+  vector and popularity indexes are ready, recommendation automatically falls
+  back to recent/following candidates instead of failing the feed.
+- The configured model outputs 768 dimensions. If
+  `RECOMMENDATION_EMBEDDING_MODEL` or
+  `RECOMMENDATION_EMBEDDING_DIMENSIONS` changes, update the vector index
+  dimension and redeploy indexes first.
+- `backfillRecentPostEmbeddings` now walks the whole eligible post collection
+  with a persistent cursor in `system/recommendationVectorBackfill`, 80 posts
+  every 15 minutes. New and edited posts are indexed immediately by
+  `embedPostContent`.
 
 ## Safety model
 
@@ -293,6 +311,9 @@ Timestamps below are Firestore `Timestamp` values in the database:
 - Active personas gain real `recommendationInteractions`, `interestVector`,
   weight and effective count after triggers finish.
 - Topic-personalized posts score above unrelated posts once embeddings exist.
+- KNN retrieval finds relevant posts outside the latest-180 window and reports
+  `retrievalMode: hybrid_vector`; disabling/missing indexes keeps fallback feed
+  usable.
 - New zero-engagement posts rank by freshness while recent popular posts rank
   by engagement; old popular posts demonstrate the seven-day cutoff.
 - Quote/repost counters equal the actual reference documents.
@@ -321,7 +342,7 @@ Timestamps below are Firestore `Timestamp` values in the database:
   media, privacy, action and repost widgets.
 - `lib/models/post_report_model.dart`, `post_report_reason.dart`, and
   `lib/services/report/post_report_service.dart`.
-- `functions/src/recommendation/core.js`, `embedding.js`,
+- `functions/src/recommendation/core.js`, `embedding.js`, `retrieval.js`,
   `src/callables/recommendPosts.js`, and `src/triggers/recommendationEvents.js`.
 - Post/comment/image/video moderation callables and triggers,
   `functions/reputation/types.js`, `triggers.js`, and `functions/index.js`.
@@ -336,8 +357,11 @@ Timestamps below are Firestore `Timestamp` values in the database:
   roughly doubled. Likes/comments can additionally invoke Functions, create
   notifications/reputation records, run embedding inference and invalidate
   caches.
-- Recommendation hydration reads every selected post separately. Monitor
-  Firestore reads when testing larger pages.
+- KNN queries charge vector-index reads in addition to the post documents that
+  are hydrated for ranking/display. Monitor both index-entry and document reads
+  when tuning candidate limits.
+- Eligible post writes maintain one server-only recommendation-index document;
+  interaction counter changes also refresh its popularity metadata.
 - Model generation can consume CPU, memory, network download and Functions
   runtime. Prefer the Emulator for repeated experiments.
 - Firebase Storage costs occur only for URLs/files managed separately; this

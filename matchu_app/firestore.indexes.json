@@ -151,6 +151,45 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "postRecommendationIndex",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "eligible",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "embeddingModel",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "embedding",
+          "vectorConfig": {
+            "dimension": 768,
+            "flat": {}
+          }
+        }
+      ]
+    },
+    {
+      "collectionGroup": "postRecommendationIndex",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "eligible",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "trendDayKey",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "popularityScore",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

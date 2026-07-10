@@ -1,24 +1,38 @@
 const { admin, db } = require("../shared/firebase");
 const {
   DEFAULT_EMBEDDING_MODEL,
+  EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
   embeddingSignatureForPost,
   generatePostEmbedding,
   normalizeEmbeddingText,
 } = require("./embedding");
+const {
+  RECENT_CANDIDATE_LIMIT,
+  buildEmbeddingSearchKey,
+  buildRecommendationIndexMetadata,
+  calculatePopularitySignal,
+  loadFollowingCandidates,
+  loadPostsByIds,
+  loadRecentCandidates,
+  loadTrendingCandidateIds,
+  loadVectorCandidateMatches,
+  recommendationIndexRef,
+} = require("./retrieval");
 
 const DECAY_FLOOR = 0.6;
 const HALF_LIFE_DAYS = 3;
 const MIN_SIMILARITY = 0.7;
 const TRENDING_WINDOW_DAYS = 7;
 const MAX_WEIGHT_CAP = 100;
-const CANDIDATE_LIMIT = 180;
+const CANDIDATE_LIMIT = RECENT_CANDIDATE_LIMIT;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_POST_POOL_SIZE = 140;
 const INTERACTION_HISTORY_LIMIT = 500;
 const TRENDING_FRESHNESS_BASELINE = 0.15;
 const INTEREST_HALF_LIFE_DAYS = 30;
 const MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL = 3;
+const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v1";
 
 const ACTION_WEIGHTS = Object.freeze({
   like: 1.0,
@@ -81,19 +95,9 @@ function exponentialDecay(
 }
 
 function calculateTrendingScore(post, nowMillis = Date.now()) {
-  const stats = post.stats || {};
   const createdAtMillis = toMillis(post.createdAt) || nowMillis;
-  const engagement =
-    ((Number(stats.likeCount) || 0) * 1.0) +
-    ((Number(stats.commentCount) || 0) * 0.8) +
-    ((Number(stats.shareCount) || 0) * 1.5);
-  const popularity = Math.max(0,
-    engagement +
-    (Number(post.trendScore) || 0) +
-    ((Number(post.trendBucket) || 0) * 0.25)
-  );
   return (
-    Math.log1p(popularity) + TRENDING_FRESHNESS_BASELINE
+    calculatePopularitySignal(post) + TRENDING_FRESHNESS_BASELINE
   ) * exponentialDecay(createdAtMillis, nowMillis);
 }
 
@@ -113,7 +117,7 @@ function resolveRatios(user, hasFollowing) {
     (user?.interestEmbeddingModel || DEFAULT_EMBEDDING_MODEL) ===
       EMBEDDING_MODEL;
   const hasInterestVector = modelMatches &&
-    parseVector(user?.interestVector).length > 0;
+    parseVector(user?.interestVector).length === EMBEDDING_DIMENSIONS;
 
   if (effectiveCount <= 0 || !hasInterestVector) {
     return hasFollowing
@@ -210,12 +214,30 @@ function isPostEmbeddingCurrent(postData) {
   const modelMatches = postData?.contentEmbeddingModel === EMBEDDING_MODEL;
   const signatureMatches = postData?.contentEmbeddingSignature === signature;
   const dimensionsMatch =
-    Number(postData?.contentVectorDimensions || 0) === existingVector.length;
+    Number(postData?.contentVectorDimensions || 0) === existingVector.length &&
+    (existingVector.length === 0 || existingVector.length === EMBEDDING_DIMENSIONS);
   if (!normalizedText) {
-    return modelMatches && signatureMatches && existingVector.length === 0;
+    return modelMatches &&
+      signatureMatches &&
+      existingVector.length === 0 &&
+      postData?.contentVectorSearchKey === null;
   }
+  const expectedSearchKey = buildEmbeddingSearchKey(
+    signature,
+    existingVector.length
+  );
   return modelMatches && signatureMatches && dimensionsMatch &&
-    existingVector.length > 0;
+    existingVector.length > 0 &&
+    postData?.contentVectorSearchKey === expectedSearchKey;
+}
+
+function hasReusablePostEmbedding(postData) {
+  const vector = parseVector(postData?.contentVector);
+  if (vector.length !== EMBEDDING_DIMENSIONS) return false;
+  return postData?.contentEmbeddingModel === EMBEDDING_MODEL &&
+    postData?.contentEmbeddingSignature ===
+      embeddingSignatureForPost(postData || {}) &&
+    Number(postData?.contentVectorDimensions || 0) === vector.length;
 }
 
 async function ensurePostEmbedding(postId, postData, { forceRefresh = false } = {}) {
@@ -230,55 +252,197 @@ async function ensurePostEmbedding(postId, postData, { forceRefresh = false } = 
     content: postData?.content,
     tags: postData?.tags,
   });
-  if (!normalizedText) {
-    await db.collection("posts").doc(postId).set({
-      contentVector: [],
-      contentEmbeddingModel: EMBEDDING_MODEL,
-      contentEmbeddingSignature: signature,
-      contentVectorDimensions: 0,
-      contentVectorUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-    return [];
-  }
+  const vector = !normalizedText
+    ? []
+    : (!forceRefresh && hasReusablePostEmbedding(postData)
+      ? existingVector
+      : await generatePostEmbedding(postData || {}));
+  if (normalizedText && vector.length !== EMBEDDING_DIMENSIONS) return [];
 
-  const vector = await generatePostEmbedding(postData || {});
-  if (!vector.length) return [];
+  const postRef = db.collection("posts").doc(postId);
+  const searchKey = vector.length
+    ? buildEmbeddingSearchKey(signature, vector.length)
+    : null;
+  let didWrite = false;
+  await db.runTransaction(async (tx) => {
+    didWrite = false;
+    const latestSnap = await tx.get(postRef);
+    if (!latestSnap.exists) return;
+    const latestData = latestSnap.data() || {};
+    if (embeddingSignatureForPost(latestData) !== signature ||
+        !isEligiblePost(latestData)) {
+      return;
+    }
 
-  const latestSnap = await db.collection("posts").doc(postId).get();
-  if (!latestSnap.exists) return [];
-  const latestData = latestSnap.data() || {};
-  if (embeddingSignatureForPost(latestData) !== signature ||
-      !isEligiblePost(latestData)) {
-    return [];
-  }
-
-  await db.collection("posts").doc(postId).set(
-    {
+    tx.set(postRef, {
       contentVector: vector,
       contentEmbeddingModel: EMBEDDING_MODEL,
       contentEmbeddingSignature: signature,
       contentVectorDimensions: vector.length,
+      contentVectorSearchKey: searchKey,
       contentVectorUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-  return vector;
+    }, { merge: true });
+
+    const indexData = {
+      ...buildRecommendationIndexMetadata(postId, latestData),
+      embeddingModel: vector.length
+        ? EMBEDDING_MODEL
+        : admin.firestore.FieldValue.delete(),
+      embeddingSignature: vector.length
+        ? signature
+        : admin.firestore.FieldValue.delete(),
+      embeddingDimensions: vector.length
+        ? vector.length
+        : admin.firestore.FieldValue.delete(),
+      embedding: vector.length
+        ? admin.firestore.FieldValue.vector(vector)
+        : admin.firestore.FieldValue.delete(),
+      embeddingUpdatedAt: vector.length
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : admin.firestore.FieldValue.delete(),
+    };
+    tx.set(recommendationIndexRef(postId), indexData, { merge: true });
+    didWrite = true;
+  });
+  return didWrite ? vector : [];
 }
 
-async function loadCandidatePosts() {
-  const snapshot = await db
-    .collection("posts")
-    .where("visibility", "==", "public")
-    .where("moderationStatus", "==", "approved")
-    .orderBy("createdAt", "desc")
-    .limit(CANDIDATE_LIMIT)
-    .get();
+function retrievalErrorCode(error) {
+  const code = error?.code;
+  if (typeof code === "number" || typeof code === "string") {
+    return String(code);
+  }
+  return "unknown";
+}
 
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, data: doc.data() || {} }))
-    .filter((post) => isEligiblePost(post.data));
+async function loadHybridCandidatePosts({ userVector, following, nowMillis }) {
+  const vectorSearchEnabled =
+    process.env.RECOMMENDATION_VECTOR_SEARCH_ENABLED !== "false" &&
+    userVector.length === EMBEDDING_DIMENSIONS;
+
+  const [recentResult, vectorResult, trendingResult, followingResult] =
+    await Promise.allSettled([
+      loadRecentCandidates(),
+      vectorSearchEnabled
+        ? loadVectorCandidateMatches(userVector, {
+          minSimilarity: MIN_SIMILARITY,
+        })
+        : Promise.resolve([]),
+      loadTrendingCandidateIds(nowMillis),
+      following.size > 0
+        ? loadFollowingCandidates(following)
+        : Promise.resolve([]),
+    ]);
+
+  if (recentResult.status === "rejected") throw recentResult.reason;
+
+  const vectorMatches = vectorResult.status === "fulfilled"
+    ? vectorResult.value
+    : [];
+  const trendingIds = trendingResult.status === "fulfilled"
+    ? trendingResult.value
+    : [];
+  const followingCandidates = followingResult.status === "fulfilled"
+    ? followingResult.value
+    : [];
+
+  if (vectorResult.status === "rejected") {
+    console.warn("Vector candidate retrieval fell back to hybrid discovery:", {
+      code: retrievalErrorCode(vectorResult.reason),
+      message: vectorResult.reason?.message || String(vectorResult.reason),
+    });
+  }
+  if (trendingResult.status === "rejected") {
+    console.warn("Trending index retrieval fell back to recent posts:", {
+      code: retrievalErrorCode(trendingResult.reason),
+      message: trendingResult.reason?.message || String(trendingResult.reason),
+    });
+  }
+  if (followingResult.status === "rejected") {
+    console.warn("Following candidate retrieval fell back to other sources:", {
+      code: retrievalErrorCode(followingResult.reason),
+      message: followingResult.reason?.message || String(followingResult.reason),
+    });
+  }
+
+  const indexedIds = new Set([
+    ...vectorMatches.map((item) => item.postId),
+    ...trendingIds,
+  ]);
+  let indexedPosts = [];
+  let indexedHydrationError = null;
+  if (indexedIds.size > 0) {
+    try {
+      indexedPosts = await loadPostsByIds(indexedIds);
+    } catch (error) {
+      indexedHydrationError = retrievalErrorCode(error);
+      console.warn("Indexed candidate hydration failed:", {
+        code: indexedHydrationError,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  const similarities = new Map(
+    vectorMatches.map((item) => [item.postId, item.similarity])
+  );
+  const byPostId = new Map();
+  const addCandidates = (candidates, source) => {
+    for (const candidate of candidates) {
+      if (!candidate?.id || !candidate.data) continue;
+      const existing = byPostId.get(candidate.id);
+      if (existing) {
+        existing.sources.add(source);
+        if (similarities.has(candidate.id)) {
+          existing.vectorSimilarity = similarities.get(candidate.id);
+        }
+        continue;
+      }
+      byPostId.set(candidate.id, {
+        id: candidate.id,
+        data: candidate.data,
+        vectorSimilarity: similarities.get(candidate.id),
+        sources: new Set([source]),
+      });
+    }
+  };
+
+  addCandidates(recentResult.value, "recent");
+  addCandidates(followingCandidates, "following");
+  addCandidates(indexedPosts, "index");
+
+  const candidates = Array.from(byPostId.values())
+    .filter((candidate) => isEligiblePost(candidate.data));
+  return {
+    candidates,
+    metadata: {
+      retrievalMode: vectorSearchEnabled
+        ? (vectorResult.status === "fulfilled"
+          ? "hybrid_vector"
+          : "hybrid_fallback")
+        : "hybrid_discovery",
+      candidateCount: candidates.length,
+      recentCandidateCount: recentResult.value.length,
+      vectorCandidateCount: vectorMatches.length,
+      trendingCandidateCount: trendingIds.length,
+      followingCandidateCount: followingCandidates.length,
+      vectorSearchUsed: vectorSearchEnabled && vectorResult.status === "fulfilled",
+      vectorSearchFallbackCode:
+        vectorResult.status === "rejected"
+          ? retrievalErrorCode(vectorResult.reason)
+          : null,
+      trendingSearchFallbackCode:
+        trendingResult.status === "rejected"
+          ? retrievalErrorCode(trendingResult.reason)
+          : null,
+      followingSearchFallbackCode:
+        followingResult.status === "rejected"
+          ? retrievalErrorCode(followingResult.reason)
+          : null,
+      indexedHydrationError,
+    },
+  };
 }
 
 async function buildRecommendationPool(uid) {
@@ -295,14 +459,24 @@ async function buildRecommendationPool(uid) {
       : []
   );
   const { restrictedAuthorIds, hiddenPostIds } = await fetchRestrictions(uid);
+  for (const restrictedAuthorId of restrictedAuthorIds) {
+    following.delete(restrictedAuthorId);
+  }
   const ratios = resolveRatios(user, following.size > 0);
+  const parsedUserVector = parseVector(user.interestVector);
   const userVector =
-    (user.interestEmbeddingModel || DEFAULT_EMBEDDING_MODEL) === EMBEDDING_MODEL
-      ? parseVector(user.interestVector)
+    (user.interestEmbeddingModel || DEFAULT_EMBEDDING_MODEL) === EMBEDDING_MODEL &&
+    parsedUserVector.length === EMBEDDING_DIMENSIONS
+      ? parsedUserVector
       : [];
   const nowMillis = Date.now();
   const trendingCutoff = nowMillis - (TRENDING_WINDOW_DAYS * 86400000);
-  const candidates = await loadCandidatePosts();
+  const retrieval = await loadHybridCandidatePosts({
+    userVector,
+    following,
+    nowMillis,
+  });
+  const candidates = retrieval.candidates;
   const scored = [];
 
   for (const candidate of candidates) {
@@ -319,7 +493,9 @@ async function buildRecommendationPool(uid) {
     const postVector = isPostEmbeddingCurrent(post)
       ? parseVector(post.contentVector)
       : [];
-    const similarity = cosineSimilarity(userVector, postVector);
+    const similarity = Number.isFinite(candidate.vectorSimilarity)
+      ? candidate.vectorSimilarity
+      : cosineSimilarity(userVector, postVector);
     const contentBasedScore =
       similarity >= MIN_SIMILARITY
         ? similarity * timeDecay(createdAtMillis, nowMillis)
@@ -390,6 +566,9 @@ async function buildRecommendationPool(uid) {
       processingTimeMs: Date.now() - startedAt,
       ratio: ratios.label,
       embeddingModel: EMBEDDING_MODEL,
+      embeddingDimensions: EMBEDDING_DIMENSIONS,
+      algorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
+      ...retrieval.metadata,
     },
   };
 }
@@ -427,6 +606,8 @@ async function getOrBuildRecommendationPool(uid, { forceRefresh = false } = {}) 
   if (
     cacheSnap?.exists &&
     Number(cacheSnap.data()?.expiresAtMillis || 0) > nowMillis &&
+    cacheSnap.data()?.metadata?.algorithmVersion ===
+      RECOMMENDATION_ALGORITHM_VERSION &&
     Array.isArray(cacheSnap.data()?.postIds)
   ) {
     return {
@@ -662,7 +843,7 @@ async function rebuildUserInterestVector(
     }
     const vector = parseVector(interaction.postVector);
     const actionWeight = Number(interaction.actionWeight) || 0;
-    if (!vector.length || actionWeight <= 0) continue;
+    if (vector.length !== EMBEDDING_DIMENSIONS || actionWeight <= 0) continue;
 
     const occurredAtMillis =
       Number(interaction.createdAtMillis) ||
@@ -723,6 +904,7 @@ module.exports = {
   MAX_WEIGHT_CAP,
   MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL,
   MIN_SIMILARITY,
+  RECOMMENDATION_ALGORITHM_VERSION,
   TRENDING_WINDOW_DAYS,
   buildRecommendationPool,
   calculateTrendingScore,
@@ -732,9 +914,11 @@ module.exports = {
   ensurePostEmbedding,
   exponentialDecay,
   getOrBuildRecommendationPool,
+  hasReusablePostEmbedding,
   invalidateRecommendationCache,
   isEligiblePost,
   isPostEmbeddingCurrent,
+  loadHybridCandidatePosts,
   normalizeRatios,
   parseVector,
   rebuildUserInterestVector,

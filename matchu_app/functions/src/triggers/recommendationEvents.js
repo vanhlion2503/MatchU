@@ -16,10 +16,18 @@ const {
   recordRecommendationInteraction,
   toSafeUid,
 } = require("../recommendation/core");
+const {
+  syncRecommendationIndexMetadata,
+} = require("../recommendation/retrieval");
+const {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+} = require("../recommendation/embedding");
 const REBUILD_BATCH_SIZE = 80;
 const REBUILD_STALE_DAYS = 3;
 const EMBEDDING_BACKFILL_BATCH_SIZE = 80;
-const EMBEDDING_BACKFILL_SCAN_SIZE = 240;
+const EMBEDDING_BACKFILL_GENERATION =
+  `vector_index_v1:${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}`;
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -38,6 +46,27 @@ function postContentSignature(data) {
   return JSON.stringify({ content, tags });
 }
 
+function postRecommendationMetadataSignature(data) {
+  const stats = data?.stats || {};
+  const createdAtMillis = typeof data?.createdAt?.toMillis === "function"
+    ? data.createdAt.toMillis()
+    : 0;
+  return JSON.stringify({
+    authorId: cleanId(data?.authorId),
+    referenceAuthorId: cleanId(data?.referencePost?.authorId),
+    visibility: data?.visibility || "",
+    moderationStatus: data?.moderationStatus || "approved",
+    postType: data?.postType || "post",
+    deleted: Boolean(data?.deletedAt),
+    createdAtMillis,
+    likeCount: Number(stats.likeCount) || 0,
+    commentCount: Number(stats.commentCount) || 0,
+    shareCount: Number(stats.shareCount) || 0,
+    trendScore: Number(data?.trendScore) || 0,
+    trendBucket: Number(data?.trendBucket) || 0,
+  });
+}
+
 const embedPostContent = onDocumentWritten(
   {
     document: "posts/{postId}",
@@ -47,11 +76,34 @@ const embedPostContent = onDocumentWritten(
   async (event) => {
     const postId = cleanId(event.params.postId);
     const afterSnap = event.data?.after;
-    if (!postId || !afterSnap?.exists) return;
+    if (!postId) return;
+    if (!afterSnap?.exists) {
+      await syncRecommendationIndexMetadata(postId, {}, false, {
+        eventVersionMillis: eventVersionMillis(event),
+      });
+      return;
+    }
 
     const before = event.data?.before?.exists ? event.data.before.data() || {} : {};
     const after = afterSnap.data() || {};
-    if (!isEligiblePost(after)) return;
+    const eligible = isEligiblePost(after);
+    const metadataChanged = !event.data?.before?.exists ||
+      postRecommendationMetadataSignature(before) !==
+        postRecommendationMetadataSignature(after);
+    if (metadataChanged) {
+      await syncRecommendationIndexMetadata(postId, after, eligible, {
+        eventVersionMillis: eventVersionMillis(event),
+      });
+    }
+    if (!eligible) {
+      if (after.contentVectorSearchKey != null) {
+        await afterSnap.ref.set({
+          contentVectorSearchKey: null,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
+      return;
+    }
 
     const beforeSignature = postContentSignature(before);
     const afterSignature = postContentSignature(after);
@@ -284,40 +336,111 @@ const rebuildStaleInterestVectors = onSchedule(
 
 const backfillRecentPostEmbeddings = onSchedule(
   {
-    schedule: "every 12 hours",
+    schedule: "every 15 minutes",
     timeZone: "Asia/Bangkok",
     timeoutSeconds: 540,
     memory: "1GiB",
   },
   async () => {
-    const snapshot = await db
+    const stateRef = db
+      .collection("system")
+      .doc("recommendationVectorBackfill");
+    const stateSnap = await stateRef.get();
+    const state = stateSnap.data() || {};
+    const generationMatches =
+      state.generation === EMBEDDING_BACKFILL_GENERATION;
+    if (generationMatches && state.completed === true) {
+      console.info("recommendation vector backfill already completed:", {
+        generation: EMBEDDING_BACKFILL_GENERATION,
+      });
+      return;
+    }
+
+    let query = db
       .collection("posts")
       .where("visibility", "==", "public")
       .where("moderationStatus", "==", "approved")
       .orderBy("createdAt", "desc")
-      .limit(EMBEDDING_BACKFILL_SCAN_SIZE)
-      .get();
+      .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+      .limit(EMBEDDING_BACKFILL_BATCH_SIZE);
+    if (
+      generationMatches &&
+      state.cursorCreatedAt &&
+      typeof state.cursorPostId === "string" &&
+      state.cursorPostId
+    ) {
+      query = query.startAfter(state.cursorCreatedAt, state.cursorPostId);
+    }
+
+    const snapshot = await query.get();
 
     let embeddedCount = 0;
+    let scannedCount = 0;
+    let failedPostId = null;
+    let lastSuccessfulDoc = null;
     for (const doc of snapshot.docs) {
       const post = doc.data() || {};
-      if (isPostEmbeddingCurrent(post)) continue;
-      if (embeddedCount >= EMBEDDING_BACKFILL_BATCH_SIZE) break;
-
       try {
-        await ensurePostEmbedding(doc.id, post);
-        embeddedCount += 1;
+        if (isEligiblePost(post)) {
+          await syncRecommendationIndexMetadata(doc.id, post, true, {
+            reconcileSource: true,
+          });
+          if (!isPostEmbeddingCurrent(post)) {
+            await ensurePostEmbedding(doc.id, post);
+            embeddedCount += 1;
+          }
+        } else {
+          await syncRecommendationIndexMetadata(doc.id, post, false, {
+            reconcileSource: true,
+          });
+        }
+        scannedCount += 1;
+        lastSuccessfulDoc = doc;
       } catch (error) {
         console.error("backfillRecentPostEmbeddings failed:", {
           postId: doc.id,
           error: error?.message || String(error),
         });
+        failedPostId = doc.id;
+        break;
       }
     }
 
+    const completed = !failedPostId &&
+      snapshot.size < EMBEDDING_BACKFILL_BATCH_SIZE;
+    const lastData = lastSuccessfulDoc?.data() || {};
+    await stateRef.set({
+      generation: EMBEDDING_BACKFILL_GENERATION,
+      completed,
+      cursorCreatedAt: completed
+        ? admin.firestore.FieldValue.delete()
+        : (lastData.createdAt ||
+          (generationMatches ? state.cursorCreatedAt : null) ||
+          null),
+      cursorPostId: completed
+        ? admin.firestore.FieldValue.delete()
+        : (lastSuccessfulDoc?.id ||
+          (generationMatches ? state.cursorPostId : null) ||
+          null),
+      failedPostId,
+      scannedCount: generationMatches
+        ? admin.firestore.FieldValue.increment(scannedCount)
+        : scannedCount,
+      embeddedCount: generationMatches
+        ? admin.firestore.FieldValue.increment(embeddedCount)
+        : embeddedCount,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      completedAt: completed
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : null,
+    }, { merge: true });
+
     console.info("backfillRecentPostEmbeddings completed:", {
-      scannedCount: snapshot.size,
+      generation: EMBEDDING_BACKFILL_GENERATION,
+      scannedCount,
       embeddedCount,
+      completed,
+      failedPostId,
     });
   }
 );

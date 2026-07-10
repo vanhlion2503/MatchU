@@ -708,6 +708,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Recommendation retrieval/index documents are maintained by Admin SDK
+    // Cloud Functions and are never exposed directly to clients.
+    match /postRecommendationIndex/{postId} {
+      allow read, write: if false;
+    }
+
+    match /system/{documentId} {
+      allow read, write: if false;
+    }
+
     // ================= POSTS / SOCIAL FEED =================
     match /posts/{postId} {
 
@@ -721,6 +731,42 @@ service cloud.firestore {
 
       function isAuthorCreate() {
         return isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      }
+
+      function touchesServerManagedPostRecommendationFields() {
+        return request.resource.data.diff(resource.data).changedKeys().hasAny([
+          "contentVector",
+          "contentEmbeddingModel",
+          "contentEmbeddingSignature",
+          "contentVectorDimensions",
+          "contentVectorSearchKey",
+          "contentVectorUpdatedAt",
+          "trendScore",
+          "trendBucket"
+        ]);
+      }
+
+      function hasValidPostRecommendationCreateDefaults() {
+        return (
+          !("contentVector" in request.resource.data)
+          || (
+            request.resource.data.contentVector is list
+            && request.resource.data.contentVector.size() == 0
+          )
+        )
+        && !("contentEmbeddingModel" in request.resource.data)
+        && !("contentEmbeddingSignature" in request.resource.data)
+        && !("contentVectorDimensions" in request.resource.data)
+        && !("contentVectorSearchKey" in request.resource.data)
+        && !("contentVectorUpdatedAt" in request.resource.data)
+        && (
+          !("trendScore" in request.resource.data)
+          || request.resource.data.trendScore == 0
+        )
+        && (
+          !("trendBucket" in request.resource.data)
+          || request.resource.data.trendBucket == 0
+        );
       }
 
       function authorReputationScore() {
@@ -837,12 +883,14 @@ service cloud.firestore {
       allow create: if isAuthorCreate()
         && canCreatePostByReputation()
         && hasValidPostVisibilityForWrite(request.resource.data)
-        && hasValidPostModerationForCreate(request.resource.data);
+        && hasValidPostModerationForCreate(request.resource.data)
+        && hasValidPostRecommendationCreateDefaults();
       allow update: if (
           isAuthor()
           && hasValidPostVisibilityForWrite(request.resource.data)
           && hasValidPostModerationForWrite(request.resource.data)
           && isAllowedAuthorPostModerationUpdate()
+          && !touchesServerManagedPostRecommendationFields()
         ) || isStatsCounterOnlyUpdate();
       allow delete: if isAuthor();
 

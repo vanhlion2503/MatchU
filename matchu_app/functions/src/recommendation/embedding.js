@@ -4,6 +4,18 @@ const DEFAULT_EMBEDDING_MODEL =
   "Xenova/paraphrase-multilingual-mpnet-base-v2";
 const EMBEDDING_MODEL =
   process.env.RECOMMENDATION_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+const EMBEDDING_DIMENSIONS = Number(
+  process.env.RECOMMENDATION_EMBEDDING_DIMENSIONS || 768
+);
+if (
+  !Number.isInteger(EMBEDDING_DIMENSIONS) ||
+  EMBEDDING_DIMENSIONS <= 0 ||
+  EMBEDDING_DIMENSIONS > 2048
+) {
+  throw new Error(
+    "RECOMMENDATION_EMBEDDING_DIMENSIONS must be an integer from 1 to 2048."
+  );
+}
 
 let extractorPromise = null;
 
@@ -57,7 +69,17 @@ async function generateEmbeddingFromText(text) {
     normalize: true,
   });
 
-  return Array.from(output.data || [], Number);
+  const vector = Array.from(output.data || [], Number);
+  if (
+    vector.length !== EMBEDDING_DIMENSIONS ||
+    vector.some((value) => !Number.isFinite(value))
+  ) {
+    throw new Error(
+      `Embedding model returned ${vector.length} dimensions; ` +
+      `expected ${EMBEDDING_DIMENSIONS}.`
+    );
+  }
+  return vector;
 }
 
 async function generatePostEmbedding(postData) {
@@ -70,6 +92,7 @@ async function generatePostEmbedding(postData) {
 
 module.exports = {
   DEFAULT_EMBEDDING_MODEL,
+  EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
   embeddingSignatureForPost,
   embeddingSignatureForText,

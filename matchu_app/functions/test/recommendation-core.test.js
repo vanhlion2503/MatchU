@@ -14,9 +14,16 @@ const {
   resolveRatios,
 } = require("../src/recommendation/core");
 const {
+  EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
   embeddingSignatureForPost,
 } = require("../src/recommendation/embedding");
+const {
+  buildEmbeddingSearchKey,
+  calculatePopularitySignal,
+  recentTrendDayKeys,
+  trendDayKey,
+} = require("../src/recommendation/retrieval");
 
 test("parseVector rejects a partially corrupt vector", () => {
   assert.deepEqual(parseVector([0.1, 0.2]), [0.1, 0.2]);
@@ -31,14 +38,15 @@ test("cosine similarity is stable for normalized and invalid dimensions", () => 
 });
 
 test("ratios always sum to one when following is unavailable", () => {
+  const interestVector = Array(EMBEDDING_DIMENSIONS).fill(0.1);
   const exploration = resolveRatios({
     effectiveCount: 5,
-    interestVector: [1, 0],
+    interestVector,
     interestEmbeddingModel: EMBEDDING_MODEL,
   }, false);
   const personalized = resolveRatios({
     effectiveCount: 12,
-    interestVector: [1, 0],
+    interestVector,
     interestEmbeddingModel: EMBEDDING_MODEL,
   }, false);
 
@@ -85,11 +93,18 @@ test("embedding metadata invalidates edited or model-mismatched content", () => 
   const post = { content: "Flutter Firebase", tags: ["dart"] };
   const current = {
     ...post,
-    contentVector: [0.1, 0.2],
+    contentVector: Array.from(
+      { length: EMBEDDING_DIMENSIONS },
+      (_, index) => index / EMBEDDING_DIMENSIONS
+    ),
     contentEmbeddingModel: EMBEDDING_MODEL,
     contentEmbeddingSignature: embeddingSignatureForPost(post),
-    contentVectorDimensions: 2,
+    contentVectorDimensions: EMBEDDING_DIMENSIONS,
   };
+  current.contentVectorSearchKey = buildEmbeddingSearchKey(
+    current.contentEmbeddingSignature,
+    EMBEDDING_DIMENSIONS
+  );
 
   assert.equal(isPostEmbeddingCurrent(current), true);
   assert.equal(isPostEmbeddingCurrent({ ...current, content: "AI mới" }), false);
@@ -101,6 +116,19 @@ test("embedding metadata invalidates edited or model-mismatched content", () => 
     ...current,
     contentVectorDimensions: 3,
   }), false);
+});
+
+test("retrieval index uses stable UTC day keys and log-scaled popularity", () => {
+  const now = Date.UTC(2026, 6, 11, 12, 0, 0);
+  assert.equal(trendDayKey(now), "20260711");
+  const keys = recentTrendDayKeys(now, 7);
+  assert.equal(keys.length, 8);
+  assert.equal(keys[0], "20260711");
+  assert.equal(keys.at(-1), "20260704");
+  assert.equal(calculatePopularitySignal({ stats: {} }), 0);
+  assert.ok(calculatePopularitySignal({
+    stats: { likeCount: 10, commentCount: 2, shareCount: 1 },
+  }) > 0);
 });
 
 test("author diversity defers repeated posts without dropping pool capacity", () => {
