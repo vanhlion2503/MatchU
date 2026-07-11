@@ -9,7 +9,9 @@ const { CONTENT_BY_TOPIC, TOPIC_GROUPS, TOPICS } = require("./content");
 
 const PROTECTED_PROJECT_IDS = new Set(["matchu-5bd75"]);
 const BATCH_COLLECTION = "_seedBatches";
-const MAX_BATCH_DATA_WRITES = 220;
+// Embedding-bearing posts are much larger than ordinary Firestore documents.
+// Keep each data+manifest commit comfortably below Firestore's 10 MiB limit.
+const MAX_BATCH_DATA_WRITES = 50;
 const COMMENT_TEXTS = Object.freeze([
   "Mình cũng từng thử cách này và thấy khá hiệu quả.",
   "Góc nhìn hay quá, cảm ơn bạn đã chia sẻ!",
@@ -338,36 +340,62 @@ function userSnapshot(doc) {
   };
 }
 
+const REALISTIC_NAMES = Object.freeze([
+  "Minh Anh", "Hoàng Nam", "Thảo Vy", "Quốc Bảo", "Ngọc Hà",
+  "Gia Huy", "Khánh Linh", "Đức Minh", "Mai Phương", "Tuấn Kiệt",
+  "Thanh Trúc", "Nhật Long", "Yến Nhi", "Anh Khoa", "Hải Yến",
+  "Trọng Nhân", "Bảo Ngọc", "Đình Phúc", "Thu Trang", "Quang Huy",
+  "Phương Thảo", "Minh Quân", "Kim Ngân", "Tuệ Lâm", "Đăng Khoa",
+  "Hồng Nhung", "Thiên An", "Mạnh Hùng", "Ngọc Mai", "Tấn Phát",
+  "Lan Chi", "Hoài Nam", "Mỹ Duyên", "Trung Kiên", "Hà My",
+  "Xuân Bách", "Diệu Linh", "Thành Đạt", "Khả Hân", "Văn Khôi",
+  "Ánh Dương", "Hữu Phước", "Thùy Dương", "Phúc An", "Như Quỳnh",
+  "Đông Quân", "Trâm Anh", "Việt Anh", "Uyên Nhi", "Khôi Nguyên",
+]);
+
+const PROFILE_BIOS = Object.freeze([
+  "Thích công nghệ, cà phê và những cuộc trò chuyện có chiều sâu.",
+  "Ghi lại chuyện học tập, công việc và những điều nhỏ bé mỗi ngày.",
+  "Cuối tuần thường đi bộ, chụp ảnh và tìm một quán ăn mới.",
+  "Đang học cách sống chậm hơn nhưng vẫn tiến về phía trước.",
+  "Chia sẻ trải nghiệm thật, hỏi điều mình chưa biết và học từ mọi người.",
+  "Yêu sách, âm nhạc và các dự án khiến bản thân tò mò.",
+  "Một người bình thường đang cố gắng tốt hơn một chút mỗi ngày.",
+]);
+
 function buildSeedUser(options, index, role = "author") {
   const id = `seed_${sanitizeId(options.seedBatchId)}_${role}_${String(index + 1).padStart(2, "0")}`;
   const group = TOPIC_GROUPS[index % TOPIC_GROUPS.length];
   const now = admin.firestore.Timestamp.now();
-  const nickname = `${role === "actor" ? "persona" : "tacgia"}${index + 1}`;
+  const profileIndex = role === "actor" ? index + 27 : index;
+  const fullname = REALISTIC_NAMES[profileIndex % REALISTIC_NAMES.length];
+  const nickname = fullname
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "") + String(profileIndex + 1);
+  const avatarUrl = `https://i.pravatar.cc/300?img=${(profileIndex % 70) + 1}`;
   return {
     id,
     snapshot: {
       id,
-      name:
-        role === "actor"
-          ? `Persona đề xuất ${index + 1}`
-          : `Tác giả mẫu ${index + 1}`,
+      name: fullname,
       nickname,
-      avatar: "",
-      isVerified: false,
+      avatar: avatarUrl,
+      isVerified: index % 11 === 0,
       isSeedData: true,
       interests: group,
     },
     data: {
       uid: id,
       email: "",
-      fullname:
-        role === "actor"
-          ? `Persona đề xuất ${index + 1}`
-          : `Tác giả mẫu ${index + 1}`,
+      fullname,
       nickname,
       phonenumber: "",
-      bio: "Tài khoản Firestore chỉ dùng cho dữ liệu kiểm thử feed.",
-      avatarUrl: "",
+      bio: PROFILE_BIOS[profileIndex % PROFILE_BIOS.length],
+      avatarUrl,
       interests: group,
       interestVector: [],
       interestWeight: 0,
@@ -391,7 +419,7 @@ function buildSeedUser(options, index, role = "author") {
       accountStatus: "active",
       role: "user",
       isProfileCompleted: true,
-      isFaceVerified: false,
+      isFaceVerified: index % 11 === 0,
       createdAt: now,
       updatedAt: now,
       isSeedData: true,
@@ -658,8 +686,9 @@ function buildPosts(options, authors, mediaConfig) {
       content = "";
     }
     const visibilityRoll = index % 20;
-    const requestedVisibility =
-      visibilityRoll === 0
+    const requestedVisibility = options.target === "production"
+      ? "public"
+      : visibilityRoll === 0
         ? "private"
         : visibilityRoll <= 2
           ? "followers"
