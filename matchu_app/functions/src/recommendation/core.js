@@ -33,6 +33,7 @@ const TRENDING_FRESHNESS_BASELINE = 0.15;
 const INTEREST_HALF_LIFE_DAYS = 30;
 const MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL = 3;
 const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v1";
+const RECOMMENDATION_FEED_STATE_PATH = "system/recommendationFeedState";
 
 const ACTION_WEIGHTS = Object.freeze({
   like: 1.0,
@@ -161,6 +162,18 @@ function recommendationCacheRef(uid) {
     .doc("feed");
 }
 
+function recommendationFeedStateRef() {
+  return db.doc(RECOMMENDATION_FEED_STATE_PATH);
+}
+
+async function bumpRecommendationFeedRevision(reason = "post_changed") {
+  await recommendationFeedStateRef().set({
+    revision: admin.firestore.FieldValue.increment(1),
+    reason,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 async function invalidateRecommendationCache(uid, reason) {
   const normalizedUid = toSafeUid(uid);
   if (!normalizedUid) return;
@@ -242,7 +255,18 @@ function hasReusablePostEmbedding(postData) {
 
 async function ensurePostEmbedding(postId, postData, { forceRefresh = false } = {}) {
   const existingVector = parseVector(postData?.contentVector);
-  if (!forceRefresh && isPostEmbeddingCurrent(postData)) return existingVector;
+  if (!forceRefresh && isPostEmbeddingCurrent(postData)) {
+    const expectedStatus = existingVector.length ? "ready" : "discovery_only";
+    if (postData?.recommendationStatus !== expectedStatus) {
+      await db.collection("posts").doc(postId).set({
+        recommendationStatus: expectedStatus,
+        recommendationErrorCode: admin.firestore.FieldValue.delete(),
+        recommendationAttemptCount: admin.firestore.FieldValue.increment(0),
+        recommendationUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    return existingVector;
+  }
   if (!isEligiblePost({ ...postData, postType: postData?.postType || "post" })) {
     return [];
   }
@@ -281,6 +305,10 @@ async function ensurePostEmbedding(postId, postData, { forceRefresh = false } = 
       contentVectorDimensions: vector.length,
       contentVectorSearchKey: searchKey,
       contentVectorUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      recommendationStatus: vector.length ? "ready" : "discovery_only",
+      recommendationErrorCode: admin.firestore.FieldValue.delete(),
+      recommendationAttemptCount: admin.firestore.FieldValue.increment(1),
+      recommendationUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
 
@@ -600,12 +628,17 @@ function diversifyByAuthor(ranked, limit) {
 
 async function getOrBuildRecommendationPool(uid, { forceRefresh = false } = {}) {
   const cacheRef = recommendationCacheRef(uid);
-  const cacheSnap = forceRefresh ? null : await cacheRef.get();
+  const [cacheSnap, feedStateSnap] = await Promise.all([
+    forceRefresh ? Promise.resolve(null) : cacheRef.get(),
+    recommendationFeedStateRef().get(),
+  ]);
   const nowMillis = Date.now();
+  const feedRevision = Number(feedStateSnap.data()?.revision) || 0;
 
   if (
     cacheSnap?.exists &&
     Number(cacheSnap.data()?.expiresAtMillis || 0) > nowMillis &&
+    Number(cacheSnap.data()?.feedRevision || 0) === feedRevision &&
     cacheSnap.data()?.metadata?.algorithmVersion ===
       RECOMMENDATION_ALGORITHM_VERSION &&
     Array.isArray(cacheSnap.data()?.postIds)
@@ -624,6 +657,7 @@ async function getOrBuildRecommendationPool(uid, { forceRefresh = false } = {}) 
   await cacheRef.set(
     {
       ...pool,
+      feedRevision,
       expiresAtMillis: nowMillis + CACHE_TTL_MS,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -907,6 +941,7 @@ module.exports = {
   RECOMMENDATION_ALGORITHM_VERSION,
   TRENDING_WINDOW_DAYS,
   buildRecommendationPool,
+  bumpRecommendationFeedRevision,
   calculateTrendingScore,
   cosineSimilarity,
   deactivateRecommendationInteraction,
@@ -924,6 +959,7 @@ module.exports = {
   rebuildUserInterestVector,
   recordRecommendationInteraction,
   recommendationCacheRef,
+  recommendationFeedStateRef,
   resolveRatios,
   timeDecay,
   toMillis,

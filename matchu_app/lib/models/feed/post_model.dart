@@ -128,6 +128,29 @@ enum PostModerationStatus {
   }
 }
 
+enum PostRecommendationStatus {
+  unknown,
+  ready,
+  discoveryOnly,
+  failed,
+  ineligible;
+
+  static PostRecommendationStatus fromFirestoreValue(dynamic value) {
+    switch (value?.toString().trim().toLowerCase()) {
+      case 'ready':
+        return PostRecommendationStatus.ready;
+      case 'discovery_only':
+        return PostRecommendationStatus.discoveryOnly;
+      case 'failed':
+        return PostRecommendationStatus.failed;
+      case 'ineligible':
+        return PostRecommendationStatus.ineligible;
+      default:
+        return PostRecommendationStatus.unknown;
+    }
+  }
+}
+
 class PostAuthorModel {
   const PostAuthorModel({
     required this.id,
@@ -366,6 +389,15 @@ class PostModel {
     required this.media,
     required this.tags,
     this.contentVector = const <double>[],
+    this.contentEmbeddingModel,
+    this.contentEmbeddingSignature,
+    this.contentVectorDimensions = 0,
+    this.contentVectorSearchKey,
+    this.contentVectorUpdatedAt,
+    this.recommendationStatus = PostRecommendationStatus.unknown,
+    this.recommendationErrorCode,
+    this.recommendationAttemptCount = 0,
+    this.recommendationUpdatedAt,
     required this.stats,
     required this.trendScore,
     required this.trendBucket,
@@ -402,6 +434,15 @@ class PostModel {
   final List<MediaModel> media;
   final List<String> tags;
   final List<double> contentVector;
+  final String? contentEmbeddingModel;
+  final String? contentEmbeddingSignature;
+  final int contentVectorDimensions;
+  final String? contentVectorSearchKey;
+  final DateTime? contentVectorUpdatedAt;
+  final PostRecommendationStatus recommendationStatus;
+  final String? recommendationErrorCode;
+  final int recommendationAttemptCount;
+  final DateTime? recommendationUpdatedAt;
   final PostVisibility visibility;
   final PostVisibility? requestedVisibility;
   final PostModerationStatus moderationStatus;
@@ -480,6 +521,25 @@ class PostModel {
           .where((tag) => tag.isNotEmpty)
           .toList(growable: false),
       contentVector: _parseDoubleList(json['contentVector']),
+      contentEmbeddingModel: _parseNullableString(
+        json['contentEmbeddingModel'],
+      ),
+      contentEmbeddingSignature: _parseNullableString(
+        json['contentEmbeddingSignature'],
+      ),
+      contentVectorDimensions: _parseInt(json['contentVectorDimensions']),
+      contentVectorSearchKey: _parseNullableString(
+        json['contentVectorSearchKey'],
+      ),
+      contentVectorUpdatedAt: _parseDateTime(json['contentVectorUpdatedAt']),
+      recommendationStatus: PostRecommendationStatus.fromFirestoreValue(
+        json['recommendationStatus'],
+      ),
+      recommendationErrorCode: _parseNullableString(
+        json['recommendationErrorCode'],
+      ),
+      recommendationAttemptCount: _parseInt(json['recommendationAttemptCount']),
+      recommendationUpdatedAt: _parseDateTime(json['recommendationUpdatedAt']),
       visibility: PostVisibility.fromFirestoreValue(
         json['visibility'],
         legacyIsPublic: json['isPublic'],
@@ -518,6 +578,15 @@ class PostModel {
       'media': media.map((item) => item.toJson()).toList(growable: false),
       'tags': tags,
       'contentVector': contentVector,
+      'contentEmbeddingModel': contentEmbeddingModel,
+      'contentEmbeddingSignature': contentEmbeddingSignature,
+      'contentVectorDimensions': contentVectorDimensions,
+      'contentVectorSearchKey': contentVectorSearchKey,
+      'contentVectorUpdatedAt': contentVectorUpdatedAt,
+      'recommendationStatus': _recommendationStatusFirestoreValue,
+      'recommendationErrorCode': recommendationErrorCode,
+      'recommendationAttemptCount': recommendationAttemptCount,
+      'recommendationUpdatedAt': recommendationUpdatedAt,
       'visibility': visibility.firestoreValue,
       'isPublic': isPublic,
       'requestedVisibility': requestedVisibility?.firestoreValue,
@@ -547,6 +616,15 @@ class PostModel {
     List<MediaModel>? media,
     List<String>? tags,
     List<double>? contentVector,
+    String? contentEmbeddingModel,
+    String? contentEmbeddingSignature,
+    int? contentVectorDimensions,
+    String? contentVectorSearchKey,
+    DateTime? contentVectorUpdatedAt,
+    PostRecommendationStatus? recommendationStatus,
+    String? recommendationErrorCode,
+    int? recommendationAttemptCount,
+    DateTime? recommendationUpdatedAt,
     PostVisibility? visibility,
     bool? isPublic,
     PostVisibility? requestedVisibility,
@@ -580,6 +658,23 @@ class PostModel {
       media: media ?? this.media,
       tags: tags ?? this.tags,
       contentVector: contentVector ?? this.contentVector,
+      contentEmbeddingModel:
+          contentEmbeddingModel ?? this.contentEmbeddingModel,
+      contentEmbeddingSignature:
+          contentEmbeddingSignature ?? this.contentEmbeddingSignature,
+      contentVectorDimensions:
+          contentVectorDimensions ?? this.contentVectorDimensions,
+      contentVectorSearchKey:
+          contentVectorSearchKey ?? this.contentVectorSearchKey,
+      contentVectorUpdatedAt:
+          contentVectorUpdatedAt ?? this.contentVectorUpdatedAt,
+      recommendationStatus: recommendationStatus ?? this.recommendationStatus,
+      recommendationErrorCode:
+          recommendationErrorCode ?? this.recommendationErrorCode,
+      recommendationAttemptCount:
+          recommendationAttemptCount ?? this.recommendationAttemptCount,
+      recommendationUpdatedAt:
+          recommendationUpdatedAt ?? this.recommendationUpdatedAt,
       visibility:
           visibility ??
           (isPublic == null
@@ -617,6 +712,21 @@ class PostModel {
     if (value is DateTime) return value;
     if (value is String) return DateTime.tryParse(value);
     return null;
+  }
+
+  String get _recommendationStatusFirestoreValue {
+    switch (recommendationStatus) {
+      case PostRecommendationStatus.discoveryOnly:
+        return 'discovery_only';
+      case PostRecommendationStatus.ready:
+        return 'ready';
+      case PostRecommendationStatus.failed:
+        return 'failed';
+      case PostRecommendationStatus.ineligible:
+        return 'ineligible';
+      case PostRecommendationStatus.unknown:
+        return 'unknown';
+    }
   }
 
   static double _parseDouble(dynamic value) {

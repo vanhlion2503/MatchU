@@ -65,6 +65,7 @@ const {
   removeInterestOnPostUnlike,
   removeInterestOnPostUnsave,
   rebuildStaleInterestVectors,
+  retryFailedPostEmbeddings,
   updateInterestOnPostComment,
   updateInterestOnPostLike,
   updateInterestOnPostSave,
@@ -123,6 +124,7 @@ exports.updateInterestOnPostSave = updateInterestOnPostSave;
 exports.removeInterestOnPostUnsave = removeInterestOnPostUnsave;
 exports.updateInterestOnQuoteOrRepost = updateInterestOnQuoteOrRepost;
 exports.rebuildStaleInterestVectors = rebuildStaleInterestVectors;
+exports.retryFailedPostEmbeddings = retryFailedPostEmbeddings;
 exports.invalidateRecommendationCacheOnRestrictions =
   invalidateRecommendationCacheOnRestrictions;
 exports.invalidateRecommendationCacheOnBlock =

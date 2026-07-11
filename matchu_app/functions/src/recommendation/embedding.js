@@ -1,9 +1,18 @@
 const crypto = require("node:crypto");
 
-const DEFAULT_EMBEDDING_MODEL =
+const DEFAULT_EMBEDDING_SOURCE_MODEL =
   "Xenova/paraphrase-multilingual-mpnet-base-v2";
-const EMBEDDING_MODEL =
-  process.env.RECOMMENDATION_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
+const DEFAULT_EMBEDDING_DTYPE = "q4";
+const EMBEDDING_SOURCE_MODEL =
+  process.env.RECOMMENDATION_EMBEDDING_MODEL ||
+  DEFAULT_EMBEDDING_SOURCE_MODEL;
+const EMBEDDING_DTYPE =
+  process.env.RECOMMENDATION_EMBEDDING_DTYPE || DEFAULT_EMBEDDING_DTYPE;
+// The dtype is part of the model identity so interest vectors and post vectors
+// produced with different quantization levels are never mixed silently.
+const EMBEDDING_MODEL = `${EMBEDDING_SOURCE_MODEL}@${EMBEDDING_DTYPE}`;
+const DEFAULT_EMBEDDING_MODEL =
+  `${DEFAULT_EMBEDDING_SOURCE_MODEL}@${DEFAULT_EMBEDDING_DTYPE}`;
 const EMBEDDING_DIMENSIONS = Number(
   process.env.RECOMMENDATION_EMBEDDING_DIMENSIONS || 768
 );
@@ -51,7 +60,9 @@ async function loadExtractor() {
       const { pipeline, env } = await import("@huggingface/transformers");
       env.allowLocalModels = false;
       env.allowRemoteModels = true;
-      return pipeline("feature-extraction", EMBEDDING_MODEL);
+      return pipeline("feature-extraction", EMBEDDING_SOURCE_MODEL, {
+        dtype: EMBEDDING_DTYPE,
+      });
     })();
   }
 
@@ -92,8 +103,12 @@ async function generatePostEmbedding(postData) {
 
 module.exports = {
   DEFAULT_EMBEDDING_MODEL,
+  DEFAULT_EMBEDDING_DTYPE,
+  DEFAULT_EMBEDDING_SOURCE_MODEL,
+  EMBEDDING_DTYPE,
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
+  EMBEDDING_SOURCE_MODEL,
   embeddingSignatureForPost,
   embeddingSignatureForText,
   generateEmbeddingFromText,

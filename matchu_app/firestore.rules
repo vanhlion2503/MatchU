@@ -741,6 +741,10 @@ service cloud.firestore {
           "contentVectorDimensions",
           "contentVectorSearchKey",
           "contentVectorUpdatedAt",
+          "recommendationStatus",
+          "recommendationErrorCode",
+          "recommendationAttemptCount",
+          "recommendationUpdatedAt",
           "trendScore",
           "trendBucket"
         ]);
@@ -759,6 +763,10 @@ service cloud.firestore {
         && !("contentVectorDimensions" in request.resource.data)
         && !("contentVectorSearchKey" in request.resource.data)
         && !("contentVectorUpdatedAt" in request.resource.data)
+        && !("recommendationStatus" in request.resource.data)
+        && !("recommendationErrorCode" in request.resource.data)
+        && !("recommendationAttemptCount" in request.resource.data)
+        && !("recommendationUpdatedAt" in request.resource.data)
         && (
           !("trendScore" in request.resource.data)
           || request.resource.data.trendScore == 0

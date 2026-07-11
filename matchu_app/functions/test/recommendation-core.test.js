@@ -1,0 +1,104 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const test = require("node:test");
+
+const {
+  calculateTrendingScore,
+  cosineSimilarity,
+  diversifyByAuthor,
+  isPostEmbeddingCurrent,
+  parseVector,
+  resolveRatios,
+} = require("../src/recommendation/core");
+const {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+  embeddingSignatureForPost,
+} = require("../src/recommendation/embedding");
+const {
+  buildEmbeddingSearchKey,
+  recentTrendDayKeys,
+  trendDayKey,
+} = require("../src/recommendation/retrieval");
+
+test("parseVector rejects partially corrupt data", () => {
+  assert.deepEqual(parseVector([0.1, 0.2]), [0.1, 0.2]);
+  assert.deepEqual(parseVector([0.1, Number.NaN]), []);
+  assert.deepEqual(parseVector([0.1, "0.2"]), []);
+});
+
+test("cosine similarity rejects mismatched dimensions", () => {
+  assert.equal(cosineSimilarity([1, 0], [1, 0]), 1);
+  assert.equal(cosineSimilarity([1, 0], [0, 1]), 0);
+  assert.equal(cosineSimilarity([1], [1, 0]), 0);
+});
+
+test("personalization ratios stay normalized without following", () => {
+  const interestVector = Array(EMBEDDING_DIMENSIONS).fill(0.1);
+  const ratios = resolveRatios({
+    effectiveCount: 12,
+    interestVector,
+    interestEmbeddingModel: EMBEDDING_MODEL,
+  }, false);
+
+  assert.ok(Math.abs(ratios.content + ratios.trending - 1) < 1e-12);
+  assert.equal(ratios.following, 0);
+});
+
+test("fresh zero-engagement posts retain a discovery score", () => {
+  const now = Date.now();
+  const score = calculateTrendingScore({
+    createdAt: now,
+    stats: {},
+    trendScore: 0,
+    trendBucket: 0,
+  }, now);
+  assert.ok(score > 0);
+});
+
+test("embedding metadata detects content and model changes", () => {
+  const post = { content: "Flutter Firebase", tags: ["dart"] };
+  const signature = embeddingSignatureForPost(post);
+  const current = {
+    ...post,
+    contentVector: Array(EMBEDDING_DIMENSIONS).fill(0.01),
+    contentEmbeddingModel: EMBEDDING_MODEL,
+    contentEmbeddingSignature: signature,
+    contentVectorDimensions: EMBEDDING_DIMENSIONS,
+    contentVectorSearchKey: buildEmbeddingSearchKey(
+      signature,
+      EMBEDDING_DIMENSIONS
+    ),
+  };
+
+  assert.equal(isPostEmbeddingCurrent(current), true);
+  assert.equal(isPostEmbeddingCurrent({ ...current, content: "AI mới" }), false);
+  assert.equal(isPostEmbeddingCurrent({
+    ...current,
+    contentEmbeddingModel: "old-model",
+  }), false);
+});
+
+test("retrieval index uses stable UTC day keys", () => {
+  const now = Date.UTC(2026, 6, 11, 12, 0, 0);
+  assert.equal(trendDayKey(now), "20260711");
+  assert.deepEqual(recentTrendDayKeys(now, 1), ["20260711", "20260710"]);
+});
+
+test("author diversity preserves pool capacity", () => {
+  const ranked = [
+    ...Array.from({ length: 5 }, (_, index) => ({
+      postId: `a-${index}`,
+      authorId: "a",
+    })),
+    ...Array.from({ length: 3 }, (_, index) => ({
+      postId: `b-${index}`,
+      authorId: "b",
+    })),
+  ];
+
+  const selected = diversifyByAuthor(ranked, 6);
+  assert.equal(selected.length, 6);
+  assert.equal(selected.filter((item) => item.authorId === "b").length, 3);
+});

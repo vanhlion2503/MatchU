@@ -17,6 +17,17 @@ enum FeedStatus { initial, loading, success, empty, error }
 enum FeedTimeline { latest, featured, following }
 
 class FeedController extends GetxController {
+  FeedController({
+    PostService? postService,
+    RecommendationService? recommendationService,
+    PostRestrictionService? restrictionService,
+    GetStorage? storage,
+  }) : _service = postService ?? PostService(),
+       _recommendationService =
+           recommendationService ?? RecommendationService(),
+       _restrictionService = restrictionService ?? PostRestrictionService(),
+       _storage = storage ?? GetStorage();
+
   static const int _pageSize = 10;
   static const double _loadMoreThreshold = 640;
   static const String _hiddenPostsStorageKeyPrefix = 'feed_hidden_posts_';
@@ -26,10 +37,10 @@ class FeedController extends GetxController {
     milliseconds: 220,
   );
 
-  final PostService _service = PostService();
-  final RecommendationService _recommendationService = RecommendationService();
-  final PostRestrictionService _restrictionService = PostRestrictionService();
-  final GetStorage _storage = GetStorage();
+  final PostService _service;
+  final RecommendationService _recommendationService;
+  final PostRestrictionService _restrictionService;
+  final GetStorage _storage;
 
   final RxList<PostModel> posts = <PostModel>[].obs;
   final Rx<FeedStatus> status = FeedStatus.initial.obs;

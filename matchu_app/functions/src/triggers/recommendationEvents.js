@@ -8,6 +8,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { admin, db } = require("../shared/firebase");
 const {
   deactivateRecommendationInteraction,
+  bumpRecommendationFeedRevision,
   ensurePostEmbedding,
   invalidateRecommendationCache,
   isEligiblePost,
@@ -26,8 +27,16 @@ const {
 const REBUILD_BATCH_SIZE = 80;
 const REBUILD_STALE_DAYS = 3;
 const EMBEDDING_BACKFILL_BATCH_SIZE = 80;
+const EMBEDDING_RETRY_BATCH_SIZE = 20;
+// ONNX plus the Cloud Run Node runtime peaks above 2 GiB during cold starts,
+// even with q4 weights. Leave headroom and allow one inference per instance.
+const EMBEDDING_RUNTIME_OPTIONS = Object.freeze({
+  memory: "4GiB",
+  concurrency: 1,
+  maxInstances: 2,
+});
 const EMBEDDING_BACKFILL_GENERATION =
-  `vector_index_v1:${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}`;
+  `vector_index_v2_status:${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}`;
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -67,11 +76,42 @@ function postRecommendationMetadataSignature(data) {
   });
 }
 
+function postRecommendationPoolSignature(data) {
+  return JSON.stringify({
+    content: postContentSignature(data),
+    authorId: cleanId(data?.authorId),
+    referenceAuthorId: cleanId(data?.referencePost?.authorId),
+    visibility: data?.visibility || "",
+    moderationStatus: data?.moderationStatus || "approved",
+    postType: data?.postType || "post",
+    deleted: Boolean(data?.deletedAt),
+  });
+}
+
+function recommendationErrorCode(error) {
+  const rawCode = error?.code || error?.name || "embedding_failed";
+  return String(rawCode)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "_")
+    .slice(0, 80) || "embedding_failed";
+}
+
+async function markRecommendationFailure(postRef, error) {
+  await postRef.set({
+    recommendationStatus: "failed",
+    recommendationErrorCode: recommendationErrorCode(error),
+    recommendationAttemptCount: admin.firestore.FieldValue.increment(1),
+    recommendationUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+}
+
 const embedPostContent = onDocumentWritten(
   {
     document: "posts/{postId}",
     timeoutSeconds: 120,
-    memory: "1GiB",
+    ...EMBEDDING_RUNTIME_OPTIONS,
   },
   async (event) => {
     const postId = cleanId(event.params.postId);
@@ -81,6 +121,7 @@ const embedPostContent = onDocumentWritten(
       await syncRecommendationIndexMetadata(postId, {}, false, {
         eventVersionMillis: eventVersionMillis(event),
       });
+      await bumpRecommendationFeedRevision("post_deleted");
       return;
     }
 
@@ -90,15 +131,30 @@ const embedPostContent = onDocumentWritten(
     const metadataChanged = !event.data?.before?.exists ||
       postRecommendationMetadataSignature(before) !==
         postRecommendationMetadataSignature(after);
+    const poolChanged = !event.data?.before?.exists ||
+      postRecommendationPoolSignature(before) !==
+        postRecommendationPoolSignature(after);
     if (metadataChanged) {
       await syncRecommendationIndexMetadata(postId, after, eligible, {
         eventVersionMillis: eventVersionMillis(event),
       });
     }
+    if (poolChanged && (isEligiblePost(before) || eligible)) {
+      await bumpRecommendationFeedRevision(
+        event.data?.before?.exists ? "post_changed" : "post_created"
+      );
+    }
     if (!eligible) {
-      if (after.contentVectorSearchKey != null) {
+      if (
+        after.contentVectorSearchKey != null ||
+        after.recommendationStatus !== "ineligible"
+      ) {
         await afterSnap.ref.set({
           contentVectorSearchKey: null,
+          recommendationStatus: "ineligible",
+          recommendationErrorCode: admin.firestore.FieldValue.delete(),
+          recommendationAttemptCount: admin.firestore.FieldValue.increment(0),
+          recommendationUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
       }
@@ -107,6 +163,14 @@ const embedPostContent = onDocumentWritten(
 
     const beforeSignature = postContentSignature(before);
     const afterSignature = postContentSignature(after);
+    // A failure write must not recursively invoke the expensive model again.
+    // Content edits and the scheduled retry job still get another attempt.
+    if (
+      after.recommendationStatus === "failed" &&
+      beforeSignature === afterSignature
+    ) {
+      return;
+    }
     if (
       beforeSignature === afterSignature &&
       isPostEmbeddingCurrent(after)
@@ -117,6 +181,7 @@ const embedPostContent = onDocumentWritten(
     try {
       await ensurePostEmbedding(postId, after);
     } catch (error) {
+      await markRecommendationFailure(afterSnap.ref, error);
       console.error("embedPostContent failed:", {
         postId,
         error: error?.message || String(error),
@@ -129,7 +194,7 @@ const updateInterestOnPostLike = onDocumentCreated(
   {
     document: "posts/{postId}/likes/{userId}",
     timeoutSeconds: 120,
-    memory: "1GiB",
+    ...EMBEDDING_RUNTIME_OPTIONS,
   },
   async (event) => {
     const postId = cleanId(event.params.postId);
@@ -171,7 +236,7 @@ const updateInterestOnPostComment = onDocumentCreated(
   {
     document: "posts/{postId}/comments/{commentId}",
     timeoutSeconds: 120,
-    memory: "1GiB",
+    ...EMBEDDING_RUNTIME_OPTIONS,
   },
   async (event) => {
     const postId = cleanId(event.params.postId);
@@ -215,7 +280,7 @@ const updateInterestOnPostSave = onDocumentCreated(
   {
     document: "users/{userId}/savedPosts/{postId}",
     timeoutSeconds: 120,
-    memory: "1GiB",
+    ...EMBEDDING_RUNTIME_OPTIONS,
   },
   async (event) => {
     const uid = toSafeUid(event.params.userId);
@@ -256,7 +321,7 @@ const updateInterestOnQuoteOrRepost = onDocumentWritten(
   {
     document: "posts/{postId}",
     timeoutSeconds: 120,
-    memory: "1GiB",
+    ...EMBEDDING_RUNTIME_OPTIONS,
   },
   async (event) => {
     const postId = cleanId(event.params.postId);
@@ -339,7 +404,7 @@ const backfillRecentPostEmbeddings = onSchedule(
     schedule: "every 15 minutes",
     timeZone: "Asia/Bangkok",
     timeoutSeconds: 540,
-    memory: "1GiB",
+    ...EMBEDDING_RUNTIME_OPTIONS,
   },
   async () => {
     const stateRef = db
@@ -445,6 +510,45 @@ const backfillRecentPostEmbeddings = onSchedule(
   }
 );
 
+const retryFailedPostEmbeddings = onSchedule(
+  {
+    schedule: "every 30 minutes",
+    timeZone: "Asia/Bangkok",
+    timeoutSeconds: 540,
+    ...EMBEDDING_RUNTIME_OPTIONS,
+  },
+  async () => {
+    const snapshot = await db
+      .collection("posts")
+      .where("recommendationStatus", "==", "failed")
+      .limit(EMBEDDING_RETRY_BATCH_SIZE)
+      .get();
+
+    let recoveredCount = 0;
+    for (const doc of snapshot.docs) {
+      const post = doc.data() || {};
+      if (!isEligiblePost(post)) continue;
+      try {
+        await ensurePostEmbedding(doc.id, post, {
+          forceRefresh: true,
+        });
+        recoveredCount += 1;
+      } catch (error) {
+        await markRecommendationFailure(doc.ref, error);
+        console.error("retryFailedPostEmbeddings failed:", {
+          postId: doc.id,
+          error: error?.message || String(error),
+        });
+      }
+    }
+
+    console.info("retryFailedPostEmbeddings completed:", {
+      scannedCount: snapshot.size,
+      recoveredCount,
+    });
+  }
+);
+
 const invalidateRecommendationCacheOnRestrictions = onDocumentWritten(
   "users/{userId}/hiddenPostAuthors/{authorId}",
   async (event) => {
@@ -484,6 +588,7 @@ module.exports = {
   removeInterestOnPostUnlike,
   removeInterestOnPostUnsave,
   rebuildStaleInterestVectors,
+  retryFailedPostEmbeddings,
   updateInterestOnPostComment,
   updateInterestOnPostLike,
   updateInterestOnPostSave,
