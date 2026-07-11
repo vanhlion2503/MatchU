@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/controllers/feed/feed_engagement_controller.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
@@ -89,6 +90,10 @@ class AppPages {
       page: () => const HomeView(),
       binding: BindingsBuilder(() {
         Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
+        Get.lazyPut<FeedEngagementController>(
+          () => FeedEngagementController(),
+          fenix: true,
+        );
         Get.lazyPut<PostRestrictionsController>(
           () => PostRestrictionsController(),
           fenix: true,
@@ -124,6 +129,10 @@ class AppPages {
         // 🔹 Feature
         Get.put(AvatarController());
         Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
+        Get.lazyPut<FeedEngagementController>(
+          () => FeedEngagementController(),
+          fenix: true,
+        );
 
         // 🔥 NEARBY
         Get.put(NearbyController());

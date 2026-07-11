@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { normalizeTopicIds } = require("./topicTaxonomy");
 
 const DEFAULT_EMBEDDING_SOURCE_MODEL =
   "Xenova/paraphrase-multilingual-mpnet-base-v2";
@@ -31,13 +32,7 @@ let extractorPromise = null;
 function normalizeEmbeddingText({ content, tags }) {
   const normalizedContent =
     typeof content === "string" ? content.trim().replace(/\s+/g, " ") : "";
-  const normalizedTags = Array.isArray(tags)
-    ? tags
-        .filter((tag) => typeof tag === "string")
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-        .join(" ")
-    : "";
+  const normalizedTags = normalizeTopicIds(tags).join(" ");
 
   return [normalizedContent, normalizedTags].filter(Boolean).join("\n# ");
 }

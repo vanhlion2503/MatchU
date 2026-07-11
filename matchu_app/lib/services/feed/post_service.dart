@@ -14,6 +14,7 @@ import 'package:matchu_app/models/feed/post_page_result.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/feed/post_text_moderation_service.dart';
+import 'package:matchu_app/utils/topic_taxonomy.dart';
 import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 import 'package:path_provider/path_provider.dart';
@@ -1471,6 +1472,10 @@ class PostService {
       }
 
       final savedSnap = await transaction.get(savedRef);
+      final stats = Map<String, dynamic>.from(
+        postData['stats'] as Map? ?? const <String, dynamic>{},
+      );
+      final currentSaveCount = (stats['saveCount'] as num?)?.toInt() ?? 0;
 
       if (shouldSave) {
         if (savedSnap.exists) return;
@@ -1481,11 +1486,19 @@ class PostService {
           'savedAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
+        transaction.update(postRef, {
+          'stats.saveCount': currentSaveCount + 1,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
         return;
       }
 
       if (!savedSnap.exists) return;
       transaction.delete(savedRef);
+      transaction.update(postRef, {
+        'stats.saveCount': currentSaveCount > 0 ? currentSaveCount - 1 : 0,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 
@@ -2021,18 +2034,7 @@ class PostService {
   }
 
   List<String> _normalizeTags(List<String> tags) {
-    final unique = <String>{};
-
-    for (final tag in tags) {
-      final normalized = tag.trim().toLowerCase().replaceAll(
-        RegExp(r'\s+'),
-        '',
-      );
-      if (normalized.isEmpty) continue;
-      unique.add(normalized);
-    }
-
-    return unique.toList(growable: false);
+    return TopicTaxonomy.normalizeAll(tags);
   }
 
   String _fileExtension(String fileName) {

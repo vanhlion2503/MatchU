@@ -32,14 +32,20 @@ const INTERACTION_HISTORY_LIMIT = 500;
 const TRENDING_FRESHNESS_BASELINE = 0.15;
 const INTEREST_HALF_LIFE_DAYS = 30;
 const MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL = 3;
-const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v1";
+const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v2_feedback";
 const RECOMMENDATION_FEED_STATE_PATH = "system/recommendationFeedState";
 
 const ACTION_WEIGHTS = Object.freeze({
+  dwell: 0.35,
   like: 1.0,
   comment: 1.2,
   save: 1.3,
   share: 1.5,
+});
+const NEGATIVE_ACTION_WEIGHTS = Object.freeze({
+  hide_post: 1.0,
+  hide_author: 1.4,
+  report: 2.0,
 });
 
 function toSafeUid(value) {
@@ -497,6 +503,12 @@ async function buildRecommendationPool(uid) {
     parsedUserVector.length === EMBEDDING_DIMENSIONS
       ? parsedUserVector
       : [];
+  const parsedNegativeVector = parseVector(user.negativeInterestVector);
+  const negativeUserVector =
+    user.negativeInterestEmbeddingModel === EMBEDDING_MODEL &&
+    parsedNegativeVector.length === EMBEDDING_DIMENSIONS
+      ? parsedNegativeVector
+      : [];
   const nowMillis = Date.now();
   const trendingCutoff = nowMillis - (TRENDING_WINDOW_DAYS * 86400000);
   const retrieval = await loadHybridCandidatePosts({
@@ -528,6 +540,9 @@ async function buildRecommendationPool(uid) {
       similarity >= MIN_SIMILARITY
         ? similarity * timeDecay(createdAtMillis, nowMillis)
         : 0;
+    const negativeSimilarity = negativeUserVector.length
+      ? Math.max(0, cosineSimilarity(negativeUserVector, postVector))
+      : 0;
     const rawTrendingScore =
       createdAtMillis >= trendingCutoff
         ? calculateTrendingScore(post, nowMillis)
@@ -544,6 +559,7 @@ async function buildRecommendationPool(uid) {
       contentBasedScore,
       rawTrendingScore,
       followingBoost,
+      negativeSimilarity,
       createdAtMillis,
     });
   }
@@ -560,10 +576,14 @@ async function buildRecommendationPool(uid) {
       (item.contentBasedScore * ratios.content) +
       (trendingScore * ratios.trending) +
       (item.followingBoost * ratios.following);
+    const adjustedFinalScore = Math.max(
+      0,
+      finalScore - (item.negativeSimilarity * 0.35),
+    );
     return {
       ...item,
       trendingScore,
-      finalScore,
+      finalScore: adjustedFinalScore,
     };
   });
 
@@ -811,7 +831,7 @@ async function deactivateRecommendationInteraction({
     ? eventId.trim().replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 140)
     : "";
   if (!normalizedUid || !normalizedPostId || !interactionId ||
-      !ACTION_WEIGHTS[action]) {
+      !(ACTION_WEIGHTS[action] || NEGATIVE_ACTION_WEIGHTS[action])) {
     return;
   }
 
@@ -830,7 +850,7 @@ async function deactivateRecommendationInteraction({
     tx.set(ref, {
       postId: normalizedPostId,
       action,
-      actionWeight: ACTION_WEIGHTS[action],
+      actionWeight: ACTION_WEIGHTS[action] || NEGATIVE_ACTION_WEIGHTS[action],
       active: false,
       eventVersionMillis,
       createdAtMillis: Number(existing.createdAtMillis) || Date.now(),
@@ -846,6 +866,38 @@ async function deactivateRecommendationInteraction({
   } else {
     await invalidateRecommendationCache(normalizedUid, `${action}_removed`);
   }
+}
+
+async function recordNegativeRecommendationInteraction({
+  uid, postId, action, eventId, occurredAt, eventVersionMillis = Date.now(),
+}) {
+  const normalizedUid = toSafeUid(uid);
+  const normalizedPostId = typeof postId === "string" ? postId.trim() : "";
+  const actionWeight = NEGATIVE_ACTION_WEIGHTS[action];
+  if (!normalizedUid || !normalizedPostId || !actionWeight) return;
+  const postSnap = await db.collection("posts").doc(normalizedPostId).get();
+  if (!postSnap.exists) return;
+  const vector = await ensurePostEmbedding(normalizedPostId, postSnap.data() || {});
+  if (!vector.length) return;
+  const interactionId = String(eventId || `${action}_${normalizedPostId}`)
+    .replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 140);
+  await interactionRef(normalizedUid, interactionId).set({
+    postId: normalizedPostId,
+    action,
+    actionWeight,
+    direction: "negative",
+    postVector: vector,
+    active: true,
+    embeddingModel: EMBEDDING_MODEL,
+    vectorDimensions: vector.length,
+    eventVersionMillis,
+    createdAt: occurredAt || admin.firestore.FieldValue.serverTimestamp(),
+    createdAtMillis: toMillis(occurredAt) || Date.now(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  await rebuildUserInterestVector(normalizedUid, {
+    invalidationReason: action,
+  });
 }
 
 async function rebuildUserInterestVector(
@@ -867,6 +919,8 @@ async function rebuildUserInterestVector(
   let totalWeight = 0;
   let rebuiltVector = [];
   let effectiveCount = 0;
+  let negativeTotalWeight = 0;
+  let negativeVector = [];
 
   for (const doc of interactionsSnap.docs) {
     const interaction = doc.data() || {};
@@ -891,6 +945,17 @@ async function rebuildUserInterestVector(
       );
     if (decayedWeight <= 0) continue;
 
+    if (interaction.direction === "negative") {
+      const nextWeight = negativeTotalWeight + decayedWeight;
+      negativeVector = !negativeVector.length
+        ? vector
+        : vector.map((value, index) =>
+          ((negativeVector[index] * negativeTotalWeight) +
+            (value * decayedWeight)) / nextWeight);
+      negativeTotalWeight = nextWeight;
+      continue;
+    }
+
     if (!rebuiltVector.length || rebuiltVector.length !== vector.length) {
       rebuiltVector = vector;
       totalWeight = decayedWeight;
@@ -914,6 +979,9 @@ async function rebuildUserInterestVector(
       interestVector: rebuiltVector,
       interestWeight: Math.min(MAX_WEIGHT_CAP, totalWeight),
       effectiveCount,
+      negativeInterestVector: negativeVector,
+      negativeInterestWeight: Math.min(MAX_WEIGHT_CAP, negativeTotalWeight),
+      negativeInterestEmbeddingModel: EMBEDDING_MODEL,
       interestEmbeddingModel: EMBEDDING_MODEL,
       interestVectorDimensions: rebuiltVector.length,
       interestUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -929,6 +997,7 @@ async function rebuildUserInterestVector(
 
 module.exports = {
   ACTION_WEIGHTS,
+  NEGATIVE_ACTION_WEIGHTS,
   CACHE_POST_POOL_SIZE,
   CACHE_TTL_MS,
   CANDIDATE_LIMIT,
@@ -958,6 +1027,7 @@ module.exports = {
   parseVector,
   rebuildUserInterestVector,
   recordRecommendationInteraction,
+  recordNegativeRecommendationInteraction,
   recommendationCacheRef,
   recommendationFeedStateRef,
   resolveRatios,

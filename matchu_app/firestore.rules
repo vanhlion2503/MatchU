@@ -600,6 +600,41 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    match /users/{userId}/feedImpressions/{postId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function hasValidImpressionData() {
+        return request.resource.data.keys().hasOnly([
+          "userId", "postId", "source", "impressionCount",
+          "totalDwellMs", "lastDwellMs", "firstSeenAt", "lastSeenAt",
+          "updatedAt"
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.postId == postId
+        && request.resource.data.source is string
+        && request.resource.data.impressionCount is int
+        && request.resource.data.impressionCount > 0
+        && request.resource.data.totalDwellMs is int
+        && request.resource.data.totalDwellMs >= 0
+        && request.resource.data.lastDwellMs is int
+        && request.resource.data.lastDwellMs >= 0
+        && request.resource.data.lastDwellMs <= 120000;
+      }
+
+      allow read: if isOwner();
+      allow create: if isOwner() && hasValidImpressionData()
+        && request.resource.data.impressionCount == 1;
+      allow update: if isOwner() && hasValidImpressionData()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.postId == resource.data.postId
+        && request.resource.data.firstSeenAt == resource.data.firstSeenAt
+        && request.resource.data.impressionCount == resource.data.impressionCount + 1
+        && request.resource.data.totalDwellMs >= resource.data.totalDwellMs;
+      allow delete: if false;
+    }
+
     match /users/{userId}/hiddenPosts/{postId} {
       function isOwner() {
         return request.auth != null && request.auth.uid == userId;
@@ -853,6 +888,22 @@ service cloud.firestore {
                 .changedKeys()
                 .hasOnly(["shareCount"])
               && isCounterDelta("shareCount")
+            )
+            || (
+              request.resource.data.stats.diff(resource.data.stats)
+                .changedKeys()
+                .hasOnly(["saveCount"])
+              && isCounterDelta("saveCount")
+              && (
+                (
+                  newStatsValue("saveCount") == oldStatsValue("saveCount") + 1
+                  && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/savedPosts/$(postId))
+                )
+                || (
+                  newStatsValue("saveCount") == oldStatsValue("saveCount") - 1
+                  && !existsAfter(/databases/$(database)/documents/users/$(request.auth.uid)/savedPosts/$(postId))
+                )
+              )
             )
           );
       }

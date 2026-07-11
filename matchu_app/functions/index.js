@@ -69,6 +69,11 @@ const {
   updateInterestOnPostComment,
   updateInterestOnPostLike,
   updateInterestOnPostSave,
+  updateInterestOnDwell,
+  updateNegativeInterestOnHiddenPost,
+  updateNegativeInterestOnHiddenAuthor,
+  updateNegativeInterestOnPostReport,
+  removeNegativeInterestOnUnhideAuthor,
   updateInterestOnQuoteOrRepost,
 } = require("./src/triggers/recommendationEvents");
 const {
@@ -121,6 +126,12 @@ exports.removeInterestOnPostUnlike = removeInterestOnPostUnlike;
 exports.updateInterestOnPostComment = updateInterestOnPostComment;
 exports.removeInterestOnPostCommentDelete = removeInterestOnPostCommentDelete;
 exports.updateInterestOnPostSave = updateInterestOnPostSave;
+exports.updateInterestOnDwell = updateInterestOnDwell;
+exports.updateNegativeInterestOnHiddenPost = updateNegativeInterestOnHiddenPost;
+exports.updateNegativeInterestOnHiddenAuthor = updateNegativeInterestOnHiddenAuthor;
+exports.updateNegativeInterestOnPostReport = updateNegativeInterestOnPostReport;
+exports.removeNegativeInterestOnUnhideAuthor =
+  removeNegativeInterestOnUnhideAuthor;
 exports.removeInterestOnPostUnsave = removeInterestOnPostUnsave;
 exports.updateInterestOnQuoteOrRepost = updateInterestOnQuoteOrRepost;
 exports.rebuildStaleInterestVectors = rebuildStaleInterestVectors;

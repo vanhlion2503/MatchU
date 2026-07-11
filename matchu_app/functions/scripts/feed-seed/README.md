@@ -61,17 +61,17 @@ Production media paths are `posts/{uid}/{postId}/image_{index}.jpg`,
 tool does not invent download URLs or upload unmoderated files. With no media
 configuration, selected image/video posts safely become text-only.
 
-### Current schema/ranking limitations
+### Current schema/ranking notes
 
-- There is no `viewCount`, view collection, per-post location, category field,
-  or topic ID field. Those cases are not fabricated by the seed tool.
-- `StatsModel` contains `saveCount`, but `PostService._setSaved` neither updates
-  it nor has a Cloud Function that does. Firestore rules also omit `saveCount`
-  from client counter updates. The seed keeps its initial value equal to the
-  seeded saved documents, but later app saves can make it stale.
-- Views, reports and hidden-author actions do not train the recommender. Like
-  (1.0), comment (1.2), save (1.3), and quote/repost share (1.5) do. Removing
-  any of these interactions rebuilds the user vector from active history.
+- Feed exposure is aggregated at `users/{uid}/feedImpressions/{postId}`. A
+  visible fraction of at least 60% for three seconds adds a light dwell signal
+  (0.35); raw impressions alone do not train preference.
+- `saveCount` is updated atomically with `savedPosts` and contributes to
+  popularity using the same 1.3 weight as preference learning.
+- Tags are canonical topic IDs. Known aliases are normalized before embedding;
+  changing the normalized content signature causes a real re-embedding.
+- Hide-post (1.0), hide-author (1.4), and report (2.0) build a separate negative
+  vector. It penalizes similar candidates without corrupting positive interest.
 - Candidate retrieval is hybrid: up to 160 global cosine-nearest posts, 120
   seven-day popularity candidates, 180 recent posts, and bounded public posts
   from followed authors are merged before ranking. Similarity must be `>= 0.7`.

@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/controllers/feed/feed_engagement_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
@@ -22,6 +23,7 @@ import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key, this.bottomNavigationVisibility});
@@ -899,46 +901,55 @@ class _FeedRemovalAnimatedPostItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = FeedPalette.of(context);
+    final engagementController = Get.find<FeedEngagementController>();
 
-    return Obx(() {
-      final isRemoving = controller.isPostRemoving(post.postId);
+    return VisibilityDetector(
+      key: ValueKey('feed_exposure_${post.postId}'),
+      onVisibilityChanged:
+          (info) => engagementController.updateVisibility(
+            post.postId,
+            info.visibleFraction,
+          ),
+      child: Obx(() {
+        final isRemoving = controller.isPostRemoving(post.postId);
 
-      return AnimatedSwitcher(
-        duration: controller.postRemovalAnimationDuration,
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return SizeTransition(
-            sizeFactor: animation,
-            axisAlignment: -1,
-            child: FadeTransition(opacity: animation, child: child),
-          );
-        },
-        child:
-            isRemoving
-                ? SizedBox(key: ValueKey('feed_post_removing_${post.postId}'))
-                : Column(
-                  key: ValueKey('feed_post_visible_${post.postId}'),
-                  children: [
-                    if (showDivider)
-                      Divider(height: 1, thickness: 1, color: palette.border),
-                    PostItem(
-                      key: ValueKey(post.postId),
-                      post: post,
-                      onTap: onTap,
-                      onLikeTap: onLikeTap,
-                      onCommentTap: onCommentTap,
-                      onRepostTap: onRepostTap,
-                      onShareTap: onShareTap,
-                      onMoreTap: onMoreTap,
-                      onAuthorTap: onAuthorTap,
-                      onReferenceAuthorTap: onReferenceAuthorTap,
-                      onReferenceTap: onReferenceTap,
-                    ),
-                  ],
-                ),
-      );
-    });
+        return AnimatedSwitcher(
+          duration: controller.postRemovalAnimationDuration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+          child:
+              isRemoving
+                  ? SizedBox(key: ValueKey('feed_post_removing_${post.postId}'))
+                  : Column(
+                    key: ValueKey('feed_post_visible_${post.postId}'),
+                    children: [
+                      if (showDivider)
+                        Divider(height: 1, thickness: 1, color: palette.border),
+                      PostItem(
+                        key: ValueKey(post.postId),
+                        post: post,
+                        onTap: onTap,
+                        onLikeTap: onLikeTap,
+                        onCommentTap: onCommentTap,
+                        onRepostTap: onRepostTap,
+                        onShareTap: onShareTap,
+                        onMoreTap: onMoreTap,
+                        onAuthorTap: onAuthorTap,
+                        onReferenceAuthorTap: onReferenceAuthorTap,
+                        onReferenceTap: onReferenceTap,
+                      ),
+                    ],
+                  ),
+        );
+      }),
+    );
   }
 }
 

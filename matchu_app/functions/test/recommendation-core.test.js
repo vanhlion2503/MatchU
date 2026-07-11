@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  ACTION_WEIGHTS,
+  NEGATIVE_ACTION_WEIGHTS,
   calculateTrendingScore,
   cosineSimilarity,
   diversifyByAuthor,
@@ -11,6 +13,8 @@ const {
   parseVector,
   resolveRatios,
 } = require("../src/recommendation/core");
+const { calculatePopularitySignal } = require("../src/recommendation/retrieval");
+const { normalizeTopicIds } = require("../src/recommendation/topicTaxonomy");
 const {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
@@ -101,4 +105,21 @@ test("author diversity preserves pool capacity", () => {
   const selected = diversifyByAuthor(ranked, 6);
   assert.equal(selected.length, 6);
   assert.equal(selected.filter((item) => item.authorId === "b").length, 3);
+});
+
+test("taxonomy maps aliases to stable topic IDs", () => {
+  assert.deepEqual(
+    normalizeTopicIds([" Flutter ", "flutter-dev", "Lập trình Flutter", "AI"]),
+    ["flutter", "ai"],
+  );
+});
+
+test("save count contributes to popularity with the recommendation weight", () => {
+  const score = calculatePopularitySignal({ stats: { saveCount: 2 } });
+  assert.ok(Math.abs(score - Math.log1p(2.6)) < 1e-12);
+});
+
+test("implicit and negative feedback weights remain intentionally bounded", () => {
+  assert.ok(ACTION_WEIGHTS.dwell < ACTION_WEIGHTS.like);
+  assert.ok(NEGATIVE_ACTION_WEIGHTS.report > NEGATIVE_ACTION_WEIGHTS.hide_post);
 });

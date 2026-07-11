@@ -15,6 +15,7 @@ const {
   isPostEmbeddingCurrent,
   rebuildUserInterestVector,
   recordRecommendationInteraction,
+  recordNegativeRecommendationInteraction,
   toSafeUid,
 } = require("../recommendation/core");
 const {
@@ -71,6 +72,7 @@ function postRecommendationMetadataSignature(data) {
     likeCount: Number(stats.likeCount) || 0,
     commentCount: Number(stats.commentCount) || 0,
     shareCount: Number(stats.shareCount) || 0,
+    saveCount: Number(stats.saveCount) || 0,
     trendScore: Number(data?.trendScore) || 0,
     trendBucket: Number(data?.trendBucket) || 0,
   });
@@ -295,6 +297,103 @@ const updateInterestOnPostSave = onDocumentCreated(
       eventVersionMillis: eventVersionMillis(event),
     });
   }
+);
+
+const updateInterestOnDwell = onDocumentWritten(
+  {
+    document: "users/{userId}/feedImpressions/{postId}",
+    timeoutSeconds: 120,
+    ...EMBEDDING_RUNTIME_OPTIONS,
+  },
+  async (event) => {
+    const beforeMs = Number(event.data?.before?.data()?.totalDwellMs) || 0;
+    const after = event.data?.after?.data() || {};
+    const afterMs = Number(after.totalDwellMs) || 0;
+    // One lightweight learning event per post after meaningful attention.
+    if (beforeMs >= 3000 || afterMs < 3000) return;
+    await recordRecommendationInteraction({
+      uid: event.params.userId,
+      postId: event.params.postId,
+      action: "dwell",
+      eventId: `dwell_${event.params.postId}_${event.params.userId}`,
+      occurredAt: after.lastSeenAt || admin.firestore.FieldValue.serverTimestamp(),
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  },
+);
+
+const updateNegativeInterestOnHiddenPost = onDocumentCreated(
+  {
+    document: "users/{userId}/hiddenPosts/{postId}",
+    timeoutSeconds: 120,
+    ...EMBEDDING_RUNTIME_OPTIONS,
+  },
+  async (event) => recordNegativeRecommendationInteraction({
+    uid: event.params.userId,
+    postId: event.params.postId,
+    action: "hide_post",
+    eventId: `hide_post_${event.params.postId}_${event.params.userId}`,
+    occurredAt: event.data?.data()?.hiddenAt,
+    eventVersionMillis: eventVersionMillis(event),
+  }),
+);
+
+const updateNegativeInterestOnHiddenAuthor = onDocumentCreated(
+  {
+    document: "users/{userId}/hiddenPostAuthors/{authorId}",
+    timeoutSeconds: 120,
+    ...EMBEDDING_RUNTIME_OPTIONS,
+  },
+  async (event) => {
+    const postId = cleanId(event.data?.data()?.sourcePostId);
+    if (!postId) return;
+    await recordNegativeRecommendationInteraction({
+      uid: event.params.userId,
+      postId,
+      action: "hide_author",
+      eventId: `hide_author_${event.params.authorId}_${event.params.userId}`,
+      occurredAt: event.data?.data()?.hiddenAt,
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  },
+);
+
+const removeNegativeInterestOnUnhideAuthor = onDocumentDeleted(
+  {
+    document: "users/{userId}/hiddenPostAuthors/{authorId}",
+    timeoutSeconds: 120,
+    memory: "1GiB",
+  },
+  async (event) => {
+    const postId = cleanId(event.data?.data()?.sourcePostId);
+    if (!postId) return;
+    await deactivateRecommendationInteraction({
+      uid: event.params.userId,
+      postId,
+      action: "hide_author",
+      eventId: `hide_author_${event.params.authorId}_${event.params.userId}`,
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  },
+);
+
+const updateNegativeInterestOnPostReport = onDocumentCreated(
+  {
+    document: "postReports/{reportId}",
+    timeoutSeconds: 120,
+    ...EMBEDDING_RUNTIME_OPTIONS,
+  },
+  async (event) => {
+    const report = event.data?.data() || {};
+    await recordNegativeRecommendationInteraction({
+      uid: report.fromUid,
+      postId: report.postId,
+      action: "report",
+      eventId: `report_${event.params.reportId}`,
+      occurredAt: report.createdAt,
+      eventVersionMillis: eventVersionMillis(event),
+    });
+  },
 );
 
 const removeInterestOnPostUnsave = onDocumentDeleted(
@@ -592,5 +691,10 @@ module.exports = {
   updateInterestOnPostComment,
   updateInterestOnPostLike,
   updateInterestOnPostSave,
+  updateInterestOnDwell,
+  updateNegativeInterestOnHiddenPost,
+  updateNegativeInterestOnHiddenAuthor,
+  updateNegativeInterestOnPostReport,
+  removeNegativeInterestOnUnhideAuthor,
   updateInterestOnQuoteOrRepost,
 };
