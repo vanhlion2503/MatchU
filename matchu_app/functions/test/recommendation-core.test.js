@@ -7,9 +7,12 @@ const {
   ACTION_WEIGHTS,
   NEGATIVE_ACTION_WEIGHTS,
   calculateTrendingScore,
+  calculateSeenPenalty,
+  composeDiversePool,
   cosineSimilarity,
   diversifyByAuthor,
   isPostEmbeddingCurrent,
+  isFrequencyCapped,
   parseVector,
   resolveRatios,
 } = require("../src/recommendation/core");
@@ -122,4 +125,29 @@ test("save count contributes to popularity with the recommendation weight", () =
 test("implicit and negative feedback weights remain intentionally bounded", () => {
   assert.ok(ACTION_WEIGHTS.dwell < ACTION_WEIGHTS.like);
   assert.ok(NEGATIVE_ACTION_WEIGHTS.report > NEGATIVE_ACTION_WEIGHTS.hide_post);
+});
+
+test("seen penalty is capped and 24-hour frequency cap starts at three", () => {
+  const now = Date.now();
+  const impression = {
+    lastSeenAt: now - 1000,
+    lastDwellMs: 8000,
+    frequencyWindowStartedAt: now - 60000,
+    impressionCount24h: 12,
+  };
+  assert.ok(Math.abs(calculateSeenPenalty(impression, now) - 0.40) < 1e-12);
+  assert.equal(isFrequencyCapped(impression, now), true);
+  assert.equal(isFrequencyCapped({ ...impression, impressionCount24h: 2 }, now), false);
+});
+
+test("diverse pool reserves exploration and following slots per page", () => {
+  const ranked = Array.from({ length: 40 }, (_, index) => ({
+    postId: `post-${index}`,
+    contentBasedScore: index < 30 ? 1 : 0,
+    rawTrendingScore: index < 35 ? 1 : 0,
+    followingBoost: index === 39 ? 1 : 0,
+  }));
+  const selected = composeDiversePool(ranked, 20, "stable-seed", "personalized");
+  assert.equal(selected.length, 20);
+  assert.ok(selected.some((item) => item.postId === "post-39"));
 });

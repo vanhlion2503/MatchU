@@ -32,6 +32,7 @@ class RecommendationService {
       _firestore.collection('posts');
 
   int _lastLoadedServerPage = 0;
+  String? _activeSessionId;
 
   Future<PaginatedRecommendations> getRecommendedPosts({
     required String userId,
@@ -59,14 +60,20 @@ class RecommendationService {
     }
 
     try {
+      if (lastDocument == null) {
+        _lastLoadedServerPage = 0;
+        _activeSessionId = null;
+      }
       final page = lastDocument == null ? 1 : _lastLoadedServerPage + 1;
       final callable = _functions.httpsCallable('recommendPosts');
       final response = await callable.call<Map<String, dynamic>>({
         'limit': limit,
         'page': page,
         'forceRefresh': forceRefresh,
+        if (_activeSessionId != null) 'sessionId': _activeSessionId,
       });
       final data = Map<String, dynamic>.from(response.data);
+      _activeSessionId = data['sessionId']?.toString().trim();
       final postIds = (data['postIds'] as List<dynamic>? ?? const <dynamic>[])
           .map((item) => item.toString().trim())
           .where((item) => item.isNotEmpty)
@@ -88,6 +95,8 @@ class RecommendationService {
         metadata: Map<String, dynamic>.from(
           data['metadata'] as Map<dynamic, dynamic>? ?? const {},
         )..['clientProcessingTimeMs'] = stopwatch.elapsedMilliseconds,
+        sessionId: _activeSessionId,
+        poolId: data['poolId']?.toString().trim(),
       );
     } catch (error) {
       debugPrint('RecommendationService.getRecommendedPosts failed: $error');
@@ -173,6 +182,7 @@ class RecommendationService {
         trendingScore: _parseDouble(data['trendingScore']),
         followingBoost: _parseDouble(data['followingBoost']),
         finalScore: _parseDouble(data['finalScore']),
+        seenPenalty: _parseDouble(data['seenPenalty']),
       );
     }
     return result;

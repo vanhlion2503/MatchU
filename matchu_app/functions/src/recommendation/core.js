@@ -32,8 +32,12 @@ const INTERACTION_HISTORY_LIMIT = 500;
 const TRENDING_FRESHNESS_BASELINE = 0.15;
 const INTEREST_HALF_LIFE_DAYS = 30;
 const MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL = 3;
-const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v2_feedback";
+const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v3_sessions";
 const RECOMMENDATION_FEED_STATE_PATH = "system/recommendationFeedState";
+const RECENT_SEEN_WINDOW_MS = 30 * 60 * 1000;
+const IMPRESSION_FREQUENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_SEEN_PENALTY = 0.40;
+const QUALIFIED_DWELL_MS = 5000;
 
 const ACTION_WEIGHTS = Object.freeze({
   dwell: 0.35,
@@ -479,7 +483,116 @@ async function loadHybridCandidatePosts({ userVector, following, nowMillis }) {
   };
 }
 
-async function buildRecommendationPool(uid) {
+function seededRandom(seed) {
+  let state = 2166136261;
+  for (const character of String(seed || "feed")) {
+    state ^= character.charCodeAt(0);
+    state = Math.imul(state, 16777619);
+  }
+  return () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleScoreBands(ranked, seed, bandSize = 0.05) {
+  const random = seededRandom(seed);
+  const result = [];
+  for (let index = 0; index < ranked.length;) {
+    const band = [ranked[index]];
+    const bandScore = ranked[index].finalScore;
+    index += 1;
+    while (index < ranked.length &&
+      Math.abs(ranked[index].finalScore - bandScore) <= bandSize) {
+      band.push(ranked[index]);
+      index += 1;
+    }
+    for (let cursor = band.length - 1; cursor > 0; cursor -= 1) {
+      const target = Math.floor(random() * (cursor + 1));
+      [band[cursor], band[target]] = [band[target], band[cursor]];
+    }
+    result.push(...band);
+  }
+  return result;
+}
+
+function calculateSeenPenalty(impression, nowMillis = Date.now()) {
+  if (!impression) return 0;
+  const lastSeenAt = toMillis(impression.lastSeenAt);
+  const windowStartedAt = toMillis(impression.frequencyWindowStartedAt);
+  const recentSeenPenalty = lastSeenAt &&
+    nowMillis - lastSeenAt < RECENT_SEEN_WINDOW_MS ? 0.22 : 0;
+  const frequencyCount = windowStartedAt &&
+    nowMillis - windowStartedAt < IMPRESSION_FREQUENCY_WINDOW_MS
+    ? Number(impression.impressionCount24h) || 0
+    : 0;
+  const impressionFrequencyPenalty = frequencyCount >= 3
+    ? Math.min(0.12, 0.04 * (frequencyCount - 2))
+    : 0;
+  const qualifiedDwellPenalty = Number(impression.lastDwellMs) >=
+    QUALIFIED_DWELL_MS ? 0.06 : 0;
+  return Math.min(
+    MAX_SEEN_PENALTY,
+    recentSeenPenalty + impressionFrequencyPenalty + qualifiedDwellPenalty,
+  );
+}
+
+function isFrequencyCapped(impression, nowMillis = Date.now()) {
+  const windowStartedAt = toMillis(impression?.frequencyWindowStartedAt);
+  return Boolean(
+    windowStartedAt &&
+    nowMillis - windowStartedAt < IMPRESSION_FREQUENCY_WINDOW_MS &&
+    (Number(impression?.impressionCount24h) || 0) >= 3,
+  );
+}
+
+async function loadFeedImpressions(uid) {
+  const snap = await db.collection("users").doc(uid)
+    .collection("feedImpressions").limit(INTERACTION_HISTORY_LIMIT).get();
+  return new Map(snap.docs.map((doc) => [doc.id, doc.data() || {}]));
+}
+
+function composeDiversePool(ranked, limit, seed, ratioLabel) {
+  const random = seededRandom(`${seed}:exploration`);
+  const available = [...ranked];
+  const selected = [];
+  const selectedIds = new Set();
+  const take = (predicate, count, randomize = false) => {
+    let candidates = available.filter((item) =>
+      !selectedIds.has(item.postId) && predicate(item));
+    if (randomize) candidates = candidates.sort(() => random() - 0.5);
+    for (const item of candidates.slice(0, count)) {
+      selected.push(item);
+      selectedIds.add(item.postId);
+    }
+  };
+
+  // Cold-start reserves more discovery; established profiles approximate 14/3/2/1.
+  const explorationRatio = ratioLabel.startsWith("cold_start") ? 0.20 : 0.10;
+  while (selected.length < limit && selected.length < ranked.length) {
+    const batchSize = Math.min(20, limit - selected.length);
+    const followingCount = Math.round(batchSize * 0.05);
+    const trendingCount = Math.round(batchSize * 0.15);
+    const explorationCount = Math.max(1, Math.round(batchSize * explorationRatio));
+    const personalizedCount = Math.max(
+      0,
+      batchSize - followingCount - trendingCount - explorationCount,
+    );
+    const before = selected.length;
+    take((item) => item.contentBasedScore > 0, personalizedCount);
+    take((item) => item.rawTrendingScore > 0, trendingCount);
+    take(() => true, explorationCount, true);
+    take((item) => item.followingBoost > 0, followingCount);
+    take(() => true, batchSize - (selected.length - before));
+    if (selected.length === before) break;
+  }
+  return selected;
+}
+
+async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = {}) {
   const startedAt = Date.now();
   const userSnap = await db.collection("users").doc(uid).get();
   if (!userSnap.exists) {
@@ -511,11 +624,14 @@ async function buildRecommendationPool(uid) {
       : [];
   const nowMillis = Date.now();
   const trendingCutoff = nowMillis - (TRENDING_WINDOW_DAYS * 86400000);
-  const retrieval = await loadHybridCandidatePosts({
+  const [retrieval, impressions] = await Promise.all([
+    loadHybridCandidatePosts({
     userVector,
     following,
     nowMillis,
-  });
+    }),
+    loadFeedImpressions(uid),
+  ]);
   const candidates = retrieval.candidates;
   const scored = [];
 
@@ -561,6 +677,12 @@ async function buildRecommendationPool(uid) {
       followingBoost,
       negativeSimilarity,
       createdAtMillis,
+      seenPenalty: calculateSeenPenalty(impressions.get(candidate.id), nowMillis),
+      recentlySeen: (() => {
+        const lastSeenAt = toMillis(impressions.get(candidate.id)?.lastSeenAt);
+        return Boolean(lastSeenAt && nowMillis - lastSeenAt < RECENT_SEEN_WINDOW_MS);
+      })(),
+      frequencyCapped: isFrequencyCapped(impressions.get(candidate.id), nowMillis),
     });
   }
 
@@ -578,7 +700,7 @@ async function buildRecommendationPool(uid) {
       (item.followingBoost * ratios.following);
     const adjustedFinalScore = Math.max(
       0,
-      finalScore - (item.negativeSimilarity * 0.35),
+      finalScore - (item.negativeSimilarity * 0.35) - item.seenPenalty,
     );
     return {
       ...item,
@@ -592,7 +714,22 @@ async function buildRecommendationPool(uid) {
     return b.createdAtMillis - a.createdAtMillis;
   });
 
-  const pool = diversifyByAuthor(ranked, CACHE_POST_POOL_SIZE);
+  const unseenRanked = ranked.filter((item) =>
+    !item.recentlySeen && !item.frequencyCapped);
+  // Capped/just-seen posts only return when the unseen candidate supply is short.
+  const seenFallback = ranked.filter((item) =>
+    item.recentlySeen || item.frequencyCapped);
+  const bandShuffled = shuffleScoreBands(
+    [...unseenRanked, ...seenFallback],
+    seed,
+  );
+  const composed = composeDiversePool(
+    bandShuffled,
+    CACHE_POST_POOL_SIZE,
+    seed,
+    ratios.label,
+  );
+  const pool = diversifyByAuthor(composed, CACHE_POST_POOL_SIZE);
   return {
     postIds: pool.map((item) => item.postId),
     scoresByPostId: Object.fromEntries(
@@ -602,6 +739,7 @@ async function buildRecommendationPool(uid) {
           contentBasedScore: item.contentBasedScore,
           trendingScore: item.trendingScore,
           followingBoost: item.followingBoost,
+          seenPenalty: item.seenPenalty,
           finalScore: item.finalScore,
         },
       ])
@@ -616,6 +754,11 @@ async function buildRecommendationPool(uid) {
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
       algorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
+      seed,
+      recentSeenExcludedCount: unseenRanked.length >= CACHE_POST_POOL_SIZE
+        ? seenFallback.length
+        : Math.min(seenFallback.length, CACHE_POST_POOL_SIZE - unseenRanked.length),
+      impressionCount: impressions.size,
       ...retrieval.metadata,
     },
   };
@@ -646,7 +789,10 @@ function diversifyByAuthor(ranked, limit) {
   return selected;
 }
 
-async function getOrBuildRecommendationPool(uid, { forceRefresh = false } = {}) {
+async function getOrBuildRecommendationPool(
+  uid,
+  { forceRefresh = false, seed = `${uid}:${Date.now()}` } = {},
+) {
   const cacheRef = recommendationCacheRef(uid);
   const [cacheSnap, feedStateSnap] = await Promise.all([
     forceRefresh ? Promise.resolve(null) : cacheRef.get(),
@@ -673,7 +819,7 @@ async function getOrBuildRecommendationPool(uid, { forceRefresh = false } = {}) 
     };
   }
 
-  const pool = await buildRecommendationPool(uid);
+  const pool = await buildRecommendationPool(uid, { seed });
   await cacheRef.set(
     {
       ...pool,
@@ -1012,6 +1158,7 @@ module.exports = {
   buildRecommendationPool,
   bumpRecommendationFeedRevision,
   calculateTrendingScore,
+  calculateSeenPenalty,
   cosineSimilarity,
   deactivateRecommendationInteraction,
   diversifyByAuthor,
@@ -1022,8 +1169,10 @@ module.exports = {
   invalidateRecommendationCache,
   isEligiblePost,
   isPostEmbeddingCurrent,
+  isFrequencyCapped,
   loadHybridCandidatePosts,
   normalizeRatios,
+  composeDiversePool,
   parseVector,
   rebuildUserInterestVector,
   recordRecommendationInteraction,
@@ -1031,6 +1180,7 @@ module.exports = {
   recommendationCacheRef,
   recommendationFeedStateRef,
   resolveRatios,
+  shuffleScoreBands,
   timeDecay,
   toMillis,
   toSafeUid,

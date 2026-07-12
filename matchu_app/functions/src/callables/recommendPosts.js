@@ -1,4 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const crypto = require("node:crypto");
+const { admin, db } = require("../shared/firebase");
 
 const {
   getOrBuildRecommendationPool,
@@ -6,6 +8,16 @@ const {
 } = require("../recommendation/core");
 
 const MAX_LIMIT = 50;
+const SESSION_TTL_MS = 30 * 60 * 1000;
+
+function safeSessionId(value) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return /^[A-Za-z0-9_-]{8,100}$/.test(normalized) ? normalized : "";
+}
+
+function sessionRef(uid, sessionId) {
+  return db.collection("users").doc(uid).collection("feedSessions").doc(sessionId);
+}
 
 const recommendPosts = onCall(
   { timeoutSeconds: 60, memory: "1GiB" },
@@ -18,22 +30,71 @@ const recommendPosts = onCall(
     const limit = Math.min(Math.max(Number(request.data?.limit) || 20, 1), MAX_LIMIT);
     const page = Math.max(Number(request.data?.page) || 1, 1);
     const forceRefresh = request.data?.forceRefresh === true;
+    const requestedSessionId = safeSessionId(request.data?.sessionId);
 
     try {
-      const pool = await getOrBuildRecommendationPool(uid, { forceRefresh });
+      const nowMillis = Date.now();
+      let sessionId = forceRefresh ? "" : requestedSessionId;
+      let session = null;
+      if (sessionId) {
+        const sessionSnap = await sessionRef(uid, sessionId).get();
+        const data = sessionSnap.data();
+        if (sessionSnap.exists && Number(data?.expiresAtMillis) > nowMillis &&
+          Array.isArray(data?.postIds)) {
+          session = data;
+        } else {
+          sessionId = "";
+        }
+      }
+
+      if (!session) {
+        sessionId = crypto.randomUUID();
+        const seed = `${uid}:${sessionId}`;
+        const pool = await getOrBuildRecommendationPool(uid, {
+          forceRefresh,
+          seed,
+        });
+        session = {
+          postIds: pool.postIds,
+          scoresByPostId: pool.scoresByPostId || {},
+          metadata: pool.metadata || {},
+          poolId: crypto.randomUUID(),
+          createdAtMillis: nowMillis,
+          expiresAtMillis: nowMillis + SESSION_TTL_MS,
+        };
+        await sessionRef(uid, sessionId).set({
+          ...session,
+          sessionId,
+          servedPostIds: [],
+          algorithmVersion: session.metadata.algorithmVersion || "unknown",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt: admin.firestore.Timestamp.fromMillis(session.expiresAtMillis),
+        });
+      }
+
       const offset = (page - 1) * limit;
-      const selectedPostIds = pool.postIds.slice(offset, offset + limit);
+      const selectedPostIds = session.postIds.slice(offset, offset + limit);
+      if (selectedPostIds.length) {
+        await sessionRef(uid, sessionId).set({
+          servedPostIds: admin.firestore.FieldValue.arrayUnion(...selectedPostIds),
+          lastServedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
 
       return {
         postIds: selectedPostIds,
         limit,
         page,
-        hasMore: offset + limit < pool.postIds.length,
-        scoresByPostId: pool.scoresByPostId || {},
+        hasMore: offset + limit < session.postIds.length,
+        scoresByPostId: session.scoresByPostId || {},
+        sessionId,
+        poolId: session.poolId,
         metadata: {
-          ...(pool.metadata || {}),
+          ...(session.metadata || {}),
+          sessionReused: Boolean(requestedSessionId && requestedSessionId === sessionId),
+          requestError: null,
           totalRecommended: selectedPostIds.length,
-          pagePoolSize: pool.postIds.length,
+          pagePoolSize: session.postIds.length,
         },
         generatedAt: new Date().toISOString(),
       };

@@ -25,6 +25,13 @@ class FeedEngagementRepository {
         .doc(normalizedPostId);
     await _firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(ref);
+      final now = DateTime.now();
+      final currentWindowStart =
+          (snapshot.data()?['frequencyWindowStartedAt'] as Timestamp?)
+              ?.toDate();
+      final isCurrentWindow =
+          currentWindowStart != null &&
+          now.difference(currentWindowStart) < const Duration(hours: 24);
       final data = <String, dynamic>{
         'userId': uid,
         'postId': normalizedPostId,
@@ -34,7 +41,11 @@ class FeedEngagementRepository {
         'lastDwellMs': dwellMs.clamp(0, 120000),
         'lastSeenAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'impressionCount24h': isCurrentWindow ? FieldValue.increment(1) : 1,
       };
+      if (!isCurrentWindow) {
+        data['frequencyWindowStartedAt'] = FieldValue.serverTimestamp();
+      }
       if (!snapshot.exists) data['firstSeenAt'] = FieldValue.serverTimestamp();
       transaction.set(ref, data, SetOptions(merge: true));
     });

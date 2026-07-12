@@ -8,6 +8,7 @@ class RecommendationScore {
     required this.trendingScore,
     required this.followingBoost,
     required this.finalScore,
+    this.seenPenalty = 0,
   });
 
   final String postId;
@@ -15,6 +16,7 @@ class RecommendationScore {
   final double trendingScore;
   final double followingBoost;
   final double finalScore;
+  final double seenPenalty;
 
   Map<String, dynamic> toJson() {
     return {
@@ -23,6 +25,7 @@ class RecommendationScore {
       'trendingScore': trendingScore,
       'followingBoost': followingBoost,
       'finalScore': finalScore,
+      'seenPenalty': seenPenalty,
     };
   }
 }
@@ -36,6 +39,8 @@ class PaginatedRecommendations {
     required this.metadata,
     this.lastDocument,
     this.scoresByPostId = const <String, RecommendationScore>{},
+    this.sessionId,
+    this.poolId,
   });
 
   final List<PostModel> posts;
@@ -45,4 +50,6 @@ class PaginatedRecommendations {
   final Map<String, dynamic> metadata;
   final DocumentSnapshot<Map<String, dynamic>>? lastDocument;
   final Map<String, RecommendationScore> scoresByPostId;
+  final String? sessionId;
+  final String? poolId;
 }

@@ -56,6 +56,8 @@ class FeedController extends GetxController {
   final RxBool featuredIsLoadingMore = false.obs;
   final RxBool featuredHasMore = true.obs;
   final RxnString featuredErrorMessage = RxnString();
+  final RxMap<String, dynamic> featuredRecommendationMetadata =
+      <String, dynamic>{}.obs;
 
   final RxList<PostModel> followingPosts = <PostModel>[].obs;
   final Rx<FeedStatus> followingStatus = FeedStatus.initial.obs;
@@ -842,6 +844,12 @@ class FeedController extends GetxController {
         forceRefresh: reset && isManualRefresh,
       );
       final loadedPosts = await _hydrateFeedPosts(page.posts, reset: reset);
+      featuredRecommendationMetadata.assignAll({
+        ...page.metadata,
+        'sessionId': page.sessionId,
+        'poolId': page.poolId,
+        'requestError': null,
+      });
 
       if (reset) {
         featuredPosts.assignAll(loadedPosts);
@@ -861,6 +869,11 @@ class FeedController extends GetxController {
       }
     } catch (error) {
       final message = _mapError(error);
+      featuredRecommendationMetadata.assignAll({
+        ...featuredRecommendationMetadata,
+        'cacheHit': null,
+        'requestError': error.toString(),
+      });
       if (hadPostsBeforeRequest) {
         featuredStatus.value = FeedStatus.success;
         _showError(message);
