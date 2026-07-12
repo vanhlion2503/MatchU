@@ -37,16 +37,36 @@ class OtherProfileController extends GetxController {
 
   void loadUserRealtime() {
     _userSub?.cancel();
-    _userSub = _userService.streamUser(userId).listen((userdata) async {
-      user.value = userdata;
-      isLoadingFollowing.value = false;
+    _userSub = _userService
+        .streamUser(userId)
+        .listen(
+          (userdata) {
+            user.value = userdata;
+            isLoadingFollowing.value = false;
 
-      if (userdata != null) {
-        isFollowing.value = await _userService.isFollowing(userId);
-        canMessage.value =
-            !hasBlockRelationship && userdata.followers.contains(currentUid);
-      }
-    });
+            if (userdata != null) {
+              canMessage.value =
+                  !hasBlockRelationship &&
+                  userdata.followers.contains(currentUid);
+              unawaited(_loadFollowingState());
+            }
+          },
+          onError: (_) {
+            isLoadingFollowing.value = false;
+          },
+        );
+  }
+
+  Future<void> _loadFollowingState() async {
+    try {
+      isFollowing.value = await _userService
+          .isFollowing(userId)
+          .timeout(const Duration(seconds: 12));
+    } catch (_) {
+      // Keep the realtime profile usable when this secondary read fails.
+    } finally {
+      isLoadingFollowing.value = false;
+    }
   }
 
   Future<void> loadBlockState() async {
@@ -55,12 +75,14 @@ class OtherProfileController extends GetxController {
       final states = await Future.wait([
         _restrictionService.isUserBlocked(userId),
         _restrictionService.isBlockedByUser(userId),
-      ]);
+      ]).timeout(const Duration(seconds: 12));
       isBlocked.value = states[0];
       isBlockedByUser.value = states[1];
       if (hasBlockRelationship) {
         canMessage.value = false;
       }
+    } catch (_) {
+      // Profile content can still be shown when this secondary check fails.
     } finally {
       isLoadingBlockState.value = false;
     }

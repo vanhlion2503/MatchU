@@ -99,6 +99,7 @@ class FeedController extends GetxController {
   final List<PostModel> _followingBufferedPosts = <PostModel>[];
   Set<String> _followingAuthorIds = <String>{};
   bool _followingSourceHasMore = true;
+  Future<void>? _followingRequest;
 
   String get currentUserId => _service.uid;
   Duration get postRemovalAnimationDuration => _postRemovalAnimationDuration;
@@ -899,6 +900,37 @@ class FeedController extends GetxController {
   Future<void> _loadFollowingFeed({
     required bool reset,
     bool isManualRefresh = false,
+  }) async {
+    final activeRequest = _followingRequest;
+    if (activeRequest != null) {
+      // Never let two requests mutate the following cursors and buffers at the
+      // same time. A refresh must run after the current pagination request so
+      // the user's refresh gesture is not silently ignored.
+      await activeRequest;
+      if (isClosed) return;
+      if (!reset) return;
+      return _loadFollowingFeed(reset: true, isManualRefresh: isManualRefresh);
+    }
+
+    final requestCompleter = Completer<void>();
+    final requestFuture = requestCompleter.future;
+    _followingRequest = requestFuture;
+    try {
+      await _performFollowingFeedLoad(
+        reset: reset,
+        isManualRefresh: isManualRefresh,
+      );
+    } finally {
+      requestCompleter.complete();
+      if (identical(_followingRequest, requestFuture)) {
+        _followingRequest = null;
+      }
+    }
+  }
+
+  Future<void> _performFollowingFeedLoad({
+    required bool reset,
+    required bool isManualRefresh,
   }) async {
     final hadPostsBeforeRequest = followingPosts.isNotEmpty;
 

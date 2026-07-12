@@ -784,8 +784,9 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
     final palette = FeedPalette.of(context);
     final theme = Theme.of(context);
     final pendingOffset = widget.isPostSubmitting ? 1 : 0;
-    final itemCount =
-        widget.posts.length + pendingOffset + (widget.isLoadingMore ? 1 : 0);
+    final showEndOfFeed = widget.posts.isNotEmpty && !widget.hasMore;
+    final footerOffset = widget.isLoadingMore || showEndOfFeed ? 1 : 0;
+    final itemCount = widget.posts.length + pendingOffset + footerOffset;
 
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
@@ -809,6 +810,19 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
 
             final postIndex = index - pendingOffset;
             if (postIndex >= widget.posts.length) {
+              if (showEndOfFeed) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                  child: Center(
+                    child: Text(
+                      'Bạn đã xem hết bài viết.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              }
               return FeedPostShimmerItem(
                 key: const ValueKey<String>('feed_load_more_shimmer'),
                 showDivider: widget.posts.isNotEmpty,

@@ -97,9 +97,7 @@ class OtherProfileView extends StatelessWidget {
         ],
       ),
       body: Obx(() {
-        if (c.isLoadingFollowing.value ||
-            c.isLoadingBlockState.value ||
-            c.user.value == null) {
+        if (c.isLoadingBlockState.value || c.user.value == null) {
           return const Center(child: CircularProgressIndicator());
         }
 
