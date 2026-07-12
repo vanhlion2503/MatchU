@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
@@ -70,11 +68,19 @@ class _MainViewState extends State<MainView> {
 
   void _handleTabSelected(int index) {
     if (index == 0) {
-      if (c.currentIndex.value != 0) {
+      final isAlreadyOnHome = c.currentIndex.value == 0;
+      if (!isAlreadyOnHome) {
+        // Returning from another tab must preserve feed data and scroll position.
         c.changePage(0);
+        return;
       }
+
+      // Only a second tap while Home is already active triggers refresh.
       if (Get.isRegistered<FeedController>()) {
-        unawaited(Get.find<FeedController>().refreshActiveFeed());
+        final feedController = Get.find<FeedController>();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          feedController.requestHomeRefresh();
+        });
       }
       return;
     }

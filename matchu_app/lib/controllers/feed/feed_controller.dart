@@ -49,6 +49,7 @@ class FeedController extends GetxController {
   final RxBool hasMore = true.obs;
   final RxnString errorMessage = RxnString();
   final Rx<FeedTimeline> activeTimeline = FeedTimeline.featured.obs;
+  final RxInt homeRefreshRequest = 0.obs;
 
   final RxList<PostModel> featuredPosts = <PostModel>[].obs;
   final Rx<FeedStatus> featuredStatus = FeedStatus.initial.obs;
@@ -386,6 +387,11 @@ class FeedController extends GetxController {
       case FeedTimeline.latest:
         return refreshFeed();
     }
+  }
+
+  /// Lets FeedScreen own the scroll and RefreshIndicator animation.
+  void requestHomeRefresh() {
+    homeRefreshRequest.value++;
   }
 
   Future<void> loadMoreActiveFeed() {

@@ -43,6 +43,10 @@ class _FeedScreenState extends State<FeedScreen>
   final ScrollController _latestScrollController = ScrollController();
   final ScrollController _featuredScrollController = ScrollController();
   final ScrollController _followingScrollController = ScrollController();
+  final GlobalKey<RefreshIndicatorState> _featuredRefreshKey = GlobalKey();
+  final GlobalKey<RefreshIndicatorState> _latestRefreshKey = GlobalKey();
+  final GlobalKey<RefreshIndicatorState> _followingRefreshKey = GlobalKey();
+  Worker? _homeRefreshWorker;
   int _lastSyncedTabIndex = 0;
 
   @override
@@ -64,10 +68,15 @@ class _FeedScreenState extends State<FeedScreen>
     _latestScrollController.addListener(_handleLatestScroll);
     _featuredScrollController.addListener(_handleFeaturedScroll);
     _followingScrollController.addListener(_handleFollowingScroll);
+    _homeRefreshWorker = ever<int>(
+      controller.homeRefreshRequest,
+      (_) => unawaited(_handleHomeRefreshRequest()),
+    );
   }
 
   @override
   void dispose() {
+    _homeRefreshWorker?.dispose();
     _latestScrollController.removeListener(_handleLatestScroll);
     _featuredScrollController.removeListener(_handleFeaturedScroll);
     _followingScrollController.removeListener(_handleFollowingScroll);
@@ -77,6 +86,43 @@ class _FeedScreenState extends State<FeedScreen>
     _followingScrollController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleHomeRefreshRequest() async {
+    if (!mounted) return;
+    final timeline = controller.activeTimeline.value;
+    final scrollController = switch (timeline) {
+      FeedTimeline.featured => _featuredScrollController,
+      FeedTimeline.latest => _latestScrollController,
+      FeedTimeline.following => _followingScrollController,
+    };
+    final refreshKey = switch (timeline) {
+      FeedTimeline.featured => _featuredRefreshKey,
+      FeedTimeline.latest => _latestRefreshKey,
+      FeedTimeline.following => _followingRefreshKey,
+    };
+
+    if (scrollController.hasClients && scrollController.offset > 0) {
+      await scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (!mounted) return;
+
+    // show() renders the same indicator and invokes the same callback as pull-to-refresh.
+    final indicator = refreshKey.currentState;
+    if (indicator != null) {
+      await indicator.show(atTop: true);
+      return;
+    }
+
+    // The feed can still be mounting immediately after switching from another tab.
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) {
+      await refreshKey.currentState?.show(atTop: true);
+    }
   }
 
   void _handleTabControllerChanged() {
@@ -373,6 +419,7 @@ class _FeedScreenState extends State<FeedScreen>
         children: [
           Obx(
             () => _FeedTimelineBody(
+              refreshIndicatorKey: _featuredRefreshKey,
               controller: controller,
               posts: controller.featuredPosts.toList(growable: false),
               status: controller.featuredStatus.value,
@@ -403,6 +450,7 @@ class _FeedScreenState extends State<FeedScreen>
           ),
           Obx(
             () => _FeedTimelineBody(
+              refreshIndicatorKey: _latestRefreshKey,
               controller: controller,
               posts: controller.posts.toList(growable: false),
               status: controller.status.value,
@@ -433,6 +481,7 @@ class _FeedScreenState extends State<FeedScreen>
           ),
           Obx(
             () => _FeedTimelineBody(
+              refreshIndicatorKey: _followingRefreshKey,
               controller: controller,
               posts: controller.followingPosts.toList(growable: false),
               status: controller.followingStatus.value,
@@ -578,6 +627,7 @@ class _CreatePostFloatingButtonState extends State<_CreatePostFloatingButton>
 
 class _FeedTimelineBody extends StatefulWidget {
   const _FeedTimelineBody({
+    required this.refreshIndicatorKey,
     required this.controller,
     required this.posts,
     required this.status,
@@ -604,6 +654,7 @@ class _FeedTimelineBody extends StatefulWidget {
   });
 
   final FeedController controller;
+  final GlobalKey<RefreshIndicatorState> refreshIndicatorKey;
   final List<PostModel> posts;
   final FeedStatus status;
   final bool isLoadingMore;
@@ -701,6 +752,7 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
 
     if (widget.status == FeedStatus.error && widget.posts.isEmpty) {
       return _FeedStateScrollView(
+        refreshIndicatorKey: widget.refreshIndicatorKey,
         onRefresh: widget.onRefresh,
         children: [
           _PostSubmissionStatusBar(isVisible: widget.isPostSubmitting),
@@ -715,6 +767,7 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
 
     if (widget.status == FeedStatus.empty) {
       return _FeedStateScrollView(
+        refreshIndicatorKey: widget.refreshIndicatorKey,
         onRefresh: widget.onRefresh,
         children: [
           _PostSubmissionStatusBar(isVisible: widget.isPostSubmitting),
@@ -737,6 +790,7 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: RefreshIndicator(
+        key: widget.refreshIndicatorKey,
         onRefresh: widget.onRefresh,
         color: theme.colorScheme.primary,
         backgroundColor: palette.surface,
@@ -949,14 +1003,20 @@ class _FeedRemovalAnimatedPostItem extends StatelessWidget {
 }
 
 class _FeedStateScrollView extends StatelessWidget {
-  const _FeedStateScrollView({required this.onRefresh, required this.children});
+  const _FeedStateScrollView({
+    required this.refreshIndicatorKey,
+    required this.onRefresh,
+    required this.children,
+  });
 
+  final GlobalKey<RefreshIndicatorState> refreshIndicatorKey;
   final Future<void> Function() onRefresh;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
+      key: refreshIndicatorKey,
       onRefresh: onRefresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(
