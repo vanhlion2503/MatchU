@@ -13,6 +13,14 @@
     "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
     "https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1200&q=80"
   ],
-  "videoUrls": [],
-  "videoThumbnailUrls": []
+  "videoUrls": [
+    "https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4",
+    "https://flutter.github.io/assets-for-api-docs/assets/videos/butterfly.mp4",
+    "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
+  ],
+  "videoThumbnailUrls": [
+    "https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1473445361085-b9a07f55608b?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=1200&q=80"
+  ]
 }

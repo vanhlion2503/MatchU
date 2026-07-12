@@ -138,6 +138,84 @@ const CONTENT_BY_TOPIC = Object.freeze({
     "Một năm trước mình còn sợ bắt đầu vì nghĩ chưa đủ giỏi.\n\nBây giờ dự án vẫn chưa hoàn hảo, nhưng nó đã tồn tại. Mỗi lần sửa một chi tiết nhỏ, mình lại thấy quyết định bắt đầu ngày ấy thật đáng giá.",
     "Nếu hôm nay chỉ làm được một việc nhỏ cho mục tiêu dài hạn, việc đó vẫn đáng tính. Tiến bộ không cần lúc nào cũng ồn ào. 🌱 #dongluc",
   ],
+  "sức-khỏe": [
+    "Mình bắt đầu để chai nước ngay cạnh bàn làm việc và bất ngờ là uống đủ nước dễ hơn hẳn.",
+    "Có ai duy trì thói quen ngủ trước 11 giờ được lâu chưa? Mình đang thử giảm màn hình từ 10 giờ tối.",
+    "Một buổi đi bộ nhẹ không giải quyết hết mọi chuyện, nhưng thường giúp mình bình tĩnh để nhìn vấn đề rõ hơn.",
+    "Tuần này mình ưu tiên ba việc đơn giản: ngủ đủ, ăn đúng bữa và vận động mỗi ngày một chút.",
+  ],
+  "nấu-ăn": [
+    "Bữa tối hôm nay chỉ có cơm, rau xào và trứng nhưng trình bày đẹp một chút là tự nhiên thấy ngon hơn.",
+    "Mình vừa học cách nêm từng ít một thay vì cho tất cả gia vị ngay từ đầu. Món ăn dễ cứu hơn rất nhiều.",
+    "Có món nào nấu dưới 20 phút mà vẫn đủ rau và đạm không? Cho mình xin ý tưởng cho tuần bận rộn.",
+    "Cuối tuần mình định nấu một nồi lớn rồi chia phần cho ba ngày. Mọi người thường chuẩn bị món gì để không bị ngán?",
+  ],
+  "cà-phê": [
+    "Một góc cửa sổ, ly cà phê ít đá và playlist quen thuộc là đủ cho buổi sáng dễ chịu.",
+    "Mình đang tập phân biệt vị chua tự nhiên và vị đắng của cà phê, càng uống chậm càng thấy nhiều tầng vị.",
+    "Bạn thích quán yên tĩnh để làm việc hay quán đông vui để trò chuyện? Mình chọn khác nhau tùy ngày.",
+    "Hôm nay thử gọi món không quen và bất ngờ lại tìm được đồ uống mới hợp gu.",
+  ],
+  "thú-cưng": [
+    "Bé mèo nhà mình có thể ngủ cả ngày nhưng đúng lúc mình họp là bắt đầu chạy vòng quanh phòng.",
+    "Nuôi thú cưng dạy mình kiên nhẫn với những tiến bộ rất nhỏ, từ một bữa ăn đúng giờ đến lần đầu chịu cắt móng.",
+    "Mọi người có mẹo nào giúp chó bớt lo khi nghe tiếng sấm không? Mình muốn chuẩn bị tốt hơn trước mùa mưa.",
+    "Khoảnh khắc vui nhất hôm nay là được một bạn mèo lạ ngoài ngõ chủ động đến cọ chân.",
+  ],
+  "ngoại-ngữ": [
+    "Mình đổi ngôn ngữ điện thoại sang tiếng Anh một tuần và học được khá nhiều từ dùng hàng ngày.",
+    "Thay vì học danh sách từ rời, mình đang ghi cả câu có ngữ cảnh. Lúc nói nhớ ra nhanh hơn hẳn.",
+    "Có ai muốn lập nhóm luyện nói 15 phút mỗi tối không? Ưu tiên sửa nhẹ nhàng và không ngại sai.",
+    "Hôm nay mình nghe lại một đoạn podcast ba lần: lần đầu hiểu ý, lần hai ghi từ mới, lần ba nhại theo ngữ điệu.",
+  ],
+  "tài-chính-cá-nhân": [
+    "Mình bắt đầu ghi chi tiêu theo nhóm thay vì nhớ trong đầu. Chỉ một tuần đã thấy rõ khoản nào đang vượt kế hoạch.",
+    "Quỹ dự phòng nghe xa vời, nên mình đặt mục tiêu nhỏ là đủ cho một tuần trước rồi mới tăng dần.",
+    "Mọi người thường quyết định một món đồ là nhu cầu hay mong muốn bằng cách nào? Mình đang thử chờ 48 giờ trước khi mua.",
+    "Tháng này mình đặt ngân sách vui chơi riêng để tiêu thoải mái trong giới hạn mà không thấy có lỗi.",
+  ],
+  "khởi-nghiệp": [
+    "Ý tưởng chỉ bắt đầu rõ khi mình nói chuyện với người thực sự gặp vấn đề đó, không phải khi ngồi chỉnh slide.",
+    "Nhóm mình vừa bỏ một tính năng đã làm hai tuần vì người dùng không cần. Tiếc nhưng bài học rất đáng giá.",
+    "Nếu có một tuần để kiểm chứng ý tưởng mới, bạn sẽ làm landing page, prototype hay phỏng vấn người dùng trước?",
+    "Mình thích những sản phẩm giải quyết một việc nhỏ thật tốt hơn là cố làm mọi thứ ngay phiên bản đầu.",
+  ],
+  "thiết-kế": [
+    "Một giao diện đẹp nhưng người dùng không biết bấm đâu thì vẫn chưa hoàn thành nhiệm vụ của thiết kế.",
+    "Mình đang thử thiết kế màn hình ở trạng thái rỗng, lỗi và loading trước khi làm trạng thái đẹp nhất.",
+    "Khoảng trắng không phải chỗ bị bỏ phí; dùng đúng thì nội dung dễ thở và dễ đọc hơn nhiều.",
+    "Bạn thường bắt đầu một màn hình mới từ wireframe đen trắng hay chọn màu và typography trước?",
+  ],
+  "khoa-học": [
+    "Đọc một nghiên cứu thú vị nhất ở phần phương pháp, vì nó cho biết kết luận được xây trên dữ liệu như thế nào.",
+    "Mình vừa xem video giải thích vì sao bầu trời đổi màu lúc hoàng hôn và thấy những điều quen thuộc bỗng mới mẻ.",
+    "Có chủ đề khoa học nào bạn từng nghĩ rất khó nhưng sau một lời giải thích đúng cách lại trở nên dễ hiểu không?",
+    "Tuần này mình thử kiểm tra nguồn gốc của một thông tin trước khi chia sẻ, mất thêm vài phút nhưng yên tâm hơn.",
+  ],
+  "môi-trường": [
+    "Mình mang theo túi vải không phải lúc nào cũng nhớ, nên để sẵn một chiếc trong balô và một chiếc cạnh cửa.",
+    "Sống xanh với mình bắt đầu từ dùng hết đồ đang có, không phải mua ngay một bộ sản phẩm mới.",
+    "Khu mình ở vừa có điểm thu gom pin cũ. Mọi người nhớ tách riêng thay vì bỏ chung với rác sinh hoạt nhé.",
+    "Nếu mỗi người chọn một thói quen giảm rác dễ duy trì nhất, bạn sẽ bắt đầu từ việc nào?",
+  ],
+  "chuyện-công-sở": [
+    "Một cuộc họp tốt nên kết thúc bằng việc ai làm gì và khi nào hoàn thành, nếu không rất dễ họp lại lần nữa.",
+    "Mình đang tập phản hồi vào công việc cụ thể thay vì đánh giá con người. Không khí trao đổi nhẹ hơn nhiều.",
+    "Có cách nào từ chối thêm việc khi lịch đã đầy mà vẫn rõ ràng và tôn trọng không? Cho mình xin kinh nghiệm.",
+    "Hôm nay đồng đội chủ động ghi lại bối cảnh của một quyết định nhỏ, vài tuần sau đọc lại thấy cực kỳ hữu ích.",
+  ],
+  "gia-đình": [
+    "Một cuộc gọi ngắn hỏi thăm đôi khi ý nghĩa hơn việc chờ đến lúc có thật nhiều chuyện mới liên lạc.",
+    "Nhà mình có thói quen ăn chung một bữa cuối tuần, không cần món cầu kỳ nhưng ai cũng cố gắng có mặt.",
+    "Càng lớn mình càng hiểu nhiều lời nhắc của bố mẹ xuất phát từ lo lắng, dù cách thể hiện đôi lúc chưa khéo.",
+    "Mọi người có hoạt động gia đình nào đơn giản nhưng duy trì được nhiều năm không?",
+  ],
+  "sự-kiện": [
+    "Cuối tuần có phiên chợ sáng tạo nhỏ, mình định đi sớm để xem các gian thủ công và tránh quá đông.",
+    "Buổi workshop hôm nay hay nhất ở phần mọi người tự làm và nhận phản hồi, không chỉ ngồi nghe lý thuyết.",
+    "Ai quan tâm công nghệ và thiết kế có muốn đi sự kiện cùng không? Mình thích có người trao đổi sau mỗi phiên.",
+    "Mình vừa đăng ký một hoạt động cộng đồng dù chưa quen ai. Hy vọng sẽ mang về vài câu chuyện mới.",
+  ],
 });
 
 const TOPIC_GROUPS = Object.freeze([
@@ -148,6 +226,9 @@ const TOPIC_GROUPS = Object.freeze([
   ["học-tập", "đời-sống-sinh-viên", "việc-làm", "thực-tập"],
   ["tâm-sự", "tình-bạn", "tình-yêu", "truyền-cảm-hứng"],
   ["tin-cộng-đồng", "thảo-luận", "hài-hước"],
+  ["sức-khỏe", "nấu-ăn", "cà-phê", "thú-cưng"],
+  ["ngoại-ngữ", "tài-chính-cá-nhân", "khởi-nghiệp", "chuyện-công-sở"],
+  ["thiết-kế", "khoa-học", "môi-trường", "sự-kiện", "gia-đình"],
 ]);
 
 const TOPICS = Object.freeze(Object.keys(CONTENT_BY_TOPIC));

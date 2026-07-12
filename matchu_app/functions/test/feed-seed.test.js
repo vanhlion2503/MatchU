@@ -19,8 +19,8 @@ function options(overrides = {}) {
     target: "emulator",
     dryRun: true,
     deleteBatch: false,
-    count: 108,
-    authorCount: 12,
+    count: 160,
+    authorCount: 16,
     interactionActorCount: 8,
     maxAgeDays: 120,
     topics: [...TOPICS],
@@ -49,12 +49,12 @@ function users(count, prefix) {
   }));
 }
 
-test("content catalog has three distinct, production-sized variants per topic", () => {
-  assert.equal(TOPICS.length, 27);
+test("content catalog has at least three distinct production-sized variants per topic", () => {
+  assert.ok(TOPICS.length >= 40);
   for (const topic of TOPICS) {
     const variants = CONTENT_BY_TOPIC[topic];
-    assert.equal(variants.length, 3, topic);
-    assert.equal(new Set(variants).size, 3, topic);
+    assert.ok(variants.length >= 3, topic);
+    assert.equal(new Set(variants).size, variants.length, topic);
     for (const content of variants) {
       assert.ok(content.length > 0, topic);
       assert.ok(content.length <= 300, `${topic}: ${content.length}`);

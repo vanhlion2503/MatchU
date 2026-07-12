@@ -21,6 +21,27 @@ const COMMENT_TEXTS = Object.freeze([
   "Mình chọn phương án thứ hai vì dễ áp dụng hơn.",
   "Lưu lại để cuối tuần thử nhé.",
   "Có ai đã áp dụng lâu hơn một tháng chưa?",
+  "Mình có trải nghiệm hơi khác một chút, nhưng cách bạn phân tích rất dễ hiểu.",
+  "Phần này đúng lúc mình đang cần, cảm ơn bạn nhé.",
+  "Bạn có thể chia sẻ thêm nguồn để mình đọc sâu hơn không?",
+  "Mình đã gửi bài này cho nhóm bạn vì chủ đề đang được bàn khá nhiều.",
+  "Nếu áp dụng cho người mới bắt đầu thì nên làm bước nào trước nhỉ?",
+  "Đồng ý với ý chính, nhưng mình nghĩ vẫn cần cân nhắc hoàn cảnh của từng người.",
+  "Ảnh đẹp và nội dung cũng rất có tâm. Chờ bài tiếp theo của bạn!",
+  "Mình thử từ ngày mai, vài hôm nữa quay lại cập nhật kết quả.",
+]);
+
+const CONTENT_CONTEXTS = Object.freeze([
+  "Mình ghi lại ở đây để vài tuần nữa quay lại xem điều gì thực sự hiệu quả.",
+  "Đây là trải nghiệm cá nhân nên mình cũng muốn nghe thêm góc nhìn khác.",
+  "Nếu bạn từng ở tình huống tương tự, chia sẻ cách bạn xử lý nhé.",
+  "Điều nhỏ nhất mình có thể bắt đầu ngay hôm nay là gì nhỉ?",
+  "Sau một thời gian thử và điều chỉnh, mình thấy sự đều đặn quan trọng hơn hoàn hảo.",
+  "Mình vẫn đang học nên mọi góp ý cụ thể đều rất đáng quý.",
+  "Có lẽ cuối tuần này mình sẽ thử lại theo một cách đơn giản hơn.",
+  "Không biết trải nghiệm của mọi người có giống mình không?",
+  "Mình thích những thay đổi nhỏ nhưng có thể duy trì lâu dài.",
+  "Đọc lại mới thấy tiến bộ đôi khi nằm ở những chi tiết rất khó nhận ra.",
 ]);
 
 function parseBoolean(value, fallback = false) {
@@ -375,7 +396,9 @@ function buildSeedUser(options, index, role = "author") {
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D")
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, "") + String(profileIndex + 1);
+    .replace(/[^a-z0-9]/g, "") +
+    (role === "actor" ? "p" : "a") +
+    String(profileIndex + 1);
   const avatarUrl = `https://i.pravatar.cc/300?img=${(profileIndex % 70) + 1}`;
   return {
     id,
@@ -550,8 +573,11 @@ function chooseMediaType(ratios, index) {
 
 function buildMedia(mediaType, mediaConfig, index) {
   if (mediaType === "image" && mediaConfig.imageUrls.length > 0) {
-    const count =
-      index % 5 === 0 ? Math.min(3, mediaConfig.imageUrls.length) : 1;
+    const count = index % 11 === 0
+      ? Math.min(4, mediaConfig.imageUrls.length)
+      : index % 5 === 0
+        ? Math.min(2, mediaConfig.imageUrls.length)
+        : 1;
     return Array.from({ length: count }, (_, position) => ({
       url: mediaConfig.imageUrls[
         (index + position) % mediaConfig.imageUrls.length
@@ -567,7 +593,7 @@ function buildMedia(mediaType, mediaConfig, index) {
             index % mediaConfig.videoThumbnailUrls.length
           ]
         : undefined;
-    return [
+    const items = [
       {
         url: mediaConfig.videoUrls[index % mediaConfig.videoUrls.length],
         type: "video",
@@ -575,6 +601,15 @@ function buildMedia(mediaType, mediaConfig, index) {
         ...(thumbnailUrl ? { thumbnailUrl } : {}),
       },
     ];
+    // A small mixed-media slice exercises video + picture rendering.
+    if (index % 4 === 0 && mediaConfig.imageUrls.length > 0) {
+      items.push({
+        url: mediaConfig.imageUrls[index % mediaConfig.imageUrls.length],
+        type: "image",
+        mimeType: "image/jpeg",
+      });
+    }
+    return items;
   }
   return [];
 }
@@ -649,6 +684,14 @@ function buildPosts(options, authors, mediaConfig) {
     const variantIndex =
       Math.floor(index / options.topics.length) % variants.length;
     let content = variants[variantIndex];
+    const contentCycle = Math.floor(index / (options.topics.length * variants.length));
+    if (contentCycle > 0) {
+      const context = CONTENT_CONTEXTS[
+        hashNumber(`${options.seedBatchId}:context:${index}`) %
+          CONTENT_CONTEXTS.length
+      ];
+      content = `${content}\n\n${context}`.slice(0, 300);
+    }
     const id = `seed_${sanitizeId(options.seedBatchId)}_post_${String(index + 1).padStart(4, "0")}`;
     let postType = "post";
     let referencePost = null;
@@ -714,7 +757,9 @@ function buildPosts(options, authors, mediaConfig) {
         "popular",
         "comment-heavy",
         "save-heavy",
-      ][index % 6],
+        "viral",
+        "discussion-viral",
+      ][index % 8],
       referencePost,
       data: {
         postId: id,
@@ -722,8 +767,9 @@ function buildPosts(options, authors, mediaConfig) {
         postType,
         content,
         media,
-        tags:
-          index % 4 === 0
+        tags: index % 5 === 0
+          ? []
+          : index % 4 === 0
             ? [topic, TOPIC_GROUPS[groupIndex][0]].filter(
                 (item, pos, list) => list.indexOf(item) === pos,
               )
@@ -772,7 +818,9 @@ function buildPosts(options, authors, mediaConfig) {
           "popular",
           "comment-heavy",
           "save-heavy",
-        ][index % 6],
+          "viral",
+          "discussion-viral",
+        ][index % 8],
       },
     });
   }
@@ -796,21 +844,33 @@ function desiredCounts(profile, actorCount) {
       };
     case "popular":
       return {
-        likes: Math.min(10, unique),
-        comments: Math.min(7, actorCount * 2),
-        saves: Math.min(5, unique),
+        likes: Math.min(20, unique),
+        comments: Math.min(16, actorCount * 2),
+        saves: Math.min(10, unique),
       };
     case "comment-heavy":
       return {
-        likes: Math.min(2, unique),
-        comments: Math.min(10, actorCount * 2),
-        saves: Math.min(1, unique),
+        likes: Math.min(8, unique),
+        comments: Math.min(24, actorCount * 2),
+        saves: Math.min(3, unique),
       };
     case "save-heavy":
       return {
-        likes: Math.min(2, unique),
-        comments: 1,
-        saves: Math.min(9, unique),
+        likes: Math.min(10, unique),
+        comments: 5,
+        saves: Math.min(20, unique),
+      };
+    case "viral":
+      return {
+        likes: Math.min(40, unique),
+        comments: Math.min(32, actorCount * 2),
+        saves: Math.min(24, unique),
+      };
+    case "discussion-viral":
+      return {
+        likes: Math.min(28, unique),
+        comments: Math.min(45, actorCount * 2),
+        saves: Math.min(12, unique),
       };
     default:
       return { likes: 0, comments: 0, saves: 0 };
@@ -991,7 +1051,11 @@ async function generateRealEmbeddings(options, posts) {
       post.data.visibility === "public" &&
       post.data.moderationStatus === "approved" &&
       !post.data.deletedAt &&
-      post.data.postType !== "repost",
+      post.data.postType !== "repost" &&
+      (
+        String(post.data.content || "").trim().length > 0 ||
+        (Array.isArray(post.data.tags) && post.data.tags.length > 0)
+      ),
   );
   console.info(
     `[feed-seed] generating ${eligible.length} real embeddings with ${EMBEDDING_MODEL}`,
