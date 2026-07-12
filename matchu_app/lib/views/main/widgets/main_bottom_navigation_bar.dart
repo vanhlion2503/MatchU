@@ -8,6 +8,7 @@ class MainBottomNavigationBar extends StatefulWidget {
     required this.currentIndex,
     required this.isVisible,
     required this.unreadCount,
+    required this.isHomeRefreshing,
     required this.onTabSelected,
     required this.onCenterTap,
   });
@@ -15,6 +16,7 @@ class MainBottomNavigationBar extends StatefulWidget {
   final int currentIndex;
   final bool isVisible;
   final int unreadCount;
+  final bool isHomeRefreshing;
   final ValueChanged<int> onTabSelected;
   final VoidCallback onCenterTap;
 
@@ -201,6 +203,7 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
               child: _MainNavBarItem(
                 icon: Iconsax.home_2,
                 isSelected: widget.currentIndex == 0,
+                isLoading: widget.isHomeRefreshing,
                 onTap: () => widget.onTabSelected(0),
               ),
             ),
@@ -376,12 +379,14 @@ class _MainNavBarItem extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.badgeCount = 0,
+    this.isLoading = false,
   });
 
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
   final int badgeCount;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -403,14 +408,26 @@ class _MainNavBarItem extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Center(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    child: Icon(
-                      icon,
-                      size: isSelected ? 24 : 22,
-                      color: isSelected ? selectedColor : unselectedColor,
-                    ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child:
+                        isLoading
+                            ? SizedBox(
+                              key: const ValueKey<String>('home_refreshing'),
+                              width: 21,
+                              height: 21,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: selectedColor,
+                              ),
+                            )
+                            : Icon(
+                              icon,
+                              key: ValueKey<IconData>(icon),
+                              size: isSelected ? 24 : 22,
+                              color:
+                                  isSelected ? selectedColor : unselectedColor,
+                            ),
                   ),
                 ),
                 if (badgeCount > 0)

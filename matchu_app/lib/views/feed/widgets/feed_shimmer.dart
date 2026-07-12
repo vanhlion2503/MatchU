@@ -10,9 +10,6 @@ class FeedShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = FeedPalette.of(context);
-    final shimmer = _FeedShimmerColors.of(context);
-
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(
         parent: BouncingScrollPhysics(),
@@ -20,21 +17,42 @@ class FeedShimmer extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(0, 12, 0, 120),
       itemCount: itemCount,
       itemBuilder: (_, index) {
-        return Column(
-          children: [
-            if (index > 0)
-              Padding(
-                padding: const EdgeInsets.only(left: 68, right: 16),
-                child: Divider(height: 1, thickness: 1, color: palette.border),
-              ),
-            _PostSkeleton(
-              palette: palette,
-              colors: shimmer,
-              showMedia: index.isEven,
-            ),
-          ],
+        return FeedPostShimmerItem(
+          showDivider: index > 0,
+          showMedia: index.isEven,
         );
       },
+    );
+  }
+}
+
+/// A single post placeholder for pagination without nesting another ListView.
+class FeedPostShimmerItem extends StatelessWidget {
+  const FeedPostShimmerItem({
+    super.key,
+    this.showDivider = true,
+    this.showMedia = false,
+  });
+
+  final bool showDivider;
+  final bool showMedia;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = FeedPalette.of(context);
+    return Column(
+      children: [
+        if (showDivider)
+          Padding(
+            padding: const EdgeInsets.only(left: 68, right: 16),
+            child: Divider(height: 1, thickness: 1, color: palette.border),
+          ),
+        _PostSkeleton(
+          palette: palette,
+          colors: _FeedShimmerColors.of(context),
+          showMedia: showMedia,
+        ),
+      ],
     );
   }
 }

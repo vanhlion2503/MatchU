@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
+import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/views/chat/list_chat/chat_list_view.dart';
@@ -65,6 +68,19 @@ class _MainViewState extends State<MainView> {
     _isHomeBottomNavigationVisible.value = true;
   }
 
+  void _handleTabSelected(int index) {
+    if (index == 0) {
+      if (c.currentIndex.value != 0) {
+        c.changePage(0);
+      }
+      if (Get.isRegistered<FeedController>()) {
+        unawaited(Get.find<FeedController>().refreshActiveFeed());
+      }
+      return;
+    }
+    c.changePage(index);
+  }
+
   @override
   void dispose() {
     _tabIndexWorker?.dispose();
@@ -92,6 +108,12 @@ class _MainViewState extends State<MainView> {
                 return Obx(() {
                   final int currentIndex = c.currentIndex.value;
                   final int unreadCount = unreadController.totalUnread.value;
+                  final feedController =
+                      Get.isRegistered<FeedController>()
+                          ? Get.find<FeedController>()
+                          : null;
+                  final isHomeRefreshing =
+                      feedController?.visibleIsRefreshing ?? false;
                   final bool isBottomNavigationVisible =
                       currentIndex == 0 ? isHomeBottomNavigationVisible : true;
 
@@ -99,7 +121,8 @@ class _MainViewState extends State<MainView> {
                     currentIndex: currentIndex,
                     isVisible: isBottomNavigationVisible,
                     unreadCount: unreadCount,
-                    onTabSelected: c.changePage,
+                    isHomeRefreshing: isHomeRefreshing,
+                    onTabSelected: _handleTabSelected,
                     onCenterTap: () => c.changePage(2),
                   );
                 });

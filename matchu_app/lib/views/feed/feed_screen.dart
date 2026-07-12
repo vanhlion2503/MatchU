@@ -755,15 +755,10 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
 
             final postIndex = index - pendingOffset;
             if (postIndex >= widget.posts.length) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 18),
-                child: Center(
-                  child: SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2.3),
-                  ),
-                ),
+              return FeedPostShimmerItem(
+                key: const ValueKey<String>('feed_load_more_shimmer'),
+                showDivider: widget.posts.isNotEmpty,
+                showMedia: false,
               );
             }
 
