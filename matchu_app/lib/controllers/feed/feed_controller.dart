@@ -31,8 +31,6 @@ class FeedController extends GetxController {
   static const int _pageSize = 10;
   static const double _loadMoreThreshold = 640;
   static const String _hiddenPostsStorageKeyPrefix = 'feed_hidden_posts_';
-  static const int _followingCandidateBatchSize = 24;
-  static const int _followingScanPassesPerRequest = 6;
   static const Duration _postRemovalAnimationDuration = Duration(
     milliseconds: 220,
   );
@@ -91,7 +89,11 @@ class FeedController extends GetxController {
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   int _featuredLastLoadedPage = 0;
   String? _featuredSessionId;
-  DocumentSnapshot<Map<String, dynamic>>? _followingLastDocument;
+  final Map<String, DocumentSnapshot<Map<String, dynamic>>>
+  _followingPublicLastDocumentsByChunk =
+      <String, DocumentSnapshot<Map<String, dynamic>>>{};
+  final Set<String> _followingPublicExhaustedChunkKeys = <String>{};
+  Set<String> _followingPublicActiveChunkKeys = <String>{};
   final Map<String, DocumentSnapshot<Map<String, dynamic>>>
   _followingFollowersOnlyLastDocuments =
       <String, DocumentSnapshot<Map<String, dynamic>>>{};
@@ -99,7 +101,6 @@ class FeedController extends GetxController {
   final List<PostModel> _featuredBufferedPosts = <PostModel>[];
   final List<PostModel> _followingBufferedPosts = <PostModel>[];
   Set<String> _followingAuthorIds = <String>{};
-  bool _followingSourceHasMore = true;
   Future<void>? _followingRequest;
 
   String get currentUserId => _service.uid;
@@ -945,11 +946,12 @@ class FeedController extends GetxController {
         followingStatus.value = FeedStatus.loading;
       }
       followingErrorMessage.value = null;
-      _followingLastDocument = null;
+      _followingPublicLastDocumentsByChunk.clear();
+      _followingPublicExhaustedChunkKeys.clear();
+      _followingPublicActiveChunkKeys = <String>{};
       _followingFollowersOnlyLastDocuments.clear();
       _followingFollowersOnlyExhaustedAuthorIds.clear();
       _followingBufferedPosts.clear();
-      _followingSourceHasMore = true;
       followingHasMore.value = true;
     } else {
       if (followingIsLoadingMore.value || !followingHasMore.value) return;
@@ -968,11 +970,12 @@ class FeedController extends GetxController {
         if (reset) {
           followingPosts.clear();
         }
-        _followingLastDocument = null;
+        _followingPublicLastDocumentsByChunk.clear();
+        _followingPublicExhaustedChunkKeys.clear();
+        _followingPublicActiveChunkKeys = <String>{};
         _followingFollowersOnlyLastDocuments.clear();
         _followingFollowersOnlyExhaustedAuthorIds.clear();
         _followingBufferedPosts.clear();
-        _followingSourceHasMore = false;
         followingHasMore.value = false;
         followingStatus.value = FeedStatus.empty;
         return;
@@ -980,9 +983,6 @@ class FeedController extends GetxController {
 
       final loadedPosts = <PostModel>[];
       final loadedPostIds = <String>{};
-      var cursor = reset ? null : _followingLastDocument;
-      var sourceHasMore = reset ? true : _followingSourceHasMore;
-      var scanPass = 0;
       final existingIds = <String>{
         if (!reset) ...followingPosts.map((post) => post.postId.trim()),
       };
@@ -1017,78 +1017,60 @@ class FeedController extends GetxController {
       }
 
       if (loadedPosts.length < _pageSize) {
-        final followersOnlyPage = await _service
-            .fetchFollowersOnlyPostsByAuthors(
-              authorIds: followingAuthorIds,
-              startAfterByAuthor: Map.of(_followingFollowersOnlyLastDocuments),
-              exhaustedAuthorIds: Set.of(
-                _followingFollowersOnlyExhaustedAuthorIds,
-              ),
-              limitPerAuthor: reset ? 2 : 1,
-            );
+        final followersOnlyFuture = _service.fetchFollowersOnlyPostsByAuthors(
+          authorIds: followingAuthorIds,
+          startAfterByAuthor: Map.of(_followingFollowersOnlyLastDocuments),
+          exhaustedAuthorIds: Set.of(_followingFollowersOnlyExhaustedAuthorIds),
+          limitPerAuthor: reset ? 2 : 1,
+        );
+        final publicFuture = _service.fetchPublicPostsByAuthors(
+          authorIds: followingAuthorIds,
+          startAfterByChunk: Map.of(_followingPublicLastDocumentsByChunk),
+          exhaustedChunkKeys: Set.of(_followingPublicExhaustedChunkKeys),
+          limitPerChunk: _pageSize,
+        );
+        final followersOnlyPage = await followersOnlyFuture;
+        final publicPage = await publicFuture;
         _followingFollowersOnlyLastDocuments.addAll(
           followersOnlyPage.lastDocumentsByAuthor,
         );
         _followingFollowersOnlyExhaustedAuthorIds.addAll(
           followersOnlyPage.exhaustedAuthorIds,
         );
+        _followingPublicLastDocumentsByChunk.addAll(
+          publicPage.lastDocumentsByChunk,
+        );
+        _followingPublicExhaustedChunkKeys.addAll(
+          publicPage.exhaustedChunkKeys,
+        );
+        _followingPublicActiveChunkKeys = publicPage.activeChunkKeys;
 
-        final hydratedFollowersOnlyPosts = await _hydrateFeedPosts(
-          followersOnlyPage.posts,
+        final combinedCandidates = <String, PostModel>{
+          for (final post in followersOnlyPage.posts) post.postId: post,
+          for (final post in publicPage.posts) post.postId: post,
+        }.values.toList(growable: false)..sort((a, b) {
+          final aCreatedAt =
+              a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bCreatedAt =
+              b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return bCreatedAt.compareTo(aCreatedAt);
+        });
+        final hydratedCandidates = await _hydrateFeedPosts(
+          combinedCandidates,
           reset: false,
         );
-        final acceptedFollowersOnlyPosts = <PostModel>[];
-        for (final post in hydratedFollowersOnlyPosts) {
+        final acceptedCandidates = <PostModel>[];
+        for (final post in hydratedCandidates) {
           final postId = post.postId.trim();
           if (postId.isEmpty ||
               existingIds.contains(postId) ||
               loadedPostIds.contains(postId)) {
             continue;
           }
-          acceptedFollowersOnlyPosts.add(post);
+          acceptedCandidates.add(post);
           loadedPostIds.add(postId);
         }
-        acceptFollowingPosts(acceptedFollowersOnlyPosts);
-      }
-
-      while (loadedPosts.length < _pageSize &&
-          sourceHasMore &&
-          scanPass < _followingScanPassesPerRequest) {
-        final page = await _service.fetchLatestPosts(
-          startAfter: cursor,
-          limit: _followingCandidateBatchSize,
-        );
-        cursor = page.lastDocument;
-        sourceHasMore = page.hasMore;
-
-        final followingCandidates = page.posts
-            .where((post) => followingAuthorIds.contains(post.authorId.trim()))
-            .toList(growable: false);
-
-        if (followingCandidates.isEmpty) {
-          scanPass++;
-          continue;
-        }
-
-        final hydratedBatch = await _hydrateFeedPosts(
-          followingCandidates,
-          reset: false,
-        );
-
-        final acceptedBatch = <PostModel>[];
-        for (final post in hydratedBatch) {
-          final postId = post.postId.trim();
-          if (postId.isEmpty ||
-              existingIds.contains(postId) ||
-              loadedPostIds.contains(postId)) {
-            continue;
-          }
-          acceptedBatch.add(post);
-          loadedPostIds.add(postId);
-        }
-
-        acceptFollowingPosts(acceptedBatch);
-        scanPass++;
+        acceptFollowingPosts(acceptedCandidates);
       }
 
       loadedPosts.sort((a, b) {
@@ -1105,11 +1087,12 @@ class FeedController extends GetxController {
         followingPosts.assignAll(_mergePosts(followingPosts, loadedPosts));
       }
 
-      _followingLastDocument = cursor;
-      _followingSourceHasMore = sourceHasMore;
+      final publicHasMore =
+          _followingPublicExhaustedChunkKeys.length <
+          _followingPublicActiveChunkKeys.length;
       followingHasMore.value =
           _followingBufferedPosts.isNotEmpty ||
-          _followingSourceHasMore ||
+          publicHasMore ||
           _followingFollowersOnlyExhaustedAuthorIds.length <
               followingAuthorIds.length;
 

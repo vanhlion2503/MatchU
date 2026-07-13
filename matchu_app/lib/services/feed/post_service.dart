@@ -286,6 +286,142 @@ class PostService {
     );
   }
 
+  Future<
+    ({
+      List<PostModel> posts,
+      Map<String, DocumentSnapshot<Map<String, dynamic>>> lastDocumentsByChunk,
+      Set<String> exhaustedChunkKeys,
+      Set<String> activeChunkKeys,
+    })
+  >
+  fetchPublicPostsByAuthors({
+    required Iterable<String> authorIds,
+    required Map<String, DocumentSnapshot<Map<String, dynamic>>>
+    startAfterByChunk,
+    required Set<String> exhaustedChunkKeys,
+    int limitPerChunk = defaultPageSize,
+  }) async {
+    final normalizedAuthorIds = authorIds
+      .map((authorId) => authorId.trim())
+      .where((authorId) => authorId.isNotEmpty)
+      .toSet()
+      .toList(growable: false)..sort();
+
+    if (normalizedAuthorIds.isEmpty || limitPerChunk <= 0) {
+      return (
+        posts: const <PostModel>[],
+        lastDocumentsByChunk:
+            const <String, DocumentSnapshot<Map<String, dynamic>>>{},
+        exhaustedChunkKeys: const <String>{},
+        activeChunkKeys: const <String>{},
+      );
+    }
+
+    final chunks = <({String key, List<String> authorIds})>[];
+    for (
+      var offset = 0;
+      offset < normalizedAuthorIds.length;
+      offset += _whereInLimit
+    ) {
+      final end =
+          offset + _whereInLimit < normalizedAuthorIds.length
+              ? offset + _whereInLimit
+              : normalizedAuthorIds.length;
+      final chunkAuthorIds = normalizedAuthorIds.sublist(offset, end);
+      chunks.add((
+        key: chunkAuthorIds.join('\u001F'),
+        authorIds: chunkAuthorIds,
+      ));
+    }
+
+    final activeChunkKeys = chunks.map((chunk) => chunk.key).toSet();
+    final queryResults = await Future.wait(
+      chunks.map((chunk) async {
+        if (exhaustedChunkKeys.contains(chunk.key)) {
+          return (
+            key: chunk.key,
+            docs: <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+            skipped: true,
+            permissionDenied: false,
+          );
+        }
+
+        Query<Map<String, dynamic>> query = _postsRef
+            .where('authorId', whereIn: chunk.authorIds)
+            .where(
+              'visibility',
+              isEqualTo: PostVisibility.public.firestoreValue,
+            )
+            .where(
+              'moderationStatus',
+              isEqualTo: PostModerationStatus.approved.firestoreValue,
+            )
+            .orderBy('createdAt', descending: true)
+            .limit(limitPerChunk);
+        final cursor = startAfterByChunk[chunk.key];
+        if (cursor != null) {
+          query = query.startAfterDocument(cursor);
+        }
+
+        try {
+          final snapshot = await query.get();
+          return (
+            key: chunk.key,
+            docs: snapshot.docs,
+            skipped: false,
+            permissionDenied: false,
+          );
+        } on FirebaseException catch (error) {
+          if (error.code != 'permission-denied') rethrow;
+          return (
+            key: chunk.key,
+            docs: <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+            skipped: false,
+            permissionDenied: true,
+          );
+        }
+      }),
+    );
+
+    final collectedPosts = <PostModel>[];
+    final nextCursors = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    final newlyExhaustedChunkKeys = <String>{};
+    for (final result in queryResults) {
+      if (result.skipped) continue;
+      final docs = result.docs;
+      if (result.permissionDenied || docs.isEmpty) {
+        newlyExhaustedChunkKeys.add(result.key);
+        continue;
+      }
+
+      nextCursors[result.key] = docs.last;
+      if (docs.length < limitPerChunk) {
+        newlyExhaustedChunkKeys.add(result.key);
+      }
+      for (final doc in docs) {
+        final post = PostModel.fromDoc(doc);
+        if (post.deletedAt != null ||
+            post.postType.isRepostOnly ||
+            !post.isModerationApproved) {
+          continue;
+        }
+        collectedPosts.add(post);
+      }
+    }
+
+    collectedPosts.sort((a, b) {
+      final aCreatedAt = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bCreatedAt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bCreatedAt.compareTo(aCreatedAt);
+    });
+    return (
+      posts: collectedPosts,
+      lastDocumentsByChunk: nextCursors,
+      exhaustedChunkKeys: newlyExhaustedChunkKeys,
+      activeChunkKeys: activeChunkKeys,
+    );
+  }
+
   Future<PostPageResult> fetchPostsByAuthor({
     required String authorId,
     DocumentSnapshot<Map<String, dynamic>>? startAfter,
