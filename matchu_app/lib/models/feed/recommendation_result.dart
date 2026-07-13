@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 
 class RecommendationScore {
@@ -37,7 +36,6 @@ class PaginatedRecommendations {
     required this.page,
     required this.hasMore,
     required this.metadata,
-    this.lastDocument,
     this.scoresByPostId = const <String, RecommendationScore>{},
     this.sessionId,
     this.poolId,
@@ -48,7 +46,6 @@ class PaginatedRecommendations {
   final int page;
   final bool hasMore;
   final Map<String, dynamic> metadata;
-  final DocumentSnapshot<Map<String, dynamic>>? lastDocument;
   final Map<String, RecommendationScore> scoresByPostId;
   final String? sessionId;
   final String? poolId;

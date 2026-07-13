@@ -89,7 +89,8 @@ class FeedController extends GetxController {
   final Set<String> _blockedUserIds = <String>{};
   final RxSet<String> _removingPostIds = <String>{}.obs;
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
-  DocumentSnapshot<Map<String, dynamic>>? _featuredLastDocument;
+  int _featuredLastLoadedPage = 0;
+  String? _featuredSessionId;
   DocumentSnapshot<Map<String, dynamic>>? _followingLastDocument;
   final Map<String, DocumentSnapshot<Map<String, dynamic>>>
   _followingFollowersOnlyLastDocuments =
@@ -831,7 +832,8 @@ class FeedController extends GetxController {
         featuredStatus.value = FeedStatus.loading;
       }
       featuredErrorMessage.value = null;
-      _featuredLastDocument = null;
+      _featuredLastLoadedPage = 0;
+      _featuredSessionId = null;
       _featuredBufferedPosts.clear();
       featuredHasMore.value = true;
     } else {
@@ -847,7 +849,8 @@ class FeedController extends GetxController {
       final page = await _recommendationService.getRecommendedPosts(
         userId: currentUserId,
         limit: _pageSize,
-        lastDocument: reset ? null : _featuredLastDocument,
+        page: reset ? 1 : _featuredLastLoadedPage + 1,
+        sessionId: reset ? null : _featuredSessionId,
         forceRefresh: reset && isManualRefresh,
       );
       final loadedPosts = await _hydrateFeedPosts(page.posts, reset: reset);
@@ -866,7 +869,8 @@ class FeedController extends GetxController {
         );
       }
 
-      _featuredLastDocument = page.lastDocument;
+      _featuredLastLoadedPage = page.page;
+      _featuredSessionId = page.sessionId;
       featuredHasMore.value = page.hasMore;
 
       if (featuredPosts.isEmpty) {

@@ -31,13 +31,11 @@ class RecommendationService {
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
 
-  int _lastLoadedServerPage = 0;
-  String? _activeSessionId;
-
   Future<PaginatedRecommendations> getRecommendedPosts({
     required String userId,
     int limit = 20,
-    DocumentSnapshot<Map<String, dynamic>>? lastDocument,
+    int page = 1,
+    String? sessionId,
     bool forceRefresh = false,
   }) async {
     final stopwatch = Stopwatch()..start();
@@ -46,7 +44,7 @@ class RecommendationService {
       return PaginatedRecommendations(
         posts: const <PostModel>[],
         limit: limit,
-        page: lastDocument == null ? 1 : 2,
+        page: page,
         hasMore: false,
         metadata: const <String, dynamic>{
           'totalRecommended': 0,
@@ -60,42 +58,33 @@ class RecommendationService {
     }
 
     try {
-      if (lastDocument == null) {
-        _lastLoadedServerPage = 0;
-        _activeSessionId = null;
-      }
-      final page = lastDocument == null ? 1 : _lastLoadedServerPage + 1;
       final callable = _functions.httpsCallable('recommendPosts');
       final response = await callable.call<Map<String, dynamic>>({
         'limit': limit,
         'page': page,
         'forceRefresh': forceRefresh,
-        if (_activeSessionId != null) 'sessionId': _activeSessionId,
+        if (sessionId?.trim().isNotEmpty == true)
+          'sessionId': sessionId!.trim(),
       });
       final data = Map<String, dynamic>.from(response.data);
-      _activeSessionId = data['sessionId']?.toString().trim();
+      final resolvedSessionId = data['sessionId']?.toString().trim();
       final postIds = (data['postIds'] as List<dynamic>? ?? const <dynamic>[])
           .map((item) => item.toString().trim())
           .where((item) => item.isNotEmpty)
           .toList(growable: false);
       final fetched = await _fetchPostsByIds(postIds);
       final posts = fetched.posts;
-      _lastLoadedServerPage = page;
       stopwatch.stop();
       return PaginatedRecommendations(
         posts: posts,
         limit: limit,
         page: page,
         hasMore: data['hasMore'] == true,
-        lastDocument:
-            posts.isEmpty
-                ? lastDocument
-                : fetched.snapshotsByPostId[posts.last.postId],
         scoresByPostId: _parseScores(data['scoresByPostId']),
         metadata: Map<String, dynamic>.from(
           data['metadata'] as Map<dynamic, dynamic>? ?? const {},
         )..['clientProcessingTimeMs'] = stopwatch.elapsedMilliseconds,
-        sessionId: _activeSessionId,
+        sessionId: resolvedSessionId,
         poolId: data['poolId']?.toString().trim(),
       );
     } catch (error) {

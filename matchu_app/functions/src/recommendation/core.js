@@ -176,6 +176,19 @@ function recommendationFeedStateRef() {
   return db.doc(RECOMMENDATION_FEED_STATE_PATH);
 }
 
+function isRecommendationSessionReusable(
+  session,
+  nowMillis = Date.now(),
+  invalidatedAtMillis = 0,
+) {
+  return Boolean(
+    session &&
+    Array.isArray(session.postIds) &&
+    Number(session.expiresAtMillis || 0) > nowMillis &&
+    Number(session.createdAtMillis || 0) >= Number(invalidatedAtMillis || 0),
+  );
+}
+
 async function bumpRecommendationFeedRevision(reason = "post_changed") {
   await recommendationFeedStateRef().set({
     revision: admin.firestore.FieldValue.increment(1),
@@ -551,11 +564,33 @@ function isFrequencyCapped(impression, nowMillis = Date.now()) {
 
 async function loadFeedImpressions(uid) {
   const snap = await db.collection("users").doc(uid)
-    .collection("feedImpressions").limit(INTERACTION_HISTORY_LIMIT).get();
+    .collection("feedImpressions")
+    .orderBy("lastSeenAt", "desc")
+    .limit(INTERACTION_HISTORY_LIMIT)
+    .get();
   return new Map(snap.docs.map((doc) => [doc.id, doc.data() || {}]));
 }
 
-function composeDiversePool(ranked, limit, seed, ratioLabel) {
+function resolveCompositionTargets(batchSize, ratios) {
+  const explorationRatio = String(ratios?.label || "")
+    .startsWith("cold_start") ? 0.20 : 0.10;
+  const exploration = Math.min(
+    batchSize,
+    Math.max(1, Math.round(batchSize * explorationRatio)),
+  );
+  const rankedSlots = Math.max(0, batchSize - exploration);
+  const normalized = normalizeRatios({
+    content: Math.max(0, Number(ratios?.content) || 0),
+    trending: Math.max(0, Number(ratios?.trending) || 0),
+    following: Math.max(0, Number(ratios?.following) || 0),
+  });
+  const content = Math.round(rankedSlots * normalized.content);
+  const trending = Math.round(rankedSlots * normalized.trending);
+  const following = Math.max(0, rankedSlots - content - trending);
+  return { content, trending, following, exploration };
+}
+
+function composeDiversePool(ranked, limit, seed, ratios) {
   const random = seededRandom(`${seed}:exploration`);
   const available = [...ranked];
   const selected = [];
@@ -570,22 +605,14 @@ function composeDiversePool(ranked, limit, seed, ratioLabel) {
     }
   };
 
-  // Cold-start reserves more discovery; established profiles approximate 14/3/2/1.
-  const explorationRatio = ratioLabel.startsWith("cold_start") ? 0.20 : 0.10;
   while (selected.length < limit && selected.length < ranked.length) {
     const batchSize = Math.min(20, limit - selected.length);
-    const followingCount = Math.round(batchSize * 0.05);
-    const trendingCount = Math.round(batchSize * 0.15);
-    const explorationCount = Math.max(1, Math.round(batchSize * explorationRatio));
-    const personalizedCount = Math.max(
-      0,
-      batchSize - followingCount - trendingCount - explorationCount,
-    );
+    const targets = resolveCompositionTargets(batchSize, ratios);
     const before = selected.length;
-    take((item) => item.contentBasedScore > 0, personalizedCount);
-    take((item) => item.rawTrendingScore > 0, trendingCount);
-    take(() => true, explorationCount, true);
-    take((item) => item.followingBoost > 0, followingCount);
+    take((item) => item.contentBasedScore > 0, targets.content);
+    take((item) => item.rawTrendingScore > 0, targets.trending);
+    take((item) => item.followingBoost > 0, targets.following);
+    take(() => true, targets.exploration, true);
     take(() => true, batchSize - (selected.length - before));
     if (selected.length === before) break;
   }
@@ -727,7 +754,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
     bandShuffled,
     CACHE_POST_POOL_SIZE,
     seed,
-    ratios.label,
+    ratios,
   );
   const pool = diversifyByAuthor(composed, CACHE_POST_POOL_SIZE);
   return {
@@ -751,6 +778,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       followingCount: ranked.filter((item) => item.followingBoost > 0).length,
       processingTimeMs: Date.now() - startedAt,
       ratio: ratios.label,
+      compositionTargetsPer20: resolveCompositionTargets(20, ratios),
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
       algorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
@@ -1169,6 +1197,7 @@ module.exports = {
   invalidateRecommendationCache,
   isEligiblePost,
   isPostEmbeddingCurrent,
+  isRecommendationSessionReusable,
   isFrequencyCapped,
   loadHybridCandidatePosts,
   normalizeRatios,
@@ -1180,6 +1209,7 @@ module.exports = {
   recommendationCacheRef,
   recommendationFeedStateRef,
   resolveRatios,
+  resolveCompositionTargets,
   shuffleScoreBands,
   timeDecay,
   toMillis,

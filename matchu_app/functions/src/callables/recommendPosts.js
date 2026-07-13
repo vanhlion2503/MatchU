@@ -4,6 +4,8 @@ const { admin, db } = require("../shared/firebase");
 
 const {
   getOrBuildRecommendationPool,
+  isRecommendationSessionReusable,
+  recommendationCacheRef,
   toSafeUid,
 } = require("../recommendation/core");
 
@@ -28,7 +30,7 @@ const recommendPosts = onCall(
 
     const uid = toSafeUid(request.auth.uid);
     const limit = Math.min(Math.max(Number(request.data?.limit) || 20, 1), MAX_LIMIT);
-    const page = Math.max(Number(request.data?.page) || 1, 1);
+    let page = Math.max(Number(request.data?.page) || 1, 1);
     const forceRefresh = request.data?.forceRefresh === true;
     const requestedSessionId = safeSessionId(request.data?.sessionId);
 
@@ -37,10 +39,18 @@ const recommendPosts = onCall(
       let sessionId = forceRefresh ? "" : requestedSessionId;
       let session = null;
       if (sessionId) {
-        const sessionSnap = await sessionRef(uid, sessionId).get();
+        const [sessionSnap, cacheSnap] = await Promise.all([
+          sessionRef(uid, sessionId).get(),
+          recommendationCacheRef(uid).get(),
+        ]);
         const data = sessionSnap.data();
-        if (sessionSnap.exists && Number(data?.expiresAtMillis) > nowMillis &&
-          Array.isArray(data?.postIds)) {
+        const invalidatedAtMillis =
+          cacheSnap.data()?.invalidatedAt?.toMillis?.() || 0;
+        if (sessionSnap.exists && isRecommendationSessionReusable(
+          data,
+          nowMillis,
+          invalidatedAtMillis,
+        )) {
           session = data;
         } else {
           sessionId = "";
@@ -48,6 +58,10 @@ const recommendPosts = onCall(
       }
 
       if (!session) {
+        // A missing, expired, or invalidated session represents a new ordered
+        // pool. Always serve its first page instead of applying an offset that
+        // belonged to the previous session.
+        page = 1;
         sessionId = crypto.randomUUID();
         const seed = `${uid}:${sessionId}`;
         const pool = await getOrBuildRecommendationPool(uid, {

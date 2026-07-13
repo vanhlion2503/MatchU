@@ -12,9 +12,11 @@ const {
   cosineSimilarity,
   diversifyByAuthor,
   isPostEmbeddingCurrent,
+  isRecommendationSessionReusable,
   isFrequencyCapped,
   parseVector,
   resolveRatios,
+  resolveCompositionTargets,
 } = require("../src/recommendation/core");
 const { calculatePopularitySignal } = require("../src/recommendation/retrieval");
 const { normalizeTopicIds } = require("../src/recommendation/topicTaxonomy");
@@ -140,6 +142,33 @@ test("seen penalty is capped and 24-hour frequency cap starts at three", () => {
   assert.equal(isFrequencyCapped({ ...impression, impressionCount24h: 2 }, now), false);
 });
 
+test("recommendation session expires when user cache is invalidated", () => {
+  const now = Date.now();
+  const session = {
+    postIds: ["post-1"],
+    createdAtMillis: now - 1000,
+    expiresAtMillis: now + 60000,
+  };
+  assert.equal(isRecommendationSessionReusable(session, now, now - 2000), true);
+  assert.equal(isRecommendationSessionReusable(session, now, now), false);
+  assert.equal(isRecommendationSessionReusable(session, now + 60001, 0), false);
+});
+
+test("composition targets follow scoring ratios while reserving exploration", () => {
+  assert.deepEqual(resolveCompositionTargets(20, {
+    content: 0.7,
+    trending: 0.2,
+    following: 0.1,
+    label: "personalized",
+  }), { content: 13, trending: 4, following: 1, exploration: 2 });
+  assert.deepEqual(resolveCompositionTargets(20, {
+    content: 0,
+    trending: 0.6,
+    following: 0.4,
+    label: "cold_start",
+  }), { content: 0, trending: 10, following: 6, exploration: 4 });
+});
+
 test("diverse pool reserves exploration and following slots per page", () => {
   const ranked = Array.from({ length: 40 }, (_, index) => ({
     postId: `post-${index}`,
@@ -147,7 +176,12 @@ test("diverse pool reserves exploration and following slots per page", () => {
     rawTrendingScore: index < 35 ? 1 : 0,
     followingBoost: index === 39 ? 1 : 0,
   }));
-  const selected = composeDiversePool(ranked, 20, "stable-seed", "personalized");
+  const selected = composeDiversePool(ranked, 20, "stable-seed", {
+    content: 0.7,
+    trending: 0.2,
+    following: 0.1,
+    label: "personalized",
+  });
   assert.equal(selected.length, 20);
   assert.ok(selected.some((item) => item.postId === "post-39"));
 });
