@@ -89,39 +89,39 @@ class _FeedScreenState extends State<FeedScreen>
   }
 
   Future<void> _handleHomeRefreshRequest() async {
-    if (!mounted) return;
-    final timeline = controller.activeTimeline.value;
-    final scrollController = switch (timeline) {
-      FeedTimeline.featured => _featuredScrollController,
-      FeedTimeline.latest => _latestScrollController,
-      FeedTimeline.following => _followingScrollController,
-    };
-    final refreshKey = switch (timeline) {
-      FeedTimeline.featured => _featuredRefreshKey,
-      FeedTimeline.latest => _latestRefreshKey,
-      FeedTimeline.following => _followingRefreshKey,
-    };
+    try {
+      if (!mounted) return;
+      final timeline = controller.activeTimeline.value;
+      final scrollController = _scrollControllerFor(timeline);
+      final refreshKey = switch (timeline) {
+        FeedTimeline.featured => _featuredRefreshKey,
+        FeedTimeline.latest => _latestRefreshKey,
+        FeedTimeline.following => _followingRefreshKey,
+      };
 
-    if (scrollController.hasClients && scrollController.offset > 0) {
-      await scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    }
-    if (!mounted) return;
+      if (scrollController.hasClients && scrollController.offset > 0) {
+        await scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      if (!mounted) return;
 
-    // show() renders the same indicator and invokes the same callback as pull-to-refresh.
-    final indicator = refreshKey.currentState;
-    if (indicator != null) {
-      await indicator.show(atTop: true);
-      return;
-    }
+      // show() renders the same indicator and invokes the same callback as pull-to-refresh.
+      final indicator = refreshKey.currentState;
+      if (indicator != null) {
+        await indicator.show(atTop: true);
+        return;
+      }
 
-    // The feed can still be mounting immediately after switching from another tab.
-    await WidgetsBinding.instance.endOfFrame;
-    if (mounted) {
-      await refreshKey.currentState?.show(atTop: true);
+      // The feed can still be mounting immediately after switching from another tab.
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) {
+        await refreshKey.currentState?.show(atTop: true);
+      }
+    } finally {
+      controller.completeHomeRefreshRequest();
     }
   }
 
@@ -135,6 +135,7 @@ class _FeedScreenState extends State<FeedScreen>
 
   void _handleLatestScroll() {
     if (!_latestScrollController.hasClients) return;
+    _syncHomeFeedScrollState(FeedTimeline.latest, _latestScrollController);
     if (_latestScrollController.position.extentAfter <= _loadMoreThreshold) {
       unawaited(controller.loadMore());
     }
@@ -142,6 +143,7 @@ class _FeedScreenState extends State<FeedScreen>
 
   void _handleFeaturedScroll() {
     if (!_featuredScrollController.hasClients) return;
+    _syncHomeFeedScrollState(FeedTimeline.featured, _featuredScrollController);
     if (_featuredScrollController.position.extentAfter <= _loadMoreThreshold) {
       unawaited(controller.loadMoreFeaturedFeed());
     }
@@ -149,18 +151,41 @@ class _FeedScreenState extends State<FeedScreen>
 
   void _handleFollowingScroll() {
     if (!_followingScrollController.hasClients) return;
+    _syncHomeFeedScrollState(
+      FeedTimeline.following,
+      _followingScrollController,
+    );
     if (_followingScrollController.position.extentAfter <= _loadMoreThreshold) {
       unawaited(controller.loadMoreFollowingFeed());
     }
   }
 
-  Future<void> _syncTimelineWithTab(int index) {
+  Future<void> _syncTimelineWithTab(int index) async {
     final timeline = switch (index) {
       0 => FeedTimeline.featured,
       1 => FeedTimeline.latest,
       _ => FeedTimeline.following,
     };
-    return controller.selectTimeline(timeline);
+    await controller.selectTimeline(timeline);
+    _syncHomeFeedScrollState(timeline, _scrollControllerFor(timeline));
+  }
+
+  ScrollController _scrollControllerFor(FeedTimeline timeline) {
+    return switch (timeline) {
+      FeedTimeline.featured => _featuredScrollController,
+      FeedTimeline.latest => _latestScrollController,
+      FeedTimeline.following => _followingScrollController,
+    };
+  }
+
+  void _syncHomeFeedScrollState(
+    FeedTimeline timeline,
+    ScrollController scrollController,
+  ) {
+    if (controller.activeTimeline.value != timeline) return;
+    final isScrolled =
+        scrollController.hasClients && scrollController.offset > 0;
+    controller.updateHomeFeedScrollState(isScrolled);
   }
 
   Future<void> _openCreatePostSheet(BuildContext context) async {

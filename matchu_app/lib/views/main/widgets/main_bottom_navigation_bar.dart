@@ -9,6 +9,7 @@ class MainBottomNavigationBar extends StatefulWidget {
     required this.isVisible,
     required this.unreadCount,
     required this.isHomeRefreshing,
+    required this.isHomeFeedScrolled,
     required this.onTabSelected,
     required this.onCenterTap,
   });
@@ -17,6 +18,7 @@ class MainBottomNavigationBar extends StatefulWidget {
   final bool isVisible;
   final int unreadCount;
   final bool isHomeRefreshing;
+  final bool isHomeFeedScrolled;
   final ValueChanged<int> onTabSelected;
   final VoidCallback onCenterTap;
 
@@ -29,6 +31,7 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
     with TickerProviderStateMixin {
   late final AnimationController _centerSweepController;
   late final AnimationController _visibilityController;
+  late final AnimationController _homeRefreshController;
   late final Animation<double> _centerSweepOffset;
   late final Animation<double> _centerIconWiggleAngle;
   late final Animation<double> _visibilityAnimation;
@@ -111,11 +114,29 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
       begin: const Offset(0, 0.24),
       end: Offset.zero,
     ).animate(_visibilityAnimation);
+
+    _homeRefreshController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 720),
+    );
+    if (widget.isHomeRefreshing) {
+      _homeRefreshController.repeat();
+    }
   }
 
   @override
   void didUpdateWidget(covariant MainBottomNavigationBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.isHomeRefreshing != widget.isHomeRefreshing) {
+      if (widget.isHomeRefreshing) {
+        _homeRefreshController.repeat();
+      } else {
+        _homeRefreshController
+          ..stop()
+          ..reset();
+      }
+    }
 
     if (oldWidget.isVisible == widget.isVisible) return;
 
@@ -135,6 +156,7 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
   void dispose() {
     _centerSweepController.dispose();
     _visibilityController.dispose();
+    _homeRefreshController.dispose();
     super.dispose();
   }
 
@@ -201,9 +223,15 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
           children: [
             Expanded(
               child: _MainNavBarItem(
-                icon: Iconsax.home_2,
+                icon:
+                    widget.currentIndex == 0 &&
+                            (widget.isHomeFeedScrolled ||
+                                widget.isHomeRefreshing)
+                        ? Icons.refresh_rounded
+                        : Iconsax.home_2,
                 isSelected: widget.currentIndex == 0,
-                isLoading: widget.isHomeRefreshing,
+                rotation:
+                    widget.isHomeRefreshing ? _homeRefreshController : null,
                 onTap: () => widget.onTabSelected(0),
               ),
             ),
@@ -379,14 +407,14 @@ class _MainNavBarItem extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.badgeCount = 0,
-    this.isLoading = false,
+    this.rotation,
   });
 
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
   final int badgeCount;
-  final bool isLoading;
+  final Animation<double>? rotation;
 
   @override
   Widget build(BuildContext context) {
@@ -410,24 +438,15 @@ class _MainNavBarItem extends StatelessWidget {
                 Center(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
-                    child:
-                        isLoading
-                            ? SizedBox(
-                              key: const ValueKey<String>('home_refreshing'),
-                              width: 21,
-                              height: 21,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                                color: selectedColor,
-                              ),
-                            )
-                            : Icon(
-                              icon,
-                              key: ValueKey<IconData>(icon),
-                              size: isSelected ? 24 : 22,
-                              color:
-                                  isSelected ? selectedColor : unselectedColor,
-                            ),
+                    child: RotationTransition(
+                      key: ValueKey<IconData>(icon),
+                      turns: rotation ?? const AlwaysStoppedAnimation(0),
+                      child: Icon(
+                        icon,
+                        size: isSelected ? 24 : 22,
+                        color: isSelected ? selectedColor : unselectedColor,
+                      ),
+                    ),
                   ),
                 ),
                 if (badgeCount > 0)

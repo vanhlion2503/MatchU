@@ -119,7 +119,11 @@ class _MainViewState extends State<MainView> {
                           ? Get.find<FeedController>()
                           : null;
                   final isHomeRefreshing =
-                      feedController?.visibleIsRefreshing ?? false;
+                      (feedController?.visibleIsRefreshing ?? false) ||
+                      (feedController?.isHomeRefreshRequestRunning.value ??
+                          false);
+                  final isHomeFeedScrolled =
+                      feedController?.isHomeFeedScrolled.value ?? false;
                   final bool isBottomNavigationVisible =
                       currentIndex == 0 ? isHomeBottomNavigationVisible : true;
 
@@ -128,6 +132,7 @@ class _MainViewState extends State<MainView> {
                     isVisible: isBottomNavigationVisible,
                     unreadCount: unreadCount,
                     isHomeRefreshing: isHomeRefreshing,
+                    isHomeFeedScrolled: isHomeFeedScrolled,
                     onTabSelected: _handleTabSelected,
                     onCenterTap: () => c.changePage(2),
                   );
