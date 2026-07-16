@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
@@ -483,7 +483,7 @@ Future<bool> showPasscodeResetConfirmDialog(BuildContext context) async {
         child: AlertDialog(
           title: const Text('Đặt lại mã PIN'),
           content: const Text(
-            'Việc nãy sẽ xóa toàn bộ tin nhắn đã mã hóa cũ trên thiết bị này',
+            'Việc này sẽ xóa toàn bộ tin nhắn đã mã hóa cũ trên thiết bị này',
           ),
           actions: [
             TextButton(

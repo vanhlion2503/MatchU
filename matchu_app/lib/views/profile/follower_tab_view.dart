@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/profile/followers_controller.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';

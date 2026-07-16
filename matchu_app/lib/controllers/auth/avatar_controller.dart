@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/auth_translations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -104,8 +105,11 @@ class AvatarController extends GetxController {
       aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
       compressFormat: ImageCompressFormat.jpg,
       uiSettings: [
-        AndroidUiSettings(toolbarTitle: 'Cắt ảnh', lockAspectRatio: true),
-        IOSUiSettings(title: 'Cắt ảnh', aspectRatioLockEnabled: true),
+        AndroidUiSettings(
+          toolbarTitle: authTr('Cắt ảnh'),
+          lockAspectRatio: true,
+        ),
+        IOSUiSettings(title: authTr('Cắt ảnh'), aspectRatioLockEnabled: true),
       ],
     );
 
@@ -154,9 +158,12 @@ class AvatarController extends GetxController {
       );
       user.refresh();
 
-      Get.snackbar("Thành công", "Cập nhật avatar thành công");
+      Get.snackbar(
+        AuthTranslationKeys.success.tr,
+        authTr("Cập nhật avatar thành công"),
+      );
     } catch (e) {
-      Get.snackbar("Lỗi", e.toString());
+      Get.snackbar(AuthTranslationKeys.error.tr, authTr(e.toString()));
     } finally {
       isUploadingAvatar.value = false;
     }
@@ -188,9 +195,12 @@ class AvatarController extends GetxController {
       );
       user.refresh();
 
-      Get.snackbar("Thành công", "Đã khôi phục avatar mặc định");
+      Get.snackbar(
+        AuthTranslationKeys.success.tr,
+        authTr("Đã khôi phục avatar mặc định"),
+      );
     } catch (e) {
-      Get.snackbar("Lỗi", e.toString());
+      Get.snackbar(AuthTranslationKeys.error.tr, authTr(e.toString()));
     } finally {
       isUploadingAvatar.value = false;
     }

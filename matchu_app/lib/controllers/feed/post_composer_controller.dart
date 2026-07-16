@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/models/feed/media_model.dart';
 import 'package:matchu_app/models/feed/post_media_draft.dart';
@@ -544,8 +545,10 @@ class PostComposerController extends GetxController {
 
   void _showMaxMediaNotice() {
     Get.snackbar(
-      'Thông báo',
-      'Chỉ có thể đăng tối đa $maxMediaItems tệp đính kèm cho mỗi bài viết.',
+      PostTranslationKeys.notice.tr,
+      PostTranslationKeys.maxAttachmentsMessage.trParams({
+        'max': '$maxMediaItems',
+      }),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -571,8 +574,8 @@ class PostComposerController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

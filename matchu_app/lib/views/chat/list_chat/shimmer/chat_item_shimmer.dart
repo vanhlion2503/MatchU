@@ -17,10 +17,7 @@ class ChatItemShimmer extends StatelessWidget {
           Shimmer.fromColors(
             baseColor: shimmer.base,
             highlightColor: shimmer.highlight,
-            child: CircleAvatar(
-              radius: 30,
-              backgroundColor: shimmer.surface,
-            ),
+            child: CircleAvatar(radius: 30, backgroundColor: shimmer.surface),
           ),
 
           const SizedBox(width: 12),
@@ -45,10 +42,9 @@ class ChatItemShimmer extends StatelessWidget {
             children: [
               _line(context, shimmer, width: 40, height: 12),
               const SizedBox(height: 12),
-              _line(context, shimmer,
-                  width: 18, height: 18, radius: 9),
+              _line(context, shimmer, width: 18, height: 18, radius: 9),
             ],
-          )
+          ),
         ],
       ),
     );

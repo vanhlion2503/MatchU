@@ -20,9 +20,5 @@ Widget genderIcon(String? gender, ThemeData theme) {
       return const SizedBox();
   }
 
-  return Icon(
-    icon,
-    size: 16,
-    color: color,
-  );
+  return Icon(icon, size: 16, color: color);
 }

@@ -51,16 +51,12 @@ class _CircleIconButtonState extends State<CircleIconButton> {
               shape: BoxShape.circle,
               color: theme.scaffoldBackgroundColor,
               border: Border.all(
-                color: isDark
-                    ? AppTheme.darkBorder
-                    : AppTheme.lightBorder,
+                color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(
-                    isDark ? 0.35 : 0.06,
-                  ),
+                  color: Colors.black.withOpacity(isDark ? 0.35 : 0.06),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -70,8 +66,7 @@ class _CircleIconButtonState extends State<CircleIconButton> {
             child: Icon(
               widget.icon,
               size: widget.iconSize,
-              color: widget.iconColor ??
-                  theme.colorScheme.onSurface,
+              color: widget.iconColor ?? theme.colorScheme.onSurface,
             ),
           ),
         ),

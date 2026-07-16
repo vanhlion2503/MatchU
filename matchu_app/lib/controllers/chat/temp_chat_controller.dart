@@ -11,6 +11,7 @@ import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
 import 'package:matchu_app/views/matching/match_transition_view.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
 import '../auth/auth_controller.dart';
 import 'dart:async';
 import 'dart:math';
@@ -424,8 +425,8 @@ class TempChatController extends GetxController {
         final toUid = myUid == data["userA"] ? data["userB"] : data["userA"];
         // 👉 Người ở lại
         Get.snackbar(
-          "Thông báo",
-          "Người kia đã rời phòng",
+          MatchingChatTranslationKeys.notice.tr,
+          matchingChatTr("Người kia đã rời phòng"),
           snackPosition: SnackPosition.TOP,
           duration: const Duration(seconds: 2),
         );
@@ -507,8 +508,8 @@ class TempChatController extends GetxController {
       if (e.code == 'permission-denied') {
         _justSentMessage.value = false;
         Get.snackbar(
-          "Thông báo",
-          "Không thể gửi tin nhắn lúc này.",
+          MatchingChatTranslationKeys.notice.tr,
+          matchingChatTr("Không thể gửi tin nhắn lúc này."),
           snackPosition: SnackPosition.TOP,
           duration: const Duration(seconds: 2),
         );

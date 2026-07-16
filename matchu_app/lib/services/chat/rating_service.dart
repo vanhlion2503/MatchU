@@ -22,6 +22,7 @@ class RatingService {
       ),
     );
   }
+
   static Future<void> submitRating(ChatRatingModel rating) async {
     final ratingRef = _db
         .collection("chatRatings")
@@ -67,5 +68,4 @@ class RatingService {
       });
     });
   }
-
 }

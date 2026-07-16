@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
@@ -21,6 +21,7 @@ import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
 import 'package:matchu_app/widgets/avatar_bottom_sheet.dart';
 import 'package:matchu_app/widgets/profile_interests_wrap.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 
 class ProfileView extends StatelessWidget {
   const ProfileView({super.key});
@@ -70,8 +71,10 @@ class ProfileView extends StatelessWidget {
     PostCreationSync.sync(createdPost);
     if (createdPost.isModerationPending) {
       Get.snackbar(
-        'Đang kiểm duyệt video',
-        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        profileTr('Đang kiểm duyệt video'),
+        profileTr(
+          'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        ),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -81,8 +84,10 @@ class ProfileView extends StatelessWidget {
     if (createdPost.isPublic) return;
 
     Get.snackbar(
-      'Thông báo',
-      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
+      ProfileTranslationKeys.notice.tr,
+      profileTr(
+        'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
+      ),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -109,7 +114,7 @@ class ProfileView extends StatelessWidget {
           padding: EdgeInsets.only(bottom: bottomInset + 80),
           child: FloatingActionButton(
             heroTag: 'profile_create_post_fab',
-            tooltip: 'Tạo bài viết',
+            tooltip: 'Tạo bài viết'.tr,
             backgroundColor: theme.colorScheme.primary,
             foregroundColor: theme.colorScheme.onPrimary,
             onPressed: () => _openCreatePostSheet(context),

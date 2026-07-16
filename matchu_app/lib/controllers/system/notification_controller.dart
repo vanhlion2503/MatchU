@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';

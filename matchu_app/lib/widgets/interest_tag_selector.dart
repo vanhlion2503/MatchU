@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/utils/interest_tags.dart';
 
@@ -73,7 +74,7 @@ class _InterestTagSelectorState extends State<InterestTagSelector> {
           textInputAction: TextInputAction.done,
           onSubmitted: _submitFirstSuggestion,
           decoration: InputDecoration(
-            labelText: 'Nhập sở thích',
+            labelText: 'Nhập sở thích'.tr,
             prefixIcon: const Icon(Iconsax.heart),
             suffixText: '$selectedCount/${InterestTags.maxSelected}',
           ),
@@ -86,7 +87,7 @@ class _InterestTagSelectorState extends State<InterestTagSelector> {
             children: widget.selectedTags
                 .map(
                   (tag) => InputChip(
-                    label: Text(tag),
+                    label: Text(InterestTags.localizedLabel(tag)),
                     onDeleted:
                         widget.enabled ? () => widget.onRemoveTag(tag) : null,
                   ),
@@ -114,7 +115,7 @@ class _InterestTagSelectorState extends State<InterestTagSelector> {
                       children: _suggestions
                           .map(
                             (tag) => ActionChip(
-                              label: Text(tag),
+                              label: Text(InterestTags.localizedLabel(tag)),
                               onPressed:
                                   widget.enabled
                                       ? () => widget.onAddTag(tag)

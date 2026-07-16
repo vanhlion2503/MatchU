@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
@@ -854,8 +855,8 @@ class PostCommentsController extends GetxController {
     _rebuildThreadEntries();
 
     Get.snackbar(
-      'Thông báo',
-      'Đã ẩn bình luận này khỏi thiết bị của bạn.',
+      PostTranslationKeys.notice.tr,
+      'Đã ẩn bình luận này khỏi thiết bị của bạn.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -1587,8 +1588,8 @@ class PostCommentsController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

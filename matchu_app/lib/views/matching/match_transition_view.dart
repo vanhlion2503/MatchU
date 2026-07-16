@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
 import 'package:matchu_app/views/matching/widgets/animated_progress_bar.dart';
 import 'package:matchu_app/views/matching/widgets/floating_avatar.dart';
 import 'package:matchu_app/views/matching/widgets/heart_ripple.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
 
 class MatchTransitionView extends StatefulWidget {
   final String tempRoomId;
@@ -69,7 +70,10 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
       Get.offNamed("/chat", arguments: {"roomId": newRoomId});
     } catch (e) {
       if (!mounted) return;
-      Get.snackbar("Lỗi", "Không thể tạo phòng chat");
+      Get.snackbar(
+        MatchingChatTranslationKeys.error.tr,
+        matchingChatTr("Không thể tạo phòng chat"),
+      );
       Get.back();
     }
   }

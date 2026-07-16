@@ -21,6 +21,7 @@ class AppRouter {
   static const String searchUser = '/search-user';
   static const String profileQr = '/profile-qr';
   static const String displayMode = '/display-mode';
+  static const String language = '/language';
   static const String editProfile = '/edit-profile';
   static const String restrictionList = '/restriction-list';
 

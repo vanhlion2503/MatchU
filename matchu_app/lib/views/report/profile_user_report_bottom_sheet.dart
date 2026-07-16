@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/report/user_profile_report_controller.dart';
 import 'package:matchu_app/views/report/report_form_widgets.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 
 class ProfileUserReportBottomSheet extends StatefulWidget {
   const ProfileUserReportBottomSheet({
@@ -102,7 +103,7 @@ class _ProfileUserReportBottomSheetState
                         child: Text(
                           selectedCategory == null
                               ? 'Báo cáo người dùng'
-                              : selectedCategory.title,
+                              : profileTr(selectedCategory.title),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
@@ -131,7 +132,7 @@ class _ProfileUserReportBottomSheetState
                       (category) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: ReportFormCategoryTile(
-                          title: category.title,
+                          title: profileTr(category.title),
                           icon: category.icon,
                           onTap: () => _controller.openCategory(category),
                         ),
@@ -144,7 +145,7 @@ class _ProfileUserReportBottomSheetState
                       (reason) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: ReportFormReasonTile(
-                          title: reason.title,
+                          title: profileTr(reason.title),
                           selected: selectedReason?.key == reason.key,
                           onTap: () => _controller.selectReason(reason),
                         ),
@@ -159,8 +160,8 @@ class _ProfileUserReportBottomSheetState
                         maxLines: 3,
                         maxLength: 200,
                         textAlignVertical: TextAlignVertical.top,
-                        decoration: const InputDecoration(
-                          hintText: 'Nhập lý do khác',
+                        decoration: InputDecoration(
+                          hintText: 'Nhập lý do khác'.tr,
                           alignLabelWithHint: true,
                         ),
                       ),
@@ -198,9 +199,10 @@ class _ProfileUserReportBottomSheetState
                             maxLines: 4,
                             maxLength: 400,
                             textAlignVertical: TextAlignVertical.top,
-                            decoration: const InputDecoration(
-                              hintText:
-                                  'Bạn có thể bổ sung bối cảnh để đội ngũ kiểm duyệt xem xét chính xác hơn.',
+                            decoration: InputDecoration(
+                              hintText: profileTr(
+                                'Bạn có thể bổ sung bối cảnh để đội ngũ kiểm duyệt xem xét chính xác hơn.',
+                              ),
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
@@ -411,9 +411,10 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
                                     (_) => _controller.dismissComposer(),
                                 decoration: InputDecoration(
                                   hintText:
-                                      editingComment != null
-                                          ? 'Chỉnh sửa bình luận...'
-                                          : 'Nhập bình luận...',
+                                      (editingComment != null
+                                              ? 'Chỉnh sửa bình luận...'
+                                              : 'Nhập bình luận...')
+                                          .tr,
                                 ),
                                 onSubmitted: (_) => _controller.submitComment(),
                               ),

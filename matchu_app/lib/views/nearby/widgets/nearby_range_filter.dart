@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -23,19 +23,18 @@ class NearbyRangeFilter extends StatelessWidget {
           color: colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isDark
-                ? AppTheme.darkBorder
-                : AppTheme.lightBorder,
+            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
           ),
-          boxShadow: isDark
+          boxShadow:
+              isDark
                   ? null
                   : [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

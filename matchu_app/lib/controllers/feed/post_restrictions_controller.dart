@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
@@ -174,8 +175,8 @@ class PostRestrictionsController extends GetxController {
       _notifyUserBlocked(blockedUserId);
 
       Get.snackbar(
-        'Th\u00F4ng b\u00E1o',
-        '\u0110\u00E3 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y.',
+        PostTranslationKeys.notice.tr,
+        'Đã chặn người dùng này.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -214,8 +215,8 @@ class PostRestrictionsController extends GetxController {
       _notifyUserUnblocked(normalizedBlockedUserId);
 
       Get.snackbar(
-        'Th\u00F4ng b\u00E1o',
-        '\u0110\u00E3 g\u1EE1 ch\u1EB7n ng\u01B0\u1EDDi d\u00F9ng n\u00E0y.',
+        PostTranslationKeys.notice.tr,
+        'Đã gỡ chặn người dùng này.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -254,8 +255,8 @@ class PostRestrictionsController extends GetxController {
       }
 
       Get.snackbar(
-        'Th\u00F4ng b\u00E1o',
-        '\u0110\u00E3 b\u1ECF \u1EA9n b\u00E0i vi\u1EBFt t\u1EEB ng\u01B0\u1EDDi n\u00E0y.',
+        PostTranslationKeys.notice.tr,
+        'Đã bỏ ẩn bài viết từ người này.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -287,8 +288,8 @@ class PostRestrictionsController extends GetxController {
               : PostRestrictionsStatus.success;
 
       Get.snackbar(
-        'Th\u00F4ng b\u00E1o',
-        '\u0110\u00E3 b\u1EADt l\u1EA1i th\u00F4ng b\u00E1o t\u1EEB ng\u01B0\u1EDDi n\u00E0y.',
+        PostTranslationKeys.notice.tr,
+        'Đã bật lại thông báo từ người này.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -313,8 +314,8 @@ class PostRestrictionsController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'L\u1ED7i',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

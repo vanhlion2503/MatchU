@@ -75,4 +75,3 @@ class UnreadController extends GetxController {
     super.onClose();
   }
 }
-

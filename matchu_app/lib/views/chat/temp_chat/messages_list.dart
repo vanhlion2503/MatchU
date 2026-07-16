@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -54,8 +55,8 @@ class _MessagesListState extends State<MessagesList> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Get.snackbar(
-        "Thông báo",
-        message,
+        MatchingChatTranslationKeys.notice.tr,
+        matchingChatTr(message),
         snackPosition: SnackPosition.TOP,
         duration: const Duration(seconds: 2),
       );

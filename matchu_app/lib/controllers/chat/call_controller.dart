@@ -12,6 +12,7 @@ import 'package:matchu_app/services/chat/ice_server_service.dart';
 import 'package:matchu_app/services/chat/webrtc_service.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
+import 'package:matchu_app/translations/long_chat_translations.dart';
 
 enum CallUiState { idle, creating, ringing, connecting, active, ended, error }
 
@@ -167,7 +168,10 @@ class CallController extends GetxController {
 
     if (summary.roomChatId.isEmpty || summary.peerUserId.isEmpty) {
       closeEndedScreen();
-      Get.snackbar('Call', 'Unable to redial this conversation.');
+      Get.snackbar(
+        LongChatTranslationKeys.call.tr,
+        longChatTr('Unable to redial this conversation.'),
+      );
       return;
     }
 
@@ -1085,7 +1089,7 @@ class CallController extends GetxController {
     errorMessage.value = message;
     isIncomingActionBusy.value = false;
     callState.value = CallUiState.error;
-    Get.snackbar('Call', message);
+    Get.snackbar(LongChatTranslationKeys.call.tr, longChatTr(message));
   }
 
   void _openIncomingCallView(String callId) {

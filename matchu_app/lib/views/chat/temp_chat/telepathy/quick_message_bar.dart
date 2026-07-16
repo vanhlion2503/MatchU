@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 
@@ -30,26 +30,22 @@ class QuickMessageBar extends StatelessWidget {
 
             return GestureDetector(
               onTap: () {
-                controller.send(
-                  msg.text,
-                  type: msg.type,
-                );
+                controller.send(msg.text, type: msg.type);
 
                 controller.switchToIceBreaker();
 
                 controller.showQuickMessages.value = false;
               },
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Text(
-                  msg.text,
-                  style: theme.textTheme.bodyMedium,
-                ),
+                child: Text(msg.text, style: theme.textTheme.bodyMedium),
               ),
             );
           },

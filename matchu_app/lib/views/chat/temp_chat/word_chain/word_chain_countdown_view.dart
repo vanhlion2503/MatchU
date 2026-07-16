@@ -1,18 +1,16 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class WordChainCountdownView extends StatelessWidget {
   final int seconds;
 
-  const WordChainCountdownView({
-    super.key,
-    required this.seconds,
-  });
+  const WordChainCountdownView({super.key, required this.seconds});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
-    final muted = theme.textTheme.bodySmall?.color ??
+    final muted =
+        theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
 
     return Center(
@@ -47,9 +45,7 @@ class WordChainCountdownView extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Sẵn sàng bắt đầu',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: muted,
-            ),
+            style: theme.textTheme.bodySmall?.copyWith(color: muted),
           ),
         ],
       ),

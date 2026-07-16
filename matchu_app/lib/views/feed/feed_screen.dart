@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
@@ -238,8 +239,9 @@ class _FeedScreenState extends State<FeedScreen>
     PostCreationSync.sync(createdPost);
     if (createdPost.isModerationPending) {
       Get.snackbar(
-        'Đang kiểm duyệt video',
-        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        'Đang kiểm duyệt video'.tr,
+        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.'
+            .tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -249,8 +251,8 @@ class _FeedScreenState extends State<FeedScreen>
     if (createdPost.isPublic) return;
 
     Get.snackbar(
-      'Thông báo',
-      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
+      PostTranslationKeys.notice.tr,
+      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -628,7 +630,7 @@ class _CreatePostFloatingButtonState extends State<_CreatePostFloatingButton>
       child: RepaintBoundary(
         child: FloatingActionButton(
           heroTag: 'feed_create_post_fab',
-          tooltip: 'Tạo bài viết',
+          tooltip: 'Tạo bài viết'.tr,
           backgroundColor: widget.backgroundColor,
           foregroundColor: widget.foregroundColor,
           onPressed: widget.onPressed,

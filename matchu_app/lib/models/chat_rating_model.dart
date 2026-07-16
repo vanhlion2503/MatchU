@@ -18,11 +18,11 @@ class ChatRatingModel {
   });
 
   Map<String, dynamic> toJson() => {
-        "roomId": roomId,
-        "fromUid": fromUid,
-        "toUid": toUid,
-        "score": score,
-        "skipped": skipped,
-        "createdAt": Timestamp.fromDate(createdAt),
-      };
+    "roomId": roomId,
+    "fromUid": fromUid,
+    "toUid": toUid,
+    "score": score,
+    "skipped": skipped,
+    "createdAt": Timestamp.fromDate(createdAt),
+  };
 }

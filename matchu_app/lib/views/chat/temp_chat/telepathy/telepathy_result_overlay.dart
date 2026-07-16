@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/models/telepathy_question.dart';
@@ -8,14 +8,10 @@ import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_motion.dart'
 class TelepathyResultOverlay extends StatefulWidget {
   final TempChatController controller;
 
-  const TelepathyResultOverlay({
-    super.key,
-    required this.controller,
-  });
+  const TelepathyResultOverlay({super.key, required this.controller});
 
   @override
-  State<TelepathyResultOverlay> createState() =>
-      _TelepathyResultOverlayState();
+  State<TelepathyResultOverlay> createState() => _TelepathyResultOverlayState();
 }
 
 class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
@@ -27,8 +23,9 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
   @override
   void initState() {
     super.initState();
-    _overlayWorker =
-        ever(widget.controller.telepathy.showResultOverlay, (show) {
+    _overlayWorker = ever(widget.controller.telepathy.showResultOverlay, (
+      show,
+    ) {
       if (show == true && mounted) {
         setState(() => _showOpponentAnswers = false);
 
@@ -123,7 +120,9 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                                       value: value,
                                       strokeWidth: stroke,
                                       backgroundColor: accent.withOpacity(0.12),
-                                      valueColor: AlwaysStoppedAnimation<Color>(accent),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        accent,
+                                      ),
                                     );
                                   },
                                 ),
@@ -131,13 +130,18 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
 
                               // ===== VÙNG CHỮ AN TOÀN BÊN TRONG =====
                               SizedBox(
-                                width: outerSize - stroke * 2 - innerPadding * 2,
-                                height: outerSize - stroke * 2 - innerPadding * 2,
+                                width:
+                                    outerSize - stroke * 2 - innerPadding * 2,
+                                height:
+                                    outerSize - stroke * 2 - innerPadding * 2,
                                 child: Center(
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: ScaleTransition(
-                                      scale: Tween(begin: 1.2, end: 1.0).animate(
+                                      scale: Tween(
+                                        begin: 1.2,
+                                        end: 1.0,
+                                      ).animate(
                                         CurvedAnimation(
                                           parent: _pulseController,
                                           curve: curveFeedback,
@@ -145,11 +149,12 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                                       ),
                                       child: Text(
                                         "${result.score}%",
-                                        style: theme.textTheme.displaySmall?.copyWith(
-                                          color: accent,
-                                          fontWeight: FontWeight.w900,
-                                          height: 1,
-                                        ),
+                                        style: theme.textTheme.displaySmall
+                                            ?.copyWith(
+                                              color: accent,
+                                              fontWeight: FontWeight.w900,
+                                              height: 1,
+                                            ),
                                       ),
                                     ),
                                   ),
@@ -158,7 +163,6 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                             ],
                           ),
                         ),
-
 
                         const SizedBox(height: 24),
                         Text(
@@ -178,7 +182,9 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                                 SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                                 SizedBox(width: 8),
                                 Text(
@@ -186,7 +192,6 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),
-                            
                                 ),
                               ],
                             ),
@@ -235,8 +240,8 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                               ),
                             ),
                           ),
-                        // ================= END AI INSIGHT =================
 
+                        // ================= END AI INSIGHT =================
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -274,19 +279,20 @@ class _TelepathyResultOverlayState extends State<TelepathyResultOverlay>
                         ),
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
-                          child: _showOpponentAnswers
-                              ? _AnswerList(
-                                  questions: telepathy.questions,
-                                  myAnswers: telepathy.myAnswers,
-                                  otherAnswers: telepathy.otherAnswers,
-                                  accent: accent,
-                                )
-                              : const SizedBox.shrink(),
+                          child:
+                              _showOpponentAnswers
+                                  ? _AnswerList(
+                                    questions: telepathy.questions,
+                                    myAnswers: telepathy.myAnswers,
+                                    otherAnswers: telepathy.otherAnswers,
+                                    accent: accent,
+                                  )
+                                  : const SizedBox.shrink(),
                         ),
                         const SizedBox(height: 18),
                         FilledButton(
-                          onPressed: () =>
-                              telepathy.showResultOverlay.value = false,
+                          onPressed:
+                              () => telepathy.showResultOverlay.value = false,
                           child: const Text("Quay lại cuộc trò chuyện"),
                         ),
                       ],
@@ -401,8 +407,7 @@ class _AnswerList extends StatelessWidget {
               otherAnswer: otherAnswers[questions[i].id],
               accent: accent,
             ),
-            if (i != questions.length - 1)
-              const Divider(height: 20),
+            if (i != questions.length - 1) const Divider(height: 20),
           ],
         ],
       ),

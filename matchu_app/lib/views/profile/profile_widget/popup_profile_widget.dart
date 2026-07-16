@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
+import 'package:get/get.dart';
 import 'package:matchu_app/controllers/profile/profile_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-
 
 void showEditBioDialog(BuildContext context, ProfileController c) {
   final TextEditingController bioC = TextEditingController(text: c.bio);
@@ -11,28 +11,23 @@ void showEditBioDialog(BuildContext context, ProfileController c) {
     builder: (_) {
       return Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 550, 
-            minHeight: 200,  
-          ),
+          constraints: const BoxConstraints(maxWidth: 550, minHeight: 200),
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 // TITLE
                 Text(
                   "Chỉnh sửa mô tả",
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Theme.of(context).brightness == Brightness.dark 
-                        ? AppTheme.darkTextPrimary 
-                        : AppTheme.lightTextSecondary,
+                    color:
+                        Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.darkTextPrimary
+                            : AppTheme.lightTextSecondary,
                   ),
                 ),
 
@@ -44,7 +39,7 @@ void showEditBioDialog(BuildContext context, ProfileController c) {
                   maxLength: 150,
                   maxLines: 5,
                   decoration: InputDecoration(
-                    hintText: "Nhập mô tả của bạn...",
+                    hintText: 'Nhập mô tả của bạn...'.tr,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -63,9 +58,13 @@ void showEditBioDialog(BuildContext context, ProfileController c) {
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,   
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,         
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),

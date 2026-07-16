@@ -17,12 +17,11 @@ class ShimmerColors {
     final isDark = theme.brightness == Brightness.dark;
 
     return ShimmerColors(
-      base: isDark
-          ? AppTheme.shimmerDarkBase
-          : AppTheme.shimmerLightBase,
-      highlight: isDark
-          ? AppTheme.shimmerDarkHighlight
-          : AppTheme.shimmerLightHighlight,
+      base: isDark ? AppTheme.shimmerDarkBase : AppTheme.shimmerLightBase,
+      highlight:
+          isDark
+              ? AppTheme.shimmerDarkHighlight
+              : AppTheme.shimmerLightHighlight,
       surface: theme.colorScheme.surface,
     );
   }

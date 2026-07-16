@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/verification/widgets/verification_common_widgets.dart';
 

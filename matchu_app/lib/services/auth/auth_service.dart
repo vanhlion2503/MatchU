@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
+import 'package:matchu_app/translations/auth_translations.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -47,9 +48,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed(
-        "Đã xảy ra lỗi không xác định. Vui lòng thử lại.",
-      );
+      onFailed(authTr("Đã xảy ra lỗi không xác định. Vui lòng thử lại."));
     }
   }
 
@@ -79,7 +78,7 @@ class AuthService {
         multiFactorSession: session,
         verificationCompleted: (_) {},
         verificationFailed: (FirebaseAuthException e) {
-          onFailed(e.message ?? "Gửi OTP bị lỗi");
+          onFailed(firebaseErrorToVietnamese(e.code));
         },
         codeSent: (String verificationId, int? resendToken) {
           onCodeSent(verificationId);
@@ -88,7 +87,7 @@ class AuthService {
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed("Không thể gửi OTP. Vui lòng thử lại.");
+      onFailed(authTr("Không thể gửi OTP. Vui lòng thử lại."));
     }
   }
 
@@ -122,7 +121,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       throw firebaseErrorToVietnamese(e.code);
     } catch (e) {
-      throw "Đã xảy ra lỗi khi xác minh OTP.";
+      throw authTr("Đã xảy ra lỗi khi xác minh OTP.");
     }
   }
 
@@ -320,7 +319,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       onFailed(firebaseErrorToVietnamese(e.code));
     } catch (e) {
-      onFailed("Lỗi không xác định.");
+      onFailed(authTr("Lỗi không xác định."));
     }
   }
 
@@ -339,7 +338,7 @@ class AuthService {
         }
       }
       if (phoneInfo == null) {
-        onFailed("Không tìm thấy số điện thoại xác minh MFA.");
+        onFailed(authTr("Không tìm thấy số điện thoại xác minh MFA."));
         return;
       }
 
@@ -360,7 +359,7 @@ class AuthService {
         codeAutoRetrievalTimeout: (_) {},
       );
     } catch (e) {
-      onFailed("Không thể gửi OTP xác minh MFA.");
+      onFailed(authTr("Không thể gửi OTP xác minh MFA."));
     }
   }
 

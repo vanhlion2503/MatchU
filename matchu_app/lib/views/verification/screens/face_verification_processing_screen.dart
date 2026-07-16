@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/verification/widgets/verification_common_widgets.dart';
 import 'package:matchu_app/views/verification/widgets/verification_scanning_avatar.dart';
@@ -21,10 +21,7 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF0F172A),
-                Color(0xFF020617),
-              ],
+              colors: [Color(0xFF0F172A), Color(0xFF020617)],
             ),
           ),
         ),
@@ -75,9 +72,7 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
                 // 📝 Subtitle
                 Text(
                   'Quá trình này chỉ mất vài giây',
-                  style: textTheme.bodySmall?.copyWith(
-                    fontSize: 13,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(fontSize: 13),
                 ),
 
                 const SizedBox(height: 24),
@@ -89,8 +84,7 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
                     width: 220,
                     child: LinearProgressIndicator(
                       minHeight: 5,
-                      backgroundColor:
-                          colorScheme.onSurface.withOpacity(0.16),
+                      backgroundColor: colorScheme.onSurface.withOpacity(0.16),
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         AppTheme.primaryColor,
                       ),

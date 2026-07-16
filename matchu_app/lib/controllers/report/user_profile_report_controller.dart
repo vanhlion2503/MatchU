@@ -1,12 +1,13 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/models/user_profile_report_model.dart';
 import 'package:matchu_app/models/user_profile_report_reason.dart';
 import 'package:matchu_app/services/report/user_profile_report_service.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 
 class UserProfileReportController extends GetxController {
   UserProfileReportController({
@@ -99,8 +100,10 @@ class UserProfileReportController extends GetxController {
 
       if (picked.length > remainingSlots) {
         Get.snackbar(
-          'Giới hạn ảnh',
-          'Chỉ lưu $remainingSlots ảnh đầu tiên. Tối đa $maxEvidenceImages ảnh cho mỗi báo cáo.',
+          profileTr('Giới hạn ảnh'),
+          profileTr(
+            'Chỉ lưu $remainingSlots ảnh đầu tiên. Tối đa $maxEvidenceImages ảnh cho mỗi báo cáo.',
+          ),
           snackPosition: SnackPosition.TOP,
         );
       }
@@ -158,10 +161,12 @@ class UserProfileReportController extends GetxController {
 
       Get.back(result: true);
       Get.snackbar(
-        'Đã gửi báo cáo',
-        reportedUserName.trim().isEmpty
-            ? 'Chúng tôi sẽ xem xét báo cáo của bạn.'
-            : 'Chúng tôi sẽ xem xét tài khoản $reportedUserName.',
+        profileTr('Đã gửi báo cáo'),
+        profileTr(
+          reportedUserName.trim().isEmpty
+              ? 'Chúng tôi sẽ xem xét báo cáo của bạn.'
+              : 'Chúng tôi sẽ xem xét tài khoản $reportedUserName.',
+        ),
         snackPosition: SnackPosition.TOP,
       );
     } catch (error) {
@@ -188,7 +193,11 @@ class UserProfileReportController extends GetxController {
   }
 
   void _showError(String message) {
-    Get.snackbar('Lỗi', message, snackPosition: SnackPosition.TOP);
+    Get.snackbar(
+      ProfileTranslationKeys.error.tr,
+      profileTr(message),
+      snackPosition: SnackPosition.TOP,
+    );
   }
 
   @override

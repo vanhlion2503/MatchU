@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
@@ -125,8 +126,9 @@ class PostCreationSync {
   static void _notifyModerationDecision(PostModel post) {
     if (post.isModerationApproved) {
       Get.snackbar(
-        'Thông báo',
-        'Video đã được duyệt và bài viết có thể hiển thị theo quyền riêng tư đã chọn.',
+        PostTranslationKeys.notice.tr,
+        'Video đã được duyệt và bài viết có thể hiển thị theo quyền riêng tư đã chọn.'
+            .tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -135,12 +137,15 @@ class PostCreationSync {
 
     final message = post.moderationMessageVi?.trim();
     Get.snackbar(
-      post.isRejectedByModeration ? 'Bài viết bị từ chối' : 'Cần xem xét',
+      (post.isRejectedByModeration
+              ? PostTranslationKeys.moderationRejected
+              : PostTranslationKeys.moderationReview)
+          .tr,
       message?.isNotEmpty == true
-          ? message!
+          ? postTr(message!)
           : post.isRejectedByModeration
-          ? 'Video vi phạm tiêu chuẩn cộng đồng nên bài viết đã bị ẩn.'
-          : 'Video cần được quản trị viên xem xét trước khi hiển thị.',
+          ? 'Video vi phạm tiêu chuẩn cộng đồng nên bài viết đã bị ẩn.'.tr
+          : 'Video cần được quản trị viên xem xét trước khi hiển thị.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

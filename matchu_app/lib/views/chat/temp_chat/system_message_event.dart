@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class SystemMessageEvent extends StatelessWidget {
   final String text;
@@ -24,13 +24,9 @@ class SystemMessageEvent extends StatelessWidget {
 
         // ===== KHỐI SỰ KIỆN =====
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: backgroundColor ??
-                theme.colorScheme.error.withOpacity(0.25),
+            color: backgroundColor ?? theme.colorScheme.error.withOpacity(0.25),
             borderRadius: BorderRadius.circular(18),
             // border: Border.all(
             //   color: theme.colorScheme.primary.withOpacity(0.25),
@@ -41,8 +37,7 @@ class SystemMessageEvent extends StatelessWidget {
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color:
-                  textColor ?? theme.colorScheme.error.withOpacity(0.8),
+              color: textColor ?? theme.colorScheme.error.withOpacity(0.8),
             ),
           ),
         ),

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:intl/intl.dart';
 import 'package:matchu_app/controllers/chat/chat_list_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
@@ -10,6 +10,7 @@ import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/utils/highlight_text.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:matchu_app/translations/long_chat_translations.dart';
 
 Widget chatItem({
   required BuildContext context,
@@ -104,7 +105,7 @@ Widget chatItem({
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           text: highlightText(
-                            text: isMe ? "Bạn: $preview" : preview,
+                            text: longChatPreview(preview, isMe: isMe),
                             query: searchQuery,
                             normalStyle:
                                 Theme.of(context).textTheme.bodyMedium!,

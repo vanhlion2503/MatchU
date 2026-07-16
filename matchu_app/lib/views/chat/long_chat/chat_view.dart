@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
+import 'package:matchu_app/translations/long_chat_translations.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
@@ -179,7 +180,10 @@ class _ChatViewState extends State<ChatView> {
                 switch (action) {
                   case ChatMenuAction.call:
                     if (otherUid == null || otherUid.isEmpty) {
-                      Get.snackbar("Call", "Unable to find receiver.");
+                      Get.snackbar(
+                        LongChatTranslationKeys.call.tr,
+                        longChatTr("Unable to find receiver."),
+                      );
                       return;
                     }
                     unawaited(
@@ -189,7 +193,10 @@ class _ChatViewState extends State<ChatView> {
 
                   case ChatMenuAction.video:
                     if (otherUid == null || otherUid.isEmpty) {
-                      Get.snackbar("Call", "Unable to find receiver.");
+                      Get.snackbar(
+                        LongChatTranslationKeys.call.tr,
+                        longChatTr("Unable to find receiver."),
+                      );
                       return;
                     }
                     unawaited(
@@ -376,8 +383,8 @@ void _showReportDialog(BuildContext context) {
           onPressed: () {
             Get.back();
             Get.snackbar(
-              "Đã gửi báo cáo",
-              "Cảm ơn bạn đã giúp cộng đồng an toàn hơn ❤️",
+              longChatTr("Đã gửi báo cáo"),
+              longChatTr("Cảm ơn bạn đã giúp cộng đồng an toàn hơn ❤️"),
             );
           },
           child: const Text("Báo cáo"),

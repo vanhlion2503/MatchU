@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' hide Text;
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 
 /// ================= DOB BOX (EDIT PROFILE) =================
@@ -24,24 +24,21 @@ Widget dobBoxEdit(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: active
-                ? theme.colorScheme.primary
-                : Colors.grey.shade300,
+            color: active ? theme.colorScheme.primary : Colors.grey.shade300,
             width: active ? 2 : 1,
           ),
-          color: active
-              ? theme.colorScheme.primary.withOpacity(0.05)
-              : null,
+          color: active ? theme.colorScheme.primary.withOpacity(0.05) : null,
         ),
         child: Text(
           label,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: label.contains('D') ||
-                    label.contains('M') ||
-                    label.contains('Y')
-                ? Colors.grey
-                : theme.colorScheme.onSurface,
+            color:
+                label.contains('D') ||
+                        label.contains('M') ||
+                        label.contains('Y')
+                    ? Colors.grey
+                    : theme.colorScheme.onSurface,
           ),
         ),
       ),
@@ -51,10 +48,7 @@ Widget dobBoxEdit(
 
 /// ================= PICKERS =================
 
-void openEditDayPicker(
-  BuildContext context,
-  AccountSettingsController c,
-) {
+void openEditDayPicker(BuildContext context, AccountSettingsController c) {
   c.selectedDobField.value = DobField.day;
 
   _openEditPicker(
@@ -68,10 +62,7 @@ void openEditDayPicker(
   );
 }
 
-void openEditMonthPicker(
-  BuildContext context,
-  AccountSettingsController c,
-) {
+void openEditMonthPicker(BuildContext context, AccountSettingsController c) {
   c.selectedDobField.value = DobField.month;
 
   _openEditPicker(
@@ -85,10 +76,7 @@ void openEditMonthPicker(
   );
 }
 
-void openEditYearPicker(
-  BuildContext context,
-  AccountSettingsController c,
-) {
+void openEditYearPicker(BuildContext context, AccountSettingsController c) {
   c.selectedDobField.value = DobField.year;
 
   final years = List.generate(
@@ -123,9 +111,7 @@ void _openEditPicker(
         height: 300,
         decoration: BoxDecoration(
           color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(20),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
@@ -143,16 +129,17 @@ void _openEditPicker(
                 onSelectedItemChanged: (i) {
                   onSelected(items[i]);
                 },
-                children: items
-                    .map(
-                      (e) => Center(
-                        child: Text(
-                          e,
-                          style: const TextStyle(fontSize: 20),
-                        ),
-                      ),
-                    )
-                    .toList(),
+                children:
+                    items
+                        .map(
+                          (e) => Center(
+                            child: Text(
+                              e,
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                          ),
+                        )
+                        .toList(),
               ),
             ),
           ],

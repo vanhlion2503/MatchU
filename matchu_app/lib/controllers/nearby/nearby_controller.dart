@@ -9,6 +9,7 @@ import 'package:matchu_app/models/nearby_user_vm.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/nearby/nearby_service.dart';
 import 'package:matchu_app/utils/location_utils.dart';
+import 'package:matchu_app/translations/nearby_translations.dart';
 
 class NearbyController extends GetxController {
   static const String _presenceOwner = 'nearby';
@@ -96,7 +97,10 @@ class NearbyController extends GetxController {
     } catch (e) {
       isLocationVisible.value = previousValue;
       _setLocationError("Không cập nhật được trạng thái hiển thị vị trí.");
-      Get.snackbar("Lỗi", "Không cập nhật được trạng thái hiển thị vị trí.");
+      Get.snackbar(
+        NearbyTranslationKeys.error.tr,
+        nearbyTr("Không cập nhật được trạng thái hiển thị vị trí."),
+      );
     } finally {
       isUpdatingVisibility.value = false;
     }
@@ -190,7 +194,10 @@ class NearbyController extends GetxController {
       _setLocationError(
         "Không tải được danh sách quanh bạn. Vui lòng thử lại.",
       );
-      Get.snackbar("Lỗi", "Không tải được danh sách quanh bạn.");
+      Get.snackbar(
+        NearbyTranslationKeys.error.tr,
+        nearbyTr("Không tải được danh sách quanh bạn."),
+      );
     }
   }
 

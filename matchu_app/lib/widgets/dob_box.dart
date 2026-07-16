@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' hide Text;
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 
 Widget dobBox(
@@ -22,31 +22,27 @@ Widget dobBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: active
-                ? theme.colorScheme.primary
-                : Colors.grey.shade300,
+            color: active ? theme.colorScheme.primary : Colors.grey.shade300,
             width: active ? 2 : 1,
           ),
-          color: active
-              ? theme.colorScheme.primary.withOpacity(0.05)
-              : null,
+          color: active ? theme.colorScheme.primary.withOpacity(0.05) : null,
         ),
         child: Text(
           label,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
-            color: label.contains('D') ||
-                    label.contains('M') ||
-                    label.contains('Y')
-                ? Colors.grey
-                : theme.colorScheme.onSurface,
+            color:
+                label.contains('D') ||
+                        label.contains('M') ||
+                        label.contains('Y')
+                    ? Colors.grey
+                    : theme.colorScheme.onSurface,
           ),
         ),
       ),
     ),
   );
 }
-
 
 void openDayPicker(BuildContext context, AuthController c) {
   c.selectedDobField.value = DobField.day;
@@ -62,7 +58,6 @@ void openDayPicker(BuildContext context, AuthController c) {
   );
 }
 
-
 void openMonthPicker(BuildContext context, AuthController c) {
   c.selectedDobField.value = DobField.month;
 
@@ -76,7 +71,6 @@ void openMonthPicker(BuildContext context, AuthController c) {
     },
   );
 }
-
 
 void openYearPicker(BuildContext context, AuthController c) {
   c.selectedDobField.value = DobField.year;
@@ -96,7 +90,6 @@ void openYearPicker(BuildContext context, AuthController c) {
     },
   );
 }
-
 
 void _openSinglePicker(
   BuildContext context, {
@@ -130,14 +123,17 @@ void _openSinglePicker(
                 onSelectedItemChanged: (i) {
                   onSelected(items[i]);
                 },
-                children: items
-                    .map((e) => Center(
-                          child: Text(
-                            e,
-                            style: const TextStyle(fontSize: 20),
+                children:
+                    items
+                        .map(
+                          (e) => Center(
+                            child: Text(
+                              e,
+                              style: const TextStyle(fontSize: 20),
+                            ),
                           ),
-                        ))
-                    .toList(),
+                        )
+                        .toList(),
               ),
             ),
           ],

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class IncomingCallActionButton extends StatelessWidget {
   const IncomingCallActionButton({

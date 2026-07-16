@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+
 class FaceVerificationPermissionScreen extends StatelessWidget {
   const FaceVerificationPermissionScreen({
     super.key,

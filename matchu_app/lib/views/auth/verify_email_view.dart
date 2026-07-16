@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:matchu_app/translations/auth_translations.dart';
 
 class VerifyEmailView extends StatefulWidget {
   const VerifyEmailView({super.key});
@@ -43,7 +44,7 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
     if (await canLaunchUrl(gmailWeb)) {
       await launchUrl(gmailWeb, mode: LaunchMode.externalApplication);
     } else {
-      Get.snackbar("Lỗi", "Không mở được Gmail");
+      Get.snackbar(AuthTranslationKeys.error.tr, authTr("Không mở được Gmail"));
     }
   }
 
@@ -98,17 +99,15 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
                           color: Theme.of(context).textTheme.bodySmall?.color,
                         ),
                         children: [
-                          const TextSpan(
-                            text: 'Chúng tôi đã gửi link xác minh đến ',
+                          TextSpan(
+                            text: authTr('Chúng tôi đã gửi link xác minh đến '),
                           ),
                           TextSpan(
                             text: maskEmail(c.emailC.text.trim()),
                             style: Theme.of(context).textTheme.bodyLarge!
                                 .copyWith(fontWeight: FontWeight.bold),
                           ),
-                          const TextSpan(
-                            text: '. Hãy mở email và xác nhận.',
-                          ),
+                          TextSpan(text: authTr('. Hãy mở email và xác nhận.')),
                         ],
                       ),
                     ),

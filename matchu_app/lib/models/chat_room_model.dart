@@ -49,4 +49,3 @@ class ChatRoomModel {
 
   int unreadCount(String uid) => unread?[uid] ?? 0;
 }
-

@@ -6,10 +6,7 @@ import 'package:matchu_app/views/nearby/widgets/nearby_user_list.dart';
 class NearbyDiscoverTab extends StatelessWidget {
   final NearbyController controller;
 
-  const NearbyDiscoverTab({
-    super.key,
-    required this.controller,
-  });
+  const NearbyDiscoverTab({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -18,9 +15,7 @@ class NearbyDiscoverTab extends StatelessWidget {
         const SizedBox(height: 4),
         NearbyRangeFilter(controller: controller),
         const SizedBox(height: 12),
-        Expanded(
-          child: NearbyUserList(controller: controller),
-        ),
+        Expanded(child: NearbyUserList(controller: controller)),
       ],
     );
   }

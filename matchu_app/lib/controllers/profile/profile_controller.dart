@@ -4,20 +4,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-
-class ProfileController extends GetxController{
+class ProfileController extends GetxController {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   final Rx<UserModel?> user = Rxn<UserModel>();
   final isLoading = true.obs;
-  
+
   StreamSubscription<DocumentSnapshot>? _userSub;
   StreamSubscription<User?>? _authSub;
   Timer? _retryTimer;
-  
+
   @override
-  void onInit(){
+  void onInit() {
     super.onInit();
     _authSub = _auth.authStateChanges().listen((firebaseUser) {
       if (firebaseUser == null) {
@@ -35,9 +34,9 @@ class ProfileController extends GetxController{
     }
   }
 
-  void _listenUserProfile([String? uid]){
+  void _listenUserProfile([String? uid]) {
     _userSub?.cancel();
-    
+
     final targetUid = uid ?? _auth.currentUser?.uid;
     if (targetUid == null) {
       isLoading.value = false;
@@ -45,42 +44,46 @@ class ProfileController extends GetxController{
     }
 
     isLoading.value = true;
-    _userSub = _db.collection('users').doc(targetUid).snapshots().listen(
-      (doc) {
-        if (doc.data() != null) {
-          user.value = UserModel.fromJson(doc.data()!, doc.id);
-        } else {
-          user.value = null;
-        }
-        isLoading.value = false;
-      },
-      onError: (error) {
-        // Handle permission or transient errors.
-        _userSub?.cancel();
-        _userSub = null;
-        user.value = null;
-        isLoading.value = false;
-        if (_retryTimer != null) return;
+    _userSub = _db
+        .collection('users')
+        .doc(targetUid)
+        .snapshots()
+        .listen(
+          (doc) {
+            if (doc.data() != null) {
+              user.value = UserModel.fromJson(doc.data()!, doc.id);
+            } else {
+              user.value = null;
+            }
+            isLoading.value = false;
+          },
+          onError: (error) {
+            // Handle permission or transient errors.
+            _userSub?.cancel();
+            _userSub = null;
+            user.value = null;
+            isLoading.value = false;
+            if (_retryTimer != null) return;
 
-        final retryUid = _auth.currentUser?.uid;
-        if (retryUid == null) return;
+            final retryUid = _auth.currentUser?.uid;
+            if (retryUid == null) return;
 
-        _retryTimer = Timer(const Duration(seconds: 2), () {
-          _retryTimer = null;
-          if (isClosed) return;
-          _listenUserProfile(retryUid);
-        });
-      },
-      cancelOnError: false,
-    );
+            _retryTimer = Timer(const Duration(seconds: 2), () {
+              _retryTimer = null;
+              if (isClosed) return;
+              _listenUserProfile(retryUid);
+            });
+          },
+          cancelOnError: false,
+        );
   }
 
-  String get fullName{
+  String get fullName {
     final u = user.value;
     return u?.fullname ?? "";
   }
 
-  String get nickName{
+  String get nickName {
     final u = user.value;
     return u?.nickname ?? "";
   }
@@ -95,20 +98,20 @@ class ProfileController extends GetxController{
     final now = DateTime.now();
     int age = now.year - u.birthday!.year;
     if (now.month < u.birthday!.month ||
-      (now.month == u.birthday!.month && now.day < u.birthday!.day)) {
+        (now.month == u.birthday!.month && now.day < u.birthday!.day)) {
       age--;
     }
 
     return age.toString();
   }
 
-  double get reputationPercent{
+  double get reputationPercent {
     final u = user.value;
-    if(u == null){
+    if (u == null) {
       return 0.0;
     }
-    final score = u.reputationScore.clamp(0,100);
-    return score/100;
+    final score = u.reputationScore.clamp(0, 100);
+    return score / 100;
   }
 
   String get reputationLabel {
@@ -133,9 +136,9 @@ class ProfileController extends GetxController{
   int get followingCount => user.value?.following.length ?? 0;
   int get rank => user.value?.rank ?? 1;
 
-  Future<void> updateBio(String newBio) async{
+  Future<void> updateBio(String newBio) async {
     final uid = _auth.currentUser?.uid;
-    if(uid == null){
+    if (uid == null) {
       return;
     }
     final trimmedBio = newBio.trim();
@@ -143,9 +146,7 @@ class ProfileController extends GetxController{
       return;
     }
 
-    await _db.collection("users").doc(uid).update({
-      "bio": trimmedBio,
-    });
+    await _db.collection("users").doc(uid).update({"bio": trimmedBio});
   }
 
   // ====================================================

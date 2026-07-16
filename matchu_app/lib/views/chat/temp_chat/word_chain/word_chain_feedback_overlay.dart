@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:iconsax/iconsax.dart';
 
 class WordChainHeartLossOverlay extends StatelessWidget {
@@ -7,7 +7,8 @@ class WordChainHeartLossOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.color ??
+    final muted =
+        theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
 
     return Positioned.fill(
@@ -40,13 +41,14 @@ class WordChainHeartLossOverlay extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 'Bạn mất 1 tim',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: muted,
-                ),
+                style: theme.textTheme.bodySmall?.copyWith(color: muted),
               ),
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.error.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -86,17 +88,11 @@ class WordChainInlineFeedback extends StatelessWidget {
       decoration: BoxDecoration(
         color: accentColor.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: accentColor.withOpacity(0.35),
-        ),
+        border: Border.all(color: accentColor.withOpacity(0.35)),
       ),
       child: Row(
         children: [
-          Icon(
-            Iconsax.danger,
-            size: 18,
-            color: accentColor,
-          ),
+          Icon(Iconsax.danger, size: 18, color: accentColor),
           const SizedBox(width: 6),
           Expanded(
             child: Text(

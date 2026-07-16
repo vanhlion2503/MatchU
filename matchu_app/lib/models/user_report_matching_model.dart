@@ -18,11 +18,11 @@ class UserReportMatchingModel {
   });
 
   Map<String, dynamic> toJson() => {
-        "roomId": roomId,
-        "fromUid": fromUid,
-        "toUid": toUid,
-        "reason": reason,
-        "description": description,
-        "createdAt": Timestamp.fromDate(createdAt),
-      };
+    "roomId": roomId,
+    "fromUid": fromUid,
+    "toUid": toUid,
+    "reason": reason,
+    "description": description,
+    "createdAt": Timestamp.fromDate(createdAt),
+  };
 }

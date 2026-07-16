@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 TextSpan highlightText({
   required String text,
@@ -19,21 +19,13 @@ TextSpan highlightText({
   while (true) {
     final index = lowerText.indexOf(lowerQuery, start);
     if (index < 0) {
-      spans.add(
-        TextSpan(
-          text: text.substring(start),
-          style: normalStyle,
-        ),
-      );
+      spans.add(TextSpan(text: text.substring(start), style: normalStyle));
       break;
     }
 
     if (index > start) {
       spans.add(
-        TextSpan(
-          text: text.substring(start, index),
-          style: normalStyle,
-        ),
+        TextSpan(text: text.substring(start, index), style: normalStyle),
       );
     }
 

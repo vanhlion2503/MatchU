@@ -1,4 +1,10 @@
+import 'package:matchu_app/translations/auth_translations.dart';
+
 String firebaseErrorToVietnamese(String code) {
+  return authTr(_firebaseErrorSource(code));
+}
+
+String _firebaseErrorSource(String code) {
   switch (code) {
     /* =============================
        LỖI EMAIL / MẬT KHẨU

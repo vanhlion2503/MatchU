@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
@@ -66,8 +66,9 @@ class _MyQrCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
       decoration: BoxDecoration(
         color: (theme.brightness == Brightness.dark
-        ? AppTheme.darkBorder
-        : AppTheme.lightBorder).withOpacity(0.45),
+                ? AppTheme.darkBorder
+                : AppTheme.lightBorder)
+            .withOpacity(0.45),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
         boxShadow: [

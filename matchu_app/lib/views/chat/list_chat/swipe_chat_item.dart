@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:iconsax/iconsax.dart';
 
 class SwipeChatItemMessage extends StatefulWidget {
@@ -40,10 +40,7 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
       vsync: this,
     );
     _offsetAnimation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: _animationCurve,
-      ),
+      CurvedAnimation(parent: _animationController, curve: _animationCurve),
     );
     _offsetAnimation.addListener(() {
       if (_isAnimating) {
@@ -67,14 +64,8 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
 
   void _animateTo(double target) {
     _isAnimating = true;
-    _offsetAnimation = Tween<double>(
-      begin: _dragOffset,
-      end: target,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: _animationCurve,
-      ),
+    _offsetAnimation = Tween<double>(begin: _dragOffset, end: target).animate(
+      CurvedAnimation(parent: _animationController, curve: _animationCurve),
     );
     _animationController.forward(from: 0).then((_) {
       _isAnimating = false;
@@ -152,10 +143,10 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
             onHorizontalDragEnd: (details) {
               final velocity = details.velocity.pixelsPerSecond.dx;
               final current = _currentOffset;
-              
+
               // Tính toán snap point dựa trên vị trí hiện tại và velocity
               double snapTarget;
-              
+
               if (velocity < -500) {
                 // Swipe nhanh sang trái → mở tối đa (3 tầng)
                 snapTarget = -maxOffset;
@@ -164,10 +155,10 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
                 snapTarget = 0;
               } else {
                 // Snap theo vị trí (ngưỡng ở giữa mỗi tile)
-                final threshold1 = -tileWidth * 0.5;  // Giữa 0 và tile 1
+                final threshold1 = -tileWidth * 0.5; // Giữa 0 và tile 1
                 final threshold2 = -tileWidth * 1.5; // Giữa tile 1 và tile 2
                 final threshold3 = -tileWidth * 2.5; // Giữa tile 2 và tile 3
-                
+
                 if (current <= threshold3) {
                   // Vượt quá giữa tile 2 và 3 → snap đến 3 tầng
                   snapTarget = -maxOffset;
@@ -182,7 +173,7 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
                   snapTarget = 0;
                 }
               }
-              
+
               _animateTo(snapTarget);
             },
             onTap: () {
@@ -211,12 +202,11 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
   }) {
     // Vị trí bắt đầu của tile này (từ phải sang trái)
     final double revealStart = tileWidth * index;
-    
+
     // Tính toán độ lệch để reveal tile
     // Khi _currentOffset = -revealStart - tileWidth, tile sẽ được reveal hoàn toàn
-    final double revealProgress = 
-        (-_currentOffset - revealStart) / tileWidth;
-    
+    final double revealProgress = (-_currentOffset - revealStart) / tileWidth;
+
     // Clamp từ 0 đến 1 và tính dx để slide vào
     final double clampedProgress = revealProgress.clamp(0.0, 1.0);
     final double dx = (1.0 - clampedProgress) * tileWidth;
@@ -253,5 +243,4 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
       ),
     );
   }
-
 }

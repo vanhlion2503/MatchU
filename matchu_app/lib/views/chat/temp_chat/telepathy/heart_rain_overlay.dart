@@ -8,10 +8,7 @@ class HeartRainOverlay {
     late OverlayEntry entry;
 
     entry = OverlayEntry(
-      builder: (_) => _HeartRain(
-        count: count,
-        onFinish: () => entry.remove(),
-      ),
+      builder: (_) => _HeartRain(count: count, onFinish: () => entry.remove()),
     );
 
     overlay.insert(entry);
@@ -22,17 +19,13 @@ class _HeartRain extends StatefulWidget {
   final int count;
   final VoidCallback onFinish;
 
-  const _HeartRain({
-    required this.count,
-    required this.onFinish,
-  });
+  const _HeartRain({required this.count, required this.onFinish});
 
   @override
   State<_HeartRain> createState() => _HeartRainState();
 }
 
-class _HeartRainState extends State<_HeartRain>
-    with TickerProviderStateMixin {
+class _HeartRainState extends State<_HeartRain> with TickerProviderStateMixin {
   final _rng = Random();
   late final List<AnimationController> _controllers;
 
@@ -43,9 +36,7 @@ class _HeartRainState extends State<_HeartRain>
     _controllers = List.generate(widget.count, (i) {
       final ctrl = AnimationController(
         vsync: this,
-        duration: Duration(
-          milliseconds: 1200 + _rng.nextInt(800),
-        ),
+        duration: Duration(milliseconds: 1200 + _rng.nextInt(800)),
       );
 
       Future.delayed(Duration(milliseconds: i * 80), () {
@@ -84,9 +75,7 @@ class _HeartRainState extends State<_HeartRain>
           return AnimatedBuilder(
             animation: _controllers[i],
             builder: (_, __) {
-              final t = Curves.easeOutCubic.transform(
-                _controllers[i].value,
-              );
+              final t = Curves.easeOutCubic.transform(_controllers[i].value);
 
               return Positioned(
                 left: lerpDouble(startX, endX, t)!,

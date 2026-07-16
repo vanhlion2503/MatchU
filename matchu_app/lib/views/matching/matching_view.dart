@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
@@ -15,8 +15,8 @@ class MatchingView extends StatefulWidget {
   State<MatchingView> createState() => _MatchingViewState();
 }
 
-class _MatchingViewState extends State<MatchingView> 
-    with SingleTickerProviderStateMixin{
+class _MatchingViewState extends State<MatchingView>
+    with SingleTickerProviderStateMixin {
   final controller = Get.find<MatchingController>();
   final anonAvatarC = Get.find<AnonymousAvatarController>();
 
@@ -27,8 +27,7 @@ class _MatchingViewState extends State<MatchingView>
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.isSearching.value ||
-          controller.isMatched.value) {
+      if (controller.isSearching.value || controller.isMatched.value) {
         return;
       }
 
@@ -37,9 +36,7 @@ class _MatchingViewState extends State<MatchingView>
       final args = Get.arguments as Map<String, dynamic>?;
 
       if (args != null && args["targetGender"] is String) {
-        controller.startMatching(
-          targetGender: args["targetGender"],
-        );
+        controller.startMatching(targetGender: args["targetGender"]);
       }
     });
 
@@ -48,7 +45,6 @@ class _MatchingViewState extends State<MatchingView>
       duration: const Duration(seconds: 2),
     )..repeat();
   }
-
 
   @override
   void dispose() {
@@ -67,7 +63,7 @@ class _MatchingViewState extends State<MatchingView>
         title: Text(
           "Đang tìm người chat",
           style: theme.textTheme.headlineSmall,
-          ),
+        ),
         leading: Container(
           margin: const EdgeInsets.only(left: 10),
           decoration: BoxDecoration(
@@ -78,7 +74,7 @@ class _MatchingViewState extends State<MatchingView>
             ),
           ),
           child: IconButton(
-            icon: const Icon(Iconsax.arrow_left_2, size: 25,),
+            icon: const Icon(Iconsax.arrow_left_2, size: 25),
             onPressed: () async {
               await controller.stopMatching();
               Get.back();
@@ -96,7 +92,7 @@ class _MatchingViewState extends State<MatchingView>
               ),
             ),
             child: IconButton(
-              icon: const Icon(Iconsax.home_2, size: 25,),
+              icon: const Icon(Iconsax.home_2, size: 25),
               onPressed: () {
                 controller.isMinimized.value = true;
                 Get.back();
@@ -114,7 +110,7 @@ class _MatchingViewState extends State<MatchingView>
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
-                children:[
+                children: [
                   const SizedBox(height: 60),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -129,33 +125,31 @@ class _MatchingViewState extends State<MatchingView>
                   const SizedBox(height: 100),
                   Text(
                     "Đang tìm bạn chat...",
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).brightness == Brightness.dark 
-                          ? AppTheme.darkTextPrimary
-                          : AppTheme.lightTextPrimary,
-                          ),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color:
+                          Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.darkTextPrimary
+                              : AppTheme.lightTextPrimary,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     "Chúng tôi đang kết nối bạn với một người ngẫu nhiên phù hợp.",
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.hintColor),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
                   ),
-        
+
                   SizedBox(height: 40),
-        
-                  AnimatedDots(
-                    color: theme.colorScheme.primary,
-                    size: 10,
-                  ),
-        
+
+                  AnimatedDots(color: theme.colorScheme.primary, size: 10),
+
                   SizedBox(height: 24),
-        
+
                   _matchTimer(theme),
-        
+
                   const Spacer(),
                   Obx(() {
                     return AnimatedOpacity(
@@ -193,6 +187,7 @@ class _MatchingViewState extends State<MatchingView>
       ),
     );
   }
+
   Widget _meAvatar() {
     return Column(
       children: [
@@ -206,9 +201,10 @@ class _MatchingViewState extends State<MatchingView>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? AppTheme.darkBorder
-                        : AppTheme.lightBorder,
+                    color:
+                        Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.darkBorder
+                            : AppTheme.lightBorder,
                     width: 3,
                   ),
                 ),
@@ -216,13 +212,10 @@ class _MatchingViewState extends State<MatchingView>
                   radius: 42,
                   backgroundColor:
                       Theme.of(context).colorScheme.surfaceContainerHighest,
-                  backgroundImage: key == null
-                      ? const AssetImage(
-                          "assets/anonymous/placeholder.png",
-                        )
-                      : AssetImage(
-                          "assets/anonymous/$key.png",
-                        ),
+                  backgroundImage:
+                      key == null
+                          ? const AssetImage("assets/anonymous/placeholder.png")
+                          : AssetImage("assets/anonymous/$key.png"),
                 ),
               );
             }),
@@ -248,7 +241,6 @@ class _MatchingViewState extends State<MatchingView>
       ],
     );
   }
-
 
   Widget _centerLine() {
     final color = Theme.of(context).colorScheme;
@@ -276,15 +268,9 @@ class _MatchingViewState extends State<MatchingView>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: color.surface.withOpacity(0.8),
-                border: Border.all(
-                  color: color.outline.withOpacity(0.15),
-                ),
+                border: Border.all(color: color.outline.withOpacity(0.15)),
               ),
-              child: Icon(
-                Icons.swap_horiz,
-                size: 20,
-                color: color.onSurface,
-              ),
+              child: Icon(Icons.swap_horiz, size: 20, color: color.onSurface),
             ),
           ],
         );
@@ -293,9 +279,10 @@ class _MatchingViewState extends State<MatchingView>
   }
 
   Widget _strangerRipple(ThemeData theme) {
-    final borderColor = theme.brightness == Brightness.dark
-        ? AppTheme.darkBorder
-        : AppTheme.lightBorder;
+    final borderColor =
+        theme.brightness == Brightness.dark
+            ? AppTheme.darkBorder
+            : AppTheme.lightBorder;
 
     return Column(
       children: [
@@ -312,10 +299,7 @@ class _MatchingViewState extends State<MatchingView>
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: borderColor,
-                    width: 3,
-                  ),
+                  border: Border.all(color: borderColor, width: 3),
                 ),
                 child: CircleAvatar(
                   radius: 38,
@@ -334,8 +318,8 @@ class _MatchingViewState extends State<MatchingView>
     );
   }
 
-  Widget _matchTimer(ThemeData theme){
-    return Obx((){
+  Widget _matchTimer(ThemeData theme) {
+    return Obx(() {
       final seconds = controller.elapsedSeconds.value;
       final min = seconds ~/ 60;
       final sec = seconds % 60;
@@ -343,20 +327,22 @@ class _MatchingViewState extends State<MatchingView>
       return AnimatedSwitcher(
         duration: const Duration(milliseconds: 100),
         child: Text(
-        "${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}",
-        key: ValueKey(seconds),
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          fontSize: 22,
-          letterSpacing: 2,
-          color: Theme.of(context).brightness == Brightness.dark 
-                        ? AppTheme.darkTextPrimary
-                        : AppTheme.lightTextPrimary,
+          "${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}",
+          key: ValueKey(seconds),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontSize: 22,
+            letterSpacing: 2,
+            color:
+                Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkTextPrimary
+                    : AppTheme.lightTextPrimary,
+          ),
         ),
-      ),
-        );
+      );
     });
   }
+
   Widget _matchedSuccessView(ThemeData theme) {
     return Center(
       child: Column(
@@ -370,10 +356,7 @@ class _MatchingViewState extends State<MatchingView>
             builder: (_, scale, child) {
               return Transform.scale(
                 scale: scale,
-                child: Opacity(
-                  opacity: scale.clamp(0.0, 1.0),
-                  child: child,
-                ),
+                child: Opacity(opacity: scale.clamp(0.0, 1.0), child: child),
               );
             },
             child: Container(
@@ -397,9 +380,10 @@ class _MatchingViewState extends State<MatchingView>
             "🎉 Đã kết nối!",
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? AppTheme.darkTextPrimary
-                  : AppTheme.lightTextPrimary,
+              color:
+                  Theme.of(context).brightness == Brightness.dark
+                      ? AppTheme.darkTextPrimary
+                      : AppTheme.lightTextPrimary,
             ),
           ),
 
@@ -420,15 +404,9 @@ class _MatchingViewState extends State<MatchingView>
           const SizedBox(height: 24),
 
           /// ⏳ LOADING NHẸ
-          AnimatedDots(
-            color: theme.colorScheme.primary,
-            size: 8,
-          ),
+          AnimatedDots(color: theme.colorScheme.primary, size: 8),
         ],
       ),
     );
   }
-
 }
-
-

@@ -4,7 +4,8 @@ import 'dart:math' as math;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
+import 'package:matchu_app/translations/long_chat_translations.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/models/message_status.dart';
@@ -717,7 +718,7 @@ class ChatController extends GetxController {
       );
     }
     if (!hasKey) {
-      Get.snackbar("🔐", "Đang thiết lập mã hóa, vui lòng đợi...");
+      Get.snackbar("🔐", longChatTr("Đang thiết lập mã hóa, vui lòng đợi..."));
       pendingTextMessages.remove(pending);
       return;
     }
@@ -748,10 +749,10 @@ class ChatController extends GetxController {
       }
       replyingMessage.value = reply;
       Get.snackbar(
-        "L\u1ED7i",
-        error is StateError
-            ? error.message
-            : "Kh\u00F4ng th\u1EC3 g\u1EEDi tin nh\u1EAFn.",
+        LongChatTranslationKeys.error.tr,
+        longChatTr(
+          error is StateError ? error.message : "Không thể gửi tin nhắn.",
+        ),
       );
     }
   }
@@ -798,7 +799,10 @@ class ChatController extends GetxController {
       replyingMessage.value = null;
     } catch (e) {
       pending.failed.value = true;
-      Get.snackbar("Lỗi", "Không thể gửi ảnh.");
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr("Không thể gửi ảnh."),
+      );
       Future.delayed(const Duration(seconds: 2), () {
         pendingImageMessages.remove(pending);
       });
@@ -818,7 +822,10 @@ class ChatController extends GetxController {
 
       final hasPermission = await _audioRecorder.hasPermission();
       if (!hasPermission) {
-        Get.snackbar("Lỗi", "Cần quyền microphone để ghi âm.");
+        Get.snackbar(
+          LongChatTranslationKeys.error.tr,
+          longChatTr("Cần quyền microphone để ghi âm."),
+        );
         return;
       }
 
@@ -849,7 +856,10 @@ class ChatController extends GetxController {
             DateTime.now().difference(startedAt).inSeconds;
       });
     } catch (error) {
-      Get.snackbar("Lỗi", "Không thể bắt đầu ghi âm lúc này.");
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr("Không thể bắt đầu ghi âm lúc này."),
+      );
     }
   }
 
@@ -866,7 +876,10 @@ class ChatController extends GetxController {
         durationMs = DateTime.now().difference(startedAt).inMilliseconds;
       }
     } catch (_) {
-      Get.snackbar("Lỗi", "Không thể lưu ghi âm lúc này.");
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr("Không thể lưu ghi âm lúc này."),
+      );
     } finally {
       _voiceAmplitudeSubscription?.cancel();
       _voiceAmplitudeSubscription = null;
@@ -918,8 +931,10 @@ class ChatController extends GetxController {
     } catch (error) {
       pending.failed.value = true;
       Get.snackbar(
-        "Lỗi",
-        error is StateError ? error.message : "Không thể gửi ghi âm.",
+        LongChatTranslationKeys.error.tr,
+        longChatTr(
+          error is StateError ? error.message : "Không thể gửi ghi âm.",
+        ),
       );
       Future.delayed(const Duration(seconds: 2), () {
         pendingImageMessages.remove(pending);
@@ -996,7 +1011,10 @@ class ChatController extends GetxController {
     }
 
     if (!hasKey) {
-      Get.snackbar("Lỗi", "Đang thiết lập mã hóa, vui lòng thử lại.");
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr("Đang thiết lập mã hóa, vui lòng thử lại."),
+      );
       return false;
     }
     return true;
@@ -1052,7 +1070,10 @@ class ChatController extends GetxController {
       editingMessage.value = null;
       inputController.clear();
     } catch (e) {
-      Get.snackbar("Lỗi", "Không thể cập nhật tin nhắn.");
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr("Không thể cập nhật tin nhắn."),
+      );
     }
   }
 
@@ -1097,7 +1118,10 @@ class ChatController extends GetxController {
         cancelEdit();
       }
     } catch (e) {
-      Get.snackbar("Lỗi", "Không thể xóa tin nhắn.");
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr("Không thể xóa tin nhắn."),
+      );
     }
   }
 
@@ -1108,7 +1132,10 @@ class ChatController extends GetxController {
     required bool isLatest,
   }) {
     if (imagePath.isEmpty) {
-      Get.snackbar("Lỗi", viewOnceDeletedText);
+      Get.snackbar(
+        LongChatTranslationKeys.error.tr,
+        longChatTr(viewOnceDeletedText),
+      );
       return;
     }
 

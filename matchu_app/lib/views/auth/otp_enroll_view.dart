@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/utils/otp_phone_formatter.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:pinput/pinput.dart';
+import 'package:matchu_app/translations/auth_translations.dart';
 
 class OtpEnrollView extends StatelessWidget {
   const OtpEnrollView({super.key});
@@ -48,7 +49,7 @@ class OtpEnrollView extends StatelessWidget {
                         ),
                         children: [
                           TextSpan(
-                            text: 'Mã xác thực đã được gửi đến số \n',
+                            text: authTr('Mã xác thực đã được gửi đến số \n'),
                             style: Theme.of(context).textTheme.bodyLarge,
                           ),
                           TextSpan(

@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 

@@ -1,10 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/widgets/animated_dots.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-
 
 class GlobalMatchingBubble extends StatelessWidget {
   GlobalMatchingBubble({super.key});
@@ -15,7 +14,7 @@ class GlobalMatchingBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return Obx((){
+    return Obx(() {
       if (!controller.isMatchingActive.value ||
           controller.isMatched.value ||
           !controller.isMinimized.value) {
@@ -27,7 +26,7 @@ class GlobalMatchingBubble extends StatelessWidget {
         left: offset.dx,
         top: offset.dy,
         child: GestureDetector(
-          onPanUpdate: (details){
+          onPanUpdate: (details) {
             final newOffset = controller.bubbleOffset.value + details.delta;
             controller.bubbleOffset.value = Offset(
               newOffset.dx.clamp(8, size.width - 72),
@@ -39,12 +38,12 @@ class GlobalMatchingBubble extends StatelessWidget {
             Get.toNamed("/matching");
           },
           child: _bubble(context),
-        )
-        );
+        ),
+      );
     });
   }
 
-  Widget _bubble(BuildContext context){
+  Widget _bubble(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
       width: 80,
@@ -52,19 +51,16 @@ class GlobalMatchingBubble extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primary,
-            theme.colorScheme.secondary,
-          ],
+          colors: [theme.colorScheme.primary, theme.colorScheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         border: Border.all(
           width: 2,
-          color: Theme.of(context).brightness == Brightness.dark 
-                        ? AppTheme.darkBorder
-                        : AppTheme.lightBorder,
-
+          color:
+              Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.darkBorder
+                  : AppTheme.lightBorder,
         ),
         boxShadow: [
           BoxShadow(
@@ -77,11 +73,7 @@ class GlobalMatchingBubble extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Iconsax.search_normal,
-            color: Colors.white,
-            size: 18,
-          ),
+          const Icon(Iconsax.search_normal, color: Colors.white, size: 18),
 
           const SizedBox(height: 4),
 
@@ -89,10 +81,7 @@ class GlobalMatchingBubble extends StatelessWidget {
 
           const SizedBox(height: 2),
 
-          AnimatedDots(
-            size: 4,
-            color: Colors.white,
-          ),
+          AnimatedDots(size: 4, color: Colors.white),
         ],
       ),
     );

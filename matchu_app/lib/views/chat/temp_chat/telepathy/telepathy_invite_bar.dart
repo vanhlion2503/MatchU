@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
@@ -13,10 +13,7 @@ const _brandGradient = LinearGradient(
 class TelepathyInviteBar extends StatelessWidget {
   final TempChatController controller;
 
-  const TelepathyInviteBar({
-    super.key,
-    required this.controller,
-  });
+  const TelepathyInviteBar({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +23,8 @@ class TelepathyInviteBar extends StatelessWidget {
     return Obx(() {
       final submitting = telepathy.submittingAction.value;
 
-      final loadingAccept =
-          submitting == TelepathySubmitAction.accept;
-      final loadingDecline =
-          submitting == TelepathySubmitAction.decline;
+      final loadingAccept = submitting == TelepathySubmitAction.accept;
+      final loadingDecline = submitting == TelepathySubmitAction.decline;
 
       if (telepathy.status.value != TelepathyStatus.inviting) {
         return const SizedBox.shrink();
@@ -166,9 +161,10 @@ class TelepathyInviteBar extends StatelessWidget {
                     icon: Icons.local_fire_department,
                     compact: true,
                     loading: loadingDecline,
-                    onTap: submitting == null
-                        ? () => telepathy.respond(false)
-                        : null,
+                    onTap:
+                        submitting == null
+                            ? () => telepathy.respond(false)
+                            : null,
                   ),
                 ],
               )
@@ -180,9 +176,10 @@ class TelepathyInviteBar extends StatelessWidget {
                       label: "Bỏ qua",
                       icon: Icons.local_fire_department,
                       loading: loadingDecline,
-                      onTap: submitting == null
-                          ? () => telepathy.respond(false)
-                          : null,
+                      onTap:
+                          submitting == null
+                              ? () => telepathy.respond(false)
+                              : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -191,9 +188,10 @@ class TelepathyInviteBar extends StatelessWidget {
                       label: "Đồng ý",
                       icon: Icons.flash_on,
                       loading: loadingAccept,
-                      onTap: submitting == null
-                          ? () => telepathy.respond(true)
-                          : null,
+                      onTap:
+                          submitting == null
+                              ? () => telepathy.respond(true)
+                              : null,
                     ),
                   ),
                 ],
@@ -235,47 +233,48 @@ class _GhostActionButton extends StatelessWidget {
             horizontal: compact ? 12 : 14,
           ),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppTheme.darkBorder
-                : AppTheme.lightBorder,
+            color:
+                Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkBorder
+                    : AppTheme.lightBorder,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Center(
-            child: loading
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(
-                        theme.colorScheme.primary,
-                      ),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        size: compact ? 14 : 16,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+            child:
+                loading
+                    ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(
+                          theme.colorScheme.primary,
                         ),
                       ),
-                    ],
-                  ),
+                    )
+                    : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          size: compact ? 14 : 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ),
     );
   }
 }
-
 
 class _GradientActionButton extends StatelessWidget {
   final String label;
@@ -303,41 +302,39 @@ class _GradientActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             gradient: loading ? null : _brandGradient,
-            color: loading
-                ? theme.colorScheme.surfaceContainerHighest
-                : null,
+            color: loading ? theme.colorScheme.surfaceContainerHighest : null,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Center(
-            child: loading
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(
-                        theme.colorScheme.primary,
-                      ),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(icon, size: 16, color: Colors.white),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+            child:
+                loading
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(
+                          theme.colorScheme.primary,
                         ),
                       ),
-                    ],
-                  ),
+                    )
+                    : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ),
     );
   }
 }
-

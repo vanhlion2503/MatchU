@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
@@ -227,7 +227,7 @@ class _ChatListViewState extends State<ChatListView>
                     }
                   },
                   decoration: InputDecoration(
-                    hintText: "Tìm kiếm cuộc trò chuyện",
+                    hintText: 'Tìm kiếm cuộc trò chuyện'.tr,
                     prefixIcon: const Icon(Iconsax.search_normal_1),
 
                     /// ❌ CLEAR BUTTON

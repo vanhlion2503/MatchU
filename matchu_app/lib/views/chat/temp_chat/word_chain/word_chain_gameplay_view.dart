@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -42,8 +42,7 @@ class WordChainGameplayView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final isMyTurn = wordChain.turnUid.value == wordChain.uid;
-      final canUseSos =
-          isMyTurn && wordChain.sosUsed[wordChain.uid] != true;
+      final canUseSos = isMyTurn && wordChain.sosUsed[wordChain.uid] != true;
 
       return Stack(
         children: [
@@ -62,40 +61,39 @@ class WordChainGameplayView extends StatelessWidget {
                   transitionBuilder: (child, animation) {
                     final isMyChild =
                         child.key == const ValueKey('word_chain_my_turn');
-                    final offset = isMyChild
-                        ? const Offset(0.08, 0)
-                        : const Offset(-0.08, 0);
+                    final offset =
+                        isMyChild
+                            ? const Offset(0.08, 0)
+                            : const Offset(-0.08, 0);
                     return SlideTransition(
                       position: Tween<Offset>(
                         begin: offset,
                         end: Offset.zero,
                       ).animate(animation),
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
+                      child: FadeTransition(opacity: animation, child: child),
                     );
                   },
-                  child: isMyTurn
-                      ? _WordChainMyTurn(
-                          key: const ValueKey('word_chain_my_turn'),
-                          currentWord: wordChain.currentWord.value,
-                          isSeed: wordChain.usedWords.length <= 1,
-                          inputController: inputController,
-                          onSubmit: onSubmit,
-                          onSOS: onSOS,
-                          canUseSos: canUseSos,
-                          feedbackMessage: inputFeedbackMessage,
-                          showError: showInputError,
-                          showSuccess: showInputSuccess,
-                          errorTick: inputErrorTick,
-                          successTick: inputSuccessTick,
-                        )
-                      : _WordChainOpponentTurn(
-                          key: const ValueKey('word_chain_other_turn'),
-                          currentWord: wordChain.currentWord.value,
-                          otherAvatarKey: otherAvatarKey,
-                        ),
+                  child:
+                      isMyTurn
+                          ? _WordChainMyTurn(
+                            key: const ValueKey('word_chain_my_turn'),
+                            currentWord: wordChain.currentWord.value,
+                            isSeed: wordChain.usedWords.length <= 1,
+                            inputController: inputController,
+                            onSubmit: onSubmit,
+                            onSOS: onSOS,
+                            canUseSos: canUseSos,
+                            feedbackMessage: inputFeedbackMessage,
+                            showError: showInputError,
+                            showSuccess: showInputSuccess,
+                            errorTick: inputErrorTick,
+                            successTick: inputSuccessTick,
+                          )
+                          : _WordChainOpponentTurn(
+                            key: const ValueKey('word_chain_other_turn'),
+                            currentWord: wordChain.currentWord.value,
+                            otherAvatarKey: otherAvatarKey,
+                          ),
                 ),
               ),
               AnimatedSize(
@@ -113,21 +111,19 @@ class WordChainGameplayView extends StatelessWidget {
                     return ClipRect(
                       child: FadeTransition(
                         opacity: animation,
-                        child: SlideTransition(
-                          position: slide,
-                          child: child,
-                        ),
+                        child: SlideTransition(position: slide, child: child),
                       ),
                     );
                   },
-                  child: isMyTurn
-                      ? _WordChainActionBar(
-                          key: const ValueKey('word_chain_action'),
-                          onSubmit: onSubmit,
-                        )
-                      : const SizedBox.shrink(
-                          key: ValueKey('word_chain_action_empty'),
-                        ),
+                  child:
+                      isMyTurn
+                          ? _WordChainActionBar(
+                            key: const ValueKey('word_chain_action'),
+                            onSubmit: onSubmit,
+                          )
+                          : const SizedBox.shrink(
+                            key: ValueKey('word_chain_action_empty'),
+                          ),
                 ),
               ),
             ],
@@ -146,19 +142,22 @@ class WordChainGameplayView extends StatelessWidget {
                       return FadeTransition(
                         opacity: animation,
                         child: ScaleTransition(
-                          scale: Tween<double>(begin: 0.85, end: 1.0)
-                              .animate(animation),
+                          scale: Tween<double>(
+                            begin: 0.85,
+                            end: 1.0,
+                          ).animate(animation),
                           child: child,
                         ),
                       );
                     },
-                    child: showReward
-                        ? _WordChainMicroReward(
-                            key: ValueKey('reward_$rewardTick'),
-                          )
-                        : const SizedBox.shrink(
-                            key: ValueKey('reward_empty'),
-                          ),
+                    child:
+                        showReward
+                            ? _WordChainMicroReward(
+                              key: ValueKey('reward_$rewardTick'),
+                            )
+                            : const SizedBox.shrink(
+                              key: ValueKey('reward_empty'),
+                            ),
                   ),
                 ),
               ),
@@ -214,44 +213,42 @@ class _WordChainHeader extends StatelessWidget {
             transitionBuilder: (child, animation) {
               return ScaleTransition(
                 scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
-                child: FadeTransition(
-                  opacity: animation,
-                  child: child,
-                ),
+                child: FadeTransition(opacity: animation, child: child),
               );
             },
-            child: isMyTurn
-                ? Container(
-                    key: const ValueKey('word_chain_timer'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.error.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.timer_outlined,
-                          size: 20,
-                          color: theme.colorScheme.error,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${displaySeconds}s',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+            child:
+                isMyTurn
+                    ? Container(
+                      key: const ValueKey('word_chain_timer'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 20,
                             color: theme.colorScheme.error,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            '${displaySeconds}s',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    : const SizedBox.shrink(
+                      key: ValueKey('word_chain_timer_empty'),
                     ),
-                  )
-                : const SizedBox.shrink(
-                    key: ValueKey('word_chain_timer_empty'),
-                  ),
           ),
         ],
       ),
@@ -314,27 +311,22 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
       TweenSequenceItem(tween: Tween(begin: 5, end: -4), weight: 1),
       TweenSequenceItem(tween: Tween(begin: -4, end: 4), weight: 1),
       TweenSequenceItem(tween: Tween(begin: 4, end: 0), weight: 1),
-    ]).animate(CurvedAnimation(
-      parent: _shakeController,
-      curve: Curves.easeOut,
-    ));
+    ]).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.easeOut),
+    );
     _successController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 650),
     );
     _successScale = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _successController,
-        curve: Curves.easeOutBack,
-      ),
+      CurvedAnimation(parent: _successController, curve: Curves.easeOutBack),
     );
     _successOpacity = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 40),
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 60),
-    ]).animate(CurvedAnimation(
-      parent: _successController,
-      curve: Curves.easeOut,
-    ));
+    ]).animate(
+      CurvedAnimation(parent: _successController, curve: Curves.easeOut),
+    );
   }
 
   @override
@@ -356,10 +348,7 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
     super.dispose();
   }
 
-  double _measureTextWidth(
-    String text,
-    TextStyle style,
-  ) {
+  double _measureTextWidth(String text, TextStyle style) {
     final painter = TextPainter(
       text: TextSpan(text: text, style: style),
       maxLines: 1,
@@ -374,43 +363,45 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
     final secondary = theme.colorScheme.secondary;
-    final muted = theme.textTheme.bodySmall?.color ??
+    final muted =
+        theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
     const errorAccent = Color(0xFFFF8A65);
     const successAccent = Color(0xFF2E7D32);
     final lastWord = _lastWordPrefix(widget.currentWord);
     final feedbackMessage = widget.feedbackMessage?.trim();
-    final showFeedback = widget.showError &&
+    final showFeedback =
+        widget.showError &&
         feedbackMessage != null &&
         feedbackMessage.isNotEmpty;
     final showSuccess = widget.showSuccess;
 
     final sourceLabel = widget.isSeed ? 'Từ hệ thống' : 'Từ đối phương';
-    final helper = lastWord.isEmpty
-        ? 'Nhập 2 từ bất kỳ'
-        : 'Nhập từ bắt đầu bằng "$lastWord"';
+    final helper =
+        lastWord.isEmpty
+            ? 'Nhập 2 từ bất kỳ'
+            : 'Nhập từ bắt đầu bằng "$lastWord"';
     final prefixText = lastWord.isEmpty ? '' : '$lastWord ';
     final textStyle = theme.textTheme.bodyLarge!.copyWith(
       fontWeight: FontWeight.w600,
     );
 
-    final prefixWidth = prefixText.isEmpty
-        ? 0.0
-        : _measureTextWidth(prefixText, textStyle);
-    final inputBorderColor = showFeedback
-        ? errorAccent
-        : showSuccess
+    final prefixWidth =
+        prefixText.isEmpty ? 0.0 : _measureTextWidth(prefixText, textStyle);
+    final inputBorderColor =
+        showFeedback
+            ? errorAccent
+            : showSuccess
             ? successAccent
             : accent.withOpacity(0.35);
-    final inputSurface = showFeedback
-        ? errorAccent.withOpacity(0.08)
-        : showSuccess
+    final inputSurface =
+        showFeedback
+            ? errorAccent.withOpacity(0.08)
+            : showSuccess
             ? successAccent.withOpacity(0.08)
             : theme.colorScheme.surface;
     const trailingPadding = 40.0;
-    final sosMuted =
-        widget.canUseSos ? muted : muted.withOpacity(0.4);
-
+    final sosMuted = widget.canUseSos ? muted : muted.withOpacity(0.4);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -429,14 +420,18 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: theme.brightness == Brightness.dark
-                        ? AppTheme.darkBorder
-                        : AppTheme.lightBorder,
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? AppTheme.darkBorder
+                            : AppTheme.lightBorder,
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -458,9 +453,7 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
                     const SizedBox(height: 6),
                     Text(
                       sourceLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: muted,
-                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
                     ),
                   ],
                 ),
@@ -501,10 +494,7 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
                     decoration: BoxDecoration(
                       color: inputSurface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: inputBorderColor,
-                        width: 2,
-                      ),
+                      border: Border.all(color: inputBorderColor, width: 2),
                     ),
                   ),
                 ),
@@ -565,9 +555,10 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
                                   TextSpan(
                                     text: suffix.isEmpty ? '...' : suffix,
                                     style: TextStyle(
-                                      color: suffix.isEmpty
-                                          ? muted
-                                          : theme.colorScheme.onSurface,
+                                      color:
+                                          suffix.isEmpty
+                                              ? muted
+                                              : theme.colorScheme.onSurface,
                                     ),
                                   ),
                                 ],
@@ -644,27 +635,25 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
               ).animate(animation);
               return FadeTransition(
                 opacity: animation,
-                child: SlideTransition(
-                  position: slide,
-                  child: child,
-                ),
+                child: SlideTransition(position: slide, child: child),
               );
             },
-            child: showFeedback
-                ? Padding(
-                    key: ValueKey(feedbackMessage),
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: WordChainInlineFeedback(
-                        message: feedbackMessage,
-                        accentColor: errorAccent,
+            child:
+                showFeedback
+                    ? Padding(
+                      key: ValueKey(feedbackMessage),
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: WordChainInlineFeedback(
+                          message: feedbackMessage,
+                          accentColor: errorAccent,
+                        ),
                       ),
+                    )
+                    : const SizedBox.shrink(
+                      key: ValueKey('word_chain_feedback_empty'),
                     ),
-                  )
-                : const SizedBox.shrink(
-                    key: ValueKey('word_chain_feedback_empty'),
-                  ),
           ),
 
           const SizedBox(height: 6),
@@ -672,19 +661,13 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
             alignment: Alignment.centerLeft,
             child: Text(
               helper,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: muted,
-              ),
+              style: theme.textTheme.bodySmall?.copyWith(color: muted),
             ),
           ),
           const SizedBox(height: 18),
           OutlinedButton.icon(
             onPressed: widget.canUseSos ? widget.onSOS : null,
-            icon: Icon(
-              Icons.help_outline,
-              size: 18,
-              color: sosMuted,
-            ),
+            icon: Icon(Icons.help_outline, size: 18, color: sosMuted),
             label: Text(
               'SOS • Cầu cứu',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -694,9 +677,10 @@ class _WordChainMyTurnState extends State<_WordChainMyTurn>
             ),
             style: OutlinedButton.styleFrom(
               side: BorderSide(
-                color: theme.brightness == Brightness.dark
-                    ? AppTheme.darkBorder
-                    : AppTheme.lightBorder,
+                color:
+                    theme.brightness == Brightness.dark
+                        ? AppTheme.darkBorder
+                        : AppTheme.lightBorder,
               ),
               shape: const StadiumBorder(),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -773,7 +757,8 @@ class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.color ??
+    final muted =
+        theme.textTheme.bodySmall?.color ??
         theme.colorScheme.onSurface.withOpacity(0.6);
     final lastWord = widget.currentWord.isEmpty ? '...' : widget.currentWord;
 
@@ -816,10 +801,7 @@ class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
                     shape: BoxShape.circle,
                   ),
                 ),
-                AnonymousAvatar(
-                  avatarKey: widget.otherAvatarKey,
-                  radius: 40,
-                ),
+                AnonymousAvatar(avatarKey: widget.otherAvatarKey, radius: 40),
               ],
             ),
           ),
@@ -835,10 +817,7 @@ class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
               ).animate(animation);
               return FadeTransition(
                 opacity: animation,
-                child: SlideTransition(
-                  position: slide,
-                  child: child,
-                ),
+                child: SlideTransition(position: slide, child: child),
               );
             },
             child: Container(
@@ -848,9 +827,10 @@ class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: theme.brightness == Brightness.dark
-                      ? AppTheme.darkBorder
-                      : AppTheme.lightBorder,
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? AppTheme.darkBorder
+                          : AppTheme.lightBorder,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -878,9 +858,7 @@ class _WordChainOpponentTurnState extends State<_WordChainOpponentTurn>
           const SizedBox(height: 24),
           Text(
             'Từ khóa trước: $lastWord',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: muted,
-            ),
+            style: theme.textTheme.bodyMedium?.copyWith(color: muted),
           ),
           const SizedBox(height: 10),
           Container(
@@ -910,9 +888,7 @@ class _WordChainMicroReward extends StatelessWidget {
       decoration: BoxDecoration(
         color: accent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: accent.withOpacity(0.35),
-        ),
+        border: Border.all(color: accent.withOpacity(0.35)),
         boxShadow: [
           BoxShadow(
             color: accent.withOpacity(0.18),
@@ -924,11 +900,7 @@ class _WordChainMicroReward extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.auto_awesome,
-            size: 16,
-            color: accent,
-          ),
+          Icon(Icons.auto_awesome, size: 16, color: accent),
           const SizedBox(width: 6),
           Text(
             'Chuẩn rồi! +1',
@@ -946,10 +918,7 @@ class _WordChainMicroReward extends StatelessWidget {
 class _WordChainActionBar extends StatelessWidget {
   final VoidCallback onSubmit;
 
-  const _WordChainActionBar({
-    super.key,
-    required this.onSubmit,
-  });
+  const _WordChainActionBar({super.key, required this.onSubmit});
 
   @override
   Widget build(BuildContext context) {
@@ -961,9 +930,10 @@ class _WordChainActionBar extends StatelessWidget {
         color: theme.colorScheme.surface,
         border: Border(
           top: BorderSide(
-            color: theme.brightness == Brightness.dark
-                ? AppTheme.darkBorder
-                : AppTheme.lightBorder,
+            color:
+                theme.brightness == Brightness.dark
+                    ? AppTheme.darkBorder
+                    : AppTheme.lightBorder,
           ),
         ),
       ),
@@ -982,9 +952,7 @@ class _WordChainActionBar extends StatelessWidget {
 class _ThinkingDots extends StatelessWidget {
   final Animation<double> progress;
 
-  const _ThinkingDots({
-    required this.progress,
-  });
+  const _ThinkingDots({required this.progress});
 
   @override
   Widget build(BuildContext context) {
@@ -1003,10 +971,7 @@ class _ThinkingDots extends StatelessWidget {
                 width: 4,
                 height: 4,
                 margin: const EdgeInsets.symmetric(horizontal: 1),
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
             );
           }),

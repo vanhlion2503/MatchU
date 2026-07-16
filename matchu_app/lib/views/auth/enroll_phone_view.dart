@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
@@ -49,9 +49,9 @@ class EnrollPhoneView extends StatelessWidget {
                 initialCountryCode: 'VN',
                 disableLengthCheck: true,
                 showDropdownIcon: true,
-                decoration: const InputDecoration(
-                  labelText: 'Số điện thoại',
-                  hintText: 'Nhập số điện thoại',
+                decoration: InputDecoration(
+                  labelText: 'Số điện thoại'.tr,
+                  hintText: 'Nhập số điện thoại'.tr,
                 ),
                 onChanged: (phone) {
                   String number = phone.completeNumber;
@@ -66,7 +66,7 @@ class EnrollPhoneView extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Chúng tôi sẽ mã OTP qua tin nhắn SMS',
+                'Chúng tôi sẽ gửi mã OTP qua tin nhắn SMS',
                 textAlign: TextAlign.start,
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                   color: Theme.of(context).textTheme.bodySmall?.color,

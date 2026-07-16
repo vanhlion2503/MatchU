@@ -6,9 +6,7 @@ class FloatingHeartOverlay {
     late OverlayEntry entry;
 
     entry = OverlayEntry(
-      builder: (_) => _FloatingHeart(
-        onFinish: () => entry.remove(),
-      ),
+      builder: (_) => _FloatingHeart(onFinish: () => entry.remove()),
     );
 
     overlay.insert(entry);
@@ -39,9 +37,10 @@ class _FloatingHeartState extends State<_FloatingHeart>
       duration: const Duration(milliseconds: 1200),
     );
 
-    _y = Tween(begin: 0.0, end: -200.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _y = Tween(
+      begin: 0.0,
+      end: -200.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _scale = TweenSequence([
       TweenSequenceItem(tween: Tween(begin: 0.6, end: 1.2), weight: 40),
@@ -49,10 +48,7 @@ class _FloatingHeartState extends State<_FloatingHeart>
     ]).animate(_controller);
 
     _opacity = Tween(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.6, 1.0),
-      ),
+      CurvedAnimation(parent: _controller, curve: const Interval(0.6, 1.0)),
     );
 
     _controller.forward().whenComplete(widget.onFinish);

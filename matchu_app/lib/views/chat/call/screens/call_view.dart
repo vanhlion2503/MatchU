@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/views/chat/call/screens/call_ended_view.dart';

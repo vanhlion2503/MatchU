@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';

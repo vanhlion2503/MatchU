@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
@@ -244,8 +245,8 @@ class FeedController extends GetxController {
     }
 
     Get.snackbar(
-      'Thông báo',
-      'Đã ẩn bài viết khỏi bảng tin của bạn.',
+      PostTranslationKeys.notice.tr,
+      'Đã ẩn bài viết khỏi bảng tin của bạn.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -271,8 +272,8 @@ class FeedController extends GetxController {
       }
 
       Get.snackbar(
-        'Th\u00F4ng b\u00E1o',
-        '\u0110\u00E3 \u1EA9n b\u00E0i vi\u1EBFt t\u1EEB ${_authorNameOf(post)}.',
+        PostTranslationKeys.notice.tr,
+        postTr('Đã ẩn bài viết từ ${_authorNameOf(post)}.'),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -653,8 +654,8 @@ class FeedController extends GetxController {
       final deletedPost = await _service.deletePost(post: post);
       await _removePostByIdWithAnimation(deletedPost.postId);
       Get.snackbar(
-        'Thông báo',
-        'Đã xóa bài viết.',
+        PostTranslationKeys.notice.tr,
+        'Đã xóa bài viết.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -1249,8 +1250,8 @@ class FeedController extends GetxController {
 
   void onShareTap() {
     Get.snackbar(
-      'Thông báo',
-      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.',
+      PostTranslationKeys.notice.tr,
+      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -2138,8 +2139,8 @@ class FeedController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

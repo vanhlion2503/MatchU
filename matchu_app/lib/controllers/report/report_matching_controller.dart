@@ -10,10 +10,7 @@ class ReportMatchingController extends GetxController {
   final String roomId;
   final String toUid;
 
-  ReportMatchingController({
-    required this.roomId,
-    required this.toUid,
-  });
+  ReportMatchingController({required this.roomId, required this.toUid});
 
   // ===== STATE =====
   final selectedReasonKey = RxnString();
@@ -42,11 +39,7 @@ class ReportMatchingController extends GetxController {
       title: "Spam tin nhắn",
       icon: Iconsax.message_remove,
     ),
-    ReportReason(
-      key: "khac",
-      title: "Lý do khác",
-      icon: Iconsax.more,
-    ),
+    ReportReason(key: "khac", title: "Lý do khác", icon: Iconsax.more),
   ];
 
   // ===== ACTIONS =====

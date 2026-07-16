@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
@@ -157,8 +158,8 @@ class PostDetailController extends GetxController {
     }
 
     Get.snackbar(
-      'Thông báo',
-      'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.',
+      PostTranslationKeys.notice.tr,
+      'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -200,8 +201,8 @@ class PostDetailController extends GetxController {
       final created = await _postService.createRepost(sourcePost: currentPost);
       _updateLocalRepostState(isReposted: true, isPending: false);
       Get.snackbar(
-        'Thông báo',
-        'Đã đăng lại bài viết thành công.',
+        PostTranslationKeys.notice.tr,
+        'Đã đăng lại bài viết thành công.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -245,8 +246,8 @@ class PostDetailController extends GetxController {
       final removed = await _postService.undoRepost(sourcePost: currentPost);
       _updateLocalRepostState(isReposted: false, isPending: false);
       Get.snackbar(
-        'Thông báo',
-        'Đã hủy đăng lại bài viết.',
+        PostTranslationKeys.notice.tr,
+        'Đã hủy đăng lại bài viết.'.tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -410,8 +411,9 @@ class PostDetailController extends GetxController {
 
       post.value = post.value.copyWith(isSavePending: false);
       Get.snackbar(
-        'Thông báo',
-        shouldSave ? 'Đã lưu bài viết vào lưu trữ.' : 'Đã bỏ lưu bài viết.',
+        PostTranslationKeys.notice.tr,
+        (shouldSave ? 'Đã lưu bài viết vào lưu trữ.' : 'Đã bỏ lưu bài viết.')
+            .tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -441,8 +443,8 @@ class PostDetailController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

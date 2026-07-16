@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';

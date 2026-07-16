@@ -21,11 +21,7 @@ class TelepathyResultCalculator {
         matched++;
         same.add({"question": q.text, "answer": my});
       } else {
-        diff.add({
-          "question": q.text,
-          "me": my,
-          "other": other,
-        });
+        diff.add({"question": q.text, "me": my, "other": other});
       }
     }
 

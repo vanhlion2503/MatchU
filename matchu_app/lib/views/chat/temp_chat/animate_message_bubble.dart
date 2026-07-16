@@ -9,7 +9,6 @@ class AnimatedMessageBubble extends StatefulWidget {
 }
 
 class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble> {
-
   double scale = 0.9;
   double opacity = 0;
 
@@ -25,7 +24,7 @@ class _AnimatedMessageBubbleState extends State<AnimatedMessageBubble> {
   }
 
   @override
-   Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
       opacity: opacity,

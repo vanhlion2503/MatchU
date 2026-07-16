@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 
 class ReportFormAddEvidenceTile extends StatelessWidget {

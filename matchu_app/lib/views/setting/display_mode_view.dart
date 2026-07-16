@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/system/theme_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/translations/translation_keys.dart';
 
 class DisplayModeView extends StatelessWidget {
   const DisplayModeView({super.key});
@@ -11,16 +12,14 @@ class DisplayModeView extends StatelessWidget {
     final themeC = Get.find<ThemeController>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Hiển thị"),
-      ),
+      appBar: AppBar(title: Text(TranslationKeys.displayMode.tr)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Hình thức",
+              TranslationKeys.appearance.tr,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -36,31 +35,34 @@ class DisplayModeView extends StatelessWidget {
                 color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? AppTheme.darkBorder 
-                      : AppTheme.lightBorder,
+                  color:
+                      Theme.of(context).brightness == Brightness.dark
+                          ? AppTheme.darkBorder
+                          : AppTheme.lightBorder,
                 ),
               ),
-              child: Obx(() => Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // 🔆 LIGHT MODE
-                      _themeOption(
-                        title: "Sáng",
-                        isSelected: themeC.themeMode.value == "light",
-                        preview: _lightPreview(),
-                        onTap: () => themeC.setLight(),
-                      ),
+              child: Obx(
+                () => Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // 🔆 LIGHT MODE
+                    _themeOption(
+                      title: TranslationKeys.light.tr,
+                      isSelected: themeC.themeMode.value == "light",
+                      preview: _lightPreview(),
+                      onTap: () => themeC.setLight(),
+                    ),
 
-                      // 🌙 DARK MODE
-                      _themeOption(
-                        title: "Tối",
-                        isSelected: themeC.themeMode.value == "dark",
-                        preview: _darkPreview(),
-                        onTap: () => themeC.setDark(),
-                      ),
-                    ],
-                  )),
+                    // 🌙 DARK MODE
+                    _themeOption(
+                      title: TranslationKeys.dark.tr,
+                      isSelected: themeC.themeMode.value == "dark",
+                      preview: _darkPreview(),
+                      onTap: () => themeC.setDark(),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -98,24 +100,28 @@ class DisplayModeView extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected 
-                        ? AppTheme.primaryColor 
-                        : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                    color:
+                        isSelected
+                            ? AppTheme.primaryColor
+                            : (isDark
+                                ? AppTheme.darkBorder
+                                : AppTheme.lightBorder),
                     width: 2,
                   ),
                 ),
-            child: isSelected
-                ? Center(
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  )
-                : null,
+                child:
+                    isSelected
+                        ? Center(
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                        : null,
               );
             },
           ),
@@ -143,9 +149,7 @@ class DisplayModeView extends StatelessWidget {
           Container(height: 40, color: AppTheme.lightSurface),
           const SizedBox(height: 8),
           Expanded(
-            child: Container(
-              color: AppTheme.lightBorder.withOpacity(0.3),
-            ),
+            child: Container(color: AppTheme.lightBorder.withOpacity(0.3)),
           ),
         ],
       ),
@@ -171,9 +175,7 @@ class DisplayModeView extends StatelessWidget {
           Container(height: 40, color: AppTheme.darkSurface),
           const SizedBox(height: 8),
           Expanded(
-            child: Container(
-              color: AppTheme.darkBorder.withOpacity(0.5),
-            ),
+            child: Container(color: AppTheme.darkBorder.withOpacity(0.5)),
           ),
         ],
       ),

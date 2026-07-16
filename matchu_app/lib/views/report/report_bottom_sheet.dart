@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/controllers/report/report_matching_controller.dart';
@@ -29,9 +29,7 @@ class ReportBottomSheet extends StatelessWidget {
         // 🎨 BACKGROUND + BO GÓC
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(24),
-          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
 
         child: SingleChildScrollView(
@@ -51,8 +49,9 @@ class ReportBottomSheet extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark 
-                            ? AppTheme.darkBorder 
+                    color:
+                        Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.darkBorder
                             : AppTheme.lightBorder,
                     borderRadius: BorderRadius.circular(2),
                   ),
@@ -79,35 +78,40 @@ class ReportBottomSheet extends StatelessWidget {
 
               Text(
                 "Lý do báo cáo",
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
 
               const SizedBox(height: 16),
 
               // ===== REASONS =====
-              Obx(() => Column(
-                    children: controller.reasons.map((r) {
-                      final selected =
-                          controller.selectedReasonKey.value == r.key;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ReportReasonTile(
-                          reason: r,
-                          selected: selected,
-                          onTap: () => controller.select(r.key),
-                        ),
-                      );
-                    }).toList(),
-                  )),
+              Obx(
+                () => Column(
+                  children:
+                      controller.reasons.map((r) {
+                        final selected =
+                            controller.selectedReasonKey.value == r.key;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ReportReasonTile(
+                            reason: r,
+                            selected: selected,
+                            onTap: () => controller.select(r.key),
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ),
 
               const SizedBox(height: 16),
 
               // ===== DESCRIPTION =====
               Text(
                 "Chi tiết thêm",
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
 
               const SizedBox(height: 12),
@@ -124,18 +128,21 @@ class ReportBottomSheet extends StatelessWidget {
               const SizedBox(height: 20),
 
               // ===== SUBMIT =====
-              Obx(() => SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.errorColor,
-                      ),
-                      onPressed: controller.selectedReasonKey.value == null
-                          ? null
-                          : controller.submit,
-                      child: const Text("🚩 Gửi báo cáo"),
+              Obx(
+                () => SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.errorColor,
                     ),
-                  )),
+                    onPressed:
+                        controller.selectedReasonKey.value == null
+                            ? null
+                            : controller.submit,
+                    child: const Text("🚩 Gửi báo cáo"),
+                  ),
+                ),
+              ),
 
               const SizedBox(height: 12),
 
@@ -152,6 +159,4 @@ class ReportBottomSheet extends StatelessWidget {
       ),
     );
   }
-
-
 }

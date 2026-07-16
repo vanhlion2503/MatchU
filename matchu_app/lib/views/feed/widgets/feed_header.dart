@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -94,10 +94,10 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
                 unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
-                tabs: const [
-                  Tab(text: 'Nổi bật'),
-                  Tab(text: 'Mới nhất'),
-                  Tab(text: 'Đã theo dõi'),
+                tabs: [
+                  Tab(text: 'Nổi bật'.tr),
+                  Tab(text: 'Mới nhất'.tr),
+                  Tab(text: 'Đã theo dõi'.tr),
                 ],
               ),
             ),

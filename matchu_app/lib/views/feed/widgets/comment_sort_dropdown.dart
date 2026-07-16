@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -22,7 +23,7 @@ class CommentSortDropdown extends StatelessWidget {
     final sortSurface = isDark ? AppTheme.darkSurface : palette.surface;
 
     return PopupMenuButton<CommentSortMode>(
-      tooltip: 'Sắp xếp bình luận',
+      tooltip: 'Sắp xếp bình luận'.tr,
       position: PopupMenuPosition.under,
       offset: const Offset(0, 3),
       splashRadius: 20,

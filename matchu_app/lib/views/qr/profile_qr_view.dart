@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
@@ -60,7 +60,7 @@ class ProfileQrView extends GetView<ProfileQrController> {
 
             final isSaving = controller.isSavingQr.value;
             return IconButton(
-              tooltip: 'Tải ảnh QR',
+              tooltip: 'Tải ảnh QR'.tr,
               onPressed: isSaving ? null : controller.saveQrImage,
               icon:
                   isSaving

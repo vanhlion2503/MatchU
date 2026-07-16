@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
 import 'package:matchu_app/utils/reaction_registry.dart';

@@ -1,7 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
@@ -685,8 +686,10 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     PostCreationSync.sync(createdPost);
     if (createdPost.isModerationPending) {
       Get.snackbar(
-        'Đang kiểm duyệt video',
-        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        profileTr('Đang kiểm duyệt video'),
+        profileTr(
+          'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        ),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -696,8 +699,10 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     if (createdPost.isPublic) return;
 
     Get.snackbar(
-      'Thông báo',
-      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
+      ProfileTranslationKeys.notice.tr,
+      profileTr(
+        'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
+      ),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -833,9 +838,9 @@ class _ProfilePostsTabBar extends StatelessWidget {
         indicatorColor: theme.colorScheme.onSurface,
         dividerColor: Colors.transparent,
         tabs: [
-          const Tab(text: 'Bài viết'),
-          const Tab(text: 'Bài đăng lại'),
-          if (showSavedTab) const Tab(text: 'Lưu trữ'),
+          Tab(text: 'Bài viết'.tr),
+          Tab(text: 'Bài đăng lại'.tr),
+          if (showSavedTab) Tab(text: 'Lưu trữ'.tr),
         ],
       ),
     );
@@ -1015,10 +1020,7 @@ class _ProfilePostsShimmer extends StatelessWidget {
 }
 
 class _ProfilePostSkeleton extends StatelessWidget {
-  const _ProfilePostSkeleton({
-    required this.colors,
-    required this.showMedia,
-  });
+  const _ProfilePostSkeleton({required this.colors, required this.showMedia});
 
   final _ProfilePostsShimmerColors colors;
   final bool showMedia;
@@ -1028,12 +1030,7 @@ class _ProfilePostSkeleton extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ShimmerBlock(
-          width: 40,
-          height: 40,
-          radius: 20,
-          colors: colors,
-        ),
+        _ShimmerBlock(width: 40, height: 40, radius: 20, colors: colors),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -1064,12 +1061,7 @@ class _ProfilePostSkeleton extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              _ShimmerBlock(
-                width: 82,
-                height: 11,
-                radius: 6,
-                colors: colors,
-              ),
+              _ShimmerBlock(width: 82, height: 11, radius: 6, colors: colors),
               const SizedBox(height: 12),
               _ShimmerBlock(
                 width: double.infinity,
@@ -1078,12 +1070,7 @@ class _ProfilePostSkeleton extends StatelessWidget {
                 colors: colors,
               ),
               const SizedBox(height: 8),
-              _ShimmerBlock(
-                width: 220,
-                height: 12,
-                radius: 6,
-                colors: colors,
-              ),
+              _ShimmerBlock(width: 220, height: 12, radius: 6, colors: colors),
               if (showMedia) ...[
                 const SizedBox(height: 12),
                 _ShimmerBlock(

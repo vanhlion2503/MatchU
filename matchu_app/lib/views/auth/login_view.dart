@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/translations/translation_keys.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -92,14 +93,14 @@ class _LoginViewState extends State<LoginView> {
                 )
               else
                 PopupMenuButton<String>(
-                  tooltip: 'Tùy chọn',
+                  tooltip: TranslationKeys.options.tr,
                   onSelected: (value) {
                     if (value == 'remove') {
                       c.removeRememberedLoginAccount(account);
                     }
                   },
                   itemBuilder:
-                      (context) => const [
+                      (context) => [
                         PopupMenuItem(
                           value: 'remove',
                           child: Row(
@@ -107,8 +108,8 @@ class _LoginViewState extends State<LoginView> {
                               Icon(Iconsax.trash, color: Colors.red, size: 20),
                               SizedBox(width: 8),
                               Text(
-                                'Gỡ',
-                                style: TextStyle(
+                                TranslationKeys.remove.tr,
+                                style: const TextStyle(
                                   color: Colors.red,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -148,7 +149,7 @@ class _LoginViewState extends State<LoginView> {
                 // ===== TITLE =====
                 Center(
                   child: Text(
-                    "Chào mừng trở lại!",
+                    TranslationKeys.welcomeBack.tr,
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -160,7 +161,7 @@ class _LoginViewState extends State<LoginView> {
                 // ===== SUBTITLE =====
                 Center(
                   child: Text(
-                    "Vui lòng nhập thông tin để đăng nhập.",
+                    TranslationKeys.loginPrompt.tr,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey.shade600,
                       fontSize: 15,
@@ -170,7 +171,7 @@ class _LoginViewState extends State<LoginView> {
 
                 const SizedBox(height: 25),
                 Text(
-                  " Email",
+                  ' ${TranslationKeys.email.tr}',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
@@ -180,10 +181,10 @@ class _LoginViewState extends State<LoginView> {
                 /// EMAIL
                 TextField(
                   controller: c.emailC,
-                  decoration: const InputDecoration(
-                    labelText: "Email",
-                    hintText: "abc@xyz.com",
-                    prefixIcon: Icon(Icons.email_outlined),
+                  decoration: InputDecoration(
+                    labelText: TranslationKeys.email.tr,
+                    hintText: 'abc@xyz.com',
+                    prefixIcon: const Icon(Icons.email_outlined),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -191,7 +192,7 @@ class _LoginViewState extends State<LoginView> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      " Mật khẩu",
+                      ' ${TranslationKeys.password.tr}',
                       style: Theme.of(context).textTheme.bodyLarge!.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -201,7 +202,7 @@ class _LoginViewState extends State<LoginView> {
                         Get.toNamed('/forgot-password');
                       },
                       child: Text(
-                        "Quên mật khẩu",
+                        TranslationKeys.forgotPassword.tr,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w600,
@@ -218,8 +219,8 @@ class _LoginViewState extends State<LoginView> {
                     controller: c.passwordC,
                     obscureText: c.isPasswordHidden.value,
                     decoration: InputDecoration(
-                      labelText: "Mật khẩu",
-                      hintText: "Nhập mật khẩu",
+                      labelText: TranslationKeys.password.tr,
+                      hintText: TranslationKeys.enterPassword.tr,
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -269,7 +270,7 @@ class _LoginViewState extends State<LoginView> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              "Lưu tài khoản",
+                              TranslationKeys.rememberAccount.tr,
                               style: Theme.of(
                                 context,
                               ).textTheme.bodyMedium?.copyWith(
@@ -301,7 +302,7 @@ class _LoginViewState extends State<LoginView> {
                           children: [
                             Opacity(
                               opacity: isLoading ? 0 : 1,
-                              child: const Text("Đăng nhập"),
+                              child: Text(TranslationKeys.login.tr),
                             ),
                             if (isLoading)
                               SizedBox(
@@ -338,7 +339,7 @@ class _LoginViewState extends State<LoginView> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
-                            "Hoặc tiếp tục với",
+                            TranslationKeys.orContinueWith.tr,
                             style: Theme.of(
                               context,
                             ).textTheme.bodyMedium!.copyWith(
@@ -425,7 +426,7 @@ class _LoginViewState extends State<LoginView> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Chưa có tài khoản?",
+                      TranslationKeys.noAccount.tr,
                       style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                         color: Theme.of(context).textTheme.bodySmall?.color,
                         fontWeight: FontWeight.w600,
@@ -437,7 +438,7 @@ class _LoginViewState extends State<LoginView> {
                         Get.toNamed(AppRouter.register);
                       },
                       child: Text(
-                        "Đăng ký",
+                        TranslationKeys.register.tr,
                         style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,

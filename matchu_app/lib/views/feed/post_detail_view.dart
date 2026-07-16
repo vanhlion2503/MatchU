@@ -2,9 +2,10 @@ import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
@@ -177,8 +178,9 @@ class _PostDetailViewState extends State<PostDetailView> {
     PostCreationSync.sync(createdPost);
     if (createdPost.isModerationPending) {
       Get.snackbar(
-        'Đang kiểm duyệt video',
-        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.',
+        'Đang kiểm duyệt video'.tr,
+        'Bài viết sẽ hiển thị theo quyền riêng tư đã chọn sau khi video được duyệt.'
+            .tr,
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -188,8 +190,8 @@ class _PostDetailViewState extends State<PostDetailView> {
     if (createdPost.isPublic) return;
 
     Get.snackbar(
-      'Thông báo',
-      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.',
+      PostTranslationKeys.notice.tr,
+      'Bài viết không công khai sẽ không hiển thị trong bảng tin công khai.'.tr,
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -772,9 +774,10 @@ class _PostDetailComposerState extends State<_PostDetailComposer> {
                             ),
                             decoration: InputDecoration(
                               hintText:
-                                  editingComment != null
-                                      ? 'Chỉnh sửa bình luận...'
-                                      : 'Bình luận...',
+                                  (editingComment != null
+                                          ? 'Chỉnh sửa bình luận...'
+                                          : 'Bình luận...')
+                                      .tr,
                               filled: false,
                               fillColor: Colors.transparent,
                               border: InputBorder.none,

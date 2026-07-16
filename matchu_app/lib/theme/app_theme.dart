@@ -30,7 +30,6 @@ class AppTheme {
   static const Color shimmerDarkBase = Color(0xFF2A2A2A);
   static const Color shimmerDarkHighlight = Color(0xFF3A3A3A);
 
-
   // =======================================================
   //                     LIGHT THEME
   // =======================================================
@@ -46,7 +45,7 @@ class AppTheme {
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: lightTextPrimary,
-      outlineVariant: lightBorder
+      outlineVariant: lightBorder,
     ),
 
     scaffoldBackgroundColor: lightBackground,
@@ -67,18 +66,9 @@ class AppTheme {
         fontWeight: FontWeight.w500,
         color: lightTextPrimary,
       ),
-      bodyLarge: GoogleFonts.inter(
-        fontSize: 18,
-        color: lightTextPrimary,
-      ),
-      bodyMedium: GoogleFonts.inter(
-        fontSize: 16,
-        color: lightTextPrimary,
-      ),
-      bodySmall: GoogleFonts.inter(
-        fontSize: 14,
-        color: lightTextSecondary,
-      ),
+      bodyLarge: GoogleFonts.inter(fontSize: 18, color: lightTextPrimary),
+      bodyMedium: GoogleFonts.inter(fontSize: 16, color: lightTextPrimary),
+      bodySmall: GoogleFonts.inter(fontSize: 14, color: lightTextSecondary),
     ),
 
     appBarTheme: const AppBarTheme(
@@ -127,10 +117,7 @@ class AppTheme {
         color: lightTextSecondary,
       ),
 
-      hintStyle: GoogleFonts.inter(
-        fontSize: 16,
-        color: lightTextSecondary,
-      ),
+      hintStyle: GoogleFonts.inter(fontSize: 16, color: lightTextSecondary),
     ),
 
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -143,13 +130,8 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
         elevation: 0,
       ),
     ),
@@ -159,13 +141,8 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -173,13 +150,8 @@ class AppTheme {
         side: const BorderSide(color: primaryColor, width: 1.5),
         foregroundColor: primaryColor,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -187,10 +159,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         foregroundColor: primaryColor,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -209,13 +178,8 @@ class AppTheme {
         color: Colors.white,
       ),
       side: BorderSide(color: lightBorder),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
-
-
-    
   );
 
   // =======================================================
@@ -233,7 +197,7 @@ class AppTheme {
       onPrimary: Colors.white,
       onSecondary: Colors.white,
       onSurface: darkTextPrimary,
-      outlineVariant: darkBorder
+      outlineVariant: darkBorder,
     ),
 
     scaffoldBackgroundColor: darkBackground,
@@ -254,18 +218,9 @@ class AppTheme {
         fontWeight: FontWeight.w500,
         color: darkTextPrimary,
       ),
-      bodyLarge: GoogleFonts.inter(
-        fontSize: 18,
-        color: darkTextPrimary,
-      ),
-      bodyMedium: GoogleFonts.inter(
-        fontSize: 16,
-        color: darkTextPrimary,
-      ),
-      bodySmall: GoogleFonts.inter(
-        fontSize: 14,
-        color: darkTextSecondary,
-      ),
+      bodyLarge: GoogleFonts.inter(fontSize: 18, color: darkTextPrimary),
+      bodyMedium: GoogleFonts.inter(fontSize: 16, color: darkTextPrimary),
+      bodySmall: GoogleFonts.inter(fontSize: 14, color: darkTextSecondary),
     ),
 
     appBarTheme: const AppBarTheme(
@@ -315,10 +270,7 @@ class AppTheme {
         color: darkTextSecondary,
       ),
 
-      hintStyle: GoogleFonts.inter(
-        fontSize: 16,
-        color: darkTextSecondary,
-      ),
+      hintStyle: GoogleFonts.inter(fontSize: 16, color: darkTextSecondary),
     ),
 
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -331,13 +283,8 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
         elevation: 0,
       ),
     ),
@@ -347,13 +294,8 @@ class AppTheme {
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -362,13 +304,8 @@ class AppTheme {
         side: const BorderSide(color: primaryColor, width: 1.5),
         foregroundColor: primaryColor,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -376,10 +313,7 @@ class AppTheme {
       style: TextButton.styleFrom(
         foregroundColor: primaryColor,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        textStyle: GoogleFonts.inter(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
       ),
     ),
 
@@ -398,11 +332,7 @@ class AppTheme {
         color: Colors.white,
       ),
       side: BorderSide(color: darkBorder),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
-
-
   );
 }

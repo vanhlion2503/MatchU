@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -60,7 +60,7 @@ class _RegisterViewState extends State<RegisterView> {
               ),
               SizedBox(height: 35),
               Text(
-                " Email",
+                "Email".tr,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
@@ -70,15 +70,15 @@ class _RegisterViewState extends State<RegisterView> {
               /// EMAIL
               TextField(
                 controller: controllerRegis.emailC,
-                decoration: const InputDecoration(
-                  labelText: "Email",
+                decoration: InputDecoration(
+                  labelText: "Email".tr,
                   hintText: "abc@xyz.com",
-                  prefixIcon: Icon(Icons.email_outlined),
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                " Mật khẩu",
+                "Mật khẩu".tr,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
@@ -91,7 +91,7 @@ class _RegisterViewState extends State<RegisterView> {
                   controller: controllerRegis.passwordC,
                   obscureText: controllerRegis.isPasswordHidden.value,
                   decoration: InputDecoration(
-                    labelText: "Mật khẩu",
+                    labelText: "Mật khẩu".tr,
                     hintText: "8+ | Aa | 0-9 | !@#",
                     prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
@@ -107,7 +107,7 @@ class _RegisterViewState extends State<RegisterView> {
               }),
               const SizedBox(height: 12),
               Text(
-                " Nhập lại mật khẩu:",
+                "Nhập lại mật khẩu".tr,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w700),
@@ -120,8 +120,8 @@ class _RegisterViewState extends State<RegisterView> {
                   controller: controllerRegis.confirmPasswordC,
                   obscureText: controllerRegis.isPasswordHidden.value,
                   decoration: InputDecoration(
-                    labelText: "Nhập lại mật khẩu",
-                    hintText: "Nhập lại mật khẩu",
+                    labelText: "Nhập lại mật khẩu".tr,
+                    hintText: "Nhập lại mật khẩu".tr,
                     prefixIcon: const Icon(Icons.lock_outlined),
                     suffixIcon: IconButton(
                       icon: Icon(

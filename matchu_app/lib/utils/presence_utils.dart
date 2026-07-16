@@ -1,9 +1,7 @@
-bool isUserOnline(DateTime? lastActiveAt){
-  if(lastActiveAt == null) return false;
+bool isUserOnline(DateTime? lastActiveAt) {
+  if (lastActiveAt == null) return false;
 
-  return DateTime.now()
-      .difference(lastActiveAt)
-      .inMinutes < 2;
+  return DateTime.now().difference(lastActiveAt).inMinutes < 2;
 }
 
 String formatLastActive(DateTime? time) {

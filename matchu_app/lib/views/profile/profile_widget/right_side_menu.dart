@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart'; // nhớ import
 
 import 'package:matchu_app/routes/app_router.dart';
+import 'package:matchu_app/translations/translation_keys.dart';
 
 class RightSideMenu {
   static void open(BuildContext context) {
@@ -12,7 +13,7 @@ class RightSideMenu {
 
     showGeneralDialog(
       context: context,
-      barrierLabel: "Menu",
+      barrierLabel: TranslationKeys.options.tr,
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 280),
@@ -50,10 +51,12 @@ class RightSideMenu {
                                 const SizedBox(height: 10),
 
                                 // ==== HỒ SƠ ====
-                                sectionHeader("Hồ sơ cá nhân"),
+                                sectionHeader(
+                                  TranslationKeys.profileSection.tr,
+                                ),
                                 menuItem(
                                   icon: Iconsax.user,
-                                  text: "Chỉnh sửa hồ sơ",
+                                  text: TranslationKeys.editProfile.tr,
                                   onTap: () {
                                     Get.back();
                                     Get.toNamed("/edit-profile");
@@ -61,14 +64,14 @@ class RightSideMenu {
                                 ),
                                 menuItem(
                                   icon: Iconsax.lock,
-                                  text: "Tài khoản & Bảo mật",
+                                  text: TranslationKeys.accountSecurity.tr,
                                   onTap: () {
                                     Get.toNamed("/account-security");
                                   },
                                 ),
                                 menuItem(
                                   icon: Iconsax.scan,
-                                  text: "Mã của tôi",
+                                  text: TranslationKeys.myCode.tr,
                                   onTap: () {
                                     Get.back();
                                     Get.toNamed(
@@ -79,7 +82,7 @@ class RightSideMenu {
                                 ),
                                 menuItem(
                                   icon: Iconsax.user_tag,
-                                  text: "Xác thực tài khoản",
+                                  text: TranslationKeys.verifyAccount.tr,
                                   onTap: () {
                                     Get.back();
                                     Get.toNamed("/face-verification");
@@ -89,25 +92,25 @@ class RightSideMenu {
                                 divider(),
 
                                 // ==== HOẠT ĐỘNG ====
-                                sectionHeader("Hoạt động"),
+                                sectionHeader(TranslationKeys.activity.tr),
                                 menuItem(
                                   icon: Iconsax.notification,
-                                  text: "Trung tâm hoạt động",
+                                  text: TranslationKeys.activityCenter.tr,
                                   onTap: () => Get.toNamed("/activity-center"),
                                 ),
                                 menuItem(
                                   icon: Iconsax.heart,
-                                  text: "Người đã thích bạn",
+                                  text: TranslationKeys.likedYou.tr,
                                   onTap: () => Get.toNamed("/liked-you"),
                                 ),
                                 menuItem(
                                   icon: Iconsax.profile_2user,
-                                  text: "Danh sách bạn đang theo dõi",
+                                  text: TranslationKeys.followingList.tr,
                                   onTap: () => Get.toNamed("/following-list"),
                                 ),
                                 menuItem(
                                   icon: Iconsax.user_remove,
-                                  text: "Danh s\u00E1ch h\u1EA1n ch\u1EBF",
+                                  text: TranslationKeys.restrictionList.tr,
                                   onTap: () {
                                     Get.back();
                                     Get.toNamed(AppRouter.restrictionList);
@@ -117,18 +120,26 @@ class RightSideMenu {
                                 divider(),
 
                                 // ==== HỆ THỐNG ====
-                                sectionHeader("Hệ thống"),
+                                sectionHeader(TranslationKeys.system.tr),
                                 menuItem(
                                   icon: Iconsax.setting_2,
-                                  text: "Cài đặt ứng dụng",
+                                  text: TranslationKeys.appSettings.tr,
                                   onTap: () => Get.toNamed("/app-settings"),
                                 ),
                                 menuItem(
                                   icon: Iconsax.moon,
-                                  text: "Chế độ",
+                                  text: TranslationKeys.displayMode.tr,
                                   onTap: () {
                                     Get.back();
                                     Get.toNamed("/display-mode");
+                                  },
+                                ),
+                                menuItem(
+                                  icon: Iconsax.global,
+                                  text: TranslationKeys.language.tr,
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed(AppRouter.language);
                                   },
                                 ),
 
@@ -137,7 +148,7 @@ class RightSideMenu {
                                 // ==== ĐĂNG XUẤT ====
                                 menuItem(
                                   icon: Icons.logout,
-                                  text: "Đăng xuất",
+                                  text: TranslationKeys.logout.tr,
                                   danger: true,
                                   onTap: () {
                                     authC.logoutC();

@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 
 import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_reward_data.dart';
-
 
 const _rewardCardRadius = BorderRadius.all(Radius.circular(16));
 
@@ -36,25 +35,26 @@ BoxDecoration rewardCardDecoration(
 class RewardHeroCard extends StatelessWidget {
   final bool isWinner;
 
-  const RewardHeroCard({super.key, 
-    required this.isWinner,
-  });
+  const RewardHeroCard({super.key, required this.isWinner});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = isWinner ? AppTheme.successColor : theme.colorScheme.primary;
     final title = isWinner ? '🎉 Bạn đã chiến thắng!' : '😅 Bạn đã thua.';
-    final subtitle = isWinner
-        ? 'Hãy đặt một câu hỏi cho đối phương.'
-        : 'Hãy chuẩn bị trả lời câu hỏi từ đối phương.';
+    final subtitle =
+        isWinner
+            ? 'Hãy đặt một câu hỏi cho đối phương.'
+            : 'Hãy chuẩn bị trả lời câu hỏi từ đối phương.';
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: rewardCardDecoration(theme).copyWith(
         gradient: LinearGradient(
           colors: [
-            accent.withOpacity(theme.brightness == Brightness.dark ? 0.2 : 0.12),
+            accent.withOpacity(
+              theme.brightness == Brightness.dark ? 0.2 : 0.12,
+            ),
             _rewardSurfaceColor(theme),
           ],
           begin: Alignment.topLeft,
@@ -83,8 +83,10 @@ class RewardHeroCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: accent.withOpacity(0.16),
                     borderRadius: BorderRadius.circular(999),
@@ -147,10 +149,7 @@ class RewardMotto extends StatelessWidget {
 class RewardStepIndicator extends StatefulWidget {
   final WordChainRewardPhase phase;
 
-  const RewardStepIndicator({
-    super.key,
-    required this.phase,
-  });
+  const RewardStepIndicator({super.key, required this.phase});
 
   @override
   State<RewardStepIndicator> createState() => _RewardStepIndicatorState();
@@ -158,12 +157,7 @@ class RewardStepIndicator extends StatefulWidget {
 
 class _RewardStepIndicatorState extends State<RewardStepIndicator>
     with SingleTickerProviderStateMixin {
-  static const _steps = <String>[
-    'Kết quả',
-    'Hỏi',
-    'Đáp',
-    'Duyệt',
-  ];
+  static const _steps = <String>['Kết quả', 'Hỏi', 'Đáp', 'Duyệt'];
 
   late final AnimationController _pulseController;
   late final Animation<double> _pulse;
@@ -193,10 +187,7 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
       duration: const Duration(milliseconds: 900),
     );
     _pulse = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOut,
-      ),
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _syncPulse();
   }
@@ -233,9 +224,10 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
   }) {
     final isComplete = index < activeIndex;
     final isActive = index == activeIndex && activeIndex < _steps.length;
-    final color = isComplete
-        ? AppTheme.successColor
-        : isActive
+    final color =
+        isComplete
+            ? AppTheme.successColor
+            : isActive
             ? accent
             : theme.colorScheme.onSurface.withOpacity(0.35);
 
@@ -245,9 +237,10 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
       height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isComplete
-            ? AppTheme.successColor.withOpacity(0.18)
-            : isActive
+        color:
+            isComplete
+                ? AppTheme.successColor.withOpacity(0.18)
+                : isActive
                 ? accent.withOpacity(0.15)
                 : theme.colorScheme.surfaceContainerHighest,
         border: Border.all(
@@ -255,27 +248,21 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
         ),
       ),
       child: Center(
-        child: isComplete
-            ? Icon(
-                Icons.check,
-                size: 18,
-                color: AppTheme.successColor,
-              )
-            : Text(
-                '${index + 1}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: color,
+        child:
+            isComplete
+                ? Icon(Icons.check, size: 18, color: AppTheme.successColor)
+                : Text(
+                  '${index + 1}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
                 ),
-              ),
       ),
     );
 
     if (isActive) {
-      circle = ScaleTransition(
-        scale: _pulse,
-        child: circle,
-      );
+      circle = ScaleTransition(scale: _pulse, child: circle);
     }
 
     return circle;
@@ -287,9 +274,10 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
     required int activeIndex,
   }) {
     final isComplete = index < activeIndex;
-    final color = isComplete
-        ? AppTheme.successColor
-        : theme.colorScheme.onSurface.withOpacity(0.2);
+    final color =
+        isComplete
+            ? AppTheme.successColor
+            : theme.colorScheme.onSurface.withOpacity(0.2);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 260),
@@ -333,9 +321,10 @@ class _RewardStepIndicatorState extends State<RewardStepIndicator>
             _steps[index],
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: index < activeIndex
-                  ? AppTheme.successColor
-                  : index == activeIndex && activeIndex < _steps.length
+              color:
+                  index < activeIndex
+                      ? AppTheme.successColor
+                      : index == activeIndex && activeIndex < _steps.length
                       ? accent
                       : theme.colorScheme.onSurface.withOpacity(0.35),
               fontWeight:
@@ -433,9 +422,7 @@ class RewardWaitingCard extends StatelessWidget {
 class LockedQuestionCard extends StatelessWidget {
   final String question;
 
-  const LockedQuestionCard({super.key, 
-    required this.question,
-  });
+  const LockedQuestionCard({super.key, required this.question});
 
   @override
   Widget build(BuildContext context) {
@@ -481,9 +468,7 @@ class LockedQuestionCard extends StatelessWidget {
 class AnswerCard extends StatelessWidget {
   final String answer;
 
-  const AnswerCard({super.key, 
-    required this.answer,
-  });
+  const AnswerCard({super.key, required this.answer});
 
   @override
   Widget build(BuildContext context) {
@@ -529,9 +514,7 @@ class AnswerCard extends StatelessWidget {
 class CountdownChip extends StatelessWidget {
   final int secondsLeft;
 
-  const CountdownChip({super.key, 
-    required this.secondsLeft,
-  });
+  const CountdownChip({super.key, required this.secondsLeft});
 
   @override
   Widget build(BuildContext context) {
@@ -543,10 +526,7 @@ class CountdownChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: accent.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: accent.withOpacity(0.4),
-          width: 1.5, 
-         ),
+        border: Border.all(color: accent.withOpacity(0.4), width: 1.5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -569,9 +549,7 @@ class CountdownChip extends StatelessWidget {
 class SafetyNote extends StatelessWidget {
   final String text;
 
-  const SafetyNote({super.key, 
-    required this.text,
-  });
+  const SafetyNote({super.key, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -605,7 +583,8 @@ class RewardTextField extends StatelessWidget {
   final int maxLines;
   final ValueChanged<String>? onChanged;
 
-  const RewardTextField({super.key, 
+  const RewardTextField({
+    super.key,
     required this.controller,
     required this.focusNode,
     required this.hintText,
@@ -625,10 +604,7 @@ class RewardTextField extends StatelessWidget {
       maxLength: maxLength,
       maxLengthEnforcement: MaxLengthEnforcement.enforced,
       onChanged: onChanged,
-      decoration: InputDecoration(
-        hintText: hintText,
-        counterText: '',
-      ),
+      decoration: InputDecoration(hintText: hintText, counterText: ''),
     );
   }
 }
@@ -638,7 +614,8 @@ class LengthRow extends StatelessWidget {
   final TextEditingController controller;
   final int maxLength;
 
-  const LengthRow({super.key, 
+  const LengthRow({
+    super.key,
     required this.label,
     required this.controller,
     required this.maxLength,
@@ -696,7 +673,8 @@ class WordChainRewardQuestionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
     final borderColor = selected ? accent : _rewardBorderColor(theme);
-    final background = selected ? accent.withOpacity(0.08) : _rewardSurfaceColor(theme);
+    final background =
+        selected ? accent.withOpacity(0.08) : _rewardSurfaceColor(theme);
 
     return Material(
       color: Colors.transparent,
@@ -745,12 +723,7 @@ class WordChainRewardQuestionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (selected)
-                Icon(
-                  Icons.check_circle,
-                  size: 18,
-                  color: accent,
-                ),
+              if (selected) Icon(Icons.check_circle, size: 18, color: accent),
             ],
           ),
         ),

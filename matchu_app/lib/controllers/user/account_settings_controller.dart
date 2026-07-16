@@ -1,11 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/profile_snap_shot.dart';
 import 'package:matchu_app/services/user/account_service.dart';
 import 'package:matchu_app/utils/interest_tags.dart';
 import 'package:matchu_app/utils/profile_input_validator.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 
 enum DobField { day, month, year }
 
@@ -56,7 +57,10 @@ class AccountSettingsController extends GetxController {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       isLoadingInitial.value = false;
-      Get.snackbar("Lỗi", "Không tìm thấy người dùng");
+      Get.snackbar(
+        ProfileTranslationKeys.error.tr,
+        profileTr("Không tìm thấy người dùng"),
+      );
       return;
     }
 
@@ -107,7 +111,10 @@ class AccountSettingsController extends GetxController {
       isNicknameAvailable.value = true;
       nicknameCheckMessage.value = '';
     } catch (e) {
-      Get.snackbar("Lỗi", "Không thể tải hồ sơ: $e");
+      Get.snackbar(
+        ProfileTranslationKeys.error.tr,
+        profileTr("Không thể tải hồ sơ: $e"),
+      );
     } finally {
       isLoadingInitial.value = false;
     }
@@ -254,14 +261,16 @@ class AccountSettingsController extends GetxController {
       }
 
       isNicknameAvailable.value = isUnique;
-      nicknameCheckMessage.value =
-          isUnique ? "Nickname có thể sử dụng" : "Nickname đã được sử dụng";
+      nicknameCheckMessage.value = profileTr(
+        isUnique ? "Nickname có thể sử dụng" : "Nickname đã được sử dụng",
+      );
       return isUnique;
     } catch (_) {
       if (currentToken == _nicknameCheckToken) {
         isNicknameAvailable.value = null;
-        nicknameCheckMessage.value =
-            "Không thể kiểm tra nickname. Vui lòng thử lại";
+        nicknameCheckMessage.value = profileTr(
+          "Không thể kiểm tra nickname. Vui lòng thử lại",
+        );
       }
       return null;
     } finally {
@@ -306,28 +315,37 @@ class AccountSettingsController extends GetxController {
 
     final fullnameError = ProfileInputValidator.validateFullname(fullname);
     if (fullnameError != null) {
-      Get.snackbar("Lỗi", fullnameError);
+      Get.snackbar(ProfileTranslationKeys.error.tr, profileTr(fullnameError));
       return;
     }
 
     final nicknameError = ProfileInputValidator.validateNickname(nickname);
     if (nicknameError != null) {
-      Get.snackbar("Lỗi", nicknameError);
+      Get.snackbar(ProfileTranslationKeys.error.tr, profileTr(nicknameError));
       return;
     }
 
     if (!['male', 'female', 'other'].contains(gender)) {
-      Get.snackbar("Lỗi", "Vui lòng chọn giới tính");
+      Get.snackbar(
+        ProfileTranslationKeys.error.tr,
+        profileTr("Vui lòng chọn giới tính"),
+      );
       return;
     }
 
     if (birthday == null) {
-      Get.snackbar("Lỗi", "Vui lòng chọn ngày sinh");
+      Get.snackbar(
+        ProfileTranslationKeys.error.tr,
+        profileTr("Vui lòng chọn ngày sinh"),
+      );
       return;
     }
 
     if (!_isAdult(birthday)) {
-      Get.snackbar("Lỗi", "Bạn phải đủ 18 tuổi");
+      Get.snackbar(
+        ProfileTranslationKeys.error.tr,
+        profileTr("Bạn phải đủ 18 tuổi"),
+      );
       return;
     }
 
@@ -337,7 +355,7 @@ class AccountSettingsController extends GetxController {
           isNicknameAvailable.value == false
               ? "Nickname đã được sử dụng"
               : "Không thể kiểm tra nickname. Vui lòng thử lại";
-      Get.snackbar("Lỗi", message);
+      Get.snackbar(ProfileTranslationKeys.error.tr, profileTr(message));
       return;
     }
 
@@ -366,9 +384,12 @@ class AccountSettingsController extends GetxController {
       isNicknameAvailable.value = true;
       nicknameCheckMessage.value = '';
 
-      Get.snackbar("Thành công", "Đã cập nhật hồ sơ");
+      Get.snackbar(
+        ProfileTranslationKeys.success.tr,
+        profileTr("Đã cập nhật hồ sơ"),
+      );
     } catch (e) {
-      Get.snackbar("Lỗi", e.toString());
+      Get.snackbar(ProfileTranslationKeys.error.tr, profileTr(e.toString()));
     } finally {
       isSaving.value = false;
     }

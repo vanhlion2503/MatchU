@@ -1,5 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
@@ -54,7 +54,7 @@ class SearchUserView extends StatelessWidget {
                   focusNode: suc.searchFocus,
                   onChanged: (value) => suc.searchUser(value),
                   decoration: InputDecoration(
-                    hintText: "Nhập nickname...",
+                    hintText: 'Nhập nickname...'.tr,
                     prefixIcon: Icon(Icons.search),
                     filled: true,
                     fillColor:

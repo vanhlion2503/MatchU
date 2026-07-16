@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
@@ -9,6 +9,8 @@ import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
+import 'package:matchu_app/translations/random_chat_translations.dart';
 
 class RandomChatView extends StatefulWidget {
   const RandomChatView({super.key});
@@ -313,8 +315,8 @@ class _RandomChatViewState extends State<RandomChatView>
 
     if (!anonAvatarC.isSelected) {
       Get.snackbar(
-        'Thiếu avatar ẩn danh',
-        'Vui lòng chọn avatar trước khi bắt đầu',
+        matchingChatTr('Thiếu avatar ẩn danh'),
+        randomChatTr('Vui lòng chọn avatar trước khi bắt đầu'),
       );
       return;
     }
@@ -386,6 +388,7 @@ class _RandomChatViewState extends State<RandomChatView>
             border: Border.all(color: color.outline.withValues(alpha: 0.1)),
           ),
           child: IconButton(
+            tooltip: 'Hướng dẫn Chat Matching'.tr,
             icon: const Icon(Iconsax.info_circle, size: 22),
             onPressed: () {
               showMatchingRulesDialog(context);

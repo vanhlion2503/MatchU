@@ -8,7 +8,8 @@ class PresenceService {
 
   static String get uid => _auth.currentUser!.uid;
 
-  static DatabaseReference _statusRefFor(String uid) => _db.child('status/$uid');
+  static DatabaseReference _statusRefFor(String uid) =>
+      _db.child('status/$uid');
 
   static DatabaseReference _deviceStatusRefFor(String uid, String deviceId) =>
       _statusRefFor(uid).child('devices/$deviceId');
@@ -37,16 +38,9 @@ class PresenceService {
     final deviceId = await DeviceService.getDeviceId();
     final deviceRef = _deviceStatusRefFor(user.uid, deviceId);
 
-    await statusRef.set({
-      'online': true,
-      'lastChanged': ServerValue.timestamp,
-    });
+    await statusRef.set({'online': true, 'lastChanged': ServerValue.timestamp});
     await deviceRef.set(
-      _devicePayload(
-        online: true,
-        appState: 'foreground',
-        screen: 'other',
-      ),
+      _devicePayload(online: true, appState: 'foreground', screen: 'other'),
     );
 
     statusRef.onDisconnect().set({
@@ -54,11 +48,7 @@ class PresenceService {
       'lastChanged': ServerValue.timestamp,
     });
     deviceRef.onDisconnect().set(
-      _devicePayload(
-        online: false,
-        appState: 'background',
-        screen: 'other',
-      ),
+      _devicePayload(online: false, appState: 'background', screen: 'other'),
     );
   }
 
@@ -106,11 +96,7 @@ class PresenceService {
         'lastChanged': ServerValue.timestamp,
       });
       await deviceRef.set(
-        _devicePayload(
-          online: false,
-          appState: 'background',
-          screen: 'other',
-        ),
+        _devicePayload(online: false, appState: 'background', screen: 'other'),
       );
 
       await statusRef.onDisconnect().cancel();

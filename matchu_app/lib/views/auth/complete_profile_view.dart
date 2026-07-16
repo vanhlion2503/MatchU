@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:dotted_border/dotted_border.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
@@ -192,9 +192,9 @@ class _FullnameField extends StatelessWidget {
           maxLength: ProfileInputValidator.maxFullnameLength,
           inputFormatters: ProfileInputValidator.fullnameInputFormatters,
           onChanged: c.onFullnameChanged,
-          decoration: const InputDecoration(
-            labelText: "Họ và tên",
-            prefixIcon: Icon(Icons.person_outline),
+          decoration: InputDecoration(
+            labelText: "Họ và tên".tr,
+            prefixIcon: const Icon(Icons.person_outline),
           ),
         ),
       ],

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class ViewOnceImageView extends StatefulWidget {
   final String imagePath;
@@ -99,10 +99,7 @@ class _ViewOnceImageViewState extends State<ViewOnceImageView> {
         appBar: AppBar(
           backgroundColor: Colors.black,
           iconTheme: const IconThemeData(color: Colors.white),
-          title: const Text(
-            "Ảnh",
-            style: TextStyle(color: Colors.white),
-          ),
+          title: const Text("Ảnh", style: TextStyle(color: Colors.white)),
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: () async {
@@ -114,19 +111,17 @@ class _ViewOnceImageViewState extends State<ViewOnceImageView> {
           ),
         ),
         body: Center(
-          child: _loading
-              ? const CircularProgressIndicator(color: Colors.white)
-              : _bytes != null
+          child:
+              _loading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : _bytes != null
                   ? InteractiveViewer(
-                      child: Image.memory(
-                        _bytes!,
-                        fit: BoxFit.contain,
-                      ),
-                    )
+                    child: Image.memory(_bytes!, fit: BoxFit.contain),
+                  )
                   : Text(
-                      _error ?? "Ảnh đã bị xóa",
-                      style: const TextStyle(color: Colors.white70),
-                    ),
+                    _error ?? "Ảnh đã bị xóa",
+                    style: const TextStyle(color: Colors.white70),
+                  ),
         ),
       ),
     );

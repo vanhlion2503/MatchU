@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/verification/widgets/verification_camera_overlay.dart';
 import 'package:matchu_app/views/verification/widgets/verification_common_widgets.dart';
@@ -156,9 +156,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
         Text(
           'Chỉ xác minh chuyển động, không lưu video',
           textAlign: TextAlign.center,
-          style: textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
+          style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
         ),
 
         const SizedBox(height: 12),
@@ -167,14 +165,16 @@ class FaceVerificationCameraScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
           decoration: BoxDecoration(
-            color: isDark
-                ? AppTheme.darkSurface.withOpacity(0.92)
-                : AppTheme.lightSurface.withOpacity(0.95),
+            color:
+                isDark
+                    ? AppTheme.darkSurface.withOpacity(0.92)
+                    : AppTheme.lightSurface.withOpacity(0.95),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: isDark
-                  ? AppTheme.darkBorder.withOpacity(0.8)
-                  : AppTheme.lightBorder,
+              color:
+                  isDark
+                      ? AppTheme.darkBorder.withOpacity(0.8)
+                      : AppTheme.lightBorder,
             ),
             boxShadow: [
               BoxShadow(
@@ -194,10 +194,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: AppTheme.primaryColor.withOpacity(0.15),
                 ),
-                child: Icon(
-                  _stepIcon(active),
-                  color: AppTheme.primaryColor,
-                ),
+                child: Icon(_stepIcon(active), color: AppTheme.primaryColor),
               ),
 
               const SizedBox(width: 12),
@@ -259,7 +256,6 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     );
   }
 
-
   IconData _stepIcon(int stepIndex) {
     switch (stepIndex) {
       case 0:
@@ -289,9 +285,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.45), // overlay OK
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.12),
-            ),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -307,7 +301,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                 style: textTheme.bodySmall?.copyWith(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -328,14 +322,11 @@ class FaceVerificationCameraScreen extends StatelessWidget {
         // 🔒 Privacy note
         Text(
           'Ảnh chỉ dùng để xác minh',
-          style: textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
+          style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
         ),
       ],
     );
   }
-
 
   Widget _buildCameraFeed() {
     final camera = cameraController;

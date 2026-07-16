@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
@@ -6,7 +6,6 @@ import 'package:matchu_app/models/word_chain.dart';
 
 import 'word_chain_reward_components.dart';
 import 'word_chain_reward_data.dart';
-
 
 enum _RewardInputMode { suggested, custom }
 
@@ -27,12 +26,7 @@ class WordChainRewardView extends StatefulWidget {
 class _WordChainRewardViewState extends State<WordChainRewardView> {
   static const int _maxQuestionLength = 120;
   static const int _maxAnswerLength = 200;
-  static const List<String> _blockedTokens = [
-    'sex',
-    'xxx',
-    'nude',
-    'onlyfans',
-  ];
+  static const List<String> _blockedTokens = ['sex', 'xxx', 'nude', 'onlyfans'];
 
   final TextEditingController _questionController = TextEditingController();
   final TextEditingController _answerController = TextEditingController();
@@ -109,17 +103,18 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
     HapticFeedback.mediumImpact();
   }
 
   Future<void> _submitQuestion() async {
     if (_sendingQuestion) return;
-    final question = _inputMode == _RewardInputMode.suggested
-        ? (_selectedPreset?.prompt ?? '')
-        : _questionController.text;
+    final question =
+        _inputMode == _RewardInputMode.suggested
+            ? (_selectedPreset?.prompt ?? '')
+            : _questionController.text;
 
     final error = _validateRewardText(question, _maxQuestionLength);
     if (error != null) {
@@ -179,8 +174,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
       final answer = widget.wordChain.rewardAnswer.value;
       final declineCount = widget.wordChain.rewardDeclineCount.value;
       final askSecondsLeft = widget.wordChain.rewardAskSecondsLeft.value;
-      final answerSecondsLeft =
-          widget.wordChain.rewardAnswerSecondsLeft.value;
+      final answerSecondsLeft = widget.wordChain.rewardAnswerSecondsLeft.value;
       final secondsLeft = widget.wordChain.rewardReviewSecondsLeft.value;
       final autoReason = widget.wordChain.rewardAutoAcceptedReason.value;
 
@@ -249,32 +243,28 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
       case WordChainRewardPhase.answering:
         return _isLoser
             ? _buildAnswerComposer(
-                theme,
-                question,
-                declineCount,
-                answerSecondsLeft,
-              )
-            : _buildWaitingAnswer(
-                theme,
-                question,
-                answerSecondsLeft,
-              );
+              theme,
+              question,
+              declineCount,
+              answerSecondsLeft,
+            )
+            : _buildWaitingAnswer(theme, question, answerSecondsLeft);
       case WordChainRewardPhase.reviewing:
         return _isWinner
             ? _buildReviewPanel(
-                theme,
-                question,
-                answer,
-                declineCount,
-                secondsLeft,
-              )
+              theme,
+              question,
+              answer,
+              declineCount,
+              secondsLeft,
+            )
             : _buildReviewWaiting(
-                theme,
-                question,
-                answer,
-                declineCount,
-                secondsLeft,
-              );
+              theme,
+              question,
+              answer,
+              declineCount,
+              secondsLeft,
+            );
       case WordChainRewardPhase.done:
         return _buildCompletion(theme, autoReason);
       case WordChainRewardPhase.idle:
@@ -288,9 +278,10 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
   }
 
   Widget _buildQuestionComposer(ThemeData theme, int secondsLeft) {
-    final canSubmit = _inputMode == _RewardInputMode.suggested
-        ? _selectedPreset != null
-        : _questionController.text.trim().isNotEmpty;
+    final canSubmit =
+        _inputMode == _RewardInputMode.suggested
+            ? _selectedPreset != null
+            : _questionController.text.trim().isNotEmpty;
 
     return Container(
       key: const ValueKey('reward_asking'),
@@ -319,8 +310,8 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
                 label: Text(
                   'Gợi ý',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w900
-                  )
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 selected: _inputMode == _RewardInputMode.suggested,
                 onSelected: (value) {
@@ -336,8 +327,8 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
                 label: Text(
                   'Tự nhập',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w900
-                  )
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 selected: _inputMode == _RewardInputMode.custom,
                 onSelected: (value) {
@@ -353,51 +344,51 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
           const SizedBox(height: 12),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 240),
-            child: _inputMode == _RewardInputMode.suggested
-                ? Column(
-                    key: const ValueKey('reward_suggested'),
-                    children: kWordChainRewardQuestions.map((card) {
-                      final selected = _selectedPreset?.id == card.id;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: WordChainRewardQuestionTile(
-                          card: card,
-                          selected: selected,
-                          onTap: () {
-                            setState(() {
-                              _selectedPreset = card;
-                            });
-                          },
+            child:
+                _inputMode == _RewardInputMode.suggested
+                    ? Column(
+                      key: const ValueKey('reward_suggested'),
+                      children:
+                          kWordChainRewardQuestions.map((card) {
+                            final selected = _selectedPreset?.id == card.id;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: WordChainRewardQuestionTile(
+                                card: card,
+                                selected: selected,
+                                onTap: () {
+                                  setState(() {
+                                    _selectedPreset = card;
+                                  });
+                                },
+                              ),
+                            );
+                          }).toList(),
+                    )
+                    : Column(
+                      key: const ValueKey('reward_custom'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LengthRow(
+                          label: 'Câu hỏi',
+                          controller: _questionController,
+                          maxLength: _maxQuestionLength,
                         ),
-                      );
-                    }).toList(),
-                  )
-                : Column(
-                    key: const ValueKey('reward_custom'),
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LengthRow(
-                        label: 'Câu hỏi',
-                        controller: _questionController,
-                        maxLength: _maxQuestionLength,
-                      ),
-                      const SizedBox(height: 8),
-                      RewardTextField(
-                        controller: _questionController,
-                        focusNode: _questionFocus,
-                        hintText: 'Nhập câu hỏi bạn muốn hỏi...',
-                        maxLength: _maxQuestionLength,
-                        onChanged: (_) => setState(() {}),
-                        minLines: 2,
-                        maxLines: 4,
-                      ),
-                    ],
-                  ),
+                        const SizedBox(height: 8),
+                        RewardTextField(
+                          controller: _questionController,
+                          focusNode: _questionFocus,
+                          hintText: 'Nhập câu hỏi bạn muốn hỏi...'.tr,
+                          maxLength: _maxQuestionLength,
+                          onChanged: (_) => setState(() {}),
+                          minLines: 2,
+                          maxLines: 4,
+                        ),
+                      ],
+                    ),
           ),
           const SizedBox(height: 12),
-          const SafetyNote(
-            text: 'Nội dung sẽ được kiểm duyệt tự động.',
-          ),
+          const SafetyNote(text: 'Nội dung sẽ được kiểm duyệt tự động.'),
           if (secondsLeft > 0) ...[
             const SizedBox(height: 10),
             CountdownChip(secondsLeft: secondsLeft),
@@ -411,28 +402,27 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
             ),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
-              child: _sendingQuestion
-                  ? const SizedBox(
-                      key: ValueKey('loading'),
-                      height: 48, // 👈 cùng height với nút
-                      child: Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+              child:
+                  _sendingQuestion
+                      ? const SizedBox(
+                        key: ValueKey('loading'),
+                        height: 48, // 👈 cùng height với nút
+                        child: Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
+                      )
+                      : const SizedBox(
+                        key: ValueKey('text'),
+                        height: 48,
+                        child: Center(child: Text('Gửi câu hỏi')),
                       ),
-                    )
-                  : const SizedBox(
-                      key: ValueKey('text'),
-                      height: 48,
-                      child: Center(
-                        child: Text('Gửi câu hỏi'),
-                      ),
-                    ),
             ),
           ),
           const SizedBox(height: 8),
@@ -444,33 +434,31 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
           ),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed:
-                !_sendingQuestion && !_exiting ? _exitReward : null,
+            onPressed: !_sendingQuestion && !_exiting ? _exitReward : null,
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.zero,
               minimumSize: const Size.fromHeight(44),
             ),
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
-              child: _exiting
-                  ? const SizedBox(
-                      key: ValueKey('exiting'),
-                      height: 44,
-                      child: Center(
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+              child:
+                  _exiting
+                      ? const SizedBox(
+                        key: ValueKey('exiting'),
+                        height: 44,
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                         ),
+                      )
+                      : const SizedBox(
+                        key: ValueKey('exit'),
+                        height: 44,
+                        child: Center(child: Text('Thoát không đặt câu hỏi')),
                       ),
-                    )
-                  : const SizedBox(
-                      key: ValueKey('exit'),
-                      height: 44,
-                      child: Center(
-                        child: Text('Thoát không đặt câu hỏi'),
-                      ),
-                    ),
             ),
           ),
         ],
@@ -539,7 +527,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
           RewardTextField(
             controller: _answerController,
             focusNode: _answerFocus,
-            hintText: 'Nhập câu trả lời của bạn...',
+            hintText: 'Nhập câu trả lời của bạn...'.tr,
             maxLength: _maxAnswerLength,
             minLines: 3,
             maxLines: 5,
@@ -547,9 +535,10 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
           ),
           const SizedBox(height: 10),
           SafetyNote(
-            text: isFinalAttempt
-                ? 'Lượt này sẽ được tự động chấp nhận để đảm bảo công bằng.'
-                : 'Bạn bắt buộc trả lời để hoàn tất cơ chế thưởng.',
+            text:
+                isFinalAttempt
+                    ? 'Lượt này sẽ được tự động chấp nhận để đảm bảo công bằng.'
+                    : 'Bạn bắt buộc trả lời để hoàn tất cơ chế thưởng.',
           ),
           if (secondsLeft > 0) ...[
             const SizedBox(height: 10),
@@ -566,28 +555,27 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
               duration: const Duration(milliseconds: 200),
               switchInCurve: Curves.easeOut,
               switchOutCurve: Curves.easeIn,
-              child: _sendingAnswer
-                  ? const SizedBox(
-                      key: ValueKey('loading'),
-                      height: 48,
-                      child: Center(
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+              child:
+                  _sendingAnswer
+                      ? const SizedBox(
+                        key: ValueKey('loading'),
+                        height: 48,
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
+                      )
+                      : const SizedBox(
+                        key: ValueKey('text'),
+                        height: 48,
+                        child: Center(child: Text('Gửi câu trả lời')),
                       ),
-                    )
-                  : const SizedBox(
-                      key: ValueKey('text'),
-                      height: 48,
-                      child: Center(
-                        child: Text('Gửi câu trả lời'),
-                      ),
-                    ),
             ),
           ),
         ],
@@ -623,8 +611,9 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    theme.colorScheme.primary,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -652,8 +641,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
     int declineCount,
     int secondsLeft,
   ) {
-    final remaining =
-        WordChainController.rewardMaxDeclines - declineCount;
+    final remaining = WordChainController.rewardMaxDeclines - declineCount;
     final canDecline = remaining > 0;
 
     return Container(
@@ -674,10 +662,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
           const SizedBox(height: 10),
           AnswerCard(answer: answer),
           const SizedBox(height: 12),
-          if (secondsLeft > 0)
-            CountdownChip(
-              secondsLeft: secondsLeft,
-            ),
+          if (secondsLeft > 0) CountdownChip(secondsLeft: secondsLeft),
           const SizedBox(height: 10),
           Text(
             canDecline
@@ -691,18 +676,17 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
               // ====== TRẢ LỜI LẠI ======
               Expanded(
                 child: OutlinedButton(
-                  onPressed: canDecline && !_reviewing
-                      ? () => _reviewAnswer(false)
-                      : null,
+                  onPressed:
+                      canDecline && !_reviewing
+                          ? () => _reviewAnswer(false)
+                          : null,
                   style: OutlinedButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size.fromHeight(48),
                   ),
                   child: const SizedBox(
                     height: 48,
-                    child: Center(
-                      child: Text('Trả lời lại'),
-                    ),
+                    child: Center(child: Text('Trả lời lại')),
                   ),
                 ),
               ),
@@ -721,28 +705,27 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
                     duration: const Duration(milliseconds: 200),
                     switchInCurve: Curves.easeOut,
                     switchOutCurve: Curves.easeIn,
-                    child: _reviewing
-                        ? const SizedBox(
-                            key: ValueKey('loading'),
-                            height: 48,
-                            child: Center(
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                    child:
+                        _reviewing
+                            ? const SizedBox(
+                              key: ValueKey('loading'),
+                              height: 48,
+                              child: Center(
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
+                            )
+                            : const SizedBox(
+                              key: ValueKey('text'),
+                              height: 48,
+                              child: Center(child: Text('Chấp nhận')),
                             ),
-                          )
-                        : const SizedBox(
-                            key: ValueKey('text'),
-                            height: 48,
-                            child: Center(
-                              child: Text('Chấp nhận'),
-                            ),
-                          ),
                   ),
                 ),
               ),
@@ -768,8 +751,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
     int declineCount,
     int secondsLeft,
   ) {
-    final remaining =
-        WordChainController.rewardMaxDeclines - declineCount;
+    final remaining = WordChainController.rewardMaxDeclines - declineCount;
 
     return Container(
       key: const ValueKey('reward_wait_review'),
@@ -803,9 +785,10 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
   }
 
   Widget _buildCompletion(ThemeData theme, String? autoReason) {
-    final message = autoReason == 'timeout'
-        ? 'Hệ thống đã tự động tiếp tục để đảm bảo trải nghiệm cho cả hai.'
-        : autoReason == 'max_declines'
+    final message =
+        autoReason == 'timeout'
+            ? 'Hệ thống đã tự động tiếp tục để đảm bảo trải nghiệm cho cả hai.'
+            : autoReason == 'max_declines'
             ? 'Hệ thống tự động chấp nhận để đảm bảo công bằng cho cả hai.'
             : 'Cơ chế thưởng đã hoàn tất. Bạn có thể tiếp tục trò chuyện.';
 
@@ -815,11 +798,7 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
       decoration: rewardCardDecoration(theme),
       child: Column(
         children: [
-          Icon(
-            Icons.verified,
-            size: 36,
-            color: theme.colorScheme.primary,
-          ),
+          Icon(Icons.verified, size: 36, color: theme.colorScheme.primary),
           const SizedBox(height: 10),
           Text(
             'Hoàn tất',

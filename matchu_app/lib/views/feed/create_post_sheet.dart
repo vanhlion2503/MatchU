@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -446,11 +446,12 @@ class _ComposerLayout extends StatelessWidget {
                 cursorColor: theme.colorScheme.primary,
                 decoration: _borderlessInputDecoration(
                   hintText:
-                      controller.isEditComposer
-                          ? 'Ch\u1EC9nh s\u1EEDa b\u00E0i vi\u1EBFt...'
-                          : controller.isQuoteComposer
-                          ? 'Thêm nhận xét của bạn...'
-                          : 'Có gì mới?',
+                      (controller.isEditComposer
+                              ? 'Ch\u1EC9nh s\u1EEDa b\u00E0i vi\u1EBFt...'
+                              : controller.isQuoteComposer
+                              ? 'Thêm nhận xét của bạn...'
+                              : 'Có gì mới?')
+                          .tr,
                   fillColor: palette.sheetBackground,
                   hintStyle: theme.textTheme.bodyLarge?.copyWith(
                     fontSize: 16,
@@ -791,7 +792,7 @@ class _TagEditor extends StatelessWidget {
                 ),
                 cursorColor: theme.colorScheme.primary,
                 decoration: _borderlessInputDecoration(
-                  hintText: 'Thêm thẻ...',
+                  hintText: 'Thêm thẻ...'.tr,
                   fillColor: palette.sheetBackground,
                   hintStyle: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 14,
@@ -1082,7 +1083,7 @@ String _privacyLabel(PostVisibility visibility) {
     case PostVisibility.public:
       return 'C\u00F4ng khai';
     case PostVisibility.followers:
-      return 'Theo d\u00F5i';
+      return 'Ng\u01B0\u1EDDi theo d\u00F5i';
     case PostVisibility.private:
       return 'Ri\u00EAng t\u01B0';
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
@@ -39,10 +39,10 @@ class _RestrictionListViewState extends State<RestrictionListView>
         title: const Text('Danh s\u00E1ch h\u1EA1n ch\u1EBF'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'B\u1ECB ch\u1EB7n'),
-            Tab(text: '\u1EA8n b\u00E0i vi\u1EBFt'),
-            Tab(text: 'T\u1EAFt th\u00F4ng b\u00E1o'),
+          tabs: [
+            Tab(text: 'Bị chặn'.tr),
+            Tab(text: 'Ẩn bài viết'.tr),
+            Tab(text: 'Tắt thông báo'.tr),
           ],
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
@@ -497,8 +498,8 @@ class OtherProfileView extends StatelessWidget {
     final blocked = await controller.blockUser();
     if (blocked && context.mounted) {
       Get.snackbar(
-        'Đã chặn người dùng',
-        'Tài khoản này đã được thêm vào danh sách hạn chế.',
+        profileTr('Đã chặn người dùng'),
+        profileTr('Tài khoản này đã được thêm vào danh sách hạn chế.'),
         snackPosition: SnackPosition.TOP,
       );
       await Navigator.of(context).maybePop();
@@ -527,10 +528,12 @@ class OtherProfileView extends StatelessWidget {
       );
     } catch (error) {
       Get.snackbar(
-        'L\u1ED7i',
-        error is StateError
-            ? error.message
-            : 'Kh\u00F4ng th\u1EC3 m\u1EDF cu\u1ED9c tr\u00F2 chuy\u1EC7n.',
+        ProfileTranslationKeys.error.tr,
+        profileTr(
+          error is StateError
+              ? error.message.toString()
+              : 'Không thể mở cuộc trò chuyện.',
+        ),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );

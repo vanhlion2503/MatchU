@@ -69,8 +69,9 @@ class TelepathyTimers {
   void ensureCountdownTimer() {
     if (_countdownTimer != null) return;
 
-    _countdownTimer =
-        Timer.periodic(const Duration(milliseconds: 200), (_) async {
+    _countdownTimer = Timer.periodic(const Duration(milliseconds: 200), (
+      _,
+    ) async {
       _updateCountdownRemaining();
 
       if (countdownSeconds.value <= 0) {
@@ -114,8 +115,9 @@ class TelepathyTimers {
       return;
     }
 
-    final effectiveStart = _questionStartedAt!
-        .add(const Duration(milliseconds: questionLeadMs));
+    final effectiveStart = _questionStartedAt!.add(
+      const Duration(milliseconds: questionLeadMs),
+    );
     final elapsedMs = _serverNow().difference(effectiveStart).inMilliseconds;
     final remainingMs = (questionDurationSeconds * 1000) - elapsedMs;
     final remaining = (remainingMs / 1000).ceil();
@@ -128,8 +130,9 @@ class TelepathyTimers {
       return;
     }
 
-    final effectiveStart = _countdownStartedAt!
-        .add(const Duration(milliseconds: countdownLeadMs));
+    final effectiveStart = _countdownStartedAt!.add(
+      const Duration(milliseconds: countdownLeadMs),
+    );
     final elapsedMs = _serverNow().difference(effectiveStart).inMilliseconds;
     final remainingMs = (countdownDurationSeconds * 1000) - elapsedMs;
     final remaining = (remainingMs / 1000).ceil();

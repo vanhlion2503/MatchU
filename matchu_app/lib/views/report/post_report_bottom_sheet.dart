@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/report/post_report_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
@@ -188,8 +188,8 @@ class _PostReportBottomSheetState extends State<PostReportBottomSheet> {
                         maxLines: 3,
                         maxLength: 200,
                         textAlignVertical: TextAlignVertical.top,
-                        decoration: const InputDecoration(
-                          hintText: 'Nhập lý do khác',
+                        decoration: InputDecoration(
+                          hintText: 'Nhập lý do khác'.tr,
                           alignLabelWithHint: true,
                         ),
                       ),
@@ -227,9 +227,10 @@ class _PostReportBottomSheetState extends State<PostReportBottomSheet> {
                             maxLines: 4,
                             maxLength: 400,
                             textAlignVertical: TextAlignVertical.top,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText:
-                                  'Bạn có thể bổ sung bối cảnh hoặc dấu hiệu cụ thể để đội ngũ kiểm duyệt xem xét chính xác hơn.',
+                                  'Bạn có thể bổ sung bối cảnh hoặc dấu hiệu cụ thể để đội ngũ kiểm duyệt xem xét chính xác hơn.'
+                                      .tr,
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,

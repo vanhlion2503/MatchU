@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class AnimatedEmoji extends StatelessWidget {
   final String text;
@@ -6,7 +6,8 @@ class AnimatedEmoji extends StatelessWidget {
   final bool isMe;
   final bool pressed;
 
-  const AnimatedEmoji({super.key, 
+  const AnimatedEmoji({
+    super.key,
     required this.text,
     required this.highlighted,
     required this.isMe,
@@ -21,8 +22,7 @@ class AnimatedEmoji extends StatelessWidget {
       duration: const Duration(milliseconds: 420),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) {
-        final shake =
-            highlighted ? (value < 0.5 ? value : (1 - value)) * 4 : 0;
+        final shake = highlighted ? (value < 0.5 ? value : (1 - value)) * 4 : 0;
 
         return Transform.translate(
           offset: Offset(shake * (isMe ? -1 : 1), 0),
@@ -38,15 +38,16 @@ class AnimatedEmoji extends StatelessWidget {
         text,
         style: TextStyle(
           fontSize: 42,
-          shadows: pressed
-              ? [
-                  Shadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
+          shadows:
+              pressed
+                  ? [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                  : null,
         ),
       ),
     );

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
 import 'package:matchu_app/models/word_chain.dart';

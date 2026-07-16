@@ -5,11 +5,7 @@ class SeenAvatarAnimated extends StatelessWidget {
   final String? userId;
   final double size;
 
-  const SeenAvatarAnimated({
-    super.key,
-    required this.userId,
-    this.size = 14,
-  });
+  const SeenAvatarAnimated({super.key, required this.userId, this.size = 14});
 
   @override
   Widget build(BuildContext context) {
@@ -26,18 +22,15 @@ class SeenAvatarAnimated extends StatelessWidget {
           ),
         );
       },
-      child: userId == null
-          ? const SizedBox(
-              key: ValueKey("empty"),
-              width: 14,
-              height: 14,
-            )
-          : SizedBox(
-              key: ValueKey("avatar"),
-              width: size,
-              height: size,
-              child: UserAvatar(userId: userId!),
-            ),
+      child:
+          userId == null
+              ? const SizedBox(key: ValueKey("empty"), width: 14, height: 14)
+              : SizedBox(
+                key: ValueKey("avatar"),
+                width: size,
+                height: size,
+                child: UserAvatar(userId: userId!),
+              ),
     );
   }
 }

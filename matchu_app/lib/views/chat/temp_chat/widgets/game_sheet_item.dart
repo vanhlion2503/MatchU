@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class GameSheetItem extends StatelessWidget {
   final IconData? icon;
@@ -7,7 +7,8 @@ class GameSheetItem extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
-  const GameSheetItem({super.key, 
+  const GameSheetItem({
+    super.key,
     this.icon,
     this.imageAsset,
     required this.title,
@@ -33,17 +34,15 @@ class GameSheetItem extends StatelessWidget {
                 color: theme.colorScheme.primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: imageAsset != null
-                    ? Image.asset(
+              child:
+                  imageAsset != null
+                      ? Image.asset(
                         imageAsset!,
                         width: 40,
                         height: 40,
                         fit: BoxFit.contain,
                       )
-                    : Icon(
-                        icon,
-                        color: theme.colorScheme.primary,
-                      ),
+                      : Icon(icon, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 
 class NearbyFriendsPlaceholder extends StatelessWidget {
   const NearbyFriendsPlaceholder({super.key});
@@ -112,16 +112,14 @@ class _GridPainter extends CustomPainter {
   final Color gridColor;
   final Color ringColor;
 
-  _GridPainter({
-    required this.gridColor,
-    required this.ringColor,
-  });
+  _GridPainter({required this.gridColor, required this.ringColor});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = gridColor.withOpacity(0.7)
-      ..strokeWidth = 1;
+    final paint =
+        Paint()
+          ..color = gridColor.withOpacity(0.7)
+          ..strokeWidth = 1;
 
     const step = 40.0;
     for (double x = 0; x <= size.width; x += step) {
@@ -132,10 +130,11 @@ class _GridPainter extends CustomPainter {
     }
 
     final center = Offset(size.width / 2, size.height / 2);
-    final ringPaint = Paint()
-      ..color = ringColor.withOpacity(0.12)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+    final ringPaint =
+        Paint()
+          ..color = ringColor.withOpacity(0.12)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2;
 
     canvas.drawCircle(center, min(size.width, size.height) * 0.18, ringPaint);
     canvas.drawCircle(center, min(size.width, size.height) * 0.3, ringPaint);

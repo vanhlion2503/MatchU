@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -40,9 +40,7 @@ class CallMessageBubble extends StatelessWidget {
             ? colorScheme.onPrimary.withValues(alpha: 0.72)
             : colorScheme.onSurface.withValues(alpha: 0.72);
     final recallButtonColor =
-        isMe
-            ? AppTheme.secondaryColor
-            : AppTheme.primaryColor;
+        isMe ? AppTheme.secondaryColor : AppTheme.primaryColor;
     final recallLabel = isVideoCall ? "Gọi video lại" : "Gọi lại";
 
     final titleStyle = theme.textTheme.bodyMedium?.copyWith(
@@ -72,10 +70,7 @@ class CallMessageBubble extends StatelessWidget {
                   _resolveCallIcon(),
                   width: 26,
                   height: 26,
-                  colorFilter: ColorFilter.mode(
-                    iconColor,
-                    BlendMode.srcIn,
-                  ),
+                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
                 ),
               ),
             ),

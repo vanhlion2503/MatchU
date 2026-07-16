@@ -1,8 +1,4 @@
-enum TelepathyLevel {
-  high,
-  medium,
-  low,
-}
+enum TelepathyLevel { high, medium, low }
 
 class TelepathyResult {
   final int score; // %
@@ -22,13 +18,13 @@ class TelepathyResult {
   });
 
   Map<String, dynamic> toJson() => {
-        "score": score,
-        "matchedCount": matchedCount,
-        "total": total,
-        "level": level.name,
-        "summaryText": summaryText,
-        "highlight": highlight,
-      };
+    "score": score,
+    "matchedCount": matchedCount,
+    "total": total,
+    "level": level.name,
+    "summaryText": summaryText,
+    "highlight": highlight,
+  };
 
   factory TelepathyResult.fromJson(Map<String, dynamic> json) {
     final levelName = json["level"];

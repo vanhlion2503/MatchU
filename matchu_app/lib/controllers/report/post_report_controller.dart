@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
@@ -114,8 +115,11 @@ class PostReportController extends GetxController {
 
       if (picked.length > remainingSlots) {
         Get.snackbar(
-          'Giới hạn ảnh',
-          'Chỉ lưu $remainingSlots ảnh đầu tiên. Tối đa $maxEvidenceImages ảnh cho mỗi báo cáo.',
+          PostTranslationKeys.imageLimit.tr,
+          PostTranslationKeys.imageLimitMessage.trParams({
+            'remaining': '$remainingSlots',
+            'max': '$maxEvidenceImages',
+          }),
           snackPosition: SnackPosition.TOP,
         );
       }
@@ -188,8 +192,10 @@ class PostReportController extends GetxController {
 
       Get.back(result: true);
       Get.snackbar(
-        'Đã gửi báo cáo',
-        'Chúng tôi sẽ xem xét bài viết của $reportedAuthorName.',
+        'Đã gửi báo cáo'.tr,
+        PostTranslationKeys.reportSentMessage.trParams({
+          'author': reportedAuthorName,
+        }),
         snackPosition: SnackPosition.TOP,
       );
     } catch (error) {
@@ -216,7 +222,11 @@ class PostReportController extends GetxController {
   }
 
   void _showError(String message) {
-    Get.snackbar('Lỗi', message, snackPosition: SnackPosition.TOP);
+    Get.snackbar(
+      PostTranslationKeys.error.tr,
+      postTr(message),
+      snackPosition: SnackPosition.TOP,
+    );
   }
 
   @override

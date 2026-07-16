@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/models/reaction_icon.dart';
 
 class ReactionRegistry {
@@ -10,18 +10,11 @@ class ReactionRegistry {
         height: 18,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.blue,
-            width: 1.5,
-          ),
+          border: Border.all(color: Colors.blue, width: 1.5),
           color: Colors.blue,
         ),
         alignment: Alignment.center,
-        child: const Icon(
-          Icons.thumb_up,
-          size: 10,
-          color: Colors.white,
-        ),
+        child: const Icon(Icons.thumb_up, size: 10, color: Colors.white),
       ),
     ),
 
@@ -32,18 +25,11 @@ class ReactionRegistry {
         height: 18,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.red,
-            width: 1.5,
-          ),
+          border: Border.all(color: Colors.red, width: 1.5),
           color: Colors.red,
         ),
         alignment: Alignment.center,
-        child: const Icon(
-          Icons.favorite,
-          size: 10,
-          color: Colors.white,
-        ),
+        child: const Icon(Icons.favorite, size: 10, color: Colors.white),
       ),
     ),
 

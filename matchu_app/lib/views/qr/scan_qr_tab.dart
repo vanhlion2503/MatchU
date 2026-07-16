@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 
 class ScanQrTab extends StatefulWidget {
   const ScanQrTab({super.key, required this.controller});
@@ -77,10 +78,8 @@ class _ScanQrTabState extends State<ScanQrTab> {
                       ),
                     ),
                 errorBuilder:
-                    (_, error) => _ScannerErrorState(
-                      message:
-                          error.errorDetails?.message ??
-                          'Không thể mở camera để quét mã.',
+                    (_, _) => _ScannerErrorState(
+                      message: profileTr('Không thể mở camera để quét mã.'),
                     ),
               ),
               Positioned.fill(

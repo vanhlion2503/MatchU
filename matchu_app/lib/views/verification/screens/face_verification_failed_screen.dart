@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/views/verification/widgets/verification_common_widgets.dart';
 
 class FaceVerificationFailedScreen extends StatelessWidget {
@@ -136,10 +136,7 @@ class FaceVerificationFailedScreen extends StatelessWidget {
 }
 
 class _ReasonTile extends StatelessWidget {
-  const _ReasonTile({
-    required this.icon,
-    required this.label,
-  });
+  const _ReasonTile({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -158,11 +155,7 @@ class _ReasonTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 19,
-            color: colorScheme.onSurface.withOpacity(0.45),
-          ),
+          Icon(icon, size: 19, color: colorScheme.onSurface.withOpacity(0.45)),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -178,4 +171,3 @@ class _ReasonTile extends StatelessWidget {
     );
   }
 }
-

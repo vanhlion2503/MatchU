@@ -34,6 +34,7 @@ import 'package:matchu_app/views/reputation/reputation_view.dart';
 import 'package:matchu_app/views/qr/profile_qr_view.dart';
 import 'package:matchu_app/views/search/search_user_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
+import 'package:matchu_app/views/setting/language_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
 import 'package:matchu_app/views/setting/restriction_list_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
@@ -154,6 +155,7 @@ class AppPages {
     ),
 
     GetPage(name: AppRouter.displayMode, page: () => DisplayModeView()),
+    GetPage(name: AppRouter.language, page: () => const LanguageView()),
 
     GetPage(
       name: AppRouter.restrictionList,

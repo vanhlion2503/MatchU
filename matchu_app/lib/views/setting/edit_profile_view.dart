@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/user/account_settings_controller.dart';
 import 'package:matchu_app/utils/profile_input_validator.dart';
@@ -64,9 +64,9 @@ class EditProfileView extends StatelessWidget {
                     inputFormatters:
                         ProfileInputValidator.fullnameInputFormatters,
                     onChanged: c.onFullnameChanged,
-                    decoration: const InputDecoration(
-                      labelText: "Họ và tên",
-                      prefixIcon: Icon(Icons.person_outline),
+                    decoration: InputDecoration(
+                      labelText: "Họ và tên".tr,
+                      prefixIcon: const Icon(Icons.person_outline),
                     ),
                   ),
 

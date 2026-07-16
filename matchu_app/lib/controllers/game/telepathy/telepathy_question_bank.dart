@@ -76,7 +76,8 @@ class TelepathyQuestionBank {
     TelepathyQuestion(
       id: "money_manage",
       category: QuestionCategory.lifestyle,
-      text: "Tài chính: Tiết kiệm lo tương lai 💰 hay YOLO tiêu hết cho sướng 🔥",
+      text:
+          "Tài chính: Tiết kiệm lo tương lai 💰 hay YOLO tiêu hết cho sướng 🔥",
       left: "Tiết kiệm 💰",
       right: "YOLO 🔥",
     ),
@@ -210,7 +211,8 @@ class TelepathyQuestionBank {
     TelepathyQuestion(
       id: "life_priority",
       category: QuestionCategory.deep,
-      text: "Ưu tiên lúc này: Sự nghiệp thăng tiến 💼 hay Gia đình hạnh phúc 🏠",
+      text:
+          "Ưu tiên lúc này: Sự nghiệp thăng tiến 💼 hay Gia đình hạnh phúc 🏠",
       left: "Sự nghiệp 💼",
       right: "Gia đình 🏠",
     ),
@@ -245,7 +247,8 @@ class TelepathyQuestionBank {
     TelepathyQuestion(
       id: "loneliness",
       category: QuestionCategory.deep,
-      text: "Cô đơn: Thích một mình để nạp năng lượng 🌌 hay Luôn cần ai đó bên cạnh 🤝",
+      text:
+          "Cô đơn: Thích một mình để nạp năng lượng 🌌 hay Luôn cần ai đó bên cạnh 🤝",
       left: "Một mình 🌌",
       right: "Cần người 🤝",
     ),
@@ -270,10 +273,10 @@ class TelepathyQuestionBank {
     final selection = <TelepathyQuestion>[];
 
     // Cấu trúc bộ câu hỏi (Tổng 5 câu)
-    selection.addAll(pickN(_funQuestions, 1));       // Câu 1: Khởi động
+    selection.addAll(pickN(_funQuestions, 1)); // Câu 1: Khởi động
     selection.addAll(pickN(_lifestyleQuestions, 1)); // Câu 2: Thói quen
-    selection.addAll(pickN(_loveQuestions, 2));      // Câu 3, 4: Quan trọng
-    selection.addAll(pickN(_deepQuestions, 1));      // Câu 5: Chốt hạ
+    selection.addAll(pickN(_loveQuestions, 2)); // Câu 3, 4: Quan trọng
+    selection.addAll(pickN(_deepQuestions, 1)); // Câu 5: Chốt hạ
 
     return selection;
   }

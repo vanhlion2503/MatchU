@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/profile_translations.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
@@ -422,8 +423,8 @@ class ProfilePostsController extends GetxController {
         isPending: false,
       );
       Get.snackbar(
-        'Thông báo',
-        'Đã đăng lại bài viết thành công.',
+        ProfileTranslationKeys.notice.tr,
+        profileTr('Đã đăng lại bài viết thành công.'),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -465,8 +466,8 @@ class ProfilePostsController extends GetxController {
         isPending: false,
       );
       Get.snackbar(
-        'Thông báo',
-        'Đã hủy đăng lại bài viết.',
+        ProfileTranslationKeys.notice.tr,
+        profileTr('Đã hủy đăng lại bài viết.'),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -487,8 +488,8 @@ class ProfilePostsController extends GetxController {
       final deletedPost = await _service.deletePost(post: post);
       await _removePostByIdWithAnimation(deletedPost.postId);
       Get.snackbar(
-        'Thông báo',
-        'Đã xóa bài viết.',
+        ProfileTranslationKeys.notice.tr,
+        profileTr('Đã xóa bài viết.'),
         snackPosition: SnackPosition.BOTTOM,
         margin: const EdgeInsets.all(12),
       );
@@ -501,8 +502,8 @@ class ProfilePostsController extends GetxController {
 
   void onShareTap() {
     Get.snackbar(
-      'Thông báo',
-      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.',
+      ProfileTranslationKeys.notice.tr,
+      profileTr('Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.'),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
@@ -992,10 +993,12 @@ class ProfilePostsController extends GetxController {
             _queuedSavedStates.remove(postId);
           }
           Get.snackbar(
-            'Thông báo',
-            targetState
-                ? 'Đã lưu bài viết vào lưu trữ.'
-                : 'Đã bỏ lưu bài viết.',
+            ProfileTranslationKeys.notice.tr,
+            profileTr(
+              targetState
+                  ? 'Đã lưu bài viết vào lưu trữ.'
+                  : 'Đã bỏ lưu bài viết.',
+            ),
             snackPosition: SnackPosition.BOTTOM,
             margin: const EdgeInsets.all(12),
           );
@@ -1304,8 +1307,8 @@ class ProfilePostsController extends GetxController {
 
   void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
-      message,
+      ProfileTranslationKeys.error.tr,
+      profileTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

@@ -2,9 +2,8 @@ class MessageModel {
   final String id;
   final String senderId;
   final String text;
-  final String type;  // text | image | system
+  final String type; // text | image | system
   final DateTime createdAt;
-  
 
   MessageModel({
     required this.id,
@@ -15,12 +14,12 @@ class MessageModel {
   });
 
   Map<String, dynamic> toJson() => {
-        "id": id,
-        "senderId": senderId,
-        "text": text,
-        "type": type,
-        "createdAt": createdAt.toIso8601String(),
-      };
+    "id": id,
+    "senderId": senderId,
+    "text": text,
+    "type": type,
+    "createdAt": createdAt.toIso8601String(),
+  };
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(

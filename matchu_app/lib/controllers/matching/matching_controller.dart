@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
 
 import '../../models/queue_user_model.dart';
 import '../../services/chat/matching_service.dart';
@@ -64,8 +65,8 @@ class MatchingController extends GetxController {
     _roomSub = null;
 
     Get.snackbar(
-      'Mất kết nối',
-      'Đã mất mạng, quay về trang tìm chat',
+      matchingChatTr('Mất kết nối'),
+      matchingChatTr('Đã mất mạng, quay về trang tìm chat'),
       snackPosition: SnackPosition.TOP,
       duration: const Duration(seconds: 2),
     );
@@ -289,8 +290,8 @@ class MatchingController extends GetxController {
       final myAnonAvatar = anonAvatarC.selectedAvatar.value;
       if (myAnonAvatar == null) {
         Get.snackbar(
-          'Thiếu avatar ẩn danh',
-          'Vui lòng chọn avatar trước khi tìm chat',
+          matchingChatTr('Thiếu avatar ẩn danh'),
+          matchingChatTr('Vui lòng chọn avatar trước khi tìm chat'),
         );
         return;
       }
@@ -298,7 +299,10 @@ class MatchingController extends GetxController {
       final profileSnap =
           await _firestore.collection('users').doc(fbUser.uid).get();
       if (!profileSnap.exists) {
-        Get.snackbar('Lỗi', 'Không tìm thấy thông tin tài khoản.');
+        Get.snackbar(
+          MatchingChatTranslationKeys.error.tr,
+          matchingChatTr('Không tìm thấy thông tin tài khoản.'),
+        );
         return;
       }
 
@@ -375,8 +379,8 @@ class MatchingController extends GetxController {
       }
 
       Get.snackbar(
-        'Không thể bắt đầu matching',
-        'Vui lòng thử lại sau ít phút.',
+        matchingChatTr('Không thể bắt đầu matching'),
+        matchingChatTr('Vui lòng thử lại sau ít phút.'),
         snackPosition: SnackPosition.TOP,
       );
     } finally {

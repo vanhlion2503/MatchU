@@ -1,10 +1,10 @@
 // FILE: lib/models/telepathy_question.dart
 
 enum QuestionCategory {
-  fun,       // Vui vẻ, khởi động
+  fun, // Vui vẻ, khởi động
   lifestyle, // Lối sống, thói quen
-  love,      // Quan điểm tình yêu
-  deep,      // Sâu sắc, giá trị sống
+  love, // Quan điểm tình yêu
+  deep, // Sâu sắc, giá trị sống
 }
 
 class TelepathyQuestion {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/nearby_user_vm.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';

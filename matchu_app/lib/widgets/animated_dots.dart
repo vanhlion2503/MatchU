@@ -4,11 +4,7 @@ class AnimatedDots extends StatefulWidget {
   final Color color;
   final double size;
 
-  const AnimatedDots({
-    super.key,
-    required this.color,
-    this.size = 8,
-  });
+  const AnimatedDots({super.key, required this.color, this.size = 8});
 
   @override
   State<AnimatedDots> createState() => _AnimatedDotsState();
@@ -48,9 +44,10 @@ class _AnimatedDotsState extends State<AnimatedDots>
             final isActive = i == activeIndex;
 
             /// 🔥 scale dot đang active
-            final scale = isActive
-                ? 1.0 + 0.4 * (1 - (localProgress - 0.5).abs() * 2)
-                : 1.0;
+            final scale =
+                isActive
+                    ? 1.0 + 0.4 * (1 - (localProgress - 0.5).abs() * 2)
+                    : 1.0;
 
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),

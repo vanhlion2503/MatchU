@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -6,10 +6,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 class NearbySegmentedControl extends StatelessWidget {
   final NearbyController controller;
 
-  const NearbySegmentedControl({
-    super.key,
-    required this.controller,
-  });
+  const NearbySegmentedControl({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -22,15 +19,14 @@ class NearbySegmentedControl extends StatelessWidget {
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isDark
-                ? AppTheme.darkBorder
-                : AppTheme.lightBorder,
-          ),
-          boxShadow: isDark
-                  ? null
-                  : [
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+            ),
+            boxShadow:
+                isDark
+                    ? null
+                    : [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.05),
                         blurRadius: 6,
@@ -43,9 +39,10 @@ class NearbySegmentedControl extends StatelessWidget {
               return Stack(
                 children: [
                   AnimatedAlign(
-                    alignment: selected == 0
-                        ? Alignment.centerLeft
-                        : Alignment.centerRight,
+                    alignment:
+                        selected == 0
+                            ? Alignment.centerLeft
+                            : Alignment.centerRight,
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOut,
                   ),
@@ -53,7 +50,7 @@ class NearbySegmentedControl extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _TabItem(
-                          title: "Tim quanh đây",
+                          title: "Tìm quanh đây",
                           isSelected: selected == 0,
                           onTap: () => controller.changeTab(0),
                         ),
@@ -98,24 +95,29 @@ class _TabItem extends StatelessWidget {
       child: Container(
         height: 42,
         decoration: BoxDecoration(
-          color: isSelected
-              ? Theme.of(context).brightness == Brightness.dark
-                ? Colors.black
-                : Colors.white// tab được chọn để highlight phía sau lo
-              : Theme.of(context).colorScheme.surface, // 👈 nền trắng cho tab chưa chọn
+          color:
+              isSelected
+                  ? Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors
+                          .white // tab được chọn để highlight phía sau lo
+                  : Theme.of(
+                    context,
+                  ).colorScheme.surface, // 👈 nền trắng cho tab chưa chọn
           borderRadius: BorderRadius.circular(10),
         ),
         child: TextButton(
           onPressed: onTap,
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
-            foregroundColor: isSelected
-                ? colorScheme.onSurface
-                : colorScheme.onSurface.withOpacity(0.7),
+            foregroundColor:
+                isSelected
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurface.withOpacity(0.7),
             textStyle: textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
-            overlayColor: Colors.transparent,   
+            overlayColor: Colors.transparent,
             splashFactory: NoSplash.splashFactory,
           ),
           child: Text(title),
@@ -124,4 +126,3 @@ class _TabItem extends StatelessWidget {
     );
   }
 }
-

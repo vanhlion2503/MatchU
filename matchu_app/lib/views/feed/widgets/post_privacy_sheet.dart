@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
@@ -153,8 +154,8 @@ class _EditPostPrivacySheetState extends State<EditPostPrivacySheet> {
 
   void _showError(String message) {
     Get.snackbar(
-      'L\u1ED7i',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

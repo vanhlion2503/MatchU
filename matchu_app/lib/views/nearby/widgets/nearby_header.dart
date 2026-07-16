@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 
@@ -30,38 +30,45 @@ class NearbyHeader extends GetView<NearbyController> {
                   width: 48,
                   height: 48,
                   child: Center(
-                    child: isUpdatingVisibility
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2.2),
-                          )
-                        : IconButton(
-                            tooltip: isLocationVisible
-                                ? "Tắt hiển thị vị trí"
-                                : "Bật hiển thị vị trí",
-                            icon: Icon(
-                              isLocationVisible
-                                  ? Icons.location_on_rounded
-                                  : Icons.location_off_rounded,
-                              color: isLocationVisible
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.error,
+                    child:
+                        isUpdatingVisibility
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                              ),
+                            )
+                            : IconButton(
+                              tooltip:
+                                  (isLocationVisible
+                                          ? "Tắt hiển thị vị trí"
+                                          : "Bật hiển thị vị trí")
+                                      .tr,
+                              icon: Icon(
+                                isLocationVisible
+                                    ? Icons.location_on_rounded
+                                    : Icons.location_off_rounded,
+                                color:
+                                    isLocationVisible
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.error,
+                              ),
+                              onPressed:
+                                  () => controller.setLocationVisibility(
+                                    !isLocationVisible,
+                                  ),
                             ),
-                            onPressed: () =>
-                                controller.setLocationVisibility(!isLocationVisible),
-                          ),
                   ),
                 ),
                 IconButton(
-                  tooltip: "Làm mới",
+                  tooltip: 'Làm mới'.tr,
                   icon: const Icon(Icons.refresh),
                   onPressed: controller.refresh,
                 ),
               ],
             );
           }),
-
         ],
       ),
     );

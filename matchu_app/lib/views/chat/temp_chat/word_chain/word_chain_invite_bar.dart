@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
@@ -14,10 +14,7 @@ const _chainGradient = LinearGradient(
 class WordChainInviteBar extends StatelessWidget {
   final TempChatController controller;
 
-  const WordChainInviteBar({
-    super.key,
-    required this.controller,
-  });
+  const WordChainInviteBar({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -64,11 +61,7 @@ class WordChainInviteBar extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: _chainGradient,
                   ),
-                  child: const Icon(
-                    Icons.link,
-                    size: 22,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.link, size: 22, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -164,9 +157,10 @@ class WordChainInviteBar extends StatelessWidget {
                     icon: Icons.close,
                     compact: true,
                     loading: loadingDecline,
-                    onTap: submitting == null
-                        ? () => wordChain.respond(false)
-                        : null,
+                    onTap:
+                        submitting == null
+                            ? () => wordChain.respond(false)
+                            : null,
                   ),
                 ],
               )
@@ -178,9 +172,10 @@ class WordChainInviteBar extends StatelessWidget {
                       label: 'Bỏ qua',
                       icon: Icons.close,
                       loading: loadingDecline,
-                      onTap: submitting == null
-                          ? () => wordChain.respond(false)
-                          : null,
+                      onTap:
+                          submitting == null
+                              ? () => wordChain.respond(false)
+                              : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -189,9 +184,10 @@ class WordChainInviteBar extends StatelessWidget {
                       label: 'Chơi ngay',
                       icon: Icons.link,
                       loading: loadingAccept,
-                      onTap: submitting == null
-                          ? () => wordChain.respond(true)
-                          : null,
+                      onTap:
+                          submitting == null
+                              ? () => wordChain.respond(true)
+                              : null,
                     ),
                   ),
                 ],
@@ -233,40 +229,42 @@ class _GhostActionButton extends StatelessWidget {
             horizontal: compact ? 12 : 14,
           ),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppTheme.darkBorder
-                : AppTheme.lightBorder,
+            color:
+                Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkBorder
+                    : AppTheme.lightBorder,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Center(
-            child: loading
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(
-                        theme.colorScheme.primary,
-                      ),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        icon,
-                        size: compact ? 14 : 16,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+            child:
+                loading
+                    ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(
+                          theme.colorScheme.primary,
                         ),
                       ),
-                    ],
-                  ),
+                    )
+                    : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          size: compact ? 14 : 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ),
@@ -304,31 +302,32 @@ class _GradientActionButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Center(
-            child: loading
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(
-                        theme.colorScheme.primary,
-                      ),
-                    ),
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(icon, size: 16, color: Colors.white),
-                      const SizedBox(width: 6),
-                      Text(
-                        label,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+            child:
+                loading
+                    ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(
+                          theme.colorScheme.primary,
                         ),
                       ),
-                    ],
-                  ),
+                    )
+                    : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(icon, size: 16, color: Colors.white),
+                        const SizedBox(width: 6),
+                        Text(
+                          label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ),

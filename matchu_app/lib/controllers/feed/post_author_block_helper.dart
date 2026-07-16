@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/services/user/user_service.dart';
@@ -32,8 +33,8 @@ class PostAuthorBlockHelper {
 
   static void _showError(String message) {
     Get.snackbar(
-      'Lỗi',
-      message,
+      PostTranslationKeys.error.tr,
+      postTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );

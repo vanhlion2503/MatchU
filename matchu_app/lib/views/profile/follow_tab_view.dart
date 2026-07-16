@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/controllers/profile/other_profile_controller.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/theme/app_theme.dart';
@@ -87,10 +87,7 @@ class _FollowTabViewState extends State<FollowTabView>
                   unselectedLabelColor: theme.textTheme.bodySmall?.color,
                   indicatorColor: theme.colorScheme.onSurface,
                   dividerColor: Colors.transparent, // Quan trọng
-                  tabs: const [
-                    Tab(text: "Theo dõi"),
-                    Tab(text: "Đã theo dõi"),
-                  ],
+                  tabs: [Tab(text: "Theo dõi".tr), Tab(text: "Đã theo dõi".tr)],
                 );
               },
             ),

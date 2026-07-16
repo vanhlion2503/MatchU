@@ -4,7 +4,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 Widget lightningIcon(BuildContext context) {
   final theme = Theme.of(context);
   final isDark = theme.brightness == Brightness.dark;
-  
+
   return Container(
     width: 36,
     height: 36,
@@ -13,15 +13,10 @@ Widget lightningIcon(BuildContext context) {
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: isDark
-            ? [
-                AppTheme.darkSurface,
-                AppTheme.darkBackground,
-              ]
-            : [
-                AppTheme.lightSurface,
-                AppTheme.lightBackground,
-              ],
+        colors:
+            isDark
+                ? [AppTheme.darkSurface, AppTheme.darkBackground]
+                : [AppTheme.lightSurface, AppTheme.lightBackground],
       ),
     ),
     child: Center(

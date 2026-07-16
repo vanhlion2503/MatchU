@@ -1,5 +1,1 @@
-enum MessageStatus {
-  sending,
-  sent,
-  seen,
-}
+enum MessageStatus { sending, sent, seen }

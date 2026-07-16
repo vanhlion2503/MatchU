@@ -86,7 +86,6 @@ class AnonymousAvatarController extends GetxController {
     }
   }
 
-
   void _reset() {
     avatars.clear();
     selectedAvatar.value = null;
@@ -142,7 +141,6 @@ class AnonymousAvatarController extends GetxController {
     _listenUserDoc(uid);
   }
 
-
   /// ===== CHỌN + LƯU AVATAR =====
   Future<void> selectAndSave(String avatarKey) async {
     selectedAvatar.value = avatarKey;
@@ -164,11 +162,7 @@ class AnonymousAvatarController extends GetxController {
 
   void _listenUserDoc(String uid) {
     _userSub?.cancel();
-    _userSub = _db
-        .collection("users")
-        .doc(uid)
-        .snapshots()
-        .listen((snap) {
+    _userSub = _db.collection("users").doc(uid).snapshots().listen((snap) {
       if (!snap.exists) return;
       final data = snap.data();
       if (data == null) return;

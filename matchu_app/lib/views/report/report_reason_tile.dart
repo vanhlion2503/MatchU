@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import '../../../models/report_reason.dart';
 
@@ -24,16 +24,18 @@ class ReportReasonTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: selected
-              ? AppTheme.errorColor.withOpacity(0.06)
-              : theme.colorScheme.surface,
+          color:
+              selected
+                  ? AppTheme.errorColor.withOpacity(0.06)
+                  : theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? AppTheme.errorColor.withOpacity(0.4)
-                : Theme.of(context).brightness == Brightness.dark 
-                            ? AppTheme.darkBorder 
-                            : AppTheme.lightBorder,
+            color:
+                selected
+                    ? AppTheme.errorColor.withOpacity(0.4)
+                    : Theme.of(context).brightness == Brightness.dark
+                    ? AppTheme.darkBorder
+                    : AppTheme.lightBorder,
           ),
         ),
         child: Row(
@@ -43,16 +45,18 @@ class ReportReasonTile extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: selected
-                    ? AppTheme.errorColor.withOpacity(0.05)
-                    : theme.scaffoldBackgroundColor,
+                color:
+                    selected
+                        ? AppTheme.errorColor.withOpacity(0.05)
+                        : theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 reason.icon,
-                color: selected
-                    ? AppTheme.errorColor
-                    : theme.colorScheme.onSurface,
+                color:
+                    selected
+                        ? AppTheme.errorColor
+                        : theme.colorScheme.onSurface,
                 size: 20,
               ),
             ),
@@ -61,20 +65,13 @@ class ReportReasonTile extends StatelessWidget {
 
             // TEXT
             Expanded(
-              child: Text(
-                reason.title,
-                style: theme.textTheme.bodyMedium,
-              ),
+              child: Text(reason.title, style: theme.textTheme.bodyMedium),
             ),
 
             // RADIO
             Icon(
-              selected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
-              color: selected
-                  ? AppTheme.errorColor
-                  : Colors.grey,
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: selected ? AppTheme.errorColor : Colors.grey,
             ),
           ],
         ),

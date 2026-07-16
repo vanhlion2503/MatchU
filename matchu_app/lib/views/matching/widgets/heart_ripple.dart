@@ -10,7 +10,6 @@ class HeartRipple extends StatefulWidget {
 
 class _HeartRippleState extends State<HeartRipple>
     with SingleTickerProviderStateMixin {
-
   late final AnimationController _controller;
 
   @override
@@ -28,12 +27,13 @@ class _HeartRippleState extends State<HeartRipple>
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return ScaleTransition(
-      scale: Tween(begin: 0.9, end: 1.1)
-          .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
+      scale: Tween(
+        begin: 0.9,
+        end: 1.1,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
       child: Container(
         width: 55,
         height: 55,
@@ -41,10 +41,7 @@ class _HeartRippleState extends State<HeartRipple>
           color: Colors.pink,
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(
-              blurRadius: 20,
-              color: Colors.pink.withOpacity(0.4),
-            )
+            BoxShadow(blurRadius: 20, color: Colors.pink.withOpacity(0.4)),
           ],
         ),
         child: const Icon(Iconsax.heart5, color: Colors.white),

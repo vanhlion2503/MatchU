@@ -1,8 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/models/word_chain.dart';
@@ -14,10 +15,7 @@ import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_winner_vie
 class WordChainPlayingBar extends StatefulWidget {
   final TempChatController controller;
 
-  const WordChainPlayingBar({
-    super.key,
-    required this.controller,
-  });
+  const WordChainPlayingBar({super.key, required this.controller});
 
   @override
   State<WordChainPlayingBar> createState() => _WordChainPlayingBarState();
@@ -85,13 +83,13 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
       }
     });
 
-    _autoAcceptWorker =
-        ever<DateTime?>(wordChain.rewardCompletedAt, (completedAt) {
+    _autoAcceptWorker = ever<DateTime?>(wordChain.rewardCompletedAt, (
+      completedAt,
+    ) {
       if (!mounted || completedAt == null) return;
       final reason = wordChain.rewardAutoAcceptedReason.value;
       if (reason == null) return;
-      if (_lastAutoAcceptAt == completedAt &&
-          _lastAutoAcceptReason == reason) {
+      if (_lastAutoAcceptAt == completedAt && _lastAutoAcceptReason == reason) {
         return;
       }
       _lastAutoAcceptAt = completedAt;
@@ -99,8 +97,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
       _showAutoAcceptNotice(reason);
     });
 
-    _invalidReasonWorker =
-        ever<String?>(wordChain.invalidReason, (reason) {
+    _invalidReasonWorker = ever<String?>(wordChain.invalidReason, (reason) {
       if (!mounted || reason == null || reason.isEmpty) return;
       if (!_awaitingSubmitAck) return;
       _clearPendingSubmit();
@@ -113,8 +110,9 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
       }
     });
 
-    _pendingWordWorker =
-        ever<Map<String, dynamic>?>(wordChain.pendingWord, (pending) {
+    _pendingWordWorker = ever<Map<String, dynamic>?>(wordChain.pendingWord, (
+      pending,
+    ) {
       if (!mounted || pending != null) return;
       if (!_awaitingSubmitAck) return;
       final reason = wordChain.invalidReason.value;
@@ -299,8 +297,8 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     }
 
     Get.snackbar(
-      "Thông báo",
-      message,
+      MatchingChatTranslationKeys.notice.tr,
+      matchingChatTr(message),
       snackPosition: SnackPosition.TOP,
       duration: const Duration(seconds: 2),
     );
@@ -360,9 +358,10 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     );
 
     if (!valid) {
-      final expected = prefix.isNotEmpty
-          ? prefix
-          : _lastWordPrefix(wordChain.currentWord.value);
+      final expected =
+          prefix.isNotEmpty
+              ? prefix
+              : _lastWordPrefix(wordChain.currentWord.value);
       _showErrorFeedback(
         expected.isEmpty
             ? 'Từ mới cần nối tiếp theo từ trước nhé!'
@@ -399,8 +398,8 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
     if (word == null || word.isEmpty) {
       if (!mounted) return;
       Get.snackbar(
-        "Thông báo",
-        "Không tìm được từ phù hợp",
+        MatchingChatTranslationKeys.notice.tr,
+        matchingChatTr("Không tìm được từ phù hợp"),
         snackPosition: SnackPosition.TOP,
         duration: const Duration(seconds: 2),
       );
@@ -427,10 +426,7 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
       builder: (context) {
         final theme = Theme.of(context);
         return AlertDialog(
-          title: Text(
-            "Sử dụng SOS?",
-            style: theme.textTheme.headlineMedium,
-          ),
+          title: Text("Sử dụng SOS?", style: theme.textTheme.headlineMedium),
           content: Text(
             "SOS chỉ được dùng 1 lần duy nhất trong 1 ván, bạn hãy cân nhắc kĩ.",
             style: theme.textTheme.bodyMedium,

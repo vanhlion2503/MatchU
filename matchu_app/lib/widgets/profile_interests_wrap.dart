@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
+import 'package:matchu_app/utils/interest_tags.dart';
 
 class ProfileInterestsWrap extends StatelessWidget {
   const ProfileInterestsWrap({
@@ -27,7 +28,7 @@ class ProfileInterestsWrap extends StatelessWidget {
           children: interests
               .map(
                 (tag) => Chip(
-                  label: Text(tag),
+                  label: Text(InterestTags.localizedLabel(tag)),
                   visualDensity: VisualDensity.compact,
                 ),
               )

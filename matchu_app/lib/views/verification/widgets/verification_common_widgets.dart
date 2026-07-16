@@ -21,13 +21,15 @@ class FaceVerificationGlassIconButton extends StatelessWidget {
         height: 42,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: isDark
-                ? Colors.white.withValues(alpha: 0.14)
-                : const Color(0xFFE2E8F0),
+          color:
+              isDark
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : const Color(0xFFE2E8F0),
           border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.14)
-                : const Color(0xFFE2E8F0),
+            color:
+                isDark
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : const Color(0xFFE2E8F0),
           ),
         ),
         child: Icon(
@@ -39,7 +41,6 @@ class FaceVerificationGlassIconButton extends StatelessWidget {
     );
   }
 }
-
 
 class FaceVerificationSoftCircle extends StatelessWidget {
   const FaceVerificationSoftCircle({

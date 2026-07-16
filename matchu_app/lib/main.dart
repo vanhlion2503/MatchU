@@ -18,6 +18,8 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/system/theme_controller.dart';
+import 'package:matchu_app/controllers/system/language_controller.dart';
+import 'package:matchu_app/translations/app_translations.dart';
 import 'package:matchu_app/widgets/global_matching_bubble.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 
@@ -98,6 +100,7 @@ void main() async {
 
   // ✅ 5. GLOBAL CONTROLLERS
   Get.put(ThemeController(), permanent: true);
+  Get.put(LanguageController(), permanent: true);
   Get.put(AuthController(), permanent: true);
   Get.put(AuthGateController(), permanent: true);
   Get.put(AppLifecycleController(), permanent: true);
@@ -119,6 +122,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeC = Get.find<ThemeController>();
+    final languageC = Get.find<LanguageController>();
 
     return Obx(
       () => GetMaterialApp(
@@ -126,6 +130,9 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: themeC.currentTheme,
+        translations: AppTranslations(),
+        locale: languageC.locale,
+        fallbackLocale: const Locale('vi', 'VN'),
         initialRoute: AppPages.initial,
         getPages: AppPages.routes,
         debugShowCheckedModeBanner: false,

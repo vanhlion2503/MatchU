@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/notification/notification_inbox_controller.dart';
@@ -366,7 +366,7 @@ class _NotificationMoreMenu extends StatelessWidget {
     final canMuteAuthor = (notification.actorId ?? '').trim().isNotEmpty;
 
     return PopupMenuButton<_NotificationMenuAction>(
-      tooltip: 'Tùy chọn thông báo',
+      tooltip: 'Tùy chọn thông báo'.tr,
       icon: Icon(Icons.more_horiz, color: theme.iconTheme.color, size: 22),
       padding: EdgeInsets.zero,
       position: PopupMenuPosition.under,

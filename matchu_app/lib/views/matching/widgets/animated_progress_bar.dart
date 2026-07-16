@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 class AnimatedProgressBar extends StatelessWidget {
   final AnimationController controller;
 
-  const AnimatedProgressBar({
-    super.key,
-    required this.controller,
-  });
+  const AnimatedProgressBar({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -24,10 +21,7 @@ class AnimatedProgressBar extends StatelessWidget {
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF1CABFF),
-                      Color(0xFF5C6CFF),
-                    ],
+                    colors: [Color(0xFF1CABFF), Color(0xFF5C6CFF)],
                   ),
                 ),
               ),

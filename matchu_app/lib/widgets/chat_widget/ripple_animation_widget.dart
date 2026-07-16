@@ -36,18 +36,12 @@ class _RadarRipplePainter extends CustomPainter {
   final double progress;
   final Color color;
 
-  _RadarRipplePainter({
-    required this.progress,
-    required this.color,
-  });
+  _RadarRipplePainter({required this.progress, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     /// 🔥 TÂM CAO → LAN XUỐNG DƯỚI MẠNH
-    final center = Offset(
-      size.width / 2,
-      size.height / 2,
-    );
+    final center = Offset(size.width / 2, size.height / 2);
 
     /// 🔥 BÁN KÍNH RẤT LỚN
     final maxRadius = size.height * 1.4;
@@ -58,10 +52,11 @@ class _RadarRipplePainter extends CustomPainter {
       final radius = maxRadius * t;
       final opacity = (1 - t).clamp(0.0, 1.0);
 
-      final paint = Paint()
-        ..color = color.withOpacity(opacity * 0.18)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+      final paint =
+          Paint()
+            ..color = color.withOpacity(opacity * 0.18)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2;
 
       canvas.drawCircle(center, radius, paint);
     }
@@ -69,7 +64,6 @@ class _RadarRipplePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RadarRipplePainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.color != color;
+    return oldDelegate.progress != progress || oldDelegate.color != color;
   }
 }

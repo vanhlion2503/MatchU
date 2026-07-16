@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
+import 'package:matchu_app/translations/localized_material.dart';
 import 'package:intl/intl.dart';
+import 'package:get/get.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
@@ -186,6 +187,15 @@ String formatRelativeTime(
   }
 
   if (diff.inMinutes < 60) {
+    if (Get.locale?.languageCode == 'en') {
+      return _formatEnglishRelativeUnit(
+        diff.inMinutes,
+        'minute',
+        withSuffix,
+        compact,
+        'm',
+      );
+    }
     return _formatRelativeUnit(
       value: diff.inMinutes,
       fullUnit: 'ph\u00FAt',
@@ -196,6 +206,15 @@ String formatRelativeTime(
   }
 
   if (diff.inHours < 24) {
+    if (Get.locale?.languageCode == 'en') {
+      return _formatEnglishRelativeUnit(
+        diff.inHours,
+        'hour',
+        withSuffix,
+        compact,
+        'h',
+      );
+    }
     return _formatRelativeUnit(
       value: diff.inHours,
       fullUnit: 'gi\u1EDD',
@@ -206,6 +225,15 @@ String formatRelativeTime(
   }
 
   if (diff.inDays < 7) {
+    if (Get.locale?.languageCode == 'en') {
+      return _formatEnglishRelativeUnit(
+        diff.inDays,
+        'day',
+        withSuffix,
+        compact,
+        'd',
+      );
+    }
     return _formatRelativeUnit(
       value: diff.inDays,
       fullUnit: 'ng\u00E0y',
@@ -283,5 +311,17 @@ String _formatRelativeUnit({
 }
 
 String _justNowLabel() {
-  return 'V\u1EEBa xong';
+  return Get.locale?.languageCode == 'en' ? 'Just now' : 'V\u1EEBa xong';
+}
+
+String _formatEnglishRelativeUnit(
+  int value,
+  String unit,
+  bool withSuffix,
+  bool compact,
+  String compactUnit,
+) {
+  if (compact) return '$value$compactUnit';
+  final label = '$value $unit${value == 1 ? '' : 's'}';
+  return withSuffix ? '$label ago' : label;
 }

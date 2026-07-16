@@ -15,6 +15,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:share_plus/share_plus.dart' as share_plus;
+import 'package:matchu_app/translations/profile_translations.dart';
 
 class ProfileQrController extends GetxController with WidgetsBindingObserver {
   ProfileQrController();
@@ -290,9 +291,9 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
       final fileName = _buildQrImageFileName();
       final result = await share_plus.SharePlus.instance.share(
         share_plus.ShareParams(
-          title: 'Chia sẻ mã QR MatchU',
-          subject: 'Mã QR MatchU của tôi',
-          text: 'Quét mã QR này để thêm tôi làm bạn trên MatchU.',
+          title: profileTr('Chia sẻ mã QR MatchU'),
+          subject: profileTr('Mã QR MatchU của tôi'),
+          text: profileTr('Quét mã QR này để thêm tôi làm bạn trên MatchU.'),
           files: [
             share_plus.XFile.fromData(
               bytes,
@@ -507,8 +508,8 @@ class ProfileQrController extends GetxController with WidgetsBindingObserver {
     bool isError = false,
   }) {
     Get.snackbar(
-      title,
-      message,
+      profileTr(title),
+      profileTr(message),
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(16),
       backgroundColor:
