@@ -41,7 +41,7 @@ class MatchingController extends GetxController {
 
   String? currentSessionId;
 
-  StreamSubscription<QuerySnapshot>? _roomSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roomSub;
   StreamSubscription<List<ConnectivityResult>>? _netSub;
 
   final elapsedSeconds = 0.obs;
@@ -54,27 +54,6 @@ class MatchingController extends GetxController {
     super.onInit();
 
     _netSub = Connectivity().onConnectivityChanged.listen(_handleConnectivity);
-    _cleanupMyOldRooms();
-  }
-
-  Future<void> _cleanupMyOldRooms() async {
-    final uid = Get.find<AuthController>().user?.uid;
-    if (uid == null) return;
-
-    final snaps =
-        await _firestore
-            .collection('tempChats')
-            .where('participants', arrayContains: uid)
-            .where('status', isEqualTo: 'active')
-            .get();
-
-    for (final doc in snaps.docs) {
-      await doc.reference.update({
-        'status': 'ended',
-        'endedReason': 'app_restarted',
-        'endedAt': FieldValue.serverTimestamp(),
-      });
-    }
   }
 
   void _handleConnectivity(List<ConnectivityResult> results) async {
@@ -281,28 +260,6 @@ class MatchingController extends GetxController {
     return _buildQuotaPreviewFromData(data);
   }
 
-  Future<bool> _consumeQuotaOnSuccessfulMatch(String uid) async {
-    final userRef = _firestore.collection('users').doc(uid);
-
-    return _firestore.runTransaction<bool>((tx) async {
-      final snap = await tx.get(userRef);
-      if (!snap.exists) return false;
-
-      final data = snap.data() ?? <String, dynamic>{};
-      final quota = _buildQuotaPreviewFromData(data);
-      if (quota.isUnlimited) return true;
-      if (quota.remaining <= 0) return false;
-
-      final nextCount = quota.used + 1;
-      tx.set(userRef, {
-        _dailyMatchingCountField: nextCount,
-        _dailyMatchingDateField: _dateKey(DateTime.now()),
-      }, SetOptions(merge: true));
-
-      return true;
-    });
-  }
-
   void _resetMatchingState() {
     stopTimer();
     elapsedSeconds.value = 0;
@@ -396,21 +353,13 @@ class MatchingController extends GetxController {
       }
 
       await _roomSub?.cancel();
-      _roomSub = _firestore
-          .collection('tempChats')
-          .where('sessionIds', arrayContains: sessionId)
-          .where('status', isEqualTo: 'active')
-          .snapshots()
-          .listen((snapshot) {
-            for (final doc in snapshot.docs) {
-              final room = doc.data();
-              if (room['sessionA'] == sessionId ||
-                  room['sessionB'] == sessionId) {
-                _go(doc.id);
-                break;
-              }
-            }
-          });
+      _roomSub = _service.listenSession(fbUser.uid).listen((snapshot) {
+        final queue = snapshot.data();
+        if (queue == null || queue['sessionId'] != sessionId) return;
+        if (queue['status'] == 'matched' && queue['roomId'] is String) {
+          _go(queue['roomId'] as String);
+        }
+      });
     } catch (_) {
       await _roomSub?.cancel();
       _roomSub = null;
@@ -418,7 +367,11 @@ class MatchingController extends GetxController {
 
       final uid = Get.find<AuthController>().user?.uid;
       if (uid != null) {
-        await _service.forceUnlock(uid);
+        try {
+          await _service.forceUnlock(uid);
+        } catch (_) {
+          // The server queue expires automatically; keep the original error.
+        }
       }
 
       Get.snackbar(
@@ -439,27 +392,6 @@ class MatchingController extends GetxController {
     _isHandlingMatchFound = true;
 
     try {
-      final user = Get.find<AuthController>().user;
-      if (user != null) {
-        final consumed = await _consumeQuotaOnSuccessfulMatch(user.uid);
-        if (!consumed) {
-          await _firestore.collection('tempChats').doc(roomId).set({
-            'status': 'ended',
-            'endedBy': user.uid,
-            'endedReason': 'daily_matching_limit_reached',
-            'endedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-
-          await _service.forceUnlock(user.uid);
-          await stopMatching();
-
-          if (Get.currentRoute == _matchingRoute) {
-            Get.back();
-          }
-          return;
-        }
-      }
-
       stopTimer();
 
       isMatched.value = true;
@@ -471,11 +403,7 @@ class MatchingController extends GetxController {
       await _roomSub?.cancel();
       _roomSub = null;
 
-      if (user != null) {
-        await _service.forceUnlock(user.uid);
-      }
-
-      await Future.delayed(const Duration(milliseconds: 1500));
+      await Future.delayed(const Duration(milliseconds: 450));
       Get.offNamed('/tempChat', arguments: {'roomId': roomId});
     } finally {
       if (!isMatched.value) {
@@ -495,6 +423,7 @@ class MatchingController extends GetxController {
 
     await _roomSub?.cancel();
     _roomSub = null;
+    final sessionId = currentSessionId;
     currentSessionId = null;
     isSearching.value = false;
     isMatched.value = false;
@@ -508,7 +437,11 @@ class MatchingController extends GetxController {
     final user = Get.find<AuthController>().user;
     if (user == null) return;
 
-    await _service.dequeue(user.uid);
+    try {
+      await _service.dequeue(user.uid, sessionId: sessionId);
+    } catch (_) {
+      // UI stops immediately; the server expires an abandoned queue session.
+    }
   }
 
   // =========================================================
@@ -517,7 +450,7 @@ class MatchingController extends GetxController {
   @override
   void onClose() {
     _netSub?.cancel();
-    stopMatching();
+    unawaited(stopMatching());
     stopTimer();
     super.onClose();
   }

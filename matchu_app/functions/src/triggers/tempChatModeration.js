@@ -610,17 +610,6 @@ const moderateTempChatMessage = onDocumentCreated(
         return;
       }
 
-      await snap.ref.set(
-        {
-          status: "approved",
-          blockedBy: null,
-          reason: null,
-          warning: false,
-          aiScore: null,
-        },
-        { merge: true }
-      );
-
       let aiResult;
       try {
         aiResult = await callAiModeration(text);
@@ -630,7 +619,16 @@ const moderateTempChatMessage = onDocumentCreated(
           messageId,
           error: error?.message || String(error),
         });
-
+        await snap.ref.set(
+          {
+            status: "approved",
+            blockedBy: null,
+            reason: null,
+            warning: false,
+            aiScore: null,
+          },
+          { merge: true }
+        );
         return;
       }
 
@@ -639,7 +637,7 @@ const moderateTempChatMessage = onDocumentCreated(
         roomId,
         senderId,
         aiResult,
-        allowedBlockStatuses: ["approved", "pending"],
+        allowedBlockStatuses: ["pending"],
       });
     } catch (error) {
       console.error("Temp chat moderation crashed; fallback approve:", {

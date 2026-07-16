@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
+import 'package:matchu_app/utils/emoji_utils.dart';
 import 'package:matchu_app/views/chat/temp_chat/icon_action.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/quick_message_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_invite_bar.dart';
@@ -587,12 +588,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return false;
 
-    final emojiRegex = RegExp(
-      r'^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})+$',
-      unicode: true,
-    );
-
-    return emojiRegex.hasMatch(trimmed);
+    return isEmojiOnlyText(trimmed);
   }
 
   void _showGameSheet(BuildContext context) {

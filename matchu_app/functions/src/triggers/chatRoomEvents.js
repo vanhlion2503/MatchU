@@ -36,14 +36,18 @@ const migrateTempChatMessages = onDocumentCreated(
     for (const doc of tempMessagesSnap.docs) {
       const data = doc.data();
 
-      if (data.type === "system" || data.code) {
+      if (data.type === "system" || data.code || data.status !== "approved") {
         continue;
       }
 
-      const newMsgRef = snap.ref.collection("messages").doc();
+      // Reuse the temp message id so a trigger retry overwrites instead of
+      // duplicating migrated history.
+      const newMsgRef = snap.ref.collection("messages").doc(doc.id);
 
       batch.set(newMsgRef, {
         ...data,
+        migratedFromTemp: true,
+        sourceTempRoomId: tempRoomId,
         createdAt: data.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
       });
 

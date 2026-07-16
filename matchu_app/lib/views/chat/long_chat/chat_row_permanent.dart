@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/utils/reaction_registry.dart';
+import 'package:matchu_app/utils/emoji_utils.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
@@ -786,12 +787,7 @@ bool _isEmojiOnly(String text) {
   final trimmed = text.trim();
   if (trimmed.isEmpty) return false;
 
-  final emojiRegex = RegExp(
-    r'^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})+$',
-    unicode: true,
-  );
-
-  return emojiRegex.hasMatch(trimmed);
+  return isEmojiOnlyText(trimmed);
 }
 
 Map<String, int> _groupReactions(Map<String, String> reactions) {

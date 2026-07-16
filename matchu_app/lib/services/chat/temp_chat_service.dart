@@ -1,16 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
-import 'package:matchu_app/services/feed/post_restriction_service.dart';
 
+/// Repository for temp-room state and message operations.
+///
+/// Matching and permanent-room conversion are server-authoritative. Frequent
+/// room operations stay on Firestore so snapshots retain offline/optimistic UI.
 class TempChatService {
-  TempChatService({
-    FirebaseFirestore? db,
-    PostRestrictionService? restrictionService,
-  }) : _db = db ?? FirebaseFirestore.instance,
-       _restrictionService = restrictionService ?? PostRestrictionService();
+  TempChatService({FirebaseFirestore? db, FirebaseFunctions? functions})
+    : _db = db ?? FirebaseFirestore.instance,
+      _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFirestore _db;
-  final PostRestrictionService _restrictionService;
+  final FirebaseFunctions _functions;
   final Map<String, String> _typingKeyCache = {};
 
   static const Map<String, dynamic> _approvedSystemFields = {
@@ -30,11 +32,9 @@ class TempChatService {
   }
 
   Future<Map<String, dynamic>> getRoom(String roomId) async {
-    final snap = await _roomRef(roomId).get();
-    final data = snap.data();
-    if (data == null) {
-      throw StateError('Temp room not found: $roomId');
-    }
+    final snapshot = await _roomRef(roomId).get();
+    final data = snapshot.data();
+    if (data == null) throw StateError('Temp room not found: $roomId');
     return data;
   }
 
@@ -43,12 +43,13 @@ class TempChatService {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessages(String roomId) {
-    return _messagesRef(roomId).orderBy('createdAt').snapshots();
+    return _messagesRef(
+      roomId,
+    ).orderBy('createdAt').limitToLast(80).snapshots();
   }
 
-  Future<void> sendMessages(String roomId, TempMessageModel messages) async {
-    await _ensureCanInteract(roomId, messages.senderId);
-    await _messagesRef(roomId).add(messages.toJson());
+  Future<void> sendMessages(String roomId, TempMessageModel message) async {
+    await _messagesRef(roomId).add(message.toJson());
   }
 
   Future<void> setLike({
@@ -56,29 +57,25 @@ class TempChatService {
     required String uid,
     required bool value,
   }) async {
-    final ref = _roomRef(roomId);
+    final roomRef = _roomRef(roomId);
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(roomRef);
+      final room = snapshot.data();
+      if (room == null || room['status'] != 'active') return;
 
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) return;
-
-      final data = snap.data() ?? const <String, dynamic>{};
-      final userA = data['userA'];
-      final userB = data['userB'];
+      final userA = room['userA'];
+      final userB = room['userB'];
       if (userA is! String || userB is! String) return;
+      if (uid != userA && uid != userB) return;
 
       final isA = userA == uid;
       final otherUid = isA ? userB : userA;
-      final likeField = isA ? 'userALiked' : 'userBLiked';
-      final previous = data[likeField] == true;
+      final field = isA ? 'userALiked' : 'userBLiked';
+      if (room[field] == value) return;
 
-      // No state change => no write (prevents duplicate system messages).
-      if (previous == value) return;
-
-      tx.update(ref, {likeField: value});
-
-      if (value == true) {
-        tx.set(_messagesRef(roomId).doc(), {
+      transaction.update(roomRef, {field: value});
+      if (value) {
+        transaction.set(_messagesRef(roomId).doc(), {
           'type': 'system',
           'systemCode': 'like',
           'text': '❤️ Đối phương đã thích bạn',
@@ -96,23 +93,21 @@ class TempChatService {
     required String uid,
     required String reason,
   }) async {
-    final ref = _roomRef(roomId);
+    final roomRef = _roomRef(roomId);
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(roomRef);
+      final room = snapshot.data();
+      if (room == null || room['status'] != 'active') return;
+      final participants = List<String>.from(room['participants'] ?? const []);
+      if (!participants.contains(uid)) return;
 
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) return;
-
-      final data = snap.data() ?? const <String, dynamic>{};
-      if (data['status'] != 'active') return;
-
-      tx.update(ref, {
+      transaction.update(roomRef, {
         'status': 'ended',
         'endedBy': uid,
         'endedReason': reason,
         'endedAt': FieldValue.serverTimestamp(),
       });
-
-      tx.set(_messagesRef(roomId).doc(), {
+      transaction.set(_messagesRef(roomId).doc(), {
         'type': 'system',
         'event': 'ended',
         'text':
@@ -127,46 +122,15 @@ class TempChatService {
   }
 
   Future<String> convertToPermanent(String tempRoomId) async {
-    final tempRef = _roomRef(tempRoomId);
-    await _ensurePermanentConversionAllowed(tempRoomId);
-
-    return _db.runTransaction<String>((tx) async {
-      final tempSnap = await tx.get(tempRef);
-      if (!tempSnap.exists) {
-        throw StateError('Temp room not found');
-      }
-
-      final data = tempSnap.data() ?? const <String, dynamic>{};
-      final participants = List<String>.from(data['participants'] ?? const []);
-      if (participants.isEmpty) {
-        throw StateError('Temp room has no participants');
-      }
-
-      if (data['status'] == 'converted' && data['permanentRoomId'] != null) {
-        return data['permanentRoomId'] as String;
-      }
-
-      final newRoomRef = _db.collection('chatRooms').doc();
-
-      tx.set(newRoomRef, {
-        'participants': participants,
-        'createdAt': FieldValue.serverTimestamp(),
-        'fromTempRoom': tempRoomId,
-        'e2ee': true,
-        'lastMessage': '💬 Bắt đầu trò chuyện',
-        'lastMessageType': 'system',
-        'lastSenderId': null,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'unread': {for (final uid in participants) uid: 0},
-      });
-
-      tx.update(tempRef, {
-        'status': 'converted',
-        'permanentRoomId': newRoomRef.id,
-      });
-
-      return newRoomRef.id;
+    final result = await _functions.httpsCallable('convertTempChat').call({
+      'roomId': tempRoomId,
     });
+    final data = Map<String, dynamic>.from(result.data as Map);
+    final roomId = data['roomId']?.toString();
+    if (roomId == null || roomId.isEmpty) {
+      throw StateError('Permanent room was not created');
+    }
+    return roomId;
   }
 
   Future<void> sendSystemMessage({
@@ -185,58 +149,6 @@ class TempChatService {
     });
   }
 
-  Future<void> _ensureCanInteract(String roomId, String senderId) async {
-    final snap = await _roomRef(roomId).get();
-    final data = snap.data();
-    if (data == null) return;
-
-    final otherUid = _otherParticipant(data, senderId);
-    if (otherUid == null) return;
-
-    if (await _restrictionService.hasBlockRelationship(otherUid)) {
-      throw StateError(
-        'Kh\u00F4ng th\u1EC3 nh\u1EAFn tin v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
-      );
-    }
-  }
-
-  Future<void> _ensurePermanentConversionAllowed(String roomId) async {
-    final data = await getRoom(roomId);
-    final participants = List<String>.from(data['participants'] ?? const []);
-    final currentUid = _restrictionService.uid;
-    if (currentUid.isEmpty) return;
-
-    final otherUid = participants.firstWhere(
-      (participant) => participant.trim() != currentUid,
-      orElse: () => '',
-    );
-    if (otherUid.isEmpty) return;
-
-    if (await _restrictionService.hasBlockRelationship(otherUid)) {
-      throw StateError(
-        'Kh\u00F4ng th\u1EC3 chuy\u1EC3n sang chat d\u00E0i v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
-      );
-    }
-  }
-
-  String? _otherParticipant(Map<String, dynamic> roomData, String senderId) {
-    final participants = List<String>.from(
-      roomData['participants'] ?? const [],
-    );
-    final normalizedSenderId = senderId.trim();
-    if (normalizedSenderId.isEmpty) return null;
-
-    final otherUid =
-        participants
-            .firstWhere(
-              (participant) => participant.trim() != normalizedSenderId,
-              orElse: () => '',
-            )
-            .trim();
-
-    return otherUid.isEmpty ? null : otherUid;
-  }
-
   Future<String?> _resolveTypingField({
     required String roomId,
     required String uid,
@@ -244,19 +156,14 @@ class TempChatService {
     final cached = _typingKeyCache[roomId];
     if (cached != null) return cached;
 
-    final snap = await _roomRef(roomId).get();
-    final data = snap.data();
-    if (data == null) return null;
-
-    final userA = data['userA'];
-    final userB = data['userB'];
-    if (userA is! String || userB is! String) return null;
-
-    final key = userA == uid ? 'userA' : (userB == uid ? 'userB' : null);
-    if (key != null) {
-      _typingKeyCache[roomId] = key;
-    }
-    return key;
+    final snapshot = await _roomRef(roomId).get();
+    final room = snapshot.data();
+    if (room == null) return null;
+    final userA = room['userA'];
+    final userB = room['userB'];
+    final field = userA == uid ? 'userA' : (userB == uid ? 'userB' : null);
+    if (field != null) _typingKeyCache[roomId] = field;
+    return field;
   }
 
   Future<void> setTyping({
@@ -264,9 +171,9 @@ class TempChatService {
     required String uid,
     required bool typing,
   }) async {
-    final typingKey = await _resolveTypingField(roomId: roomId, uid: uid);
-    if (typingKey == null) return;
-    await _roomRef(roomId).update({'typing.$typingKey': typing});
+    final field = await _resolveTypingField(roomId: roomId, uid: uid);
+    if (field == null) return;
+    await _roomRef(roomId).update({'typing.$field': typing});
   }
 
   Future<void> toggleReaction({
@@ -275,23 +182,19 @@ class TempChatService {
     required String uid,
     required String reactionId,
   }) async {
-    final msgRef = _messagesRef(roomId).doc(messageId);
-
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(msgRef);
-      final data = snap.data();
-      if (data == null) return;
+    final messageRef = _messagesRef(roomId).doc(messageId);
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(messageRef);
+      final message = snapshot.data();
+      if (message == null || message['status'] != 'approved') return;
 
       final reactions = Map<String, dynamic>.from(
-        data['reactions'] ?? const {},
+        message['reactions'] ?? const {},
       );
-      final current = reactions[uid];
-
-      if (current == reactionId) {
-        tx.update(msgRef, {'reactions.$uid': FieldValue.delete()});
-      } else {
-        tx.update(msgRef, {'reactions.$uid': reactionId});
-      }
+      transaction.update(messageRef, {
+        'reactions.$uid':
+            reactions[uid] == reactionId ? FieldValue.delete() : reactionId,
+      });
     });
   }
 }

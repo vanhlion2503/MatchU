@@ -82,6 +82,14 @@ const {
   moderateTempChatMessage,
 } = require("./src/triggers/tempChatModeration");
 const {
+  startTempChatMatching,
+  cancelTempChatMatching,
+  convertTempChat,
+  expireTempChatSessions,
+  cleanupExpiredMatchingSessions,
+  releaseEndedTempChatParticipants,
+} = require("./src/callables/tempChatSession");
+const {
   ensureUserReputationDailyDefaults,
   progressTempChat3Rooms3MinutesTask,
   progressMutualLikeLongChat5TimesTask,
@@ -158,3 +166,9 @@ exports.progressLike5PostsComment5TimesOnPostLike =
 exports.progressLike5PostsComment5TimesOnComment =
   progressLike5PostsComment5TimesOnComment;
 exports.moderateTempChatMessage = moderateTempChatMessage;
+exports.startTempChatMatching = startTempChatMatching;
+exports.cancelTempChatMatching = cancelTempChatMatching;
+exports.convertTempChat = convertTempChat;
+exports.expireTempChatSessions = expireTempChatSessions;
+exports.cleanupExpiredMatchingSessions = cleanupExpiredMatchingSessions;
+exports.releaseEndedTempChatParticipants = releaseEndedTempChatParticipants;

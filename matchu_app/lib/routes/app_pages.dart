@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/bindings/feed/post_detail_binding.dart';
 import 'package:matchu_app/bindings/notification/notification_inbox_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
+import 'package:matchu_app/bindings/chat/temp_chat_binding.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
@@ -46,7 +47,6 @@ import 'package:matchu_app/views/home_view.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/views/main_view.dart';
 import 'package:matchu_app/views/welcome_view.dart';
-import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/temp_chat_view.dart';
 
 class AppPages {
@@ -173,13 +173,7 @@ class AppPages {
       binding: FaceVerificationBinding(),
     ),
 
-    GetPage(
-      name: AppRouter.matching,
-      page: () => MatchingView(),
-      binding: BindingsBuilder(() {
-        Get.put(MatchingController());
-      }),
-    ),
+    GetPage(name: AppRouter.matching, page: () => MatchingView()),
 
     GetPage(
       name: AppRouter.rating,
@@ -197,7 +191,11 @@ class AppPages {
     ),
 
     /// TEMP CHAT ROOM
-    GetPage(name: AppRouter.tempChat, page: () => TempChatView()),
+    GetPage(
+      name: AppRouter.tempChat,
+      page: () => const TempChatView(),
+      binding: TempChatBinding(),
+    ),
 
     GetPage(
       name: AppRouter.chat,

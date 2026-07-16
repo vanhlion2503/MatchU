@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
@@ -54,23 +52,11 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
       // ===============================
       // 1️⃣ CONVERT TEMP → PERMANENT
       // ===============================
-      final newRoomId =
-          await service.convertToPermanent(widget.tempRoomId);
+      final newRoomId = await service.convertToPermanent(widget.tempRoomId);
 
       // ===============================
       // 2️⃣ INIT E2EE SESSION KEY
       // ===============================
-      final tempSnap = await FirebaseFirestore.instance
-          .collection("tempChats")
-          .doc(widget.tempRoomId)
-          .get();
-
-      final participants =
-          List<String>.from(tempSnap.data()!["participants"]);
-
-      final myUid = FirebaseAuth.instance.currentUser!.uid;
-      final otherUid = participants.firstWhere((e) => e != myUid);
-
       // ===============================
       // 3️⃣ GIỮ ANIMATION MƯỢT
       // ===============================
@@ -80,19 +66,13 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
       // ===============================
       // 4️⃣ ĐI SANG CHAT LÂU DÀI
       // ===============================
-      Get.offNamed(
-        "/chat",
-        arguments: {
-          "roomId": newRoomId,
-        },
-      );
+      Get.offNamed("/chat", arguments: {"roomId": newRoomId});
     } catch (e) {
       if (!mounted) return;
       Get.snackbar("Lỗi", "Không thể tạo phòng chat");
       Get.back();
     }
   }
-
 
   @override
   void dispose() {
@@ -122,19 +102,17 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                       -1.2 + _bgController.value * 0.2,
                       -1.1,
                     ),
-                    color: Colors.blue.withOpacity(0.35),
+                    color: Colors.blue.withValues(alpha: 0.35),
                   ),
                   _blurCircle(
-                    alignment: Alignment(
-                      1.2 - _bgController.value * 0.2,
-                      1.1,
-                    ),
-                    color: Colors.indigo.withOpacity(0.35),
+                    alignment: Alignment(1.2 - _bgController.value * 0.2, 1.1),
+                    color: Colors.indigo.withValues(alpha: 0.35),
                   ),
                 ],
               );
             },
           ),
+
           /// ===== CONTENT =====
           SafeArea(
             child: Center(
@@ -146,10 +124,8 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                     final maxH = MediaQuery.of(context).size.height;
                     // final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-                    final avatarSize =
-                        (maxW * 0.22).clamp(60.0, 92.0);
-                    final avatarOffset =
-                        (maxW * 0.18).clamp(40.0, 90.0);
+                    final avatarSize = (maxW * 0.22).clamp(60.0, 92.0);
+                    final avatarOffset = (maxW * 0.18).clamp(40.0, 90.0);
 
                     return ConstrainedBox(
                       constraints: BoxConstraints(
@@ -214,15 +190,17 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                             constraints: const BoxConstraints(maxWidth: 360),
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color:
-                                  theme.colorScheme.surface.withOpacity(0.95),
+                              color: theme.colorScheme.surface.withValues(
+                                alpha: 0.95,
+                              ),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
                                   blurRadius: 20,
-                                  color: theme.colorScheme.primary
-                                      .withOpacity(0.12),
-                                )
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
+                                ),
                               ],
                             ),
                             child: Column(
@@ -237,8 +215,8 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                                         overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -246,10 +224,9 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                                       "Đang chuyển hướng…",
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
-                                        color:
-                                            theme.colorScheme.primary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                            color: theme.colorScheme.primary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -262,23 +239,23 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
                                 ),
                                 const SizedBox(height: 16),
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       Iconsax.lock,
                                       size: 14,
-                                      color: theme.colorScheme
-                                          .onSurfaceVariant,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
                                       "Đang thiết lập kết nối an toàn",
                                       style: theme.textTheme.labelMedium
                                           ?.copyWith(
-                                        color: theme.colorScheme
-                                            .onSurfaceVariant,
-                                      ),
+                                            color:
+                                                theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -293,25 +270,18 @@ class _MatchTransitionViewState extends State<MatchTransitionView>
               ),
             ),
           ),
-
         ],
       ),
     );
   }
 
-  Widget _blurCircle({
-    required Alignment alignment,
-    required Color color,
-  }) {
+  Widget _blurCircle({required Alignment alignment, required Color color}) {
     return Align(
       alignment: alignment,
       child: Container(
         width: 260,
         height: 260,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-        ),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
     );
   }

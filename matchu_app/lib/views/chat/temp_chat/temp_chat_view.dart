@@ -34,7 +34,7 @@ class _TempChatViewState extends State<TempChatView> {
 
     final args = Get.arguments as Map<String, dynamic>;
     roomId = args["roomId"] as String;
-    controller = Get.put(TempChatController(roomId), tag: roomId);
+    controller = Get.find<TempChatController>(tag: roomId);
 
     _telepathyStatusWorker = ever<TelepathyStatus>(
       controller.telepathy.status,
@@ -87,7 +87,7 @@ class _TempChatViewState extends State<TempChatView> {
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        backgroundColor: theme.colorScheme.surface.withOpacity(0.95),
+        backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
 
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4), // chiều cao progress bar
@@ -105,7 +105,7 @@ class _TempChatViewState extends State<TempChatView> {
               width: double.infinity,
               child: LinearProgressIndicator(
                 value: progress,
-                backgroundColor: theme.dividerColor.withOpacity(0.25),
+                backgroundColor: theme.dividerColor.withValues(alpha: 0.25),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             );
@@ -199,7 +199,7 @@ class _TempChatViewState extends State<TempChatView> {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.18),
+                              color: Colors.amber.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
@@ -263,7 +263,7 @@ class _TempChatViewState extends State<TempChatView> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: color),
                 ),

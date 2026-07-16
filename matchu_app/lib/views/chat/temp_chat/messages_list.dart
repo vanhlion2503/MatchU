@@ -100,13 +100,7 @@ class _MessagesListState extends State<MessagesList> {
     final roomId = widget.roomId;
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream:
-          FirebaseFirestore.instance
-              .collection("tempChats")
-              .doc(roomId)
-              .collection("messages")
-              .orderBy("createdAt")
-              .snapshots(),
+      stream: controller.service.listenMessages(roomId),
       builder: (context, snap) {
         // Auto scroll khi có tin nhắn mới
         if (snap.hasData) {

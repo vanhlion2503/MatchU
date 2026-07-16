@@ -23,12 +23,11 @@ enum QuickMessagePhase {
 
 class TempChatController extends GetxController {
   final String roomId;
-  TempChatController(this.roomId);
+  TempChatController(this.roomId, {TempChatService? service})
+    : service = service ?? TempChatService();
 
-  final TempChatService service = TempChatService();
+  final TempChatService service;
   final uid = Get.find<AuthController>().user!.uid;
-  final _db = FirebaseFirestore.instance;
-
   final remainingSeconds = 420.obs;
   final userLiked = RxnBool();
   final otherLiked = RxnBool();
@@ -57,12 +56,14 @@ class TempChatController extends GetxController {
   bool _roomIsActive = true;
   int _lastMessageCount = 0;
   int? _lastHapticSecond;
+  int _lastTimerSecond = 421;
   bool _hasNavigatedToMatch = false;
 
   Timer? _typingTimer;
   Timer? _timer;
   StreamSubscription? _roomSub;
-  StreamSubscription? _avatarSub;
+  final List<Worker> _workers = [];
+  DateTime? _expiresAt;
   VoidCallback? onOtherLiked;
   final currentQuickMessages = <QuickMessage>[].obs;
 
@@ -118,40 +119,42 @@ class TempChatController extends GetxController {
   void onInit() {
     super.onInit();
     telepathy = Get.put(TelepathyController(roomId), tag: roomId);
-    ever<TelepathyStatus>(telepathy.status, (status) {
-      if (_telepathyAccepted) return;
-      if (status == TelepathyStatus.countdown ||
-          status == TelepathyStatus.playing ||
-          status == TelepathyStatus.revealing ||
-          status == TelepathyStatus.finished) {
-        _telepathyAccepted = true;
-      }
-    });
+    _workers.add(
+      ever<TelepathyStatus>(telepathy.status, (status) {
+        if (_telepathyAccepted) return;
+        if (status == TelepathyStatus.countdown ||
+            status == TelepathyStatus.playing ||
+            status == TelepathyStatus.revealing ||
+            status == TelepathyStatus.finished) {
+          _telepathyAccepted = true;
+        }
+      }),
+    );
     wordChain = Get.put(WordChainController(roomId), tag: roomId);
-    ever<WordChainStatus>(wordChain.status, (status) {
-      if (status == WordChainStatus.inviting) {
-        _wordChainAutoInviteTriggered = true;
-      }
-      if (status == WordChainStatus.countdown ||
-          status == WordChainStatus.playing ||
-          status == WordChainStatus.reward ||
-          status == WordChainStatus.finished) {
-        _wordChainAutoInviteLocked = true;
-      }
-    });
+    _workers.add(
+      ever<WordChainStatus>(wordChain.status, (status) {
+        if (status == WordChainStatus.inviting) {
+          _wordChainAutoInviteTriggered = true;
+        }
+        if (status == WordChainStatus.countdown ||
+            status == WordChainStatus.playing ||
+            status == WordChainStatus.reward ||
+            status == WordChainStatus.finished) {
+          _wordChainAutoInviteLocked = true;
+        }
+      }),
+    );
     _setupWordChainInviteMoment();
     _startTimer();
     _listenRoom();
-    _loadOtherUserRating();
-    _saveMyAnonymousAvatarToRoom();
-    _listenAnonymousAvatars();
+    unawaited(_loadOtherUserRating().catchError((_) {}));
     // Listen typing ?? auto scroll
     currentQuickMessages.assignAll(_introMessages);
 
     // Sau 20s ??i sang c?u h?i
     quickPhase.value = QuickMessagePhase.intro;
     currentQuickMessages.assignAll(_introMessages);
-    ever<bool>(otherTyping, _onOtherTypingChanged);
+    _workers.add(ever<bool>(otherTyping, _onOtherTypingChanged));
   }
 
   List<QuickMessage> _pickRandomIceBreakers({int min = 6, int max = 7}) {
@@ -236,14 +239,27 @@ class TempChatController extends GetxController {
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      remainingSeconds.value--;
+      final expiresAt = _expiresAt;
+      if (expiresAt == null) return;
+      final remainingMs = expiresAt.difference(DateTime.now()).inMilliseconds;
+      remainingSeconds.value =
+          remainingMs <= 0 ? 0 : ((remainingMs + 999) ~/ 1000);
 
       final sec = remainingSeconds.value;
       if (!_telepathyAccepted) {
         // 🔥 CHECK CÁC MỐC INVITE
-        if (_telepathyInviteMoments.contains(sec) &&
-            !_telepathyShownMoments.contains(sec)) {
-          _telepathyShownMoments.add(sec);
+        final crossedMoments =
+            _telepathyInviteMoments
+                .where(
+                  (moment) =>
+                      sec <= moment &&
+                      _lastTimerSecond > moment &&
+                      !_telepathyShownMoments.contains(moment),
+                )
+                .toList();
+        _lastTimerSecond = sec;
+        if (crossedMoments.isNotEmpty) {
+          _telepathyShownMoments.addAll(crossedMoments);
 
           final room = await service.getRoom(roomId);
           final isA = room["userA"] == uid;
@@ -260,14 +276,12 @@ class TempChatController extends GetxController {
 
       await _maybeAutoInviteWordChain(sec);
 
-      if (_telepathyAccepted) return;
-
       if (sec <= 10 && sec > 0 && _lastHapticSecond != sec) {
         _lastHapticSecond = sec;
         HapticFeedback.lightImpact();
       }
 
-      if (sec == 30 && hasSent30sWarning.value == false) {
+      if (sec <= 30 && sec > 0 && hasSent30sWarning.value == false) {
         hasSent30sWarning.value = true;
 
         final room = await service.getRoom(roomId);
@@ -284,7 +298,7 @@ class TempChatController extends GetxController {
       }
       if (sec <= 0) {
         _timer?.cancel();
-        endRoom("timeout");
+        unawaited(endRoom("timeout").catchError((_) {}));
       }
     });
   }
@@ -366,10 +380,17 @@ class TempChatController extends GetxController {
     _roomSub = service.listenRoom(roomId).listen((doc) async {
       if (!doc.exists) return;
       final data = doc.data() as Map<String, dynamic>;
+      _syncServerExpiry(data);
       _roomStatusKnown = true;
       _roomIsActive = data["status"] == "active";
       final typing = data["typing"] ?? {};
       final isA = data["userA"] == uid;
+
+      final avatars = Map<String, dynamic>.from(
+        data["anonymousAvatars"] ?? const {},
+      );
+      final otherUid = isA ? data["userB"] : data["userA"];
+      otherAnonymousAvatar.value = avatars[otherUid]?.toString();
 
       otherTyping.value =
           isA ? typing["userB"] == true : typing["userA"] == true;
@@ -391,6 +412,8 @@ class TempChatController extends GetxController {
       if (data["status"] == "ended") {
         if (_hasNavigatedToMatch) return;
         if (hasLeft.value == true) return;
+        _hasNavigatedToMatch = true;
+        await _roomSub?.cancel();
 
         final matchController = Get.find<MatchingController>();
         matchController.isMatched.value = false;
@@ -423,6 +446,10 @@ class TempChatController extends GetxController {
       if (data["userALiked"] == true &&
           data["userBLiked"] == true &&
           data["status"] == "active") {
+        if (_hasNavigatedToMatch) return;
+        _hasNavigatedToMatch = true;
+        await _roomSub?.cancel();
+
         final matchController = Get.find<MatchingController>();
         matchController.isMatched.value = false;
 
@@ -431,23 +458,24 @@ class TempChatController extends GetxController {
         final userB = data["userB"];
         final toUid = myUid == userA ? userB : userA;
 
-        await RatingService.autoRate(
-          roomId: roomId,
-          fromUid: myUid,
-          toUid: toUid,
-        );
-        if (_hasNavigatedToMatch) return;
-        _hasNavigatedToMatch = true;
-
-        await _roomSub?.cancel();
+        try {
+          await RatingService.autoRate(
+            roomId: roomId,
+            fromUid: myUid,
+            toUid: toUid,
+          );
+        } catch (_) {
+          // Rating must not block a successful mutual match transition.
+        }
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Get.off(
             () => MatchTransitionView(
               tempRoomId: roomId, // 👈 CHỈ TRUYỀN TEMP ROOM
               myAvatar:
-                  Get.find<AnonymousAvatarController>().selectedAvatar.value!,
-              otherAvatar: otherAnonymousAvatar.value!,
+                  Get.find<AnonymousAvatarController>().selectedAvatar.value ??
+                  'avt_01',
+              otherAvatar: otherAnonymousAvatar.value ?? 'avt_01',
             ),
           );
         });
@@ -616,20 +644,20 @@ class TempChatController extends GetxController {
 
     if (hasText && !isTyping.value) {
       isTyping.value = true;
-      service.setTyping(roomId: roomId, uid: uid, typing: true);
+      _setTypingSafely(true);
     }
 
     _typingTimer?.cancel();
 
     if (!hasText) {
       isTyping.value = false;
-      service.setTyping(roomId: roomId, uid: uid, typing: false);
+      _setTypingSafely(false);
       return;
     }
 
     _typingTimer = Timer(const Duration(seconds: 3), () {
       isTyping.value = false;
-      service.setTyping(roomId: roomId, uid: uid, typing: false);
+      _setTypingSafely(false);
     });
   }
 
@@ -639,18 +667,30 @@ class TempChatController extends GetxController {
     isTyping.value = false;
     _typingTimer?.cancel();
 
-    service.setTyping(roomId: roomId, uid: uid, typing: false);
+    _setTypingSafely(false);
   }
 
   // ================= REACTION =================
   void onReactMessage({required String messageId, required String reactionId}) {
     if (!_canUseRoomActions) return;
 
-    service.toggleReaction(
-      roomId: roomId,
-      messageId: messageId,
-      uid: uid,
-      reactionId: reactionId,
+    unawaited(
+      service
+          .toggleReaction(
+            roomId: roomId,
+            messageId: messageId,
+            uid: uid,
+            reactionId: reactionId,
+          )
+          .catchError((_) {}),
+    );
+  }
+
+  void _setTypingSafely(bool typing) {
+    unawaited(
+      service
+          .setTyping(roomId: roomId, uid: uid, typing: typing)
+          .catchError((_) {}),
     );
   }
 
@@ -676,30 +716,18 @@ class TempChatController extends GetxController {
     otherIsFaceVerified.value = data["isFaceVerified"] == true;
   }
 
-  Future<void> _saveMyAnonymousAvatarToRoom() async {
-    final anonAvatarC = Get.find<AnonymousAvatarController>();
-    final myAvatar = anonAvatarC.selectedAvatar.value;
+  void _syncServerExpiry(Map<String, dynamic> room) {
+    final expiresAt = room['expiresAt'];
+    if (expiresAt is Timestamp) {
+      _expiresAt = expiresAt.toDate();
+      return;
+    }
 
-    if (myAvatar == null) return;
-
-    await _db.collection("tempChats").doc(roomId).update({
-      "anonymousAvatars.$uid": myAvatar,
-    });
-  }
-
-  void _listenAnonymousAvatars() {
-    _avatarSub = _db.collection("tempChats").doc(roomId).snapshots().listen((
-      doc,
-    ) {
-      if (!doc.exists) return;
-
-      final data = doc.data()!;
-      final avatars = Map<String, dynamic>.from(data["anonymousAvatars"] ?? {});
-      final participants = List<String>.from(data["participants"]);
-
-      final otherUid = participants.firstWhere((e) => e != uid);
-      otherAnonymousAvatar.value = avatars[otherUid];
-    });
+    // Compatibility for rooms created before expiresAt was introduced.
+    final createdAt = room['createdAt'];
+    if (createdAt is Timestamp) {
+      _expiresAt = createdAt.toDate().add(const Duration(minutes: 7));
+    }
   }
 
   void cleanupMessageKeys(Set<String> aliveIds) {
@@ -712,11 +740,14 @@ class TempChatController extends GetxController {
 
   @override
   void onClose() {
-    service.setTyping(roomId: roomId, uid: uid, typing: false);
+    _setTypingSafely(false);
     _typingTimer?.cancel();
     _timer?.cancel();
     _roomSub?.cancel();
-    _avatarSub?.cancel();
+    for (final worker in _workers) {
+      worker.dispose();
+    }
+    scrollController.dispose();
     inputController.dispose();
     super.onClose();
   }
