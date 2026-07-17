@@ -222,4 +222,5 @@ module.exports = {
   normalizeSearchTextPreservingDiacritics,
   scorePostSearchMatch,
   tokenize,
+  tokenizePreservingDiacritics,
 };

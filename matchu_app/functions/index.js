@@ -19,6 +19,9 @@ const {
 } = require("./src/callables/recommendPosts");
 const { searchPosts } = require("./src/callables/searchPosts");
 const {
+  suggestPostSearches,
+} = require("./src/callables/suggestPostSearches");
+const {
   storeFaceRecoveryBackup,
   getFaceRecoveryBackupStatus,
   recoverBackupKeyWithFace,
@@ -109,6 +112,7 @@ exports.moderateCommentText = moderateCommentText;
 exports.moderateImageContent = moderateImageContent;
 exports.recommendPosts = recommendPosts;
 exports.searchPosts = searchPosts;
+exports.suggestPostSearches = suggestPostSearches;
 exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
 exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;
 exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;

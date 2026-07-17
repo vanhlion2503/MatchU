@@ -9,6 +9,9 @@ const {
   normalizeSearchTextPreservingDiacritics,
   scorePostSearchMatch,
 } = require("../src/search/postSearch");
+const {
+  buildPostSearchSuggestions,
+} = require("../src/search/postSearchSuggestions");
 
 test("normalization ignores Vietnamese accents, case and punctuation", () => {
   assert.equal(normalizeSearchText("  Cà Phê ĐẸP! "), "ca phe dep");
@@ -93,4 +96,39 @@ test("search index separates exact terms from safe prefixes", () => {
   assert.ok(terms.includes("getx"));
   assert.ok(exactTerms.includes("an"));
   assert.ok(!exactTerms.includes("flut"));
+});
+
+test("post search suggestions rank hashtags and preserve Vietnamese accents", () => {
+  const suggestions = buildPostSearchSuggestions([
+    {
+      data: {
+        content: "Học Flutter GetX từ cơ bản đến nâng cao",
+        tags: ["Flutter", "Lập trình Flutter"],
+      },
+      popularity: 2,
+    },
+    {
+      data: {
+        content: "Flutter giúp xây dựng ứng dụng đa nền tảng",
+        tags: ["Flutter"],
+      },
+      popularity: 5,
+    },
+  ], "flut", 5);
+
+  assert.equal(suggestions[0], "#Flutter");
+  assert.ok(suggestions.includes("flutter getx"));
+});
+
+test("post search suggestions complete the final word in a phrase", () => {
+  const suggestions = buildPostSearchSuggestions([
+    {
+      data: {
+        content: "Flutter GetX architecture rõ ràng và dễ bảo trì",
+        tags: [],
+      },
+    },
+  ], "flutter get", 5);
+
+  assert.ok(suggestions.includes("flutter getx"));
 });

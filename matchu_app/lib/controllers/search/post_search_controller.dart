@@ -1,5 +1,4 @@
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/post_search_result.dart';
@@ -8,12 +7,14 @@ import 'package:matchu_app/services/feed/post_search_repository.dart';
 enum PostSearchStatus { initial, loading, success, empty, error }
 
 class PostSearchController extends GetxController {
-  PostSearchController({PostSearchRepository? repository})
-    : _repository = repository ?? PostSearchRepository();
+  PostSearchController({
+    required String initialQuery,
+    PostSearchRepository? repository,
+  }) : _initialQuery = initialQuery.trim(),
+       _repository = repository ?? PostSearchRepository();
 
+  final String _initialQuery;
   final PostSearchRepository _repository;
-  final TextEditingController searchTextController = TextEditingController();
-  final FocusNode searchFocusNode = FocusNode();
 
   final RxList<PostSearchItem> results = <PostSearchItem>[].obs;
   final Rx<PostSearchStatus> status = PostSearchStatus.initial.obs;
@@ -27,9 +28,17 @@ class PostSearchController extends GetxController {
   int _nextOffset = 0;
 
   String get currentUserId => _repository.currentUserId;
+  String get displayQuery =>
+      submittedQuery.value.isEmpty ? _initialQuery : submittedQuery.value;
 
-  Future<void> submitSearch() async {
-    final query = searchTextController.text.trim();
+  @override
+  void onReady() {
+    super.onReady();
+    submitSearch(_initialQuery);
+  }
+
+  Future<void> submitSearch([String? rawQuery]) async {
+    final query = (rawQuery ?? submittedQuery.value).trim();
     if (query.isEmpty) {
       errorMessage.value = 'Vui lòng nhập từ khóa cần tìm.';
       status.value = PostSearchStatus.initial;
@@ -39,12 +48,12 @@ class PostSearchController extends GetxController {
     final requestVersion = ++_requestVersion;
     submittedQuery.value = query;
     status.value = PostSearchStatus.loading;
+    isLoadingMore.value = false;
     errorMessage.value = null;
     hasMore.value = false;
     totalMatched.value = 0;
     _nextOffset = 0;
     results.clear();
-    searchFocusNode.unfocus();
 
     try {
       final page = await _repository.search(query: query, offset: 0);
@@ -173,12 +182,5 @@ class PostSearchController extends GetxController {
       };
     }
     return 'Không thể tìm kiếm bài viết lúc này. Vui lòng thử lại.';
-  }
-
-  @override
-  void onClose() {
-    searchTextController.dispose();
-    searchFocusNode.dispose();
-    super.onClose();
   }
 }
