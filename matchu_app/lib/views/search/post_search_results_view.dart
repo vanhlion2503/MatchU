@@ -96,9 +96,27 @@ class _PostSearchResultsViewState extends State<PostSearchResultsView> {
     return Scaffold(
       backgroundColor: palette.pageBackground,
       appBar: AppBar(
+        toolbarHeight: 58,
         backgroundColor: palette.headerBackground,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        // Thu gọn vùng leading để tiêu đề nằm gần mũi tên hơn.
+        leadingWidth: 48,
+        leading: Semantics(
+          button: true,
+          label: 'Quay lại',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: Get.back,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Icon(Icons.arrow_back_ios_new, size: 20),
+            ),
+          ),
+        ),
         titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

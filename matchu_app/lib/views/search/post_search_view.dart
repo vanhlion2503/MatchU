@@ -29,9 +29,26 @@ class _PostSearchViewState extends State<PostSearchView> {
     return Scaffold(
       backgroundColor: palette.pageBackground,
       appBar: AppBar(
+        toolbarHeight: 58,
         backgroundColor: palette.headerBackground,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        automaticallyImplyLeading: false,
+        leadingWidth: 48,
+        leading: Semantics(
+          button: true,
+          label: 'Quay lại',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: Get.back,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Icon(Icons.arrow_back_ios_new, size: 20),
+            ),
+          ),
+        ),
         titleSpacing: 0,
         title: Text(
           'Tìm kiếm bài viết',
@@ -50,23 +67,34 @@ class _PostSearchViewState extends State<PostSearchView> {
             _SearchInput(controller: controller, palette: palette),
             Divider(height: 1, color: palette.border),
             Expanded(
-              child: Obx(
-                () => AnimatedSwitcher(
+              child: Obx(() {
+                final isShowingSuggestions = controller.isShowingSuggestions;
+                final history = controller.history.toList(growable: false);
+                final suggestions = controller.suggestions.toList(
+                  growable: false,
+                );
+                final isLoadingSuggestions =
+                    controller.isLoadingSuggestions.value;
+
+                return AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   child:
-                      controller.isShowingSuggestions
+                      isShowingSuggestions
                           ? _SuggestionList(
                             key: const ValueKey('suggestions'),
                             controller: controller,
+                            suggestions: suggestions,
+                            isLoading: isLoadingSuggestions,
                             palette: palette,
                           )
                           : _HistoryList(
                             key: const ValueKey('history'),
                             controller: controller,
+                            history: history,
                             palette: palette,
                           ),
-                ),
-              ),
+                );
+              }),
             ),
           ],
         ),
@@ -180,15 +208,17 @@ class _HistoryList extends StatelessWidget {
   const _HistoryList({
     super.key,
     required this.controller,
+    required this.history,
     required this.palette,
   });
 
   final PostSearchEntryController controller;
+  final List<String> history;
   final FeedPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    if (controller.history.isEmpty) {
+    if (history.isEmpty) {
       return _EmptyState(
         icon: Iconsax.clock,
         title: 'Chưa có lịch sử tìm kiếm',
@@ -222,7 +252,7 @@ class _HistoryList extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        for (final item in controller.history)
+        for (final item in history)
           ListTile(
             leading: Icon(Iconsax.clock, size: 20, color: palette.textTertiary),
             title: Text(
@@ -250,10 +280,14 @@ class _SuggestionList extends StatelessWidget {
   const _SuggestionList({
     super.key,
     required this.controller,
+    required this.suggestions,
+    required this.isLoading,
     required this.palette,
   });
 
   final PostSearchEntryController controller;
+  final List<String> suggestions;
+  final bool isLoading;
   final FeedPalette palette;
 
   @override
@@ -275,7 +309,7 @@ class _SuggestionList extends StatelessWidget {
                   ),
                 ),
               ),
-              if (controller.isLoadingSuggestions.value)
+              if (isLoading)
                 const SizedBox(
                   width: 16,
                   height: 16,
@@ -286,22 +320,20 @@ class _SuggestionList extends StatelessWidget {
         ),
         Expanded(
           child:
-              controller.suggestions.isEmpty
+              suggestions.isEmpty
                   ? _EmptyState(
                     icon: Iconsax.search_normal_1,
                     title:
-                        controller.isLoadingSuggestions.value
-                            ? 'Đang tìm gợi ý phù hợp'
-                            : 'Chưa có gợi ý',
+                        isLoading ? 'Đang tìm gợi ý phù hợp' : 'Chưa có gợi ý',
                     description:
                         'Bạn vẫn có thể nhấn Tìm với từ khóa hiện tại.',
                     palette: palette,
                   )
                   : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
-                    itemCount: controller.suggestions.length,
+                    itemCount: suggestions.length,
                     itemBuilder: (context, index) {
-                      final suggestion = controller.suggestions[index];
+                      final suggestion = suggestions[index];
                       return ListTile(
                         leading: Icon(
                           Iconsax.search_normal_1,
