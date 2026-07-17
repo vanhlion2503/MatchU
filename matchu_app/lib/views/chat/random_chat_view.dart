@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -23,6 +26,9 @@ enum _GuideTab { overview, howTo, rules }
 
 class _RandomChatViewState extends State<RandomChatView>
     with SingleTickerProviderStateMixin {
+  static const int _minOnlineCount = 800;
+  static const int _maxOnlineCount = 9999;
+
   static const Map<_GuideTab, _GuideSectionData> _guideSections = {
     _GuideTab.overview: _GuideSectionData(
       title: 'Giới thiệu tổng quan',
@@ -62,6 +68,9 @@ class _RandomChatViewState extends State<RandomChatView>
   };
 
   late final AnimationController _rippleController;
+  late int _onlineCount;
+  final Random _random = Random();
+  Timer? _onlineCountTimer;
 
   final controller = Get.find<MatchingController>();
   final anonAvatarC = Get.find<AnonymousAvatarController>();
@@ -77,6 +86,9 @@ class _RandomChatViewState extends State<RandomChatView>
   @override
   void initState() {
     super.initState();
+
+    _onlineCount = _randomOnlineCount();
+    _scheduleOnlineCountUpdate();
 
     _rippleController = AnimationController(
       vsync: this,
@@ -97,8 +109,24 @@ class _RandomChatViewState extends State<RandomChatView>
   @override
   void dispose() {
     AvatarOverlayService.hide();
+    _onlineCountTimer?.cancel();
     _rippleController.dispose();
     super.dispose();
+  }
+
+  void _scheduleOnlineCountUpdate() {
+    _onlineCountTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _onlineCount = _randomOnlineCount();
+      });
+    });
+  }
+
+  int _randomOnlineCount() {
+    return _minOnlineCount +
+        _random.nextInt(_maxOnlineCount - _minOnlineCount + 1);
   }
 
   Future<void> _refreshQuotaPreview() async {
@@ -407,7 +435,17 @@ class _RandomChatViewState extends State<RandomChatView>
               ),
             ),
             const SizedBox(width: 6),
-            Text('100 trực tuyến', style: theme.textTheme.headlineSmall),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              child: Text(
+                '$_onlineCount trực tuyến',
+                key: ValueKey(_onlineCount),
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
           ],
         ),
       ),
