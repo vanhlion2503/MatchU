@@ -1192,6 +1192,7 @@ module.exports = {
   diversifyByAuthor,
   ensurePostEmbedding,
   exponentialDecay,
+  fetchRestrictions,
   getOrBuildRecommendationPool,
   hasReusablePostEmbedding,
   invalidateRecommendationCache,

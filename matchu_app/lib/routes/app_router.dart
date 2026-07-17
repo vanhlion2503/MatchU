@@ -19,6 +19,7 @@ class AppRouter {
   static const String postDetail = '/post-detail';
   static const String notifications = '/notifications';
   static const String searchUser = '/search-user';
+  static const String searchPosts = '/search-posts';
   static const String profileQr = '/profile-qr';
   static const String displayMode = '/display-mode';
   static const String language = '/language';

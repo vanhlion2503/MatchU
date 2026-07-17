@@ -12,6 +12,7 @@
     "seed:feed:delete": "node scripts/feed-seed/index.js --delete-batch",
     "test:feed-seed": "node --test test/feed-seed.test.js",
     "test:recommendation": "node --test test/recommendation-core.test.js",
+    "test:post-search": "node --test test/post-search.test.js",
     "test:temp-chat": "node --test test/temp-chat-session.test.js"
   },
   "engines": {

@@ -10,6 +10,7 @@ import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/controllers/profile/followers_controller.dart';
 import 'package:matchu_app/controllers/profile/following_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
+import 'package:matchu_app/controllers/search/post_search_controller.dart';
 import 'package:matchu_app/models/feed/blocked_user_model.dart';
 import 'package:matchu_app/models/feed/hidden_post_author_model.dart';
 import 'package:matchu_app/models/notification/muted_notification_author_model.dart';
@@ -327,6 +328,9 @@ class PostRestrictionsController extends GetxController {
     }
     if (Get.isRegistered<SearchUserController>()) {
       Get.find<SearchUserController>().applyUserBlocked(userId);
+    }
+    if (Get.isRegistered<PostSearchController>()) {
+      Get.find<PostSearchController>().removeAuthor(userId);
     }
     if (Get.isRegistered<NearbyController>()) {
       Get.find<NearbyController>().applyUserBlocked(userId);

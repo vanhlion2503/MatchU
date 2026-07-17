@@ -48,9 +48,8 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
             size: 22,
             color: palette.textPrimary,
           ),
-          onPressed: () {
-            // TODO: xu ly khi bam icon trai
-          },
+          tooltip: 'Tìm kiếm bài viết'.tr,
+          onPressed: () => Get.toNamed(AppRouter.searchPosts),
         ),
       ),
       title: Text(

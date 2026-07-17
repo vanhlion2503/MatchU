@@ -13,6 +13,7 @@ abstract final class PostTranslationKeys {
 }
 
 const postVietnameseTranslations = <String, String>{
+  'Tìm kiếm bài viết': 'Tìm kiếm bài viết',
   PostTranslationKeys.notice: 'Thông báo',
   PostTranslationKeys.error: 'Lỗi',
   PostTranslationKeys.imageLimit: 'Giới hạn ảnh',
@@ -247,6 +248,7 @@ const postVietnameseTranslations = <String, String>{
 };
 
 const postEnglishTranslations = <String, String>{
+  'Tìm kiếm bài viết': 'Search posts',
   PostTranslationKeys.notice: 'Notification',
   PostTranslationKeys.error: 'Error',
   PostTranslationKeys.imageLimit: 'Photo limit',

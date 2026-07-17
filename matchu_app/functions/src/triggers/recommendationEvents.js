@@ -37,7 +37,7 @@ const EMBEDDING_RUNTIME_OPTIONS = Object.freeze({
   maxInstances: 2,
 });
 const EMBEDDING_BACKFILL_GENERATION =
-  `vector_index_v2_status:${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}`;
+  `vector_index_v2_search_v2:${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}`;
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";

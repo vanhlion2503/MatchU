@@ -3,6 +3,10 @@ const {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
 } = require("./embedding");
+const {
+  buildExactSearchTerms,
+  buildSearchTerms,
+} = require("../search/postSearch");
 
 const RECOMMENDATION_INDEX_COLLECTION = "postRecommendationIndex";
 const VECTOR_FIELD = "embedding";
@@ -78,6 +82,8 @@ function buildRecommendationIndexMetadata(postId, post) {
     createdAt: post?.createdAt || admin.firestore.FieldValue.serverTimestamp(),
     trendDayKey: trendDayKey(post?.createdAt),
     popularityScore: calculatePopularitySignal(post),
+    searchExactTerms: buildExactSearchTerms(post),
+    searchTerms: buildSearchTerms(post),
     eligible: true,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -139,6 +145,8 @@ async function syncRecommendationIndexMetadata(
       embeddingModel: admin.firestore.FieldValue.delete(),
       embeddingSignature: admin.firestore.FieldValue.delete(),
       embeddingDimensions: admin.firestore.FieldValue.delete(),
+      searchExactTerms: admin.firestore.FieldValue.delete(),
+      searchTerms: admin.firestore.FieldValue.delete(),
       embeddingUpdatedAt: admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
