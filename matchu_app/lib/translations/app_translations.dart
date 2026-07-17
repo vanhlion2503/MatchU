@@ -340,7 +340,7 @@ const _extendedVietnamese = <String, String>{
   'Xác thực ngay': 'Xác thực ngay',
   'Hướng dẫn Chat Matching': 'Hướng dẫn ghép đôi trò chuyện',
   'Không hiển thị lần sau nữa': 'Không hiển thị lần sau nữa',
-  '100 trực tuyến': '100 người đang trực tuyến',
+  '100 trực tuyến': '100 trực tuyến',
   'Làm quen ngay': 'Làm quen ngay',
   'Kết nối ẩn danh.': 'Kết nối ẩn danh.',
   'Chủ động lộ diện khi bạn sẵn sàng.': 'Chủ động lộ diện khi bạn sẵn sàng.',

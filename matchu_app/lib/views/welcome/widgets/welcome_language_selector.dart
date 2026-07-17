@@ -25,7 +25,6 @@ class WelcomeLanguageSelector extends GetView<LanguageController> {
         child: PopupMenuButton<String>(
           key: const Key('welcome_language_selector'),
           tooltip: TranslationKeys.selectLanguage.tr,
-          initialValue: selectedCode,
           position: PopupMenuPosition.under,
           offset: const Offset(0, 6),
           color: Theme.of(context).colorScheme.surface,
@@ -96,10 +95,7 @@ class WelcomeLanguageSelector extends GetView<LanguageController> {
             height: 26,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color:
-                  isSelected
-                      ? AppTheme.primaryColor.withValues(alpha: 0.12)
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(_flagFor(code), style: const TextStyle(fontSize: 21)),
@@ -108,9 +104,9 @@ class WelcomeLanguageSelector extends GetView<LanguageController> {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
           if (isSelected) ...[
