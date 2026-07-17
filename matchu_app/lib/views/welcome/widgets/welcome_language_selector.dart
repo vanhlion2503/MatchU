@@ -127,6 +127,6 @@ class WelcomeLanguageSelector extends GetView<LanguageController> {
   }
 
   String _flagFor(String code) {
-    return code == LanguageController.englishCode ? '🇺🇸' : '🇻🇳';
+    return code == LanguageController.englishCode ? '🇬🇧' : '🇻🇳';
   }
 }

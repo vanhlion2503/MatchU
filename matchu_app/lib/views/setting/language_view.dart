@@ -31,7 +31,7 @@ class LanguageView extends GetView<LanguageController> {
           Obx(
             () => _LanguageTile(
               title: TranslationKeys.english.tr,
-              flag: '🇺🇸',
+              flag: '🇬🇧',
               selected:
                   controller.languageCode.value ==
                   LanguageController.englishCode,
