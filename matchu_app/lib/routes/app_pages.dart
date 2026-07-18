@@ -4,6 +4,7 @@ import 'package:matchu_app/bindings/feed/post_detail_binding.dart';
 import 'package:matchu_app/bindings/feed/post_search_binding.dart';
 import 'package:matchu_app/bindings/feed/post_search_results_binding.dart';
 import 'package:matchu_app/bindings/notification/notification_inbox_binding.dart';
+import 'package:matchu_app/bindings/user/account_security_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
 import 'package:matchu_app/bindings/chat/temp_chat_binding.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
@@ -40,6 +41,7 @@ import 'package:matchu_app/views/search/post_search_results_view.dart';
 import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/setting/language_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
+import 'package:matchu_app/views/setting/account_security_view.dart';
 import 'package:matchu_app/views/setting/restriction_list_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
 import 'package:matchu_app/views/verification/face_verification_view.dart';
@@ -174,6 +176,14 @@ class AppPages {
 
     GetPage(name: AppRouter.displayMode, page: () => DisplayModeView()),
     GetPage(name: AppRouter.language, page: () => const LanguageView()),
+
+    GetPage(
+      name: AppRouter.accountSecurity,
+      page: () => const AccountSecurityView(),
+      binding: AccountSecurityBinding(),
+      transition: Transition.cupertino,
+      transitionDuration: const Duration(milliseconds: 240),
+    ),
 
     GetPage(
       name: AppRouter.restrictionList,

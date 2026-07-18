@@ -25,6 +25,7 @@ class AppRouter {
   static const String displayMode = '/display-mode';
   static const String language = '/language';
   static const String editProfile = '/edit-profile';
+  static const String accountSecurity = '/account-security';
   static const String restrictionList = '/restriction-list';
 
   static const String matching = '/matching';

@@ -52,6 +52,10 @@ const {
   migrateLegacyNotificationDevices,
 } = require("./src/triggers/deviceMaintenance");
 const {
+  revokeAccountSessions,
+  deleteAccount,
+} = require("./src/callables/accountSecurity");
+const {
   generateTelepathyAiInsight,
 } = require("./src/triggers/telepathyInsight");
 const {
@@ -132,6 +136,8 @@ exports.createModerationPenaltyNotification =
   createModerationPenaltyNotification;
 exports.cleanupStaleUserDevices = cleanupStaleUserDevices;
 exports.migrateLegacyNotificationDevices = migrateLegacyNotificationDevices;
+exports.revokeAccountSessions = revokeAccountSessions;
+exports.deleteAccount = deleteAccount;
 exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;

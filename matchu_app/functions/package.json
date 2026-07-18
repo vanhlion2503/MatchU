@@ -14,7 +14,8 @@
     "test:recommendation": "node --test test/recommendation-core.test.js",
     "test:post-search": "node --test test/post-search.test.js",
     "test:temp-chat": "node --test test/temp-chat-session.test.js",
-    "test:notifications": "node --test test/chat-message-notifications.test.js"
+    "test:notifications": "node --test test/chat-message-notifications.test.js",
+    "test:account-security": "node --test test/account-security.test.js"
   },
   "engines": {
     "node": "22"

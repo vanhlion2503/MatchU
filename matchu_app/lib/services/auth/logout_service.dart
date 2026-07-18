@@ -22,14 +22,14 @@ class LogoutService {
   static final _auth = FirebaseAuth.instance;
 
   /// 🔥 LOGOUT CHUẨN – DÙNG CHO TOÀN APP
-  static Future<bool> logout() async {
+  static Future<bool> logout({bool skipRemoteUpdates = false}) async {
     // 🔥 LẤY UID TRƯỚC KHI LOGOUT (QUAN TRỌNG!)
     final currentUser = _auth.currentUser;
     final uid = currentUser?.uid;
 
     try {
       // 1️⃣ Update offline (Firestore + Realtime Database) - TRƯỚC KHI DỪNG CÁC SERVICES
-      if (currentUser != null && uid != null) {
+      if (!skipRemoteUpdates && currentUser != null && uid != null) {
         try {
           // 1️⃣.1️⃣ Update Firestore offline
           var didUpdateFirestorePresence = false;

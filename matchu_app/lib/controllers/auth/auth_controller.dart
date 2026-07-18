@@ -373,6 +373,12 @@ class AuthController extends GetxController {
     _showAuthSnackbar("Đã xóa", "Tài khoản này sẽ không còn được lưu");
   }
 
+  /// Removes stale credentials after a password change or account deletion.
+  /// The security screen owns the user-facing success message.
+  Future<void> forgetRememberedAccount(String email) {
+    return _removeRememberedLoginAccount(email);
+  }
+
   Future<void> _removeRememberedLoginAccount(String email) async {
     final normalizedEmail = email.trim().toLowerCase();
     if (normalizedEmail.isEmpty) return;
@@ -1258,7 +1264,7 @@ class AuthController extends GetxController {
   // =============================================================
   //                        LOGOUT
   // =============================================================
-  Future<void> logoutC() async {
+  Future<void> logoutC({bool skipRemoteUpdates = false}) async {
     const splashRoute = '/';
     const signedOutRoute = '/welcome';
     AuthGateController? authGateC;
@@ -1272,7 +1278,9 @@ class AuthController extends GetxController {
       Get.offAllNamed(splashRoute);
     }
 
-    final loggedOut = await LogoutService.logout();
+    final loggedOut = await LogoutService.logout(
+      skipRemoteUpdates: skipRemoteUpdates,
+    );
     if (!loggedOut && FirebaseAuth.instance.currentUser != null) {
       authGateC?.reset();
       if (Get.currentRoute != '/main') {

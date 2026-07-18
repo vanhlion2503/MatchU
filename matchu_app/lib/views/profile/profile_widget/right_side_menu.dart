@@ -66,7 +66,8 @@ class RightSideMenu {
                                   icon: Iconsax.lock,
                                   text: TranslationKeys.accountSecurity.tr,
                                   onTap: () {
-                                    Get.toNamed("/account-security");
+                                    Get.back();
+                                    Get.toNamed(AppRouter.accountSecurity);
                                   },
                                 ),
                                 menuItem(
