@@ -5,11 +5,16 @@ import 'package:get/get.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 
 class UnreadController extends GetxController {
-  final ChatService _service = ChatService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  UnreadController({ChatService? service, FirebaseAuth? auth})
+    : _service = service ?? ChatService(),
+      _auth = auth ?? FirebaseAuth.instance;
+
+  final ChatService _service;
+  final FirebaseAuth _auth;
 
   final RxInt totalUnread = 0.obs;
   StreamSubscription<int>? _sub;
+  StreamSubscription<User?>? _authSub;
 
   @override
   void onInit() {
@@ -22,8 +27,9 @@ class UnreadController extends GetxController {
     }
 
     /// ✅ 2. LISTEN AUTH CHANGES
-    _auth.authStateChanges().listen((user) {
-      _sub?.cancel();
+    _authSub = _auth.authStateChanges().listen((user) async {
+      await _sub?.cancel();
+      _sub = null;
 
       if (user == null) {
         totalUnread.value = 0;
@@ -72,6 +78,7 @@ class UnreadController extends GetxController {
   @override
   void onClose() {
     cleanup();
+    _authSub?.cancel();
     super.onClose();
   }
 }

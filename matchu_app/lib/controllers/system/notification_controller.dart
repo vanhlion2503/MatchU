@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -13,17 +13,20 @@ import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/models/chat_notification_payload.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/notification/app_notification_service.dart';
-import 'package:matchu_app/services/security/device_service.dart';
+import 'package:matchu_app/services/notification/push_device_repository.dart';
 import 'package:matchu_app/services/user/presence_service.dart';
 
 enum NotificationScreenContext { other, chatList, chatRoom }
 
 class NotificationController extends GetxController {
+  NotificationController({PushDeviceRepository? pushDeviceRepository})
+    : _pushDeviceRepository = pushDeviceRepository ?? PushDeviceRepository();
+
   static const String _appLogoAssetPath = 'assets/icon/Icon.png';
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final PushDeviceRepository _pushDeviceRepository;
 
   StreamSubscription<User?>? _authSub;
   StreamSubscription<String>? _tokenRefreshSub;
@@ -35,10 +38,14 @@ class NotificationController extends GetxController {
   bool _isForeground = true;
   bool _isInitialized = false;
   bool _initialMessageChecked = false;
+  int _authGeneration = 0;
+  String? _activeAuthUid;
 
-  ChatNotificationPayload? _pendingNavigation;
+  final ListQueue<ChatNotificationPayload> _pendingNavigations = ListQueue();
+  bool _isFlushingNavigation = false;
   String? _lastHandledNavigationKey;
   int? _lastHandledNavigationAtMs;
+  SnackbarController? _activeNotificationSnackbar;
 
   static const int _navigationDedupWindowMs = 1500;
 
@@ -62,7 +69,7 @@ class NotificationController extends GetxController {
             )
             : null;
     if (localLaunchPayload != null) {
-      _pendingNavigation = localLaunchPayload;
+      _addPendingNavigation(localLaunchPayload);
     }
     await _messaging.setAutoInitEnabled(true);
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -88,31 +95,43 @@ class NotificationController extends GetxController {
               ? null
               : ChatNotificationPayload.fromRemoteMessage(initialMessage);
       if (payload != null) {
-        _pendingNavigation = payload;
+        _addPendingNavigation(payload);
       }
     }
 
     _authSub = _auth.authStateChanges().listen(_handleAuthChanged);
-
-    if (_auth.currentUser != null) {
-      await _handleAuthChanged(_auth.currentUser);
-    }
   }
 
   Future<void> _handleAuthChanged(User? user) async {
+    final generation = ++_authGeneration;
     await _tokenRefreshSub?.cancel();
     _tokenRefreshSub = null;
 
     if (user == null || !supportsNotifications) {
+      _activeAuthUid = null;
+      _pendingNavigations.clear();
+      _lastHandledNavigationKey = null;
+      _lastHandledNavigationAtMs = null;
       return;
     }
 
+    if (_activeAuthUid != null && _activeAuthUid != user.uid) {
+      _pendingNavigations.clear();
+      _lastHandledNavigationKey = null;
+      _lastHandledNavigationAtMs = null;
+    }
+    _activeAuthUid = user.uid;
+
     final settings = await _requestPermissionAndReadSettings();
-    await _syncCurrentToken(settings: settings);
+    if (!_isCurrentAuthOperation(user.uid, generation)) return;
+    await _syncCurrentToken(userId: user.uid, settings: settings);
+    if (!_isCurrentAuthOperation(user.uid, generation)) return;
 
     _tokenRefreshSub = _messaging.onTokenRefresh.listen((token) async {
+      if (_auth.currentUser?.uid != user.uid) return;
       final latestSettings = await _messaging.getNotificationSettings();
       await _upsertDeviceNotificationState(
+        userId: user.uid,
         token: token,
         settings: latestSettings,
       );
@@ -138,39 +157,34 @@ class NotificationController extends GetxController {
   }
 
   Future<void> _syncCurrentToken({
+    required String userId,
     required NotificationSettings settings,
   }) async {
     final token = await _messaging.getToken();
-    await _upsertDeviceNotificationState(token: token, settings: settings);
+    await _upsertDeviceNotificationState(
+      userId: userId,
+      token: token,
+      settings: settings,
+    );
   }
 
   Future<void> _upsertDeviceNotificationState({
+    required String userId,
     required NotificationSettings settings,
     String? token,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    if (_auth.currentUser?.uid != userId) return;
 
-    final deviceId = await DeviceService.getDeviceId();
-    final pushEnabled = _isPushAuthorized(settings.authorizationStatus);
+    await _pushDeviceRepository.upsert(
+      userId: userId,
+      platform: _platformName(),
+      settings: settings,
+      token: token,
+    );
+  }
 
-    await _db
-        .collection('users')
-        .doc(user.uid)
-        .collection('devices')
-        .doc(deviceId)
-        .set({
-          'platform': _platformName(),
-          'pushEnabled': pushEnabled,
-          'notificationPermission': _authorizationStatusToString(
-            settings.authorizationStatus,
-          ),
-          'notificationUpdatedAt': FieldValue.serverTimestamp(),
-          'lastActiveAt': FieldValue.serverTimestamp(),
-          if (token != null && token.isNotEmpty) 'fcmToken': token,
-          if (token != null && token.isNotEmpty)
-            'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+  bool _isCurrentAuthOperation(String userId, int generation) {
+    return generation == _authGeneration && _auth.currentUser?.uid == userId;
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
@@ -209,8 +223,8 @@ class NotificationController extends GetxController {
     final body = _resolveNotificationBody(payload);
     final timeLabel = _formatNotificationElapsed(sentAt);
 
-    Get.closeAllSnackbars();
-    Get.showSnackbar(
+    unawaited(_activeNotificationSnackbar?.close() ?? Future<void>.value());
+    _activeNotificationSnackbar = Get.showSnackbar(
       GetSnackBar(
         snackPosition: SnackPosition.TOP,
         snackStyle: SnackStyle.FLOATING,
@@ -388,7 +402,7 @@ class NotificationController extends GetxController {
     ChatNotificationPayload payload, {
     required bool allowImmediateRedirect,
   }) {
-    _pendingNavigation = payload;
+    _addPendingNavigation(payload);
     if (allowImmediateRedirect) {
       unawaited(flushPendingNavigation(allowMainRedirect: true));
     }
@@ -398,15 +412,36 @@ class NotificationController extends GetxController {
     bool allowMainRedirect = false,
     int retries = 8,
   }) async {
-    final payload = _pendingNavigation;
-    if (payload == null || _auth.currentUser == null) return;
+    if (_isFlushingNavigation) return;
+    _isFlushingNavigation = true;
+    try {
+      while (_pendingNavigations.isNotEmpty) {
+        final didHandle = await _flushFirstPendingNavigation(
+          allowMainRedirect: allowMainRedirect,
+          retries: retries,
+        );
+        if (!didHandle) break;
+      }
+    } finally {
+      _isFlushingNavigation = false;
+    }
+  }
+
+  Future<bool> _flushFirstPendingNavigation({
+    required bool allowMainRedirect,
+    required int retries,
+  }) async {
+    final payload =
+        _pendingNavigations.isEmpty ? null : _pendingNavigations.first;
+    if (payload == null || _auth.currentUser == null) return false;
 
     final navigationKey = '${payload.roomId}:${payload.messageId ?? ''}';
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     if (_lastHandledNavigationKey == navigationKey &&
         _lastHandledNavigationAtMs != null &&
         nowMs - _lastHandledNavigationAtMs! < _navigationDedupWindowMs) {
-      return;
+      _pendingNavigations.removeFirst();
+      return true;
     }
 
     final hasMainDeps =
@@ -414,19 +449,22 @@ class NotificationController extends GetxController {
         Get.isRegistered<ChatUserCacheController>();
 
     if (!hasMainDeps) {
-      if (!allowMainRedirect) return;
+      if (!allowMainRedirect) return false;
 
       if (Get.currentRoute != AppRouter.main) {
-        await Get.offAllNamed(AppRouter.main);
+        final opened = await _startNavigation(
+          Get.offAllNamed(AppRouter.main),
+          expectedRoute: AppRouter.main,
+        );
+        if (!opened) return false;
       }
 
-      if (retries <= 0) return;
+      if (retries <= 0) return false;
       await Future.delayed(const Duration(milliseconds: 350));
-      await flushPendingNavigation(
+      return _flushFirstPendingNavigation(
         allowMainRedirect: true,
         retries: retries - 1,
       );
-      return;
     }
 
     final mainController = Get.find<MainController>();
@@ -440,8 +478,6 @@ class NotificationController extends GetxController {
     final currentRoomId =
         currentArgs is Map ? currentArgs['roomId']?.toString() : null;
 
-    _markNavigationHandled(navigationKey);
-
     if (Get.currentRoute == AppRouter.chat) {
       if (currentRoomId == payload.roomId) {
         final messageId = payload.messageId?.trim();
@@ -450,25 +486,60 @@ class NotificationController extends GetxController {
             Get.find<ChatController>(
               tag: payload.roomId,
             ).focusMessageFromNotification(messageId);
-            return;
+            _markNavigationHandled(navigationKey);
+            return true;
           }
 
-          await Get.offNamed(
-            AppRouter.chat,
-            arguments: _buildChatArguments(payload),
+          final opened = await _startNavigation(
+            Get.offNamed(
+              AppRouter.chat,
+              arguments: _buildChatArguments(payload),
+            ),
+            expectedRoute: AppRouter.chat,
           );
+          if (opened) _markNavigationHandled(navigationKey);
+          return opened;
         }
-        return;
+        _markNavigationHandled(navigationKey);
+        return true;
       }
 
-      await Get.offNamed(
-        AppRouter.chat,
-        arguments: _buildChatArguments(payload),
+      final opened = await _startNavigation(
+        Get.offNamed(AppRouter.chat, arguments: _buildChatArguments(payload)),
+        expectedRoute: AppRouter.chat,
       );
-      return;
+      if (opened) _markNavigationHandled(navigationKey);
+      return opened;
     }
 
-    await Get.toNamed(AppRouter.chat, arguments: _buildChatArguments(payload));
+    final opened = await _startNavigation(
+      Get.toNamed(AppRouter.chat, arguments: _buildChatArguments(payload)),
+      expectedRoute: AppRouter.chat,
+    );
+    if (opened) _markNavigationHandled(navigationKey);
+    return opened;
+  }
+
+  Future<bool> _startNavigation(
+    Future<dynamic>? navigation, {
+    required String expectedRoute,
+  }) async {
+    if (navigation == null) return false;
+    unawaited(navigation.catchError((_) => null));
+
+    for (var attempt = 0; attempt < 12; attempt++) {
+      if (Get.currentRoute == expectedRoute) return true;
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+    return Get.currentRoute == expectedRoute;
+  }
+
+  void _addPendingNavigation(ChatNotificationPayload payload) {
+    final key = '${payload.roomId}:${payload.messageId ?? ''}';
+    final alreadyQueued = _pendingNavigations.any(
+      (item) => '${item.roomId}:${item.messageId ?? ''}' == key,
+    );
+    if (!alreadyQueued) _pendingNavigations.addLast(payload);
   }
 
   Future<void> setForegroundState(bool isForeground) async {
@@ -562,24 +633,6 @@ class NotificationController extends GetxController {
     }
   }
 
-  static bool _isPushAuthorized(AuthorizationStatus status) {
-    return status == AuthorizationStatus.authorized ||
-        status == AuthorizationStatus.provisional;
-  }
-
-  static String _authorizationStatusToString(AuthorizationStatus status) {
-    switch (status) {
-      case AuthorizationStatus.authorized:
-        return 'authorized';
-      case AuthorizationStatus.denied:
-        return 'denied';
-      case AuthorizationStatus.provisional:
-        return 'provisional';
-      case AuthorizationStatus.notDetermined:
-        return 'not_determined';
-    }
-  }
-
   static String _platformName() {
     if (kIsWeb) return 'web';
 
@@ -600,7 +653,9 @@ class NotificationController extends GetxController {
   }
 
   void _markNavigationHandled(String navigationKey) {
-    _pendingNavigation = null;
+    if (_pendingNavigations.isNotEmpty) {
+      _pendingNavigations.removeFirst();
+    }
     _lastHandledNavigationKey = navigationKey;
     _lastHandledNavigationAtMs = DateTime.now().millisecondsSinceEpoch;
   }
@@ -620,6 +675,7 @@ class NotificationController extends GetxController {
     _tokenRefreshSub?.cancel();
     _foregroundMessageSub?.cancel();
     _messageOpenedSub?.cancel();
+    unawaited(_activeNotificationSnackbar?.close() ?? Future<void>.value());
     super.onClose();
   }
 }

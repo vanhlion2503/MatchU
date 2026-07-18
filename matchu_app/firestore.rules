@@ -373,8 +373,20 @@ service cloud.firestore {
       
       match /devices/{deviceId} {
 
-        // Read device metadata for E2EE and push delivery.
-        allow read: if request.auth != null;
+        // Device documents are a public E2EE directory. Push credentials live
+        // in notificationDevices and must never be readable by another user.
+        allow read: if request.auth != null
+          && (
+            request.auth.uid == userId
+            || !resource.data.keys().hasAny([
+              "fcmToken",
+              "fcmTokenUpdatedAt",
+              "pushEnabled",
+              "notificationPermission",
+              "notificationUpdatedAt",
+              "lastNotificationOpenedAt"
+            ])
+          );
 
         function isOwnerDeviceWrite() {
           return request.auth != null && request.auth.uid == userId;
@@ -482,6 +494,62 @@ service cloud.firestore {
           && hasValidDeviceFieldTypes();
 
         allow delete: if isOwnerDeviceWrite();
+      }
+
+      match /notificationDevices/{deviceId} {
+        function isOwnerNotificationDevice() {
+          return request.auth != null && request.auth.uid == userId;
+        }
+
+        function hasOnlyNotificationDeviceKeys() {
+          return request.resource.data.keys().hasOnly([
+            "platform",
+            "status",
+            "lastActiveAt",
+            "fcmToken",
+            "fcmTokenUpdatedAt",
+            "pushEnabled",
+            "notificationPermission",
+            "notificationUpdatedAt",
+            "lastNotificationOpenedAt"
+          ]);
+        }
+
+        function hasValidNotificationDeviceTypes() {
+          return request.resource.data.platform is string
+            && request.resource.data.status in [
+              "active",
+              "inactive",
+              "revoked",
+              "stale"
+            ]
+            && request.resource.data.lastActiveAt is timestamp
+            && request.resource.data.pushEnabled is bool
+            && request.resource.data.notificationPermission in [
+              "authorized",
+              "denied",
+              "provisional",
+              "not_determined"
+            ]
+            && request.resource.data.notificationUpdatedAt is timestamp
+            && (
+              !("fcmToken" in request.resource.data)
+              || request.resource.data.fcmToken is string
+            )
+            && (
+              !("fcmTokenUpdatedAt" in request.resource.data)
+              || request.resource.data.fcmTokenUpdatedAt is timestamp
+            )
+            && (
+              !("lastNotificationOpenedAt" in request.resource.data)
+              || request.resource.data.lastNotificationOpenedAt is timestamp
+            );
+        }
+
+        allow read, delete: if isOwnerNotificationDevice();
+        allow create, update: if isOwnerNotificationDevice()
+          && hasOnlyNotificationDeviceKeys()
+          && hasValidNotificationDeviceTypes();
       }
 
     }

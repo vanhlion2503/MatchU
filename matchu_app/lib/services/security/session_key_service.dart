@@ -939,9 +939,7 @@ class SessionKeyService {
 
   static DateTime? _readDeviceLastActiveAt(Map<String, dynamic> data) {
     return _readTimestamp(data["lastE2eeActiveAt"]) ??
-        _readTimestamp(data["lastActiveAt"]) ??
-        _readTimestamp(data["notificationUpdatedAt"]) ??
-        _readTimestamp(data["fcmTokenUpdatedAt"]);
+        _readTimestamp(data["lastActiveAt"]);
   }
 
   static DateTime? _readTimestamp(dynamic value) {

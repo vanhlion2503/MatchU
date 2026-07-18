@@ -2,6 +2,7 @@ const {
   onDocumentCreated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 
 const { admin, db } = require("../shared/firebase");
 
@@ -14,6 +15,10 @@ const MIN_GAP_BETWEEN_NOTIFICATIONS_MS = 1800;
 const RATE_LIMIT_WINDOW_MS = 2000;
 const RATE_LIMIT_MAX_MESSAGES = 5;
 const MAX_NOTIFICATION_PREVIEW_LENGTH = 160;
+const DISPATCH_LEASE_MS = 60 * 1000;
+const QUEUE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
+const MAINTENANCE_BATCH_SIZE = 200;
 
 const DELIVERY_MODE_FOREGROUND = "foreground_data";
 const DELIVERY_MODE_PUSH = "push";
@@ -103,6 +108,9 @@ const queueChatMessageNotification = onDocumentCreated(
           version: (toInt(current.version) || 0) + 1,
           createdAt: current.createdAt || admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt: admin.firestore.Timestamp.fromMillis(
+            nowMs + QUEUE_RETENTION_MS
+          ),
           lastSentAt: current.lastSentAt || null,
         },
         { merge: true }
@@ -154,51 +162,156 @@ const dispatchQueuedChatNotification = onDocumentWritten(
       if ((toInt(currentData.version) || 0) !== version) return;
     }
 
-    await dispatchNotification(currentSnap);
+    const claim = await claimNotification(currentSnap.ref, version);
+    if (!claim) return;
+
+    await dispatchNotification(currentSnap.ref, claim);
   }
 );
 
-async function dispatchNotification(queueSnap) {
-  const queueData = queueSnap.data() || {};
-  const sendResult = await sendNotificationForQueue(queueData);
+async function claimNotification(queueRef, expectedVersion) {
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(queueRef);
+    if (!snap.exists) return null;
 
-  const update = {
-    pendingCount: 0,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    sentDeviceCount: sendResult.sentCount,
-    failedDeviceCount: sendResult.failedCount,
-    suppressedDeviceCount: sendResult.suppressedCount,
-    lastDispatchReason: sendResult.reason || admin.firestore.FieldValue.delete(),
-  };
+    const data = snap.data() || {};
+    if (data.status !== "pending") return null;
+    if ((toInt(data.version) || 0) !== expectedVersion) return null;
+    if (timestampToMillis(data.scheduledAt) > Date.now()) return null;
 
-  if (sendResult.sentCount > 0) {
-    update.status = "sent";
-    update.lastSentAt = admin.firestore.FieldValue.serverTimestamp();
-    update.lastSuppressedAt = admin.firestore.FieldValue.delete();
-    update.lastDroppedAt = admin.firestore.FieldValue.delete();
-    await queueSnap.ref.set(update, { merge: true });
-    return;
+    const claimedAtMs = Date.now();
+    transaction.set(
+      queueRef,
+      {
+        status: "sending",
+        claimedVersion: expectedVersion,
+        claimedAt: admin.firestore.Timestamp.fromMillis(claimedAtMs),
+        leaseExpiresAt: admin.firestore.Timestamp.fromMillis(
+          claimedAtMs + DISPATCH_LEASE_MS
+        ),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return { ...data, claimedVersion: expectedVersion };
+  });
+}
+
+async function dispatchNotification(queueRef, queueData) {
+  let sendResult;
+  try {
+    sendResult = await sendNotificationForQueue(queueData);
+  } catch (error) {
+    await releaseFailedClaim(queueRef, queueData.claimedVersion, error);
+    throw error;
   }
 
-  if (sendResult.suppressedCount > 0 && sendResult.eligibleCount === 0) {
-    update.status = "suppressed";
-    update.lastSuppressedAt = admin.firestore.FieldValue.serverTimestamp();
-    update.lastDroppedAt = admin.firestore.FieldValue.delete();
-    await queueSnap.ref.set(update, { merge: true });
-    return;
-  }
+  await finalizeNotificationDispatch(
+    queueRef,
+    queueData.claimedVersion,
+    sendResult
+  );
+}
 
-  update.status = "dropped";
-  update.lastDroppedAt = admin.firestore.FieldValue.serverTimestamp();
-  await queueSnap.ref.set(update, { merge: true });
+async function finalizeNotificationDispatch(queueRef, claimedVersion, sendResult) {
+  await db.runTransaction(async (transaction) => {
+    const currentSnap = await transaction.get(queueRef);
+    if (!currentSnap.exists) return;
+
+    const current = currentSnap.data() || {};
+    // A newer message arrived while FCM was sending. Its pending state owns the
+    // queue now, so the older dispatch must never clear or overwrite it.
+    if (!shouldFinalizeClaim(current, claimedVersion)) {
+      return;
+    }
+
+    const nowMs = Date.now();
+    const update = {
+      pendingCount: 0,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(
+        nowMs + QUEUE_RETENTION_MS
+      ),
+      sentDeviceCount: sendResult.sentCount,
+      failedDeviceCount: sendResult.failedCount,
+      suppressedDeviceCount: sendResult.suppressedCount,
+      lastDispatchReason:
+        sendResult.reason || admin.firestore.FieldValue.delete(),
+      claimedVersion: admin.firestore.FieldValue.delete(),
+      claimedAt: admin.firestore.FieldValue.delete(),
+      leaseExpiresAt: admin.firestore.FieldValue.delete(),
+    };
+
+    if (sendResult.sentCount > 0) {
+      update.status = "sent";
+      update.lastSentAt = admin.firestore.FieldValue.serverTimestamp();
+      update.lastSuppressedAt = admin.firestore.FieldValue.delete();
+      update.lastDroppedAt = admin.firestore.FieldValue.delete();
+      transaction.set(queueRef, update, { merge: true });
+      return;
+    }
+
+    if (sendResult.suppressedCount > 0 && sendResult.eligibleCount === 0) {
+      update.status = "suppressed";
+      update.lastSuppressedAt = admin.firestore.FieldValue.serverTimestamp();
+      update.lastDroppedAt = admin.firestore.FieldValue.delete();
+      transaction.set(queueRef, update, { merge: true });
+      return;
+    }
+
+    update.status = "dropped";
+    update.lastDroppedAt = admin.firestore.FieldValue.serverTimestamp();
+    transaction.set(queueRef, update, { merge: true });
+  });
+}
+
+async function releaseFailedClaim(queueRef, claimedVersion, error) {
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(queueRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    if (
+      data.status !== "sending" ||
+      (toInt(data.version) || 0) !== claimedVersion
+    ) {
+      return;
+    }
+
+    transaction.set(
+      queueRef,
+      {
+        status: "pending",
+        scheduledAt: admin.firestore.Timestamp.fromMillis(Date.now() + 1000),
+        version: claimedVersion + 1,
+        lastDispatchReason: cleanString(error?.code) || "dispatch_error",
+        claimedVersion: admin.firestore.FieldValue.delete(),
+        claimedAt: admin.firestore.FieldValue.delete(),
+        leaseExpiresAt: admin.firestore.FieldValue.delete(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
 }
 
 async function sendNotificationForQueue(queueData) {
-  const devicesSnap = await db
+  let devicesSnap = await db
     .collection("users")
     .doc(queueData.recipientUid)
-    .collection("devices")
+    .collection("notificationDevices")
     .get();
+
+  // Transitional fallback for app versions that still store push fields in
+  // the public E2EE device document. The migration job removes these fields,
+  // after which this path naturally becomes empty and can be retired.
+  if (devicesSnap.empty) {
+    devicesSnap = await db
+      .collection("users")
+      .doc(queueData.recipientUid)
+      .collection("devices")
+      .get();
+  }
 
   if (devicesSnap.empty) {
     return {
@@ -414,7 +527,8 @@ function truncateNotificationText(value) {
 }
 
 function isDeviceInactiveForDelivery(deviceData) {
-  const status = cleanString(deviceData.e2eeStatus);
+  const status =
+    cleanString(deviceData.status) || cleanString(deviceData.e2eeStatus);
   return status === "inactive" || status === "revoked" || status === "stale";
 }
 
@@ -437,12 +551,76 @@ async function computeSenderDelayMs(senderUid, nowMs) {
       {
         timestampsMs: recent.slice(-20),
         updatedAt: admin.firestore.Timestamp.fromMillis(nowMs),
+        expiresAt: admin.firestore.Timestamp.fromMillis(
+          nowMs + RATE_LIMIT_RETENTION_MS
+        ),
       },
       { merge: true }
     );
 
     return recent.length > RATE_LIMIT_MAX_MESSAGES ? RATE_LIMIT_WINDOW_MS : 0;
   });
+}
+
+const maintainChatNotificationQueues = onSchedule(
+  {
+    schedule: "every 5 minutes",
+    timeZone: "Asia/Bangkok",
+    region: REGION,
+  },
+  async () => {
+    const now = admin.firestore.Timestamp.now();
+    await Promise.all([
+      recoverExpiredClaims(now),
+      deleteExpiredDocuments(NOTIFICATION_QUEUE_COLLECTION, now),
+      deleteExpiredDocuments(SENDER_RATE_LIMIT_COLLECTION, now),
+    ]);
+  }
+);
+
+async function recoverExpiredClaims(now) {
+  const snap = await db
+    .collection(NOTIFICATION_QUEUE_COLLECTION)
+    .where("status", "==", "sending")
+    .where("leaseExpiresAt", "<=", now)
+    .limit(MAINTENANCE_BATCH_SIZE)
+    .get();
+
+  if (snap.empty) return 0;
+  const batch = db.batch();
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    batch.set(
+      doc.ref,
+      {
+        status: "pending",
+        scheduledAt: now,
+        version: (toInt(data.version) || 0) + 1,
+        lastDispatchReason: "dispatch_lease_expired",
+        claimedVersion: admin.firestore.FieldValue.delete(),
+        claimedAt: admin.firestore.FieldValue.delete(),
+        leaseExpiresAt: admin.firestore.FieldValue.delete(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+  await batch.commit();
+  return snap.size;
+}
+
+async function deleteExpiredDocuments(collectionName, now) {
+  const snap = await db
+    .collection(collectionName)
+    .where("expiresAt", "<=", now)
+    .limit(MAINTENANCE_BATCH_SIZE)
+    .get();
+  if (snap.empty) return 0;
+
+  const batch = db.batch();
+  snap.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  return snap.size;
 }
 
 async function cleanupInvalidTokens(outbound, results) {
@@ -498,6 +676,14 @@ function timestampToMillis(value) {
   return intValue || 0;
 }
 
+function shouldFinalizeClaim(queueData, claimedVersion) {
+  return (
+    (toInt(queueData?.version) || 0) === claimedVersion &&
+    queueData?.status === "sending" &&
+    (toInt(queueData?.claimedVersion) || 0) === claimedVersion
+  );
+}
+
 async function waitUntil(timestamp) {
   const delayMs = Math.max(0, timestampToMillis(timestamp) - Date.now());
   if (delayMs <= 0) return;
@@ -511,4 +697,10 @@ function sleep(ms) {
 module.exports = {
   queueChatMessageNotification,
   dispatchQueuedChatNotification,
+  maintainChatNotificationQueues,
+  __test: {
+    isDeviceInactiveForDelivery,
+    shouldFinalizeClaim,
+    truncateNotificationText,
+  },
 };

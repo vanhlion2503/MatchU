@@ -16,6 +16,7 @@ import '../../controllers/auth/avatar_controller.dart';
 import '../../services/user/presence_service.dart';
 import '../../services/security/device_service.dart';
 import '../../services/security/message_crypto_service.dart';
+import '../../services/notification/push_device_repository.dart';
 
 class LogoutService {
   static final _auth = FirebaseAuth.instance;
@@ -213,10 +214,8 @@ class LogoutService {
             'signedOutAt': FieldValue.serverTimestamp(),
             'e2eeUpdatedAt': FieldValue.serverTimestamp(),
             'lastActiveAt': FieldValue.serverTimestamp(),
-            'pushEnabled': false,
-            'fcmToken': FieldValue.delete(),
-            'fcmTokenUpdatedAt': FieldValue.delete(),
           }, SetOptions(merge: true));
+      await PushDeviceRepository().markInactive(uid);
     } catch (_) {}
   }
 }

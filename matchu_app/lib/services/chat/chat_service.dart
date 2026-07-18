@@ -144,7 +144,6 @@ class ChatService {
       "iv": encrypted["iv"],
       "keyId": keyId,
       "type": type,
-      "notificationPreview": _buildNotificationPreview(text),
       "replyToId": replyToId,
       "replyText": replyText,
       if (clientMessageId != null) "clientMessageId": clientMessageId,
@@ -365,30 +364,54 @@ class ChatService {
   }
 
   Stream<int> listenTotalUnread() {
-    return _db
-        .collection("chatRooms")
-        .where("participants", arrayContains: uid)
-        .snapshots()
-        .asyncMap((snap) async {
-          Set<String> blockedUserIds = const <String>{};
-          try {
-            blockedUserIds = await _restrictionService.fetchBlockedUserIds();
-          } catch (_) {}
-          int total = 0;
-          for (final doc in snap.docs) {
-            final data = doc.data();
-            final participants = List<String>.from(
-              data["participants"] ?? const [],
-            );
-            final otherUid = _otherUidFromParticipants(participants);
-            if (otherUid.isNotEmpty && blockedUserIds.contains(otherUid)) {
-              continue;
-            }
-            final unread = data["unread"]?[uid] ?? 0;
-            total += unread as int;
-          }
-          return total;
-        });
+    final currentUid = uid;
+    final roomStream =
+        _db
+            .collection("chatRooms")
+            .where("participants", arrayContains: currentUid)
+            .snapshots();
+    final blockedStream = _restrictionService.watchBlockedUserIds();
+
+    late final StreamController<int> controller;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? roomSub;
+    StreamSubscription<Set<String>>? blockedSub;
+    QuerySnapshot<Map<String, dynamic>>? latestRooms;
+    Set<String>? latestBlockedIds;
+
+    void emitIfReady() {
+      final rooms = latestRooms;
+      final blockedIds = latestBlockedIds;
+      if (rooms == null || blockedIds == null || controller.isClosed) return;
+
+      controller.add(
+        calculateTotalUnreadFromRooms(
+          rooms: rooms.docs.map((doc) => doc.data()),
+          currentUid: currentUid,
+          blockedUserIds: blockedIds,
+        ),
+      );
+    }
+
+    controller = StreamController<int>(
+      onListen: () {
+        roomSub = roomStream.listen((snapshot) {
+          latestRooms = snapshot;
+          emitIfReady();
+        }, onError: controller.addError);
+        blockedSub = blockedStream.listen((blockedIds) {
+          latestBlockedIds = blockedIds;
+          emitIfReady();
+        }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await Future.wait([
+          if (roomSub != null) roomSub!.cancel(),
+          if (blockedSub != null) blockedSub!.cancel(),
+        ]);
+      },
+    );
+
+    return controller.stream.distinct();
   }
 
   Future<void> toggleReaction({
@@ -482,25 +505,6 @@ class ChatService {
     }
   }
 
-  String _otherUidFromParticipants(List<String> participants) {
-    return participants.firstWhere(
-      (participant) => participant != uid,
-      orElse: () => '',
-    );
-  }
-
-  String _buildNotificationPreview(String text) {
-    const maxLength = 160;
-    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (normalized.isEmpty) {
-      return "Tin nhắn mới";
-    }
-    if (normalized.length <= maxLength) {
-      return normalized;
-    }
-    return "${normalized.substring(0, maxLength).trimRight()}...";
-  }
-
   String _buildImageNotificationPreview() {
     return "Đã gửi một ảnh";
   }
@@ -525,4 +529,28 @@ class ChatService {
         return 'audio/mp4';
     }
   }
+}
+
+int calculateTotalUnreadFromRooms({
+  required Iterable<Map<String, dynamic>> rooms,
+  required String currentUid,
+  Set<String> blockedUserIds = const <String>{},
+}) {
+  var total = 0;
+  for (final room in rooms) {
+    final participants = List<String>.from(
+      room["participants"] ?? const <String>[],
+    );
+    final otherUid = participants.firstWhere(
+      (participant) => participant != currentUid,
+      orElse: () => '',
+    );
+    if (otherUid.isNotEmpty && blockedUserIds.contains(otherUid)) continue;
+
+    final unreadMap = room["unread"];
+    final unreadValue = unreadMap is Map ? unreadMap[currentUid] : null;
+    final unread = unreadValue is num ? unreadValue.toInt() : 0;
+    if (unread > 0) total += unread;
+  }
+  return total;
 }

@@ -40,6 +40,7 @@ const {
 const {
   queueChatMessageNotification,
   dispatchQueuedChatNotification,
+  maintainChatNotificationQueues,
 } = require("./src/triggers/chatMessageNotifications");
 const {
   createPostLikeNotification,
@@ -48,6 +49,7 @@ const {
 } = require("./src/triggers/socialNotifications");
 const {
   cleanupStaleUserDevices,
+  migrateLegacyNotificationDevices,
 } = require("./src/triggers/deviceMaintenance");
 const {
   generateTelepathyAiInsight,
@@ -123,11 +125,13 @@ exports.claimReputationTask = claimReputationTask;
 exports.getReputationHistory = getReputationHistory;
 exports.queueChatMessageNotification = queueChatMessageNotification;
 exports.dispatchQueuedChatNotification = dispatchQueuedChatNotification;
+exports.maintainChatNotificationQueues = maintainChatNotificationQueues;
 exports.createPostLikeNotification = createPostLikeNotification;
 exports.createPostCommentNotification = createPostCommentNotification;
 exports.createModerationPenaltyNotification =
   createModerationPenaltyNotification;
 exports.cleanupStaleUserDevices = cleanupStaleUserDevices;
+exports.migrateLegacyNotificationDevices = migrateLegacyNotificationDevices;
 exports.migrateTempChatMessages = migrateTempChatMessages;
 exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -111,9 +113,17 @@ void main() async {
   Get.put(CallController(), permanent: true);
   Get.put(AnonymousAvatarController(), permanent: true);
   Get.put(MatchingController(), permanent: true);
-  await notificationController.initialize();
-
   runApp(const MyApp());
+
+  // Notification setup may access the network and request permission. Start it
+  // after the first frame so a slow FCM/Firestore call never blocks app launch.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(
+      notificationController.initialize().catchError((Object error) {
+        debugPrint('Notification initialization failed: $error');
+      }),
+    );
+  });
 }
 
 class MyApp extends StatelessWidget {

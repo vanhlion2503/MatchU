@@ -37,7 +37,7 @@ class PostSearchEntryController extends GetxController {
     _suggestionWorker = debounce<String>(
       query,
       _loadRemoteSuggestions,
-      time: const Duration(milliseconds: 350),
+      time: const Duration(milliseconds: 180),
     );
   }
 
@@ -45,7 +45,7 @@ class PostSearchEntryController extends GetxController {
     query.value = value;
     validationMessage.value = null;
     _setLocalSuggestions(value);
-    if (value.trim().length < 2) {
+    if (!_canRequestRemoteSuggestions(value)) {
       _suggestionRequestVersion++;
       isLoadingSuggestions.value = false;
     }
@@ -96,16 +96,19 @@ class PostSearchEntryController extends GetxController {
       suggestions.clear();
       return;
     }
-    suggestions.assignAll(
-      history
-          .where((item) => item.toLowerCase().contains(normalized))
-          .take(_suggestionLimit),
+    final localHistory = history.where(
+      (item) => item.toLowerCase().contains(normalized),
     );
+    final cached = _suggestionRepository.peek(
+      rawQuery,
+      limit: _suggestionLimit,
+    );
+    suggestions.assignAll(_mergeSuggestions(localHistory, cached));
   }
 
   Future<void> _loadRemoteSuggestions(String rawQuery) async {
     final normalized = _cleanQuery(rawQuery);
-    if (normalized.length < 2) return;
+    if (!_canRequestRemoteSuggestions(normalized)) return;
 
     final requestVersion = ++_suggestionRequestVersion;
     isLoadingSuggestions.value = true;
@@ -116,14 +119,7 @@ class PostSearchEntryController extends GetxController {
       );
       if (requestVersion != _suggestionRequestVersion) return;
 
-      final combined = <String>[];
-      final seen = <String>{};
-      for (final item in [...suggestions, ...remote]) {
-        final key = item.toLowerCase();
-        if (seen.add(key)) combined.add(item);
-        if (combined.length == _suggestionLimit) break;
-      }
-      suggestions.assignAll(combined);
+      suggestions.assignAll(_mergeSuggestions(suggestions, remote));
     } catch (_) {
       // Local-history suggestions remain usable when the network is offline.
     } finally {
@@ -135,6 +131,27 @@ class PostSearchEntryController extends GetxController {
 
   String _cleanQuery(String value) =>
       value.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+  bool _canRequestRemoteSuggestions(String rawQuery) {
+    final terms = _cleanQuery(
+      rawQuery,
+    ).replaceAll(RegExp(r'[^\p{L}\p{N}]+', unicode: true), ' ').split(' ');
+    return terms.any((term) => term.length >= 4);
+  }
+
+  List<String> _mergeSuggestions(
+    Iterable<String> primary,
+    Iterable<String> secondary,
+  ) {
+    final combined = <String>[];
+    final seen = <String>{};
+    for (final item in [...primary, ...secondary]) {
+      final key = item.toLowerCase();
+      if (seen.add(key)) combined.add(item);
+      if (combined.length == _suggestionLimit) break;
+    }
+    return combined;
+  }
 
   @override
   void onClose() {
