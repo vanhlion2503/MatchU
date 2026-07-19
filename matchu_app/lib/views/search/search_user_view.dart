@@ -8,6 +8,7 @@ import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:matchu_app/widgets/user_list_shimmer.dart';
 
 class SearchUserView extends StatelessWidget {
   SearchUserView({super.key});
@@ -97,7 +98,7 @@ class SearchUserView extends StatelessWidget {
             Expanded(
               child: Obx(() {
                 if (suc.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const UserListShimmer();
                 }
 
                 if (suc.results.isEmpty) {

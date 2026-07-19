@@ -6,6 +6,7 @@ import 'package:matchu_app/views/profile/follower_tab_view.dart';
 import 'package:matchu_app/views/profile/following_tab_view.dart';
 import 'package:matchu_app/widgets/back_circle_button.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:matchu_app/widgets/user_list_shimmer.dart';
 
 class FollowTabView extends StatefulWidget {
   final String userId;
@@ -50,9 +51,9 @@ class _FollowTabViewState extends State<FollowTabView>
     final textTheme = Theme.of(context).textTheme;
 
     return Obx(() {
-      // Loading user → show spinner
+      // Keep the list layout stable while the profile header is loading.
       if (c.user.value == null) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(body: SafeArea(child: UserListShimmer()));
       }
 
       final user = c.user.value!;

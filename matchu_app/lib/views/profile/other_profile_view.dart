@@ -14,6 +14,7 @@ import 'package:matchu_app/views/profile/avatar_fullscreen_view.dart';
 import 'package:matchu_app/views/profile/follow_tab_view.dart';
 import 'package:matchu_app/views/profile/profile_widget/profile_widget.dart';
 import 'package:matchu_app/views/profile/widgets/profile_posts_section.dart';
+import 'package:matchu_app/views/profile/widgets/other_profile_shimmer.dart';
 import 'package:matchu_app/views/report/profile_user_report_bottom_sheet.dart';
 import 'package:matchu_app/widgets/profile_interests_wrap.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
@@ -99,7 +100,7 @@ class OtherProfileView extends StatelessWidget {
       ),
       body: Obx(() {
         if (c.isLoadingBlockState.value || c.user.value == null) {
-          return const Center(child: CircularProgressIndicator());
+          return const OtherProfileShimmer();
         }
 
         final UserModel u = c.user.value!;

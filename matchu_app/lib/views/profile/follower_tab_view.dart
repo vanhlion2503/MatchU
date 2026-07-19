@@ -5,6 +5,7 @@ import 'package:matchu_app/controllers/profile/followers_controller.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:matchu_app/widgets/user_list_shimmer.dart';
 
 class FollowersView extends StatelessWidget {
   final String userId;
@@ -21,7 +22,7 @@ class FollowersView extends StatelessWidget {
 
     return Obx(() {
       if (c.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
+        return const UserListShimmer();
       }
 
       if (c.followers.isEmpty) {
