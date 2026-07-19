@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/post_search_result.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
+import 'package:matchu_app/repositories/profile_privacy/profile_privacy_access_repository.dart';
 
 class PostSearchRepository {
   PostSearchRepository({
@@ -11,10 +12,13 @@ class PostSearchRepository {
     FirebaseFunctions? functions,
     FirebaseAuth? auth,
     PostService? postService,
+    ProfilePrivacyAccessRepository? privacyAccessRepository,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _functions = functions ?? FirebaseFunctions.instance,
        _auth = auth ?? FirebaseAuth.instance,
-       _postService = postService ?? PostService();
+       _postService = postService ?? PostService(),
+       _privacyAccessRepository =
+           privacyAccessRepository ?? ProfilePrivacyAccessRepository();
 
   static const int pageSize = 20;
 
@@ -22,6 +26,7 @@ class PostSearchRepository {
   final FirebaseFunctions _functions;
   final FirebaseAuth _auth;
   final PostService _postService;
+  final ProfilePrivacyAccessRepository _privacyAccessRepository;
 
   String get currentUserId => _auth.currentUser?.uid.trim() ?? '';
 
@@ -122,6 +127,10 @@ class PostSearchRepository {
         isReposted: states[2][entry.key] ?? false,
       );
     }
+    final accessiblePosts = await _privacyAccessRepository
+        .filterAccessiblePosts(postsById.values);
+    final accessibleIds = accessiblePosts.map((post) => post.postId).toSet();
+    postsById.removeWhere((postId, _) => !accessibleIds.contains(postId));
     return postsById;
   }
 

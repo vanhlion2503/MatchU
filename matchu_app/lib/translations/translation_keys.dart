@@ -13,6 +13,7 @@ abstract final class TranslationKeys {
   static const activityCenter = 'activity_center';
   static const likedYou = 'liked_you';
   static const followingList = 'following_list';
+  static const privateAccount = 'private_account';
   static const restrictionList = 'restriction_list';
   static const system = 'system';
   static const appSettings = 'app_settings';

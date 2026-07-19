@@ -21,17 +21,28 @@ class _FollowTabViewState extends State<FollowTabView>
     with SingleTickerProviderStateMixin {
   late TabController tabC;
   late OtherProfileController c;
+  late final String _controllerTag;
 
   @override
   void initState() {
     super.initState();
-    c = Get.put(OtherProfileController(widget.userId));
+    _controllerTag = 'follow_tab_${widget.userId}';
+    c = Get.put(OtherProfileController(widget.userId), tag: _controllerTag);
 
     tabC = TabController(
       length: 2,
       vsync: this,
       initialIndex: widget.initialIndex,
     );
+  }
+
+  @override
+  void dispose() {
+    tabC.dispose();
+    if (Get.isRegistered<OtherProfileController>(tag: _controllerTag)) {
+      Get.delete<OtherProfileController>(tag: _controllerTag);
+    }
+    super.dispose();
   }
 
   @override

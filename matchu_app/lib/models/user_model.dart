@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/models/profile_privacy_settings.dart';
 
 class UserModel {
   final String uid;
@@ -37,6 +38,8 @@ class UserModel {
 
   final List<String> followers; // Danh sách người theo dõi
   final List<String> following; // Danh sách mình theo dõi
+  final FollowingListVisibility followingListVisibility;
+  final bool isPrivateAccount;
 
   final int rank;
   final int experience;
@@ -94,6 +97,8 @@ class UserModel {
 
     this.followers = const [],
     this.following = const [],
+    this.followingListVisibility = FollowingListVisibility.everyone,
+    this.isPrivateAccount = false,
 
     this.rank = 1,
     this.experience = 0,
@@ -154,6 +159,8 @@ class UserModel {
 
       "followers": followers,
       "following": following,
+      "followingListVisibility": followingListVisibility.firestoreValue,
+      "isPrivateAccount": isPrivateAccount,
 
       "rank": rank,
       "experience": experience,
@@ -242,6 +249,10 @@ class UserModel {
 
       followers: List<String>.from(json["followers"] ?? []),
       following: List<String>.from(json["following"] ?? []),
+      followingListVisibility: FollowingListVisibility.fromFirestore(
+        json["followingListVisibility"],
+      ),
+      isPrivateAccount: parseBool(json["isPrivateAccount"]),
 
       rank: json["rank"] ?? 1,
       experience: json["experience"] ?? 0,
@@ -303,6 +314,8 @@ class UserModel {
 
     List<String>? followers,
     List<String>? following,
+    FollowingListVisibility? followingListVisibility,
+    bool? isPrivateAccount,
 
     int? rank,
     int? experience,
@@ -363,6 +376,9 @@ class UserModel {
 
       followers: followers ?? this.followers,
       following: following ?? this.following,
+      followingListVisibility:
+          followingListVisibility ?? this.followingListVisibility,
+      isPrivateAccount: isPrivateAccount ?? this.isPrivateAccount,
 
       rank: rank ?? this.rank,
       experience: experience ?? this.experience,

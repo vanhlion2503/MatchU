@@ -31,11 +31,13 @@ class ProfilePostsSection extends StatefulWidget {
     required this.controllerTag,
     required this.isOwnerView,
     this.savedControllerTag,
+    this.canViewPosts = true,
   });
 
   final String controllerTag;
   final bool isOwnerView;
   final String? savedControllerTag;
+  final bool canViewPosts;
 
   @override
   State<ProfilePostsSection> createState() => _ProfilePostsSectionState();
@@ -95,6 +97,27 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.canViewPosts) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+        child: Column(
+          children: [
+            Icon(
+              Iconsax.lock,
+              size: 34,
+              color: Theme.of(context).textTheme.bodySmall?.color,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Tài khoản riêng tư — hãy theo dõi để xem bài viết.'.tr,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ],
+        ),
+      );
+    }
+
     final postsController = Get.find<ProfilePostsController>(
       tag: widget.controllerTag,
     );

@@ -31,6 +31,8 @@ class AppRouter {
   static const String deviceSessions = '/account-security/devices';
   static const String deleteAccount = '/account-security/delete-account';
   static const String restrictionList = '/restriction-list';
+  static const String followingListPrivacy = '/following-list-privacy';
+  static const String privateAccount = '/private-account';
 
   static const String matching = '/matching';
   static const String tempChat = '/tempChat';

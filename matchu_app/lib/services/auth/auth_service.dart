@@ -282,6 +282,8 @@ class AuthService {
 
       "followers": [],
       "following": [],
+      "followingListVisibility": "everyone",
+      "isPrivateAccount": false,
 
       "rank": 1,
       "experience": 0,

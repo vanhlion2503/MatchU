@@ -13,6 +13,7 @@ import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/post_page_result.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/repositories/profile_privacy/profile_privacy_access_repository.dart';
 import 'package:matchu_app/services/feed/post_text_moderation_service.dart';
 import 'package:matchu_app/utils/topic_taxonomy.dart';
 import 'package:matchu_app/services/moderation/image_moderation_service.dart';
@@ -28,6 +29,7 @@ class PostService {
     UserService? userService,
     PostTextModerationService? textModerationService,
     ImageModerationService? imageModerationService,
+    ProfilePrivacyAccessRepository? privacyAccessRepository,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
@@ -35,7 +37,9 @@ class PostService {
        _textModerationService =
            textModerationService ?? PostTextModerationService(),
        _imageModerationService =
-           imageModerationService ?? ImageModerationService();
+           imageModerationService ?? ImageModerationService(),
+       _privacyAccessRepository =
+           privacyAccessRepository ?? ProfilePrivacyAccessRepository();
 
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
@@ -51,6 +55,7 @@ class PostService {
   final UserService _userService;
   final PostTextModerationService _textModerationService;
   final ImageModerationService _imageModerationService;
+  final ProfilePrivacyAccessRepository _privacyAccessRepository;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -585,6 +590,9 @@ class PostService {
 
     final post = PostModel.fromDoc(doc);
     if (post.deletedAt != null) return null;
+    if (!await _privacyAccessRepository.canViewAuthorPosts(post.authorId)) {
+      return null;
+    }
     return post;
   }
 
@@ -592,10 +600,13 @@ class PostService {
     final normalizedPostId = postId.trim();
     if (normalizedPostId.isEmpty) return const Stream<PostModel?>.empty();
 
-    return _postsRef.doc(normalizedPostId).snapshots().map((doc) {
+    return _postsRef.doc(normalizedPostId).snapshots().asyncMap((doc) async {
       if (!doc.exists) return null;
       final post = PostModel.fromDoc(doc);
       if (post.deletedAt != null) return null;
+      if (!await _privacyAccessRepository.canViewAuthorPosts(post.authorId)) {
+        return null;
+      }
       return post;
     });
   }
@@ -682,8 +693,16 @@ class PostService {
           }
         }
 
+        final accessiblePosts = await _privacyAccessRepository
+            .filterAccessiblePosts(collectedPosts);
+        final accessiblePostIds =
+            accessiblePosts.map((post) => post.postId).toSet();
+        savedAtByPostId.removeWhere(
+          (postId, _) => !accessiblePostIds.contains(postId),
+        );
+
         return PostPageResult(
-          posts: collectedPosts,
+          posts: accessiblePosts,
           lastDocument: cursor,
           hasMore: canLoadMore,
           savedAtByPostId: savedAtByPostId,

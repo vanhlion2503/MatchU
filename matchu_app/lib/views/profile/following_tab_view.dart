@@ -13,12 +13,27 @@ class FollowingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final FollowingController c = Get.put(FollowingController(userId));
+    final FollowingController c = Get.put(
+      FollowingController(userId),
+      tag: userId,
+    );
     final textTheme = Theme.of(context).textTheme;
 
     return Obx(() {
       if (c.isLoading.value) {
         return const Center(child: CircularProgressIndicator());
+      }
+
+      if (c.accessDenied.value) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Danh sách đang theo dõi này được đặt ở chế độ riêng tư.'.tr,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
       }
 
       if (c.users.isEmpty) {

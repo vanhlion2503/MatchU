@@ -10,6 +10,29 @@ const profileEnglishTranslations = <String, String>{
   ProfileTranslationKeys.error: 'Error',
   ProfileTranslationKeys.success: 'Success',
   ProfileTranslationKeys.notice: 'Notice',
+  'Danh sách đang theo dõi': 'Following list',
+  'Chọn người có thể xem danh sách tài khoản mà bạn đang theo dõi.':
+      'Choose who can see the accounts you follow.',
+  'Mọi người': 'Everyone',
+  'Ai cũng có thể xem danh sách đang theo dõi của bạn.':
+      'Anyone can see your following list.',
+  'Người theo dõi': 'Followers',
+  'Chỉ người đang theo dõi bạn mới có thể xem.':
+      'Only people who follow you can see it.',
+  'Chỉ mình tôi': 'Only me',
+  'Chỉ bạn mới có thể xem danh sách này.': 'Only you can see this list.',
+  'Tài khoản riêng tư': 'Private account',
+  'Khi bật, chỉ những người đang theo dõi bạn mới có thể xem bài viết. Bạn luôn có thể xem bài viết của chính mình.':
+      'When enabled, only your followers can see your posts. You can always see your own posts.',
+  'Tài khoản của bạn hiện đang ở chế độ riêng tư.':
+      'Your account is currently private.',
+  'Tài khoản của bạn đang hiển thị bài viết bình thường.':
+      'Your posts are currently visible normally.',
+  'Không thể cập nhật quyền riêng tư.': 'Unable to update privacy settings.',
+  'Danh sách đang theo dõi này được đặt ở chế độ riêng tư.':
+      'This following list is private.',
+  'Tài khoản riêng tư — hãy theo dõi để xem bài viết.':
+      'Private account — follow to see posts.',
   'Không tìm thấy hồ sơ người dùng.': 'User profile not found.',
   'Tài khoản chưa xác thực': 'Unverified account',
   'Tài khoản này chưa xác thực': 'This account is not verified',

@@ -352,14 +352,31 @@ service cloud.firestore {
         return isOwner()
           && isValidReputationCreateDefaults()
           && isValidFaceVerificationCreateDefaults()
-          && isValidRecommendationCreateDefaults();
+          && isValidRecommendationCreateDefaults()
+          && hasValidProfilePrivacySettings();
+      }
+
+      function hasValidProfilePrivacySettings() {
+        return (
+          !("followingListVisibility" in request.resource.data)
+          || request.resource.data.followingListVisibility in [
+            "everyone",
+            "followers",
+            "only_me"
+          ]
+        )
+        && (
+          !("isPrivateAccount" in request.resource.data)
+          || request.resource.data.isPrivateAccount is bool
+        );
       }
 
       function isOwnerSafeUpdate() {
         return isOwner()
           && !touchesServerManagedReputationFields()
           && !touchesServerManagedFaceVerificationFields()
-          && !touchesServerManagedRecommendationFields();
+          && !touchesServerManagedRecommendationFields()
+          && hasValidProfilePrivacySettings();
       }
 
       allow read: if isSignedIn();

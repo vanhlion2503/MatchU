@@ -13,7 +13,10 @@ class FollowersView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final FollowersController c = Get.put(FollowersController(userId));
+    final FollowersController c = Get.put(
+      FollowersController(userId),
+      tag: userId,
+    );
     final textTheme = Theme.of(context).textTheme;
 
     return Obx(() {

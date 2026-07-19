@@ -100,14 +100,20 @@ class RightSideMenu {
                                   onTap: () => Get.toNamed("/activity-center"),
                                 ),
                                 menuItem(
-                                  icon: Iconsax.heart,
-                                  text: TranslationKeys.likedYou.tr,
-                                  onTap: () => Get.toNamed("/liked-you"),
-                                ),
-                                menuItem(
                                   icon: Iconsax.profile_2user,
                                   text: TranslationKeys.followingList.tr,
-                                  onTap: () => Get.toNamed("/following-list"),
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed(AppRouter.followingListPrivacy);
+                                  },
+                                ),
+                                menuItem(
+                                  icon: Iconsax.lock,
+                                  text: TranslationKeys.privateAccount.tr,
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed(AppRouter.privateAccount);
+                                  },
                                 ),
                                 menuItem(
                                   icon: Iconsax.user_remove,

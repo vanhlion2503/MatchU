@@ -9,6 +9,7 @@ import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
+import 'package:matchu_app/repositories/profile_privacy/profile_privacy_access_repository.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/services/feed/recommendation_service.dart';
@@ -23,11 +24,14 @@ class FeedController extends GetxController {
     PostService? postService,
     RecommendationService? recommendationService,
     PostRestrictionService? restrictionService,
+    ProfilePrivacyAccessRepository? privacyAccessRepository,
     GetStorage? storage,
   }) : _service = postService ?? PostService(),
        _recommendationService =
            recommendationService ?? RecommendationService(),
        _restrictionService = restrictionService ?? PostRestrictionService(),
+       _privacyAccessRepository =
+           privacyAccessRepository ?? ProfilePrivacyAccessRepository(),
        _storage = storage ?? GetStorage();
 
   static const int _pageSize = 10;
@@ -40,6 +44,7 @@ class FeedController extends GetxController {
   final PostService _service;
   final RecommendationService _recommendationService;
   final PostRestrictionService _restrictionService;
+  final ProfilePrivacyAccessRepository _privacyAccessRepository;
   final GetStorage _storage;
 
   final RxList<PostModel> posts = <PostModel>[].obs;
@@ -1242,7 +1247,12 @@ class FeedController extends GetxController {
     List<PostModel> incoming, {
     required bool reset,
   }) async {
-    final likedHydratedPosts = await _attachLikeStates(incoming, reset: reset);
+    final privacyFilteredPosts = await _privacyAccessRepository
+        .filterAccessiblePosts(incoming);
+    final likedHydratedPosts = await _attachLikeStates(
+      privacyFilteredPosts,
+      reset: reset,
+    );
     final repostHydratedPosts = await _attachRepostStates(
       likedHydratedPosts,
       reset: reset,

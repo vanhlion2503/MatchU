@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:matchu_app/models/profile_privacy_settings.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
@@ -12,6 +13,7 @@ class FollowingController extends GetxController {
 
   RxList<UserModel> users = <UserModel>[].obs;
   RxBool isLoading = false.obs;
+  RxBool accessDenied = false.obs;
 
   @override
   void onInit() {
@@ -21,23 +23,51 @@ class FollowingController extends GetxController {
 
   Future<void> loadFollowing() async {
     isLoading.value = true;
+    accessDenied.value = false;
+    try {
+      final targetUser = await _userService.getUser(userId);
+      if (targetUser == null) return;
 
-    final targetUser = await _userService.getUser(userId);
-    if (targetUser == null) {
+      if (!await _canViewFollowingList(targetUser)) {
+        users.clear();
+        accessDenied.value = true;
+        return;
+      }
+
+      final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
+      final list = <UserModel>[];
+      for (final id in targetUser.following) {
+        if (blockedUserIds.contains(id.trim())) continue;
+        final user = await _userService.getUser(id);
+        if (user != null) list.add(user);
+      }
+
+      users.assignAll(list);
+    } finally {
       isLoading.value = false;
-      return;
+    }
+  }
+
+  Future<bool> _canViewFollowingList(UserModel targetUser) async {
+    final currentUid = _userService.uid;
+    final isOwner = currentUid == targetUser.uid;
+    if (isOwner) return true;
+
+    if (targetUser.followingListVisibility ==
+        FollowingListVisibility.everyone) {
+      return true;
+    }
+    if (targetUser.followingListVisibility == FollowingListVisibility.onlyMe) {
+      return false;
     }
 
-    final blockedUserIds = await _restrictionService.fetchBlockedUserIds();
-    List<UserModel> list = [];
-    for (String id in targetUser.following) {
-      if (blockedUserIds.contains(id.trim())) continue;
-      final u = await _userService.getUser(id);
-      if (u != null) list.add(u);
-    }
-
-    users.assignAll(list);
-    isLoading.value = false;
+    // Check from the viewer's own `following` list. This is the direct answer
+    // to "is the viewer following this profile?" and avoids reversing the
+    // relationship with the profile owner's `followers` array.
+    final isViewerFollowingOwner = await _userService.isFollowing(
+      targetUser.uid,
+    );
+    return isViewerFollowingOwner;
   }
 
   void applyUserBlocked(String userId) {

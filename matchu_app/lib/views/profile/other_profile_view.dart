@@ -113,6 +113,7 @@ class OtherProfileView extends StatelessWidget {
           );
         }
         final bool canSeeFollowersOnly = isMe || c.isFollowing.value;
+        final bool canViewPosts = !u.isPrivateAccount || canSeeFollowersOnly;
         final postsTag = ProfilePostsController.otherProfileTag(
           u.uid,
           includePrivate: isMe,
@@ -120,7 +121,8 @@ class OtherProfileView extends StatelessWidget {
         );
         final savedPostsTag =
             isMe ? ProfilePostsController.ownerSavedTag(u.uid) : null;
-        if (!Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
+        if (canViewPosts &&
+            !Get.isRegistered<ProfilePostsController>(tag: postsTag)) {
           Get.put(
             ProfilePostsController(
               userId: u.uid,
@@ -447,6 +449,7 @@ class OtherProfileView extends StatelessWidget {
                 controllerTag: postsTag,
                 isOwnerView: isMe,
                 savedControllerTag: savedPostsTag,
+                canViewPosts: canViewPosts,
               ),
             ],
           ),
