@@ -121,6 +121,10 @@ const accountSecurityEnglishTranslations = <String, String>{
   'Không tìm thấy số điện thoại MFA để xác thực.':
       'No MFA phone number was found for verification.',
   'Số điện thoại này đã được sử dụng.': 'This phone number is already in use.',
+  'Không thể xác nhận số điện thoại bảo mật mới.':
+      'Unable to confirm the new security phone number.',
+  'Phiên đăng nhập đã thay đổi. Vui lòng thử lại.':
+      'The signed-in session changed. Please try again.',
   'Một thao tác bảo mật khác đang được xử lý.':
       'Another security action is already in progress.',
   'Vui lòng xác thực lại trước khi tiếp tục.':

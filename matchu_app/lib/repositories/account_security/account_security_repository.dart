@@ -305,46 +305,73 @@ class AccountSecurityRepository {
     required PhoneChangeChallenge challenge,
     required String smsCode,
   }) async {
-    final user = _currentUser;
-    final previousFactors = await user.multiFactor.getEnrolledFactors();
-    final previousFactorIds =
-        previousFactors.map((factor) => factor.uid).toSet();
-    final credential =
-        challenge.credential ??
-        PhoneAuthProvider.credential(
-          verificationId: challenge.verificationId,
-          smsCode: smsCode,
-        );
-    final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
+    final initialUser = _currentUser;
+    final userId = initialUser.uid;
+    var factors = await initialUser.multiFactor.getEnrolledFactors();
+    var targetFactor = _findPhoneFactor(factors, challenge.phoneNumber);
 
-    // Enroll first so the account never has a gap without its required MFA.
-    await user.multiFactor.enroll(assertion, displayName: 'SMS');
-    final updatedFactors = await user.multiFactor.getEnrolledFactors();
-    final newFactor =
-        updatedFactors
-            .whereType<PhoneMultiFactorInfo>()
-            .where((factor) => !previousFactorIds.contains(factor.uid))
-            .firstOrNull;
+    if (targetFactor == null) {
+      final credential =
+          challenge.credential ??
+          PhoneAuthProvider.credential(
+            verificationId: challenge.verificationId,
+            smsCode: smsCode,
+          );
+      final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
 
-    try {
-      await user.updatePhoneNumber(credential);
-    } on FirebaseAuthException {
-      // The MFA enrollment is the source of truth; some Firebase platforms do
-      // not allow reusing the same SMS credential for the phone provider.
+      // Enrolling a factor rotates the current user's auth tokens. Do not keep
+      // using [initialUser] after this call; reacquire it from FirebaseAuth.
+      await initialUser.multiFactor.enroll(assertion, displayName: 'SMS');
+      final enrolledUser = _currentUserForUid(userId);
+      factors = await enrolledUser.multiFactor.getEnrolledFactors();
+      targetFactor = _findPhoneFactor(factors, challenge.phoneNumber);
+      if (targetFactor == null) {
+        throw StateError('Không thể xác nhận số điện thoại bảo mật mới.');
+      }
     }
 
-    await _firestore.collection('users').doc(user.uid).set({
+    // Remove every older SMS factor while retaining the newly verified one.
+    // Reacquire currentUser after each MFA mutation because native Firebase
+    // SDKs can replace its token-bearing instance.
+    final obsoleteFactors =
+        factors
+            .whereType<PhoneMultiFactorInfo>()
+            .where((factor) => factor.uid != targetFactor!.uid)
+            .toList();
+    for (final factor in obsoleteFactors) {
+      await _currentUserForUid(
+        userId,
+      ).multiFactor.unenroll(factorUid: factor.uid);
+    }
+
+    final activeUser = _currentUserForUid(userId);
+    await _firestore.collection('users').doc(activeUser.uid).set({
       'phonenumber': challenge.phoneNumber,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
 
-    if (newFactor != null) {
-      for (final factor in previousFactors.whereType<PhoneMultiFactorInfo>()) {
-        await user.multiFactor.unenroll(factorUid: factor.uid);
-      }
+  PhoneMultiFactorInfo? _findPhoneFactor(
+    List<MultiFactorInfo> factors,
+    String phoneNumber,
+  ) {
+    final expected = phoneNumber.replaceAll(RegExp(r'\s+'), '').trim();
+    return factors
+        .whereType<PhoneMultiFactorInfo>()
+        .where(
+          (factor) =>
+              factor.phoneNumber.replaceAll(RegExp(r'\s+'), '').trim() ==
+              expected,
+        )
+        .firstOrNull;
+  }
+
+  User _currentUserForUid(String expectedUid) {
+    final user = _currentUser;
+    if (user.uid != expectedUid) {
+      throw StateError('Phiên đăng nhập đã thay đổi. Vui lòng thử lại.');
     }
-    await user.reload();
-    await _currentUser.getIdToken(true);
+    return user;
   }
 
   Future<void> revokeAllSessions() async {
