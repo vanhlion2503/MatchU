@@ -18,6 +18,14 @@ function safeSessionId(value) {
   return /^[A-Za-z0-9_-]{8,100}$/.test(normalized) ? normalized : "";
 }
 
+function safePostIds(value, limit = 100) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value
+    .map((postId) => typeof postId === "string" ? postId.trim() : "")
+    .filter((postId) => postId && postId.length <= 160)))
+    .slice(0, limit);
+}
+
 function sessionRef(uid, sessionId) {
   return db.collection("users").doc(uid).collection("feedSessions").doc(sessionId);
 }
@@ -34,9 +42,24 @@ const recommendPosts = onCall(
     let page = Math.max(Number(request.data?.page) || 1, 1);
     const forceRefresh = request.data?.forceRefresh === true;
     const requestedSessionId = safeSessionId(request.data?.sessionId);
+    const previousSessionId = safeSessionId(request.data?.previousSessionId);
+    const excludedPostIds = new Set(
+      safePostIds(request.data?.excludedPostIds),
+    );
 
     try {
       const nowMillis = Date.now();
+      if (forceRefresh && previousSessionId) {
+        const previousSessionSnap = await sessionRef(uid, previousSessionId).get();
+        if (previousSessionSnap.exists) {
+          for (const postId of safePostIds(
+            previousSessionSnap.data()?.servedPostIds,
+            140,
+          )) {
+            excludedPostIds.add(postId);
+          }
+        }
+      }
       let sessionId = forceRefresh ? "" : requestedSessionId;
       let session = null;
       if (sessionId) {
@@ -72,6 +95,7 @@ const recommendPosts = onCall(
         const pool = await getOrBuildRecommendationPool(uid, {
           forceRefresh,
           seed,
+          excludedPostIds: Array.from(excludedPostIds).slice(0, 200),
         });
         session = {
           postIds: pool.postIds,
@@ -87,6 +111,8 @@ const recommendPosts = onCall(
           sessionId,
           servedPostIds: [],
           algorithmVersion: session.metadata.algorithmVersion || "unknown",
+          previousSessionId: previousSessionId || null,
+          refreshExcludedPostCount: excludedPostIds.size,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           expiresAt: admin.firestore.Timestamp.fromMillis(session.expiresAtMillis),
         });
@@ -115,6 +141,8 @@ const recommendPosts = onCall(
           requestError: null,
           totalRecommended: selectedPostIds.length,
           pagePoolSize: session.postIds.length,
+          refreshExcludedPostCount:
+            Number(session.refreshExcludedPostCount) || excludedPostIds.size,
         },
         generatedAt: new Date().toISOString(),
       };

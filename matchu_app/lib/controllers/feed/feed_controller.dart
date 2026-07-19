@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/feed/feed_engagement_controller.dart';
 import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:get_storage/get_storage.dart';
@@ -351,6 +352,18 @@ class FeedController extends GetxController {
   }
 
   Future<void> refreshFeaturedFeed() async {
+    final engagementController = _engagementControllerOrNull;
+    if (engagementController != null) {
+      try {
+        await engagementController.flushVisibleAndWait().timeout(
+          const Duration(seconds: 2),
+        );
+      } catch (error) {
+        // Local recent IDs still prevent immediate repeats when Firestore is
+        // temporarily slow or unavailable.
+        debugPrint('Timed out while flushing feed impressions: $error');
+      }
+    }
     await _loadFeaturedFeed(reset: true, isManualRefresh: true);
   }
 
@@ -488,6 +501,7 @@ class FeedController extends GetxController {
         ),
       ),
     );
+    if (delta > 0) _markPostInteracted(postId);
   }
 
   void adjustShareCount(String postId, {int delta = 1}) {
@@ -502,6 +516,7 @@ class FeedController extends GetxController {
         ),
       ),
     );
+    if (delta > 0) _markPostInteracted(postId);
   }
 
   bool isPostReposted(PostModel sourcePost) {
@@ -839,6 +854,13 @@ class FeedController extends GetxController {
     bool isManualRefresh = false,
   }) async {
     final hadPostsBeforeRequest = featuredPosts.isNotEmpty;
+    final previousSessionId =
+        reset && isManualRefresh ? _featuredSessionId : null;
+    final clientExcludedPostIds =
+        reset && isManualRefresh
+            ? _engagementControllerOrNull?.recentPostIds(limit: 100) ??
+                const <String>[]
+            : const <String>[];
 
     if (reset) {
       if (featuredIsRefreshing.value) return;
@@ -896,6 +918,12 @@ class FeedController extends GetxController {
           limit: _pageSize,
           page: reset && requestCount == 0 ? 1 : _featuredLastLoadedPage + 1,
           sessionId: reset && requestCount == 0 ? null : _featuredSessionId,
+          previousSessionId:
+              reset && requestCount == 0 ? previousSessionId : null,
+          excludedPostIds:
+              reset && requestCount == 0
+                  ? clientExcludedPostIds
+                  : const <String>[],
           forceRefresh: reset && isManualRefresh && requestCount == 0,
         );
         requestCount++;
@@ -1284,6 +1312,7 @@ class FeedController extends GetxController {
     _replacePost(optimisticPost);
     _likeCache[postId] = shouldLike;
     _queuedLikeStates[postId] = shouldLike;
+    if (shouldLike) _markPostInteracted(postId);
     unawaited(_syncLikeState(postId));
   }
 
@@ -1300,6 +1329,7 @@ class FeedController extends GetxController {
     _replacePost(optimisticPost);
     _savedCache[postId] = shouldSave;
     _queuedSavedStates[postId] = shouldSave;
+    if (shouldSave) _markPostInteracted(postId);
     _syncSavedStateToProfile(
       optimisticPost.copyWith(isSavePending: false),
       isSaved: shouldSave,
@@ -2203,6 +2233,15 @@ class FeedController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
       margin: const EdgeInsets.all(12),
     );
+  }
+
+  FeedEngagementController? get _engagementControllerOrNull {
+    if (!Get.isRegistered<FeedEngagementController>()) return null;
+    return Get.find<FeedEngagementController>();
+  }
+
+  void _markPostInteracted(String postId) {
+    _engagementControllerOrNull?.markInteracted(postId);
   }
 
   @override

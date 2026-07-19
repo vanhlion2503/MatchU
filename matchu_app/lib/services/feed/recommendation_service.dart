@@ -36,6 +36,8 @@ class RecommendationService {
     int limit = 20,
     int page = 1,
     String? sessionId,
+    String? previousSessionId,
+    List<String> excludedPostIds = const <String>[],
     bool forceRefresh = false,
   }) async {
     final stopwatch = Stopwatch()..start();
@@ -65,6 +67,14 @@ class RecommendationService {
         'forceRefresh': forceRefresh,
         if (sessionId?.trim().isNotEmpty == true)
           'sessionId': sessionId!.trim(),
+        if (previousSessionId?.trim().isNotEmpty == true)
+          'previousSessionId': previousSessionId!.trim(),
+        if (excludedPostIds.isNotEmpty)
+          'excludedPostIds': excludedPostIds
+              .map((postId) => postId.trim())
+              .where((postId) => postId.isNotEmpty)
+              .take(100)
+              .toList(growable: false),
       });
       final data = Map<String, dynamic>.from(response.data);
       final resolvedSessionId = data['sessionId']?.toString().trim();

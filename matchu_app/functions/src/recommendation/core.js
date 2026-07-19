@@ -34,12 +34,20 @@ const DISCOVERY_FRESHNESS_BASELINE = 0.35;
 const DISCOVERY_HALF_LIFE_DAYS = 30;
 const INTEREST_HALF_LIFE_DAYS = 30;
 const MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL = 3;
-const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v4_adaptive_discovery";
+const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v5_novelty_cooldown";
 const RECOMMENDATION_FEED_STATE_PATH = "system/recommendationFeedState";
 const RECENT_SEEN_WINDOW_MS = 30 * 60 * 1000;
 const IMPRESSION_FREQUENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const VIEW_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const LONG_VIEW_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 const MAX_SEEN_PENALTY = 0.40;
 const QUALIFIED_DWELL_MS = 5000;
+const INTERACTION_COOLDOWN_MS = Object.freeze({
+  like: 24 * 60 * 60 * 1000,
+  comment: 24 * 60 * 60 * 1000,
+  save: 48 * 60 * 60 * 1000,
+  share: 24 * 60 * 60 * 1000,
+});
 
 const ACTION_WEIGHTS = Object.freeze({
   dwell: 0.35,
@@ -608,6 +616,62 @@ async function loadFeedImpressions(uid) {
   return new Map(snap.docs.map((doc) => [doc.id, doc.data() || {}]));
 }
 
+function interactionCooldownMs(action) {
+  return Math.max(0, Number(INTERACTION_COOLDOWN_MS[action]) || 0);
+}
+
+async function loadRecentActiveInteractions(uid, nowMillis = Date.now()) {
+  const snap = await db.collection("users").doc(uid)
+    .collection("recommendationInteractions")
+    .orderBy("createdAtMillis", "desc")
+    .limit(INTERACTION_HISTORY_LIMIT)
+    .get();
+  const byPostId = new Map();
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    if (data.active === false) continue;
+    const postId = typeof data.postId === "string" ? data.postId.trim() : "";
+    const cooldownMs = interactionCooldownMs(data.action);
+    const occurredAtMillis = Number(data.createdAtMillis) ||
+      toMillis(data.createdAt);
+    if (!postId || !cooldownMs || !occurredAtMillis) continue;
+    const cooldownUntilMillis = occurredAtMillis + cooldownMs;
+    if (cooldownUntilMillis <= nowMillis) continue;
+    const existing = byPostId.get(postId);
+    if (!existing || existing.cooldownUntilMillis < cooldownUntilMillis) {
+      byPostId.set(postId, {
+        action: data.action,
+        cooldownUntilMillis,
+      });
+    }
+  }
+  return byPostId;
+}
+
+function noveltySuppressionReason({
+  postId,
+  impression,
+  interaction,
+  excludedPostIds,
+  nowMillis = Date.now(),
+}) {
+  if (excludedPostIds?.has(postId)) return "refresh_history";
+  if (Number(interaction?.cooldownUntilMillis) > nowMillis) {
+    return `recent_${interaction.action || "interaction"}`;
+  }
+
+  const lastSeenAt = toMillis(impression?.lastSeenAt);
+  if (!lastSeenAt) return null;
+  const dwellMs = Math.max(0, Number(impression?.lastDwellMs) || 0);
+  const cooldownMs = dwellMs >= QUALIFIED_DWELL_MS
+    ? LONG_VIEW_COOLDOWN_MS
+    : VIEW_COOLDOWN_MS;
+  if (nowMillis - lastSeenAt < cooldownMs) {
+    return dwellMs >= QUALIFIED_DWELL_MS ? "recent_long_view" : "recent_view";
+  }
+  return isFrequencyCapped(impression, nowMillis) ? "frequency_cap" : null;
+}
+
 function resolveCompositionTargets(batchSize, ratios) {
   const explorationRatio = String(ratios?.label || "")
     .startsWith("cold_start") ? 0.20 : 0.10;
@@ -656,7 +720,42 @@ function composeDiversePool(ranked, limit, seed, ratios) {
   return selected;
 }
 
-async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = {}) {
+function composeNoveltyAwarePool({
+  unseenRanked,
+  seenFallback,
+  limit,
+  seed,
+  ratios,
+}) {
+  const unseenComposed = composeDiversePool(
+    shuffleScoreBands(unseenRanked, seed),
+    limit,
+    seed,
+    ratios,
+  );
+  const unseenPool = diversifyByAuthor(unseenComposed, limit);
+  const remaining = Math.max(0, limit - unseenPool.length);
+  const fallbackComposed = remaining > 0
+    ? composeDiversePool(
+      shuffleScoreBands(seenFallback, `${seed}:fallback`),
+      remaining,
+      `${seed}:fallback`,
+      ratios,
+    )
+    : [];
+  const fallbackPool = diversifyByAuthor(fallbackComposed, remaining);
+  return {
+    // Keep the novelty boundary strict: author diversification must never move
+    // a cooldown fallback ahead of an available unseen post.
+    pool: [...unseenPool, ...fallbackPool],
+    fallbackUsedCount: fallbackPool.length,
+  };
+}
+
+async function buildRecommendationPool(
+  uid,
+  { seed = `${uid}:${Date.now()}`, excludedPostIds = [] } = {},
+) {
   const startedAt = Date.now();
   const userSnap = await db.collection("users").doc(uid).get();
   if (!userSnap.exists) {
@@ -689,13 +788,30 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       : [];
   const nowMillis = Date.now();
   const trendingCutoff = nowMillis - (TRENDING_WINDOW_DAYS * 86400000);
-  const [retrieval, impressions] = await Promise.all([
+  const normalizedExcludedPostIds = new Set(
+    Array.from(excludedPostIds || [])
+      .map((postId) => typeof postId === "string" ? postId.trim() : "")
+      .filter(Boolean)
+      .slice(0, 200),
+  );
+  const [retrieval, impressions, recentInteractions] = await Promise.all([
     loadHybridCandidatePosts({
     userVector,
     following,
     nowMillis,
     }),
-    loadFeedImpressions(uid),
+    loadFeedImpressions(uid).catch((error) => {
+      console.warn("Feed impression retrieval failed; continuing without it:", {
+        code: retrievalErrorCode(error),
+      });
+      return new Map();
+    }),
+    loadRecentActiveInteractions(uid, nowMillis).catch((error) => {
+      console.warn("Interaction cooldown retrieval failed; continuing without it:", {
+        code: retrievalErrorCode(error),
+      });
+      return new Map();
+    }),
   ]);
   const candidates = retrieval.candidates;
   const scored = [];
@@ -730,6 +846,14 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
         : 0;
     const rawDiscoveryScore = calculateDiscoveryScore(post, nowMillis);
     const followingBoost = following.has(authorId) ? 1 : 0;
+    const impression = impressions.get(candidate.id);
+    const suppressionReason = noveltySuppressionReason({
+      postId: candidate.id,
+      impression,
+      interaction: recentInteractions.get(candidate.id),
+      excludedPostIds: normalizedExcludedPostIds,
+      nowMillis,
+    });
 
     if (
       contentBasedScore <= 0 &&
@@ -749,12 +873,14 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       followingBoost,
       negativeSimilarity,
       createdAtMillis,
-      seenPenalty: calculateSeenPenalty(impressions.get(candidate.id), nowMillis),
+      seenPenalty: calculateSeenPenalty(impression, nowMillis),
+      suppressionReason,
+      noveltySuppressed: Boolean(suppressionReason),
       recentlySeen: (() => {
-        const lastSeenAt = toMillis(impressions.get(candidate.id)?.lastSeenAt);
+        const lastSeenAt = toMillis(impression?.lastSeenAt);
         return Boolean(lastSeenAt && nowMillis - lastSeenAt < RECENT_SEEN_WINDOW_MS);
       })(),
-      frequencyCapped: isFrequencyCapped(impressions.get(candidate.id), nowMillis),
+      frequencyCapped: isFrequencyCapped(impression, nowMillis),
     });
   }
 
@@ -795,22 +921,17 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
     return b.createdAtMillis - a.createdAtMillis;
   });
 
-  const unseenRanked = ranked.filter((item) =>
-    !item.recentlySeen && !item.frequencyCapped);
-  // Capped/just-seen posts only return when the unseen candidate supply is short.
-  const seenFallback = ranked.filter((item) =>
-    item.recentlySeen || item.frequencyCapped);
-  const bandShuffled = shuffleScoreBands(
-    [...unseenRanked, ...seenFallback],
-    seed,
-  );
-  const composed = composeDiversePool(
-    bandShuffled,
-    CACHE_POST_POOL_SIZE,
+  const unseenRanked = ranked.filter((item) => !item.noveltySuppressed);
+  const seenFallback = ranked.filter((item) => item.noveltySuppressed);
+  // Exploration is intentionally limited to unseen candidates. Cooldown posts
+  // only enter after the unseen supply is exhausted, keeping sparse feeds full.
+  const { pool, fallbackUsedCount } = composeNoveltyAwarePool({
+    unseenRanked,
+    seenFallback,
+    limit: CACHE_POST_POOL_SIZE,
     seed,
     ratios,
-  );
-  const pool = diversifyByAuthor(composed, CACHE_POST_POOL_SIZE);
+  });
   return {
     postIds: pool.map((item) => item.postId),
     scoresByPostId: Object.fromEntries(
@@ -822,6 +943,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
           discoveryScore: item.discoveryScore,
           followingBoost: item.followingBoost,
           seenPenalty: item.seenPenalty,
+          suppressionReason: item.suppressionReason,
           finalScore: item.finalScore,
         },
       ])
@@ -840,9 +962,17 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       embeddingDimensions: EMBEDDING_DIMENSIONS,
       algorithmVersion: RECOMMENDATION_ALGORITHM_VERSION,
       seed,
-      recentSeenExcludedCount: unseenRanked.length >= CACHE_POST_POOL_SIZE
-        ? seenFallback.length
-        : Math.min(seenFallback.length, CACHE_POST_POOL_SIZE - unseenRanked.length),
+      unseenCandidateCount: unseenRanked.length,
+      noveltySuppressedCount: seenFallback.length,
+      refreshHistoryExcludedCount: normalizedExcludedPostIds.size,
+      interactionCooldownCount: ranked.filter((item) =>
+        String(item.suppressionReason || "").startsWith("recent_") &&
+        !String(item.suppressionReason || "").includes("view")).length,
+      fallbackUsedCount,
+      recentSeenExcludedCount: Math.max(
+        0,
+        seenFallback.length - fallbackUsedCount,
+      ),
       impressionCount: impressions.size,
       ...retrieval.metadata,
     },
@@ -876,11 +1006,22 @@ function diversifyByAuthor(ranked, limit) {
 
 async function getOrBuildRecommendationPool(
   uid,
-  { forceRefresh = false, seed = `${uid}:${Date.now()}` } = {},
+  {
+    forceRefresh = false,
+    seed = `${uid}:${Date.now()}`,
+    excludedPostIds = [],
+  } = {},
 ) {
   const cacheRef = recommendationCacheRef(uid);
+  const normalizedExcludedPostIds = Array.from(excludedPostIds || [])
+    .map((postId) => typeof postId === "string" ? postId.trim() : "")
+    .filter(Boolean)
+    .slice(0, 200);
+  const hasRequestExclusions = normalizedExcludedPostIds.length > 0;
   const [cacheSnap, feedStateSnap] = await Promise.all([
-    forceRefresh ? Promise.resolve(null) : cacheRef.get(),
+    forceRefresh || hasRequestExclusions
+      ? Promise.resolve(null)
+      : cacheRef.get(),
     recommendationFeedStateRef().get(),
   ]);
   const nowMillis = Date.now();
@@ -905,7 +1046,21 @@ async function getOrBuildRecommendationPool(
     };
   }
 
-  const pool = await buildRecommendationPool(uid, { seed });
+  const pool = await buildRecommendationPool(uid, {
+    seed,
+    excludedPostIds: normalizedExcludedPostIds,
+  });
+  if (hasRequestExclusions) {
+    return {
+      ...pool,
+      metadata: {
+        ...pool.metadata,
+        feedRevision,
+        cacheHit: false,
+        requestSpecificPool: true,
+      },
+    };
+  }
   await cacheRef.set(
     {
       ...pool,
@@ -1238,11 +1393,14 @@ module.exports = {
   DISCOVERY_HALF_LIFE_DAYS,
   HALF_LIFE_DAYS,
   INTEREST_HALF_LIFE_DAYS,
+  INTERACTION_COOLDOWN_MS,
+  LONG_VIEW_COOLDOWN_MS,
   MAX_WEIGHT_CAP,
   MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL,
   MIN_SIMILARITY,
   RECOMMENDATION_ALGORITHM_VERSION,
   TRENDING_WINDOW_DAYS,
+  VIEW_COOLDOWN_MS,
   buildRecommendationPool,
   bumpRecommendationFeedRevision,
   calculateTrendingScore,
@@ -1261,8 +1419,11 @@ module.exports = {
   isPostEmbeddingCurrent,
   isRecommendationSessionReusable,
   isFrequencyCapped,
+  interactionCooldownMs,
   loadHybridCandidatePosts,
   normalizeRatios,
+  composeNoveltyAwarePool,
+  noveltySuppressionReason,
   composeDiversePool,
   parseVector,
   rebuildUserInterestVector,

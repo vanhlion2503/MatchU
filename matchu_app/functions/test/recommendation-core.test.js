@@ -10,11 +10,14 @@ const {
   calculateTrendingScore,
   calculateSeenPenalty,
   composeDiversePool,
+  composeNoveltyAwarePool,
   cosineSimilarity,
   diversifyByAuthor,
   isPostEmbeddingCurrent,
   isRecommendationSessionReusable,
   isFrequencyCapped,
+  interactionCooldownMs,
+  noveltySuppressionReason,
   parseVector,
   resolveRatios,
   resolveDiscoveryWeight,
@@ -208,6 +211,34 @@ test("diverse pool reserves exploration and following slots per page", () => {
   assert.ok(selected.some((item) => item.postId === "post-39"));
 });
 
+test("novelty suppression applies refresh, view and explicit-action cooldowns", () => {
+  const now = Date.now();
+  assert.equal(noveltySuppressionReason({
+    postId: "refresh-post",
+    excludedPostIds: new Set(["refresh-post"]),
+    nowMillis: now,
+  }), "refresh_history");
+  assert.equal(noveltySuppressionReason({
+    postId: "liked-post",
+    interaction: {
+      action: "like",
+      cooldownUntilMillis: now + interactionCooldownMs("like"),
+    },
+    nowMillis: now,
+  }), "recent_like");
+  assert.equal(noveltySuppressionReason({
+    postId: "viewed-post",
+    impression: { lastSeenAt: now - 1000, lastDwellMs: 6000 },
+    nowMillis: now,
+  }), "recent_long_view");
+  assert.equal(noveltySuppressionReason({
+    postId: "expired-post",
+    impression: { lastSeenAt: now - (13 * 60 * 60 * 1000), lastDwellMs: 6000 },
+    nowMillis: now,
+  }), null);
+  assert.equal(interactionCooldownMs("save"), 48 * 60 * 60 * 1000);
+});
+
 test("cold-start composition fills a page when only one post is trending", () => {
   const ranked = Array.from({ length: 40 }, (_, index) => ({
     postId: `post-${index}`,
@@ -224,4 +255,66 @@ test("cold-start composition fills a page when only one post is trending", () =>
 
   assert.equal(selected.length, 20);
   assert.ok(selected.some((item) => item.postId === "post-0"));
+});
+
+test("novelty-aware composition never explores fallback while unseen is enough", () => {
+  const base = {
+    contentBasedScore: 1,
+    rawTrendingScore: 1,
+    followingBoost: 0,
+    finalScore: 1,
+  };
+  const unseenRanked = Array.from({ length: 30 }, (_, index) => ({
+    ...base,
+    postId: `unseen-${index}`,
+    authorId: `author-${index}`,
+  }));
+  const seenFallback = Array.from({ length: 10 }, (_, index) => ({
+    ...base,
+    postId: `seen-${index}`,
+    authorId: `seen-author-${index}`,
+  }));
+  const result = composeNoveltyAwarePool({
+    unseenRanked,
+    seenFallback,
+    limit: 20,
+    seed: "novelty",
+    ratios: {
+      content: 0.7,
+      trending: 0.3,
+      following: 0,
+      label: "personalized",
+    },
+  });
+
+  assert.equal(result.pool.length, 20);
+  assert.equal(result.fallbackUsedCount, 0);
+  assert.ok(result.pool.every((item) => item.postId.startsWith("unseen-")));
+});
+
+test("novelty-aware composition uses fallback only to keep a sparse feed full", () => {
+  const item = (postId) => ({
+    postId,
+    authorId: postId,
+    contentBasedScore: 0,
+    rawTrendingScore: 1,
+    followingBoost: 0,
+    finalScore: 1,
+  });
+  const result = composeNoveltyAwarePool({
+    unseenRanked: Array.from({ length: 6 }, (_, index) => item(`new-${index}`)),
+    seenFallback: Array.from({ length: 10 }, (_, index) => item(`old-${index}`)),
+    limit: 10,
+    seed: "sparse",
+    ratios: {
+      content: 0,
+      trending: 1,
+      following: 0,
+      label: "cold_start_trending",
+    },
+  });
+
+  assert.equal(result.pool.length, 10);
+  assert.equal(result.fallbackUsedCount, 4);
+  assert.ok(result.pool.slice(0, 6).every((item) => item.postId.startsWith("new-")));
 });
