@@ -40,6 +40,8 @@ const authEnglishTranslations = <String, String>{
       'Please log in with Google to continue',
   'Vui lòng đăng nhập bằng Google để xác minh OTP':
       'Please log in with Google to verify the OTP',
+  'Vui lòng xác minh số điện thoại trước khi hoàn thiện hồ sơ.':
+      'Please verify your phone number before completing your profile.',
   'Tài khoản đã tồn tại': 'Account already exists',
   'Đăng nhập Google thất bại': 'Google sign-in failed',
   'Nhập email và mật khẩu': 'Enter your email and password',

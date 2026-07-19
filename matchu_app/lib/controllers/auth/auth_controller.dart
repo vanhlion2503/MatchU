@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -876,7 +877,7 @@ class AuthController extends GetxController {
   }
 
   // =============================================================
-  //             CONFIRM ENROLL OTP → LOGOUT (FLOW OF YOU)
+  //        CONFIRM ENROLL OTP → CONTINUE GOOGLE ONBOARDING / LOGOUT
   // =============================================================
   Future<void> confirmEnrollOtp() async {
     if (isLoadingRegister.value) return;
@@ -893,6 +894,45 @@ class AuthController extends GetxController {
         verificationId: enrollVerificationId!,
         smsCode: otpC.text.trim(),
       );
+
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final isGoogleUser =
+          currentUser?.providerData.any(
+            (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
+          ) ??
+          false;
+
+      if (isGoogleUser && currentUser != null) {
+        final userDoc =
+            await _auth.db.collection('users').doc(currentUser.uid).get();
+        final isProfileCompleted =
+            userDoc.data()?['isProfileCompleted'] == true;
+        final verifiedPhone = await _auth.getVerifiedPhoneNumber(currentUser);
+
+        if (!isProfileCompleted) {
+          // Google users continue directly to profile setup, but only after
+          // Firebase confirms that phone MFA enrollment succeeded.
+          fullPhoneNumber.value = verifiedPhone;
+          _box.remove('isRegistering');
+          enrollVerificationId = null;
+          otpC.clear();
+          Get.offAllNamed('/complete-profile');
+          return;
+        }
+
+        // Repair Google profiles created by the old flow, where profile setup
+        // was allowed to finish without a verified phone number.
+        await userDoc.reference.set({
+          'phonenumber': verifiedPhone,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        await _auth.setOnlineStatus(true);
+        _box.remove('isRegistering');
+        enrollVerificationId = null;
+        otpC.clear();
+        Get.offAllNamed('/main');
+        return;
+      }
 
       await logoutC();
       _box.remove('isRegistering');
@@ -920,9 +960,6 @@ class AuthController extends GetxController {
     if (loading.value) return;
 
     _box.remove('isRegistering');
-    if (fromRegister) {
-      _box.write('isRegistering', true);
-    }
     loading.value = true;
 
     try {
@@ -1194,15 +1231,23 @@ class AuthController extends GetxController {
       return;
     }
 
-    final normalizedPhone = normalizePhoneNumber(fullPhoneNumber.value);
-    if (normalizedPhone.isNotEmpty) {
-      final isPhoneUnique = await _auth.isPhoneNumberUnique(normalizedPhone);
-      if (!isPhoneUnique) {
-        _showAuthSnackbar("Lỗi", "Số điện thoại này đã được sử dụng");
-        return;
-      }
-      fullPhoneNumber.value = normalizedPhone;
+    final verifiedPhone = await _auth.getVerifiedPhoneNumber();
+    if (verifiedPhone.isEmpty) {
+      _showAuthSnackbar(
+        "Lỗi",
+        "Vui lòng xác minh số điện thoại trước khi hoàn thiện hồ sơ.",
+      );
+      Get.offAllNamed('/enroll-phone');
+      return;
     }
+
+    final normalizedPhone = normalizePhoneNumber(verifiedPhone);
+    final isPhoneUnique = await _auth.isPhoneNumberUnique(normalizedPhone);
+    if (!isPhoneUnique) {
+      _showAuthSnackbar("Lỗi", "Số điện thoại này đã được sử dụng");
+      return;
+    }
+    fullPhoneNumber.value = normalizedPhone;
 
     if (tempAvatarFile.value == null) {
       _showAuthSnackbar(
@@ -1224,7 +1269,6 @@ class AuthController extends GetxController {
       await _auth.saveUserProfile(
         fullname: fullname,
         nickname: nickname,
-        phonenumber: fullPhoneNumber.value.trim(),
         birthday: selectedBirthday.value!,
         gender: selectedGender.value,
         interests: InterestTags.normalizeList(selectedInterests),

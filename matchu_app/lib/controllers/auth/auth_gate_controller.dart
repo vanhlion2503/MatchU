@@ -94,8 +94,10 @@ class AuthGateController extends GetxController {
 
       final enrolledFactors =
           await refreshedUser.multiFactor.getEnrolledFactors();
-      final hasMfa = enrolledFactors.isNotEmpty;
-      if (!hasMfa) {
+      final hasVerifiedPhone = enrolledFactors.any(
+        (factor) => factor is PhoneMultiFactorInfo,
+      );
+      if (!hasVerifiedPhone) {
         if (currentRoute != '/enroll-phone' && currentRoute != '/otp-enroll') {
           Get.offAllNamed('/enroll-phone');
         }
@@ -140,19 +142,37 @@ class AuthGateController extends GetxController {
       return;
     }
 
-    // ❌ CHƯA CÓ PROFILE → COMPLETE
-    if (!snap.exists) {
-      Get.offAllNamed('/complete-profile');
-      return;
+    // A Google login can create the Firebase account before a Firestore
+    // profile exists. Derive onboarding from server state so a local flag race
+    // (or an app restart) can never skip phone verification.
+    final completed = snap.data()?['isProfileCompleted'] == true;
+    final storedPhone = (snap.data()?['phonenumber'] ?? '').toString().trim();
+    final isGoogleUser = user.providerData.any(
+      (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
+    );
+    final requiresGooglePhoneRepair = !completed || storedPhone.isEmpty;
+    if (isGoogleUser && requiresGooglePhoneRepair) {
+      final enrolledFactors = await user.multiFactor.getEnrolledFactors();
+      final hasVerifiedPhone = enrolledFactors.any(
+        (factor) => factor is PhoneMultiFactorInfo,
+      );
+
+      if (!hasVerifiedPhone) {
+        Get.offAllNamed(AppRouter.enrollPhone);
+        return;
+      }
     }
 
-    final data = snap.data()!;
-    final completed = data['isProfileCompleted'] == true;
+    // ❌ CHƯA CÓ PROFILE → COMPLETE
+    if (!snap.exists) {
+      Get.offAllNamed(AppRouter.completeProfile);
+      return;
+    }
 
     // ============================
     // 5️⃣ ROUTE CUỐI CÙNG
     // ============================
-    Get.offAllNamed(completed ? '/main' : '/complete-profile');
+    Get.offAllNamed(completed ? AppRouter.main : AppRouter.completeProfile);
     if (completed && Get.isRegistered<NotificationController>()) {
       Future.delayed(const Duration(milliseconds: 250), () {
         if (!Get.isRegistered<NotificationController>()) return;

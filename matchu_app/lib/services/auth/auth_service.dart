@@ -125,6 +125,22 @@ class AuthService {
     }
   }
 
+  /// Returns the number Firebase has actually verified as a phone MFA factor.
+  /// A number typed in the UI must never be treated as verified account data.
+  Future<String> getVerifiedPhoneNumber([User? user]) async {
+    final currentUser = user ?? _auth.currentUser;
+    if (currentUser == null) return '';
+
+    final factors = await currentUser.multiFactor.getEnrolledFactors();
+    for (final factor in factors) {
+      if (factor is PhoneMultiFactorInfo) {
+        return factor.phoneNumber.trim();
+      }
+    }
+
+    return '';
+  }
+
   Future<bool> isNicknameUnique(String nickname, {String? excludeUid}) async {
     final normalized = nickname.trim();
     if (normalized.isEmpty) return false;
@@ -212,7 +228,6 @@ class AuthService {
   Future<void> saveUserProfile({
     required String fullname,
     required String nickname,
-    required String phonenumber,
     DateTime? birthday,
     String? gender,
     List<String> interests = const [],
@@ -220,6 +235,14 @@ class AuthService {
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("User chưa đăng nhập");
+
+    // This remains correct even if the app restarts after OTP verification.
+    final verifiedPhoneNumber = await getVerifiedPhoneNumber(user);
+    if (verifiedPhoneNumber.isEmpty) {
+      throw Exception(
+        authTr("Vui lòng xác minh số điện thoại trước khi hoàn thiện hồ sơ."),
+      );
+    }
 
     await user.updateDisplayName(nickname);
 
@@ -239,7 +262,7 @@ class AuthService {
       "email": user.email,
       "fullname": fullname,
       "nickname": nickname,
-      "phonenumber": phonenumber,
+      "phonenumber": verifiedPhoneNumber,
 
       "googleId": googleProvider?.uid,
 
