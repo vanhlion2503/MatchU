@@ -26,6 +26,10 @@ class AppRouter {
   static const String language = '/language';
   static const String editProfile = '/edit-profile';
   static const String accountSecurity = '/account-security';
+  static const String accountInformation = '/account-security/account';
+  static const String passwordSecurity = '/account-security/password';
+  static const String deviceSessions = '/account-security/devices';
+  static const String deleteAccount = '/account-security/delete-account';
   static const String restrictionList = '/restriction-list';
 
   static const String matching = '/matching';

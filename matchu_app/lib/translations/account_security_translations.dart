@@ -1,4 +1,13 @@
 const accountSecurityEnglishTranslations = <String, String>{
+  'Thông tin tài khoản': 'Account information',
+  'Email, số điện thoại và phương thức đăng nhập':
+      'Email, phone number, and sign-in methods',
+  'Thiết bị đã đăng nhập': 'Signed-in devices',
+  'Xem và quản lý các phiên đăng nhập': 'View and manage sign-in sessions',
+  'thiết bị': 'devices',
+  'Tài khoản và bảo mật': 'Account and security',
+  'Quản lý thông tin đăng nhập và các phiên đang hoạt động.':
+      'Manage your sign-in information and active sessions.',
   'Tài khoản': 'Account',
   'Đã xác minh': 'Verified',
   'Chưa xác minh': 'Not verified',
@@ -34,6 +43,25 @@ const accountSecurityEnglishTranslations = <String, String>{
   'Vui lòng nhập mật khẩu hiện tại.': 'Enter your current password.',
   'Đã gửi liên kết xác minh đến email mới. Email sẽ thay đổi sau khi bạn xác nhận.':
       'A verification link was sent to the new email. Your email will change after confirmation.',
+  'Xác minh email mới': 'Verify your new email',
+  'Liên kết xác minh đã được gửi đến': 'A verification link was sent to',
+  'Mở Gmail hoặc hộp thư của email mới.':
+      'Open Gmail or the inbox for your new email.',
+  'Bấm vào liên kết xác minh do MatchU gửi.':
+      'Tap the verification link sent by MatchU.',
+  'Quay lại ứng dụng và chọn Hoàn tất thay đổi.':
+      'Return to the app and select Complete change.',
+  'Mở Gmail': 'Open Gmail',
+  'Không thể mở Gmail. Vui lòng mở hộp thư thủ công.':
+      'Unable to open Gmail. Please open your inbox manually.',
+  'Email mới chưa được xác minh. Hãy bấm liên kết trong hộp thư rồi thử lại.':
+      'The new email has not been verified. Tap the link in your inbox and try again.',
+  'Hủy bỏ chỉ đóng bước này. Để giữ email hiện tại, không mở liên kết đã gửi.':
+      'Cancel only closes this step. To keep your current email, do not open the link that was sent.',
+  'Hủy bỏ': 'Cancel',
+  'Hoàn tất thay đổi': 'Complete change',
+  'Email đã được thay đổi thành công.':
+      'Your email has been changed successfully.',
   'Mật khẩu mới': 'New password',
   'Xác nhận mật khẩu mới': 'Confirm new password',
   'Mật khẩu mới phải có ít nhất 8 ký tự.':

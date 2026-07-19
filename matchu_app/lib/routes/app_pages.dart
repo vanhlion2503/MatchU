@@ -42,6 +42,7 @@ import 'package:matchu_app/views/setting/display_mode_view.dart';
 import 'package:matchu_app/views/setting/language_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
 import 'package:matchu_app/views/setting/account_security_view.dart';
+import 'package:matchu_app/views/setting/account_security_hub_view.dart';
 import 'package:matchu_app/views/setting/restriction_list_view.dart';
 import 'package:matchu_app/views/splash_view.dart';
 import 'package:matchu_app/views/verification/face_verification_view.dart';
@@ -183,6 +184,42 @@ class AppPages {
       binding: AccountSecurityBinding(),
       transition: Transition.cupertino,
       transitionDuration: const Duration(milliseconds: 240),
+    ),
+    GetPage(
+      name: AppRouter.accountInformation,
+      page:
+          () => const AccountSecurityDetailView(
+            section: AccountSecurityDetailSection.account,
+          ),
+      binding: AccountSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.passwordSecurity,
+      page:
+          () => const AccountSecurityDetailView(
+            section: AccountSecurityDetailSection.password,
+          ),
+      binding: AccountSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.deviceSessions,
+      page:
+          () => const AccountSecurityDetailView(
+            section: AccountSecurityDetailSection.devices,
+          ),
+      binding: AccountSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.deleteAccount,
+      page:
+          () => const AccountSecurityDetailView(
+            section: AccountSecurityDetailSection.deleteAccount,
+          ),
+      binding: AccountSecurityBinding(),
+      transition: Transition.cupertino,
     ),
 
     GetPage(

@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:matchu_app/controllers/user/account_security_controller.dart';
 import 'package:matchu_app/models/account_security/account_security_model.dart';
 import 'package:matchu_app/theme/app_theme.dart';
-import 'package:matchu_app/translations/translation_keys.dart';
+import 'package:matchu_app/utils/otp_phone_formatter.dart';
+import 'package:pinput/pinput.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class AccountSecurityView extends GetView<AccountSecurityController> {
-  const AccountSecurityView({super.key});
+enum AccountSecurityDetailSection { account, password, devices, deleteAccount }
+
+/// Màn hình chi tiết dùng chung để giữ toàn bộ luồng xác thực ở một nơi.
+/// Mỗi route chỉ truyền vào một nhóm chức năng cần hiển thị.
+class AccountSecurityDetailView extends GetView<AccountSecurityController> {
+  const AccountSecurityDetailView({required this.section, super.key});
+
+  final AccountSecurityDetailSection section;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(TranslationKeys.accountSecurity.tr)),
+      appBar: AppBar(title: Text(_pageTitle)),
       body: Obx(() {
         if (controller.isLoading.value && controller.account.value == null) {
           return const Center(child: CircularProgressIndicator());
@@ -33,15 +42,7 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                children: [
-                  _accountSection(context, controller.account.value!),
-                  const SizedBox(height: 22),
-                  _securitySection(context),
-                  const SizedBox(height: 22),
-                  _deviceSection(context),
-                  const SizedBox(height: 22),
-                  _accountManagementSection(context),
-                ],
+                children: [_selectedSection(context)],
               ),
             ),
             if (controller.isActionRunning.value)
@@ -51,6 +52,25 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
       }),
     );
   }
+
+  String get _pageTitle => switch (section) {
+    AccountSecurityDetailSection.account => 'Thông tin tài khoản'.tr,
+    AccountSecurityDetailSection.password => 'Đổi mật khẩu'.tr,
+    AccountSecurityDetailSection.devices => 'Thiết bị và phiên đăng nhập'.tr,
+    AccountSecurityDetailSection.deleteAccount => 'Xóa tài khoản'.tr,
+  };
+
+  Widget _selectedSection(BuildContext context) => switch (section) {
+    AccountSecurityDetailSection.account => _accountSection(
+      context,
+      controller.account.value!,
+    ),
+    AccountSecurityDetailSection.password => _securitySection(context),
+    AccountSecurityDetailSection.devices => _deviceSection(context),
+    AccountSecurityDetailSection.deleteAccount => _accountManagementSection(
+      context,
+    ),
+  };
 
   Widget _accountSection(BuildContext context, AccountSecurityInfo account) {
     final providers = account.providerLabels.join(', ');
@@ -181,13 +201,234 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
     try {
       if (!await _reauthenticate(context, password: input.password)) return;
       await controller.requestEmailChange(input.email);
-      _showSuccess(
-        'Đã gửi liên kết xác minh đến email mới. Email sẽ thay đổi sau khi bạn xác nhận.'
-            .tr,
+      if (!context.mounted) return;
+      final completed = await _showEmailVerificationPendingDialog(
+        context,
+        newEmail: input.email,
       );
+      if (completed) {
+        _showSuccess('Email đã được thay đổi thành công.'.tr);
+      }
     } catch (error) {
       _showError(error);
     }
+  }
+
+  Future<bool> _showEmailVerificationPendingDialog(
+    BuildContext context, {
+    required String newEmail,
+  }) async {
+    var isChecking = false;
+    String? statusMessage;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => StatefulBuilder(
+            builder: (context, setState) {
+              final theme = Theme.of(context);
+              final colors = theme.colorScheme;
+
+              Future<void> openInbox() async {
+                final gmailUri = Uri.https('mail.google.com', '/mail/u/', {
+                  'authuser': newEmail,
+                });
+                try {
+                  final opened = await launchUrl(
+                    gmailUri,
+                    mode: LaunchMode.externalApplication,
+                  );
+                  if (opened || !dialogContext.mounted) return;
+                } catch (_) {
+                  if (!dialogContext.mounted) return;
+                }
+                setState(
+                  () =>
+                      statusMessage =
+                          'Không thể mở Gmail. Vui lòng mở hộp thư thủ công.'
+                              .tr,
+                );
+              }
+
+              Future<void> completeChange() async {
+                if (isChecking) return;
+                setState(() {
+                  isChecking = true;
+                  statusMessage = null;
+                });
+
+                await controller.load();
+                if (!dialogContext.mounted) return;
+
+                final currentEmail =
+                    controller.account.value?.email.trim().toLowerCase() ?? '';
+                if (currentEmail == newEmail.trim().toLowerCase()) {
+                  Navigator.pop(dialogContext, true);
+                  return;
+                }
+
+                setState(() {
+                  isChecking = false;
+                  statusMessage =
+                      controller.errorMessage.isNotEmpty
+                          ? controller.errorMessage.value
+                          : 'Email mới chưa được xác minh. Hãy bấm liên kết trong hộp thư rồi thử lại.'
+                              .tr;
+                });
+              }
+
+              return PopScope(
+                canPop: false,
+                child: AlertDialog(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  insetPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                  title: Column(
+                    children: [
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.mark_email_unread_outlined,
+                          color: colors.primary,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Xác minh email mới'.tr,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Liên kết xác minh đã được gửi đến'.tr,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.textTheme.bodySmall?.color,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.primary.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colors.primary.withValues(alpha: 0.24),
+                            ),
+                          ),
+                          child: Text(
+                            newEmail,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _EmailVerificationStep(
+                          number: 1,
+                          text: 'Mở Gmail hoặc hộp thư của email mới.'.tr,
+                        ),
+                        const SizedBox(height: 12),
+                        _EmailVerificationStep(
+                          number: 2,
+                          text: 'Bấm vào liên kết xác minh do MatchU gửi.'.tr,
+                        ),
+                        const SizedBox(height: 12),
+                        _EmailVerificationStep(
+                          number: 3,
+                          text:
+                              'Quay lại ứng dụng và chọn Hoàn tất thay đổi.'.tr,
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: isChecking ? null : openInbox,
+                            icon: const Icon(Icons.open_in_new),
+                            label: Text('Mở Gmail'.tr),
+                          ),
+                        ),
+                        if (statusMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colors.errorContainer.withValues(
+                                alpha: 0.45,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              statusMessage!,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        Text(
+                          'Hủy bỏ chỉ đóng bước này. Để giữ email hiện tại, không mở liên kết đã gửi.'
+                              .tr,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  actions: [
+                    TextButton(
+                      onPressed:
+                          isChecking
+                              ? null
+                              : () => Navigator.pop(dialogContext, false),
+                      child: Text('Hủy bỏ'.tr),
+                    ),
+                    FilledButton(
+                      onPressed: isChecking ? null : completeChange,
+                      child:
+                          isChecking
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : Text('Hoàn tất thay đổi'.tr),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+    );
+
+    return result ?? false;
   }
 
   Future<void> _changePassword(BuildContext context) async {
@@ -302,87 +543,90 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
     final result = await showDialog<_EmailChangeInput>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: Text('Đổi email'.tr),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(
-                          controller: emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          autocorrect: false,
-                          decoration: InputDecoration(
-                            labelText: 'Email mới'.tr,
-                            errorText: validationMessage,
+          (dialogContext) => _DialogControllerScope(
+            controllers: [emailController, passwordController],
+            child: StatefulBuilder(
+              builder:
+                  (context, setState) => AlertDialog(
+                    title: Text('Đổi email'.tr),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            decoration: InputDecoration(
+                              labelText: 'Email mới'.tr,
+                              errorText: validationMessage,
+                            ),
                           ),
-                        ),
-                        if (controller.requiresPasswordReauthentication) ...[
+                          if (controller.requiresPasswordReauthentication) ...[
+                            const SizedBox(height: 12),
+                            _PasswordField(
+                              controller: passwordController,
+                              label: 'Mật khẩu hiện tại'.tr,
+                              obscure: obscure,
+                              onToggle:
+                                  () => setState(() => obscure = !obscure),
+                            ),
+                          ],
                           const SizedBox(height: 12),
-                          _PasswordField(
-                            controller: passwordController,
-                            label: 'Mật khẩu hiện tại'.tr,
-                            obscure: obscure,
-                            onToggle: () => setState(() => obscure = !obscure),
+                          Text(
+                            'Chúng tôi sẽ gửi liên kết xác minh đến email mới.'
+                                .tr,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
-                        const SizedBox(height: 12),
-                        Text(
-                          'Chúng tôi sẽ gửi liên kết xác minh đến email mới.'
-                              .tr,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                      ),
                     ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text('Hủy'.tr),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          final email = emailController.text.trim();
+                          final password = passwordController.text;
+                          if (!GetUtils.isEmail(email)) {
+                            setState(
+                              () =>
+                                  validationMessage = 'Email không hợp lệ.'.tr,
+                            );
+                            return;
+                          }
+                          if (email.toLowerCase() ==
+                              controller.account.value?.email.toLowerCase()) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Email mới phải khác email hiện tại.'.tr,
+                            );
+                            return;
+                          }
+                          if (controller.requiresPasswordReauthentication &&
+                              password.isEmpty) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Vui lòng nhập mật khẩu hiện tại.'.tr,
+                            );
+                            return;
+                          }
+                          Navigator.pop(
+                            dialogContext,
+                            _EmailChangeInput(email: email, password: password),
+                          );
+                        },
+                        child: Text('Gửi xác minh'.tr),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: Text('Hủy'.tr),
-                    ),
-                    FilledButton(
-                      onPressed: () {
-                        final email = emailController.text.trim();
-                        final password = passwordController.text;
-                        if (!GetUtils.isEmail(email)) {
-                          setState(
-                            () => validationMessage = 'Email không hợp lệ.'.tr,
-                          );
-                          return;
-                        }
-                        if (email.toLowerCase() ==
-                            controller.account.value?.email.toLowerCase()) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Email mới phải khác email hiện tại.'.tr,
-                          );
-                          return;
-                        }
-                        if (controller.requiresPasswordReauthentication &&
-                            password.isEmpty) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Vui lòng nhập mật khẩu hiện tại.'.tr,
-                          );
-                          return;
-                        }
-                        Navigator.pop(
-                          dialogContext,
-                          _EmailChangeInput(email: email, password: password),
-                        );
-                      },
-                      child: Text('Gửi xác minh'.tr),
-                    ),
-                  ],
-                ),
+            ),
           ),
     );
-    emailController.dispose();
-    passwordController.dispose();
     return result;
   }
 
@@ -399,111 +643,112 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
     final result = await showDialog<_PasswordChangeInput>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: Text('Đổi mật khẩu'.tr),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _PasswordField(
-                          controller: currentController,
-                          label: 'Mật khẩu hiện tại'.tr,
-                          obscure: obscureCurrent,
-                          onToggle:
-                              () => setState(
-                                () => obscureCurrent = !obscureCurrent,
+          (dialogContext) => _DialogControllerScope(
+            controllers: [currentController, newController, confirmController],
+            child: StatefulBuilder(
+              builder:
+                  (context, setState) => AlertDialog(
+                    title: Text('Đổi mật khẩu'.tr),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _PasswordField(
+                            controller: currentController,
+                            label: 'Mật khẩu hiện tại'.tr,
+                            obscure: obscureCurrent,
+                            onToggle:
+                                () => setState(
+                                  () => obscureCurrent = !obscureCurrent,
+                                ),
+                          ),
+                          const SizedBox(height: 12),
+                          _PasswordField(
+                            controller: newController,
+                            label: 'Mật khẩu mới'.tr,
+                            obscure: obscureNew,
+                            onToggle:
+                                () => setState(() => obscureNew = !obscureNew),
+                          ),
+                          const SizedBox(height: 12),
+                          _PasswordField(
+                            controller: confirmController,
+                            label: 'Xác nhận mật khẩu mới'.tr,
+                            obscure: obscureNew,
+                            onToggle:
+                                () => setState(() => obscureNew = !obscureNew),
+                          ),
+                          if (validationMessage != null) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              validationMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
                               ),
-                        ),
-                        const SizedBox(height: 12),
-                        _PasswordField(
-                          controller: newController,
-                          label: 'Mật khẩu mới'.tr,
-                          obscure: obscureNew,
-                          onToggle:
-                              () => setState(() => obscureNew = !obscureNew),
-                        ),
-                        const SizedBox(height: 12),
-                        _PasswordField(
-                          controller: confirmController,
-                          label: 'Xác nhận mật khẩu mới'.tr,
-                          obscure: obscureNew,
-                          onToggle:
-                              () => setState(() => obscureNew = !obscureNew),
-                        ),
-                        if (validationMessage != null) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            validationMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text('Hủy'.tr),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          final current = currentController.text;
+                          final next = newController.text;
+                          final confirm = confirmController.text;
+                          if (current.isEmpty) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Vui lòng nhập mật khẩu hiện tại.'.tr,
+                            );
+                            return;
+                          }
+                          if (next.length < 8) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Mật khẩu mới phải có ít nhất 8 ký tự.'
+                                          .tr,
+                            );
+                            return;
+                          }
+                          if (next == current) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Mật khẩu mới phải khác mật khẩu hiện tại.'
+                                          .tr,
+                            );
+                            return;
+                          }
+                          if (next != confirm) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Xác nhận mật khẩu không khớp.'.tr,
+                            );
+                            return;
+                          }
+                          Navigator.pop(
+                            dialogContext,
+                            _PasswordChangeInput(
+                              currentPassword: current,
+                              newPassword: next,
+                            ),
+                          );
+                        },
+                        child: Text('Cập nhật'.tr),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: Text('Hủy'.tr),
-                    ),
-                    FilledButton(
-                      onPressed: () {
-                        final current = currentController.text;
-                        final next = newController.text;
-                        final confirm = confirmController.text;
-                        if (current.isEmpty) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Vui lòng nhập mật khẩu hiện tại.'.tr,
-                          );
-                          return;
-                        }
-                        if (next.length < 8) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Mật khẩu mới phải có ít nhất 8 ký tự.'.tr,
-                          );
-                          return;
-                        }
-                        if (next == current) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Mật khẩu mới phải khác mật khẩu hiện tại.'
-                                        .tr,
-                          );
-                          return;
-                        }
-                        if (next != confirm) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Xác nhận mật khẩu không khớp.'.tr,
-                          );
-                          return;
-                        }
-                        Navigator.pop(
-                          dialogContext,
-                          _PasswordChangeInput(
-                            currentPassword: current,
-                            newPassword: next,
-                          ),
-                        );
-                      },
-                      child: Text('Cập nhật'.tr),
-                    ),
-                  ],
-                ),
+            ),
           ),
     );
-    currentController.dispose();
-    newController.dispose();
-    confirmController.dispose();
     return result;
   }
 
@@ -516,77 +761,81 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
     final result = await showDialog<_PhoneChangeInput>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: Text('Đổi số điện thoại'.tr),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IntlPhoneField(
-                          initialCountryCode: 'VN',
-                          disableLengthCheck: true,
-                          decoration: InputDecoration(
-                            labelText: 'Số điện thoại mới'.tr,
-                            errorText: validationMessage,
+          (dialogContext) => _DialogControllerScope(
+            controllers: [passwordController],
+            child: StatefulBuilder(
+              builder:
+                  (context, setState) => AlertDialog(
+                    title: Text('Đổi số điện thoại'.tr),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IntlPhoneField(
+                            initialCountryCode: 'VN',
+                            disableLengthCheck: true,
+                            decoration: InputDecoration(
+                              labelText: 'Số điện thoại mới'.tr,
+                              errorText: validationMessage,
+                            ),
+                            onChanged:
+                                (phone) => completePhone = phone.completeNumber,
                           ),
-                          onChanged:
-                              (phone) => completePhone = phone.completeNumber,
-                        ),
-                        if (controller.requiresPasswordReauthentication) ...[
-                          const SizedBox(height: 4),
-                          _PasswordField(
-                            controller: passwordController,
-                            label: 'Mật khẩu hiện tại'.tr,
-                            obscure: obscure,
-                            onToggle: () => setState(() => obscure = !obscure),
-                          ),
+                          if (controller.requiresPasswordReauthentication) ...[
+                            const SizedBox(height: 4),
+                            _PasswordField(
+                              controller: passwordController,
+                              label: 'Mật khẩu hiện tại'.tr,
+                              obscure: obscure,
+                              onToggle:
+                                  () => setState(() => obscure = !obscure),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text('Hủy'.tr),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          final phone =
+                              completePhone.replaceAll(' ', '').trim();
+                          if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Số điện thoại không hợp lệ.'.tr,
+                            );
+                            return;
+                          }
+                          final password = passwordController.text;
+                          if (controller.requiresPasswordReauthentication &&
+                              password.isEmpty) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Vui lòng nhập mật khẩu hiện tại.'.tr,
+                            );
+                            return;
+                          }
+                          Navigator.pop(
+                            dialogContext,
+                            _PhoneChangeInput(
+                              phoneNumber: phone,
+                              password: password,
+                            ),
+                          );
+                        },
+                        child: Text('Gửi OTP'.tr),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: Text('Hủy'.tr),
-                    ),
-                    FilledButton(
-                      onPressed: () {
-                        final phone = completePhone.replaceAll(' ', '').trim();
-                        if (!RegExp(r'^\+\d{9,15}$').hasMatch(phone)) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Số điện thoại không hợp lệ.'.tr,
-                          );
-                          return;
-                        }
-                        final password = passwordController.text;
-                        if (controller.requiresPasswordReauthentication &&
-                            password.isEmpty) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Vui lòng nhập mật khẩu hiện tại.'.tr,
-                          );
-                          return;
-                        }
-                        Navigator.pop(
-                          dialogContext,
-                          _PhoneChangeInput(
-                            phoneNumber: phone,
-                            password: password,
-                          ),
-                        );
-                      },
-                      child: Text('Gửi OTP'.tr),
-                    ),
-                  ],
-                ),
+            ),
           ),
     );
-    passwordController.dispose();
     return result;
   }
 
@@ -600,27 +849,154 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
       context: context,
       barrierDismissible: false,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: Text('Xác nhận OTP'.tr),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
+          (dialogContext) => _DialogControllerScope(
+            controllers: [otpController],
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                final theme = Theme.of(context);
+                final colors = theme.colorScheme;
+                final hasError = validationMessage != null;
+                const pinSpacing = 6.0;
+                const totalPinSpacing = pinSpacing * 5;
+                final dialogWidth =
+                    (MediaQuery.sizeOf(context).width - 40)
+                        .clamp(240.0, 400.0)
+                        .toDouble();
+                final pinAreaWidth =
+                    (dialogWidth - 48).clamp(180.0, 352.0).toDouble();
+                final pinWidth =
+                    ((pinAreaWidth - totalPinSpacing) / 6)
+                        .clamp(24.0, 48.0)
+                        .toDouble();
+                final pinInputWidth = pinWidth * 6 + totalPinSpacing;
+                final pinTheme = PinTheme(
+                  width: pinWidth,
+                  height: 56,
+                  textStyle: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest.withValues(
+                      alpha: 0.45,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colors.outlineVariant,
+                      width: 1.4,
+                    ),
+                  ),
+                );
+
+                return AlertDialog(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  insetPadding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                  title: Column(
                     children: [
-                      Text('${'Mã xác minh đã được gửi đến'.tr} $phoneNumber'),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: otpController,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        autofocus: true,
-                        decoration: InputDecoration(
-                          labelText: 'Mã OTP'.tr,
-                          errorText: validationMessage,
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.sms_outlined,
+                          color: colors.primary,
+                          size: 27,
                         ),
                       ),
+                      const SizedBox(height: 14),
+                      Text('Xác nhận OTP'.tr, textAlign: TextAlign.center),
                     ],
                   ),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Mã xác minh đã được gửi đến'.tr,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.textTheme.bodySmall?.color,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          maskOtpPhoneNumber(phoneNumber),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: pinInputWidth,
+                          child: Pinput(
+                            length: 6,
+                            controller: otpController,
+                            autofocus: true,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            autofillHints: const [AutofillHints.oneTimeCode],
+                            separatorBuilder:
+                                (_) => const SizedBox(width: pinSpacing),
+                            defaultPinTheme: pinTheme,
+                            focusedPinTheme: pinTheme.copyDecorationWith(
+                              color: colors.primary.withValues(alpha: 0.08),
+                              border: Border.all(
+                                color: colors.primary,
+                                width: 2,
+                              ),
+                            ),
+                            submittedPinTheme: pinTheme.copyDecorationWith(
+                              color: colors.primary.withValues(alpha: 0.06),
+                              border: Border.all(
+                                color: colors.primary.withValues(alpha: 0.55),
+                                width: 1.5,
+                              ),
+                            ),
+                            errorPinTheme: pinTheme.copyDecorationWith(
+                              color: colors.errorContainer.withValues(
+                                alpha: 0.35,
+                              ),
+                              border: Border.all(
+                                color: colors.error,
+                                width: 1.8,
+                              ),
+                            ),
+                            forceErrorState: hasError,
+                            onChanged: (_) {
+                              if (validationMessage == null) return;
+                              setState(() => validationMessage = null);
+                            },
+                          ),
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child:
+                              validationMessage == null
+                                  ? const SizedBox(height: 20)
+                                  : Padding(
+                                    key: ValueKey(validationMessage),
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      validationMessage!,
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: colors.error),
+                                    ),
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(dialogContext),
@@ -641,10 +1017,11 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
                       child: Text('Xác nhận'.tr),
                     ),
                   ],
-                ),
+                );
+              },
+            ),
           ),
     );
-    otpController.dispose();
     return result;
   }
 
@@ -660,58 +1037,60 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
     final result = await showDialog<String>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: Text(title),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(message),
-                      if (controller.requiresPasswordReauthentication) ...[
-                        const SizedBox(height: 16),
-                        _PasswordField(
-                          controller: passwordController,
-                          label: 'Mật khẩu hiện tại'.tr,
-                          obscure: obscure,
-                          errorText: validationMessage,
-                          onToggle: () => setState(() => obscure = !obscure),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          'Bạn sẽ được yêu cầu xác thực lại bằng Google.'.tr,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
+          (dialogContext) => _DialogControllerScope(
+            controllers: [passwordController],
+            child: StatefulBuilder(
+              builder:
+                  (context, setState) => AlertDialog(
+                    title: Text(title),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(message),
+                        if (controller.requiresPasswordReauthentication) ...[
+                          const SizedBox(height: 16),
+                          _PasswordField(
+                            controller: passwordController,
+                            label: 'Mật khẩu hiện tại'.tr,
+                            obscure: obscure,
+                            errorText: validationMessage,
+                            onToggle: () => setState(() => obscure = !obscure),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Bạn sẽ được yêu cầu xác thực lại bằng Google.'.tr,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
                       ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text('Hủy'.tr),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          final password = passwordController.text;
+                          if (controller.requiresPasswordReauthentication &&
+                              password.isEmpty) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Vui lòng nhập mật khẩu hiện tại.'.tr,
+                            );
+                            return;
+                          }
+                          Navigator.pop(dialogContext, password);
+                        },
+                        child: Text(confirmLabel),
+                      ),
                     ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: Text('Hủy'.tr),
-                    ),
-                    FilledButton(
-                      onPressed: () {
-                        final password = passwordController.text;
-                        if (controller.requiresPasswordReauthentication &&
-                            password.isEmpty) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Vui lòng nhập mật khẩu hiện tại.'.tr,
-                          );
-                          return;
-                        }
-                        Navigator.pop(dialogContext, password);
-                      },
-                      child: Text(confirmLabel),
-                    ),
-                  ],
-                ),
+            ),
           ),
     );
-    passwordController.dispose();
     return result;
   }
 
@@ -725,92 +1104,95 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
     final result = await showDialog<_DeleteAccountInput>(
       context: context,
       builder:
-          (dialogContext) => StatefulBuilder(
-            builder:
-                (context, setState) => AlertDialog(
-                  title: Text(
-                    'Xóa tài khoản vĩnh viễn?'.tr,
-                    style: TextStyle(color: errorColor),
-                  ),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hồ sơ, thiết bị, dữ liệu bảo mật và nội dung công khai của bạn sẽ bị xóa. Hành động này không thể hoàn tác.'
-                              .tr,
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: confirmationController,
-                          autocorrect: false,
-                          decoration: InputDecoration(
-                            labelText: '${'Nhập'.tr} XOA TAI KHOAN',
-                            errorText: validationMessage,
-                          ),
-                        ),
-                        if (controller.requiresPasswordReauthentication) ...[
-                          const SizedBox(height: 12),
-                          _PasswordField(
-                            controller: passwordController,
-                            label: 'Mật khẩu hiện tại'.tr,
-                            obscure: obscure,
-                            onToggle: () => setState(() => obscure = !obscure),
-                          ),
-                        ] else ...[
-                          const SizedBox(height: 12),
+          (dialogContext) => _DialogControllerScope(
+            controllers: [confirmationController, passwordController],
+            child: StatefulBuilder(
+              builder:
+                  (context, setState) => AlertDialog(
+                    title: Text(
+                      'Xóa tài khoản vĩnh viễn?'.tr,
+                      style: TextStyle(color: errorColor),
+                    ),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Bạn sẽ được yêu cầu xác thực lại bằng Google.'.tr,
-                            style: Theme.of(context).textTheme.bodySmall,
+                            'Hồ sơ, thiết bị, dữ liệu bảo mật và nội dung công khai của bạn sẽ bị xóa. Hành động này không thể hoàn tác.'
+                                .tr,
                           ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: confirmationController,
+                            autocorrect: false,
+                            decoration: InputDecoration(
+                              labelText: '${'Nhập'.tr} XOA TAI KHOAN',
+                              errorText: validationMessage,
+                            ),
+                          ),
+                          if (controller.requiresPasswordReauthentication) ...[
+                            const SizedBox(height: 12),
+                            _PasswordField(
+                              controller: passwordController,
+                              label: 'Mật khẩu hiện tại'.tr,
+                              obscure: obscure,
+                              onToggle:
+                                  () => setState(() => obscure = !obscure),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              'Bạn sẽ được yêu cầu xác thực lại bằng Google.'
+                                  .tr,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: Text('Hủy'.tr),
-                    ),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: errorColor,
                       ),
-                      onPressed: () {
-                        final confirmation =
-                            confirmationController.text.trim().toUpperCase();
-                        final password = passwordController.text;
-                        if (confirmation != 'XOA TAI KHOAN') {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Cụm từ xác nhận chưa chính xác.'.tr,
-                          );
-                          return;
-                        }
-                        if (controller.requiresPasswordReauthentication &&
-                            password.isEmpty) {
-                          setState(
-                            () =>
-                                validationMessage =
-                                    'Vui lòng nhập mật khẩu hiện tại.'.tr,
-                          );
-                          return;
-                        }
-                        Navigator.pop(
-                          dialogContext,
-                          _DeleteAccountInput(password: password),
-                        );
-                      },
-                      child: Text('Xóa vĩnh viễn'.tr),
                     ),
-                  ],
-                ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogContext),
+                        child: Text('Hủy'.tr),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: errorColor,
+                        ),
+                        onPressed: () {
+                          final confirmation =
+                              confirmationController.text.trim().toUpperCase();
+                          final password = passwordController.text;
+                          if (confirmation != 'XOA TAI KHOAN') {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Cụm từ xác nhận chưa chính xác.'.tr,
+                            );
+                            return;
+                          }
+                          if (controller.requiresPasswordReauthentication &&
+                              password.isEmpty) {
+                            setState(
+                              () =>
+                                  validationMessage =
+                                      'Vui lòng nhập mật khẩu hiện tại.'.tr,
+                            );
+                            return;
+                          }
+                          Navigator.pop(
+                            dialogContext,
+                            _DeleteAccountInput(password: password),
+                          );
+                        },
+                        child: Text('Xóa vĩnh viễn'.tr),
+                      ),
+                    ],
+                  ),
+            ),
           ),
     );
-    confirmationController.dispose();
-    passwordController.dispose();
     return result;
   }
 
@@ -862,6 +1244,46 @@ class _SecuritySection extends StatelessWidget {
           margin: EdgeInsets.zero,
           clipBehavior: Clip.antiAlias,
           child: Column(children: children),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmailVerificationStep extends StatelessWidget {
+  const _EmailVerificationStep({required this.number, required this.text});
+
+  final int number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colors.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '$number',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colors.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
         ),
       ],
     );
@@ -997,6 +1419,37 @@ class _DeviceTile extends StatelessWidget {
       'windows' || 'macos' || 'linux' => Icons.computer,
       _ => Icons.devices_other,
     };
+  }
+}
+
+/// Keeps text controllers alive for the entire dialog exit animation.
+///
+/// `showDialog` completes as soon as the route is popped, before its widget tree
+/// is necessarily unmounted. Disposing controllers after awaiting `showDialog`
+/// can therefore leave a closing TextField with an already disposed controller.
+class _DialogControllerScope extends StatefulWidget {
+  const _DialogControllerScope({
+    required this.controllers,
+    required this.child,
+  });
+
+  final List<TextEditingController> controllers;
+  final Widget child;
+
+  @override
+  State<_DialogControllerScope> createState() => _DialogControllerScopeState();
+}
+
+class _DialogControllerScopeState extends State<_DialogControllerScope> {
+  @override
+  Widget build(BuildContext context) => widget.child;
+
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 }
 
