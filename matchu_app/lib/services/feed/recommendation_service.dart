@@ -169,6 +169,7 @@ class RecommendationService {
         postId: postId,
         contentBasedScore: _parseDouble(data['contentBasedScore']),
         trendingScore: _parseDouble(data['trendingScore']),
+        discoveryScore: _parseDouble(data['discoveryScore']),
         followingBoost: _parseDouble(data['followingBoost']),
         finalScore: _parseDouble(data['finalScore']),
         seenPenalty: _parseDouble(data['seenPenalty']),

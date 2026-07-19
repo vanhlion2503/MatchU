@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   ACTION_WEIGHTS,
   NEGATIVE_ACTION_WEIGHTS,
+  calculateDiscoveryScore,
   calculateTrendingScore,
   calculateSeenPenalty,
   composeDiversePool,
@@ -16,6 +17,7 @@ const {
   isFrequencyCapped,
   parseVector,
   resolveRatios,
+  resolveDiscoveryWeight,
   resolveCompositionTargets,
 } = require("../src/recommendation/core");
 const { calculatePopularitySignal } = require("../src/recommendation/retrieval");
@@ -64,6 +66,24 @@ test("fresh zero-engagement posts retain a discovery score", () => {
     trendBucket: 0,
   }, now);
   assert.ok(score > 0);
+});
+
+test("cold-start discovery keeps eligible posts beyond the trending window", () => {
+  const now = Date.now();
+  const eightDaysOld = calculateDiscoveryScore({
+    createdAt: now - (8 * 86400000),
+    stats: {},
+  }, now);
+  const sixtyDaysOld = calculateDiscoveryScore({
+    createdAt: now - (60 * 86400000),
+    stats: {},
+  }, now);
+
+  assert.ok(eightDaysOld > 0);
+  assert.ok(sixtyDaysOld > 0);
+  assert.ok(eightDaysOld > sixtyDaysOld);
+  assert.ok(resolveDiscoveryWeight("cold_start_trending") >
+    resolveDiscoveryWeight("personalized"));
 });
 
 test("embedding metadata detects content and model changes", () => {
@@ -146,12 +166,14 @@ test("recommendation session expires when user cache is invalidated", () => {
   const now = Date.now();
   const session = {
     postIds: ["post-1"],
+    feedRevision: 5,
     createdAtMillis: now - 1000,
     expiresAtMillis: now + 60000,
   };
-  assert.equal(isRecommendationSessionReusable(session, now, now - 2000), true);
-  assert.equal(isRecommendationSessionReusable(session, now, now), false);
-  assert.equal(isRecommendationSessionReusable(session, now + 60001, 0), false);
+  assert.equal(isRecommendationSessionReusable(session, now, now - 2000, 5), true);
+  assert.equal(isRecommendationSessionReusable(session, now, now, 5), false);
+  assert.equal(isRecommendationSessionReusable(session, now, 0, 6), false);
+  assert.equal(isRecommendationSessionReusable(session, now + 60001, 0, 5), false);
 });
 
 test("composition targets follow scoring ratios while reserving exploration", () => {
@@ -184,4 +206,22 @@ test("diverse pool reserves exploration and following slots per page", () => {
   });
   assert.equal(selected.length, 20);
   assert.ok(selected.some((item) => item.postId === "post-39"));
+});
+
+test("cold-start composition fills a page when only one post is trending", () => {
+  const ranked = Array.from({ length: 40 }, (_, index) => ({
+    postId: `post-${index}`,
+    contentBasedScore: 0,
+    rawTrendingScore: index === 0 ? 1 : 0,
+    followingBoost: 0,
+  }));
+  const selected = composeDiversePool(ranked, 20, "cold-start", {
+    content: 0,
+    trending: 1,
+    following: 0,
+    label: "cold_start_trending",
+  });
+
+  assert.equal(selected.length, 20);
+  assert.ok(selected.some((item) => item.postId === "post-0"));
 });

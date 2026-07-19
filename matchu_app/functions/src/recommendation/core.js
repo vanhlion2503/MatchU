@@ -30,9 +30,11 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_POST_POOL_SIZE = 140;
 const INTERACTION_HISTORY_LIMIT = 500;
 const TRENDING_FRESHNESS_BASELINE = 0.15;
+const DISCOVERY_FRESHNESS_BASELINE = 0.35;
+const DISCOVERY_HALF_LIFE_DAYS = 30;
 const INTEREST_HALF_LIFE_DAYS = 30;
 const MAX_POSTS_PER_AUTHOR_IN_PRIMARY_POOL = 3;
-const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v3_sessions";
+const RECOMMENDATION_ALGORITHM_VERSION = "hybrid_vector_v4_adaptive_discovery";
 const RECOMMENDATION_FEED_STATE_PATH = "system/recommendationFeedState";
 const RECENT_SEEN_WINDOW_MS = 30 * 60 * 1000;
 const IMPRESSION_FREQUENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -112,6 +114,37 @@ function calculateTrendingScore(post, nowMillis = Date.now()) {
   ) * exponentialDecay(createdAtMillis, nowMillis);
 }
 
+/**
+ * Keeps eligible posts available to users who do not have an interest vector
+ * or a following graph yet. Age lowers discovery priority gradually instead
+ * of making a post disappear at the seven-day trending boundary.
+ */
+function calculateDiscoveryScore(post, nowMillis = Date.now()) {
+  const createdAtMillis = toMillis(post?.createdAt) || nowMillis;
+  const freshness = exponentialDecay(
+    createdAtMillis,
+    nowMillis,
+    DISCOVERY_HALF_LIFE_DAYS,
+  );
+  const boundedPopularity = Math.min(3, calculatePopularitySignal(post));
+  return (DISCOVERY_FRESHNESS_BASELINE + boundedPopularity) * freshness;
+}
+
+function resolveDiscoveryWeight(ratioLabel) {
+  switch (ratioLabel) {
+    case "cold_start_trending":
+      return 0.45;
+    case "cold_start":
+      return 0.35;
+    case "hybrid_exploration":
+      return 0.20;
+    case "personalized":
+      return 0.10;
+    default:
+      return 0.20;
+  }
+}
+
 function isEligiblePost(post) {
   return (
     post &&
@@ -180,12 +213,16 @@ function isRecommendationSessionReusable(
   session,
   nowMillis = Date.now(),
   invalidatedAtMillis = 0,
+  currentFeedRevision = null,
 ) {
+  const revisionMatches = currentFeedRevision == null ||
+    Number(session?.feedRevision) === Number(currentFeedRevision);
   return Boolean(
     session &&
     Array.isArray(session.postIds) &&
     Number(session.expiresAtMillis || 0) > nowMillis &&
-    Number(session.createdAtMillis || 0) >= Number(invalidatedAtMillis || 0),
+    Number(session.createdAtMillis || 0) >= Number(invalidatedAtMillis || 0) &&
+    revisionMatches,
   );
 }
 
@@ -637,6 +674,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
     following.delete(restrictedAuthorId);
   }
   const ratios = resolveRatios(user, following.size > 0);
+  const discoveryWeight = resolveDiscoveryWeight(ratios.label);
   const parsedUserVector = parseVector(user.interestVector);
   const userVector =
     (user.interestEmbeddingModel || DEFAULT_EMBEDDING_MODEL) === EMBEDDING_MODEL &&
@@ -690,9 +728,15 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       createdAtMillis >= trendingCutoff
         ? calculateTrendingScore(post, nowMillis)
         : 0;
+    const rawDiscoveryScore = calculateDiscoveryScore(post, nowMillis);
     const followingBoost = following.has(authorId) ? 1 : 0;
 
-    if (contentBasedScore <= 0 && rawTrendingScore <= 0 && followingBoost <= 0) {
+    if (
+      contentBasedScore <= 0 &&
+      rawTrendingScore <= 0 &&
+      followingBoost <= 0 &&
+      rawDiscoveryScore <= 0
+    ) {
       continue;
     }
 
@@ -701,6 +745,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       authorId,
       contentBasedScore,
       rawTrendingScore,
+      rawDiscoveryScore,
       followingBoost,
       negativeSimilarity,
       createdAtMillis,
@@ -717,14 +762,22 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
     (max, item) => Math.max(max, item.rawTrendingScore),
     0
   );
+  const maxDiscoveryScore = scored.reduce(
+    (max, item) => Math.max(max, item.rawDiscoveryScore),
+    0,
+  );
 
   const ranked = scored.map((item) => {
     const trendingScore =
       maxTrendingScore > 0 ? item.rawTrendingScore / maxTrendingScore : 0;
+    const discoveryScore = maxDiscoveryScore > 0
+      ? item.rawDiscoveryScore / maxDiscoveryScore
+      : 0;
     const finalScore =
       (item.contentBasedScore * ratios.content) +
       (trendingScore * ratios.trending) +
-      (item.followingBoost * ratios.following);
+      (item.followingBoost * ratios.following) +
+      (discoveryScore * discoveryWeight);
     const adjustedFinalScore = Math.max(
       0,
       finalScore - (item.negativeSimilarity * 0.35) - item.seenPenalty,
@@ -732,6 +785,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
     return {
       ...item,
       trendingScore,
+      discoveryScore,
       finalScore: adjustedFinalScore,
     };
   });
@@ -765,6 +819,7 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
         {
           contentBasedScore: item.contentBasedScore,
           trendingScore: item.trendingScore,
+          discoveryScore: item.discoveryScore,
           followingBoost: item.followingBoost,
           seenPenalty: item.seenPenalty,
           finalScore: item.finalScore,
@@ -775,9 +830,11 @@ async function buildRecommendationPool(uid, { seed = `${uid}:${Date.now()}` } = 
       totalRecommended: pool.length,
       contentBasedCount: ranked.filter((item) => item.contentBasedScore > 0).length,
       trendingCount: ranked.filter((item) => item.rawTrendingScore > 0).length,
+      discoveryCount: ranked.filter((item) => item.rawDiscoveryScore > 0).length,
       followingCount: ranked.filter((item) => item.followingBoost > 0).length,
       processingTimeMs: Date.now() - startedAt,
       ratio: ratios.label,
+      discoveryWeight,
       compositionTargetsPer20: resolveCompositionTargets(20, ratios),
       embeddingModel: EMBEDDING_MODEL,
       embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -842,6 +899,7 @@ async function getOrBuildRecommendationPool(
       scoresByPostId: cacheSnap.data().scoresByPostId || {},
       metadata: {
         ...(cacheSnap.data().metadata || {}),
+        feedRevision,
         cacheHit: true,
       },
     };
@@ -863,6 +921,7 @@ async function getOrBuildRecommendationPool(
     ...pool,
     metadata: {
       ...pool.metadata,
+      feedRevision,
       cacheHit: false,
     },
   };
@@ -1176,6 +1235,7 @@ module.exports = {
   CACHE_TTL_MS,
   CANDIDATE_LIMIT,
   DECAY_FLOOR,
+  DISCOVERY_HALF_LIFE_DAYS,
   HALF_LIFE_DAYS,
   INTEREST_HALF_LIFE_DAYS,
   MAX_WEIGHT_CAP,
@@ -1186,6 +1246,7 @@ module.exports = {
   buildRecommendationPool,
   bumpRecommendationFeedRevision,
   calculateTrendingScore,
+  calculateDiscoveryScore,
   calculateSeenPenalty,
   cosineSimilarity,
   deactivateRecommendationInteraction,
@@ -1210,6 +1271,7 @@ module.exports = {
   recommendationCacheRef,
   recommendationFeedStateRef,
   resolveRatios,
+  resolveDiscoveryWeight,
   resolveCompositionTargets,
   shuffleScoreBands,
   timeDecay,

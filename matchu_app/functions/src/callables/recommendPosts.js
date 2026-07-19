@@ -6,6 +6,7 @@ const {
   getOrBuildRecommendationPool,
   isRecommendationSessionReusable,
   recommendationCacheRef,
+  recommendationFeedStateRef,
   toSafeUid,
 } = require("../recommendation/core");
 
@@ -39,17 +40,21 @@ const recommendPosts = onCall(
       let sessionId = forceRefresh ? "" : requestedSessionId;
       let session = null;
       if (sessionId) {
-        const [sessionSnap, cacheSnap] = await Promise.all([
+        const [sessionSnap, cacheSnap, feedStateSnap] = await Promise.all([
           sessionRef(uid, sessionId).get(),
           recommendationCacheRef(uid).get(),
+          recommendationFeedStateRef().get(),
         ]);
         const data = sessionSnap.data();
         const invalidatedAtMillis =
           cacheSnap.data()?.invalidatedAt?.toMillis?.() || 0;
+        const currentFeedRevision =
+          Number(feedStateSnap.data()?.revision) || 0;
         if (sessionSnap.exists && isRecommendationSessionReusable(
           data,
           nowMillis,
           invalidatedAtMillis,
+          currentFeedRevision,
         )) {
           session = data;
         } else {
@@ -73,6 +78,7 @@ const recommendPosts = onCall(
           scoresByPostId: pool.scoresByPostId || {},
           metadata: pool.metadata || {},
           poolId: crypto.randomUUID(),
+          feedRevision: Number(pool.metadata?.feedRevision) || 0,
           createdAtMillis: nowMillis,
           expiresAtMillis: nowMillis + SESSION_TTL_MS,
         };

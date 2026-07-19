@@ -7,12 +7,14 @@ class RecommendationScore {
     required this.trendingScore,
     required this.followingBoost,
     required this.finalScore,
+    this.discoveryScore = 0,
     this.seenPenalty = 0,
   });
 
   final String postId;
   final double contentBasedScore;
   final double trendingScore;
+  final double discoveryScore;
   final double followingBoost;
   final double finalScore;
   final double seenPenalty;
@@ -22,6 +24,7 @@ class RecommendationScore {
       'postId': postId,
       'contentBasedScore': contentBasedScore,
       'trendingScore': trendingScore,
+      'discoveryScore': discoveryScore,
       'followingBoost': followingBoost,
       'finalScore': finalScore,
       'seenPenalty': seenPenalty,

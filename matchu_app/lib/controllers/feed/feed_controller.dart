@@ -92,6 +92,7 @@ class FeedController extends GetxController {
   DocumentSnapshot<Map<String, dynamic>>? _lastDocument;
   int _featuredLastLoadedPage = 0;
   String? _featuredSessionId;
+  bool _featuredSourceHasMore = true;
   final Map<String, DocumentSnapshot<Map<String, dynamic>>>
   _followingPublicLastDocumentsByChunk =
       <String, DocumentSnapshot<Map<String, dynamic>>>{};
@@ -848,6 +849,7 @@ class FeedController extends GetxController {
       featuredErrorMessage.value = null;
       _featuredLastLoadedPage = 0;
       _featuredSessionId = null;
+      _featuredSourceHasMore = true;
       _featuredBufferedPosts.clear();
       featuredHasMore.value = true;
     } else {
@@ -860,18 +862,76 @@ class FeedController extends GetxController {
         await _loadRestrictedAuthorIds();
       }
 
-      final page = await _recommendationService.getRecommendedPosts(
-        userId: currentUserId,
-        limit: _pageSize,
-        page: reset ? 1 : _featuredLastLoadedPage + 1,
-        sessionId: reset ? null : _featuredSessionId,
-        forceRefresh: reset && isManualRefresh,
-      );
-      final loadedPosts = await _hydrateFeedPosts(page.posts, reset: reset);
+      final loadedPosts = <PostModel>[];
+      final acceptedPostIds = <String>{
+        if (!reset) ...featuredPosts.map((post) => post.postId.trim()),
+      }..removeWhere((postId) => postId.isEmpty);
+
+      // Consume already hydrated overflow first. This normally stays empty,
+      // but prevents a sparse client-side filter from wasting valid results.
+      while (_featuredBufferedPosts.isNotEmpty &&
+          loadedPosts.length < _pageSize) {
+        final post = _featuredBufferedPosts.removeAt(0);
+        final postId = post.postId.trim();
+        if (postId.isEmpty ||
+            acceptedPostIds.contains(postId) ||
+            _shouldHidePost(post)) {
+          continue;
+        }
+        loadedPosts.add(_withLocalInteractionState(post));
+        acceptedPostIds.add(postId);
+      }
+
+      var sourceHasMore = _featuredSourceHasMore;
+      var requestCount = 0;
+      Map<String, dynamic> latestMetadata = const <String, dynamic>{};
+      String? latestPoolId;
+
+      // A recommendation page can shrink after hydration (for example when a
+      // post was hidden locally or deleted after the pool was built). Continue
+      // through the same server session until the UI page is full or exhausted.
+      while (loadedPosts.length < _pageSize && requestCount < 5) {
+        final page = await _recommendationService.getRecommendedPosts(
+          userId: currentUserId,
+          limit: _pageSize,
+          page: reset && requestCount == 0 ? 1 : _featuredLastLoadedPage + 1,
+          sessionId: reset && requestCount == 0 ? null : _featuredSessionId,
+          forceRefresh: reset && isManualRefresh && requestCount == 0,
+        );
+        requestCount++;
+
+        _featuredLastLoadedPage = page.page;
+        _featuredSessionId = page.sessionId;
+        latestMetadata = page.metadata;
+        latestPoolId = page.poolId;
+        sourceHasMore = page.hasMore;
+        _featuredSourceHasMore = page.hasMore;
+
+        final hydratedPage = await _hydrateFeedPosts(
+          page.posts,
+          reset: reset && requestCount == 1,
+        );
+        for (final post in hydratedPage) {
+          final postId = post.postId.trim();
+          if (postId.isEmpty || acceptedPostIds.contains(postId)) continue;
+
+          acceptedPostIds.add(postId);
+          if (loadedPosts.length < _pageSize) {
+            loadedPosts.add(post);
+          } else {
+            _featuredBufferedPosts.add(post);
+          }
+        }
+
+        if (!page.hasMore) break;
+      }
+
       featuredRecommendationMetadata.assignAll({
-        ...page.metadata,
-        'sessionId': page.sessionId,
-        'poolId': page.poolId,
+        ...latestMetadata,
+        'sessionId': _featuredSessionId,
+        'poolId': latestPoolId,
+        'clientPagesScanned': requestCount,
+        'clientAcceptedCount': loadedPosts.length,
         'requestError': null,
       });
 
@@ -883,9 +943,8 @@ class FeedController extends GetxController {
         );
       }
 
-      _featuredLastLoadedPage = page.page;
-      _featuredSessionId = page.sessionId;
-      featuredHasMore.value = page.hasMore;
+      featuredHasMore.value =
+          _featuredBufferedPosts.isNotEmpty || sourceHasMore;
 
       if (featuredPosts.isEmpty) {
         featuredStatus.value = FeedStatus.empty;
