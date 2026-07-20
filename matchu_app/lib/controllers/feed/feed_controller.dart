@@ -1347,15 +1347,6 @@ class FeedController extends GetxController {
     unawaited(_syncSavedState(postId));
   }
 
-  void onShareTap() {
-    Get.snackbar(
-      PostTranslationKeys.notice.tr,
-      'Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.'.tr,
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(12),
-    );
-  }
-
   Future<List<PostModel>> _attachLikeStates(
     List<PostModel> incoming, {
     required bool reset,

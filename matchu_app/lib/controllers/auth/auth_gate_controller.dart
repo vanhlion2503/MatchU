@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
+import 'package:matchu_app/controllers/feed/post_deep_link_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/auth/auth_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
@@ -179,6 +180,12 @@ class AuthGateController extends GetxController {
         Get.find<NotificationController>().flushPendingNavigation(
           allowMainRedirect: true,
         );
+      });
+    }
+    if (completed && Get.isRegistered<PostDeepLinkController>()) {
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!Get.isRegistered<PostDeepLinkController>()) return;
+        unawaited(Get.find<PostDeepLinkController>().flushPendingNavigation());
       });
     }
   }

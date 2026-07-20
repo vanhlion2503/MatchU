@@ -7,6 +7,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
+import 'package:matchu_app/controllers/feed/post_deep_link_controller.dart';
+import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
@@ -105,6 +107,9 @@ void main() async {
   Get.put(LanguageController(), permanent: true);
   Get.put(AuthController(), permanent: true);
   Get.put(AuthGateController(), permanent: true);
+  Get.put(PostShareController(), permanent: true);
+  // Register before runApp so cold-start links are not missed.
+  Get.put(PostDeepLinkController(), permanent: true);
   Get.put(AppLifecycleController(), permanent: true);
   final notificationController = Get.put(
     NotificationController(),

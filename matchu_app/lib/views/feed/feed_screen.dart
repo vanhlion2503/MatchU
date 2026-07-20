@@ -9,6 +9,7 @@ import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_engagement_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
+import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
@@ -40,6 +41,7 @@ class _FeedScreenState extends State<FeedScreen>
   static const double _loadMoreThreshold = 640;
 
   late final FeedController controller;
+  late final PostShareController shareController;
   late final TabController _tabController;
   final ScrollController _latestScrollController = ScrollController();
   final ScrollController _featuredScrollController = ScrollController();
@@ -54,6 +56,7 @@ class _FeedScreenState extends State<FeedScreen>
   void initState() {
     super.initState();
     controller = Get.find<FeedController>();
+    shareController = Get.find<PostShareController>();
     final initialIndex = switch (controller.activeTimeline.value) {
       FeedTimeline.featured => 0,
       FeedTimeline.latest => 1,
@@ -378,6 +381,7 @@ class _FeedScreenState extends State<FeedScreen>
       post: post,
       isSaved: post.isSaved,
       onSaveTap: () => controller.toggleSave(post.postId),
+      onCopyLinkTap: () => shareController.copyPostLink(post),
       canHidePost: canHidePost,
       onHidePostTap:
           canHidePost ? () => controller.hidePostFromFeed(post) : null,
@@ -393,6 +397,17 @@ class _FeedScreenState extends State<FeedScreen>
       onDeleteTap: canDeletePost ? () => _deletePost(post) : null,
       canReportPost: canReportPost,
       onBlockAuthorTap: canReportPost ? () => _blockPostAuthor(post) : null,
+    );
+  }
+
+  void _sharePost(PostModel post) {
+    unawaited(
+      shareController.sharePost(
+        post,
+        sharePositionOrigin: PostShareController.shareOriginFromContext(
+          context,
+        ),
+      ),
     );
   }
 
@@ -465,7 +480,7 @@ class _FeedScreenState extends State<FeedScreen>
               onLikeTap: (postId) => controller.toggleLike(postId),
               onCommentTap: _openPostDetail,
               onRepostTap: (post) => _openRepostSheet(context, post),
-              onShareTap: controller.onShareTap,
+              onShareTap: _sharePost,
               onMoreTap: (post) => _openPostActionSheet(context, post),
               onAuthorTap: _openAuthorProfile,
               onReferenceAuthorTap: _openAuthorProfile,
@@ -496,7 +511,7 @@ class _FeedScreenState extends State<FeedScreen>
               onLikeTap: (postId) => controller.toggleLike(postId),
               onCommentTap: _openPostDetail,
               onRepostTap: (post) => _openRepostSheet(context, post),
-              onShareTap: controller.onShareTap,
+              onShareTap: _sharePost,
               onMoreTap: (post) => _openPostActionSheet(context, post),
               onAuthorTap: _openAuthorProfile,
               onReferenceAuthorTap: _openAuthorProfile,
@@ -530,7 +545,7 @@ class _FeedScreenState extends State<FeedScreen>
               onLikeTap: (postId) => controller.toggleLike(postId),
               onCommentTap: _openPostDetail,
               onRepostTap: (post) => _openRepostSheet(context, post),
-              onShareTap: controller.onShareTap,
+              onShareTap: _sharePost,
               onMoreTap: (post) => _openPostActionSheet(context, post),
               onAuthorTap: _openAuthorProfile,
               onReferenceAuthorTap: _openAuthorProfile,
@@ -697,7 +712,7 @@ class _FeedTimelineBody extends StatefulWidget {
   final ValueChanged<String> onLikeTap;
   final ValueChanged<PostModel> onCommentTap;
   final ValueChanged<PostModel> onRepostTap;
-  final VoidCallback onShareTap;
+  final ValueChanged<PostModel> onShareTap;
   final ValueChanged<PostModel> onMoreTap;
   final String? emptyTitle;
   final String? emptyDescription;
@@ -868,7 +883,7 @@ class _FeedTimelineBodyState extends State<_FeedTimelineBody> {
               onLikeTap: () => widget.onLikeTap(post.postId),
               onCommentTap: () => widget.onCommentTap(post),
               onRepostTap: () => widget.onRepostTap(post),
-              onShareTap: widget.onShareTap,
+              onShareTap: () => widget.onShareTap(post),
               onMoreTap: () => widget.onMoreTap(post),
               onAuthorTap: widget.onAuthorTap,
               onReferenceAuthorTap: widget.onReferenceAuthorTap,

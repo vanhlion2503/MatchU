@@ -12,6 +12,7 @@ class PostActionSheet extends StatelessWidget {
     required this.post,
     this.isSaved = false,
     this.onSaveTap,
+    this.onCopyLinkTap,
     this.canHidePost = false,
     this.onHidePostTap,
     this.canHideAuthorPosts = false,
@@ -29,6 +30,7 @@ class PostActionSheet extends StatelessWidget {
   final PostModel post;
   final bool isSaved;
   final Future<void> Function()? onSaveTap;
+  final Future<void> Function()? onCopyLinkTap;
   final bool canHidePost;
   final Future<void> Function()? onHidePostTap;
   final bool canHideAuthorPosts;
@@ -48,6 +50,7 @@ class PostActionSheet extends StatelessWidget {
     required PostModel post,
     bool isSaved = false,
     Future<void> Function()? onSaveTap,
+    Future<void> Function()? onCopyLinkTap,
     bool canHidePost = false,
     Future<void> Function()? onHidePostTap,
     bool canHideAuthorPosts = false,
@@ -70,6 +73,7 @@ class PostActionSheet extends StatelessWidget {
             post: post,
             isSaved: isSaved,
             onSaveTap: onSaveTap,
+            onCopyLinkTap: onCopyLinkTap,
             canHidePost: canHidePost,
             onHidePostTap: onHidePostTap,
             canHideAuthorPosts: canHideAuthorPosts,
@@ -207,7 +211,7 @@ class PostActionSheet extends StatelessWidget {
                       title: 'Sao chép liên kết',
                       subtitle: 'Chia sẻ liên kết bài viết.',
                       palette: palette,
-                      onTap: () => Navigator.of(context).pop(),
+                      onTap: () => _onCopyLinkTap(context),
                     ),
                     if (canHideAuthorPosts) ...[
                       const SizedBox(height: 12),
@@ -256,6 +260,13 @@ class PostActionSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _onCopyLinkTap(BuildContext context) {
+    Navigator.of(context).pop();
+    final callback = onCopyLinkTap;
+    if (callback == null) return;
+    Future<void>.delayed(_sheetExitDelay, callback);
   }
 
   Future<void> _onHidePostTap(BuildContext context) async {

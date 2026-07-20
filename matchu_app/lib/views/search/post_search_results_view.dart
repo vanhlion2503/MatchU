@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/search/post_search_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
@@ -71,6 +71,7 @@ class _PostSearchResultsViewState extends State<PostSearchResultsView> {
       post: post,
       isSaved: post.isSaved,
       onSaveTap: () => controller.toggleSave(post.postId),
+      onCopyLinkTap: () => Get.find<PostShareController>().copyPostLink(post),
       canReportPost: canReport,
       onBlockAuthorTap:
           canReport
@@ -83,11 +84,10 @@ class _PostSearchResultsViewState extends State<PostSearchResultsView> {
   }
 
   void _sharePost(PostModel post) {
-    if (Get.isRegistered<FeedController>()) {
-      Get.find<FeedController>().onShareTap();
-      return;
-    }
-    _openPostDetail(post);
+    Get.find<PostShareController>().sharePost(
+      post,
+      sharePositionOrigin: PostShareController.shareOriginFromContext(context),
+    );
   }
 
   @override

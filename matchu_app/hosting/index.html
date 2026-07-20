@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#7c3aed" />
+    <meta property="og:title" content="Bài viết trên MatchU" />
+    <meta
+      property="og:description"
+      content="Mở MatchU để xem bài viết và tham gia cuộc trò chuyện."
+    />
+    <title>Bài viết trên MatchU</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f5ff; color: #211a35; }
+      main { width: min(88vw, 440px); padding: 36px 28px; border-radius: 28px; background: white; box-shadow: 0 20px 60px #3b246c24; text-align: center; }
+      .logo { width: 72px; height: 72px; margin: auto; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(135deg, #8b5cf6, #ec4899); color: white; font-size: 30px; font-weight: 800; }
+      h1 { margin: 22px 0 10px; font-size: 26px; }
+      p { margin: 0 0 26px; color: #6b627c; line-height: 1.6; }
+      a { display: block; padding: 14px 18px; border-radius: 14px; background: #7c3aed; color: white; text-decoration: none; font-weight: 700; }
+      small { display: block; margin-top: 18px; color: #8b829a; }
+      @media (prefers-color-scheme: dark) { body { background: #15111f; color: #f8f5ff; } main { background: #211a2f; } p, small { color: #b8aec8; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="logo">M</div>
+      <h1>Bài viết trên MatchU</h1>
+      <p>Mở ứng dụng MatchU để xem nội dung đầy đủ của bài viết này.</p>
+      <a id="open-app" href="#">Mở trong MatchU</a>
+      <small>Nội dung riêng tư chỉ hiển thị cho người có quyền truy cập.</small>
+    </main>
+    <script>
+      const segments = location.pathname.split('/').filter(Boolean);
+      const postId = segments[0] === 'p' && segments.length === 2 ? segments[1] : '';
+      const button = document.getElementById('open-app');
+      if (postId && /^[A-Za-z0-9_-]{1,200}$/.test(postId)) {
+        button.href = `matchu://post/${encodeURIComponent(postId)}`;
+      } else {
+        button.hidden = true;
+      }
+    </script>
+  </body>
+</html>

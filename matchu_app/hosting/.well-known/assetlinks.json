@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.example.matchu_app",
+      "sha256_cert_fingerprints": [
+        "43:96:DD:95:37:A2:EE:95:0E:2F:14:0E:CB:09:BC:99:CC:7D:04:4E:3F:AC:A4:C2:19:21:AF:BF:63:7D:93:34"
+      ]
+    }
+  }
+]

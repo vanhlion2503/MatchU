@@ -102,6 +102,25 @@ const postVietnameseTranslations = <String, String>{
       'Tính năng chia sẻ sẽ sớm được cập nhật.',
   'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.':
       'Tính năng chia sẻ sẽ sớm được cập nhật.',
+  'Thiết bị hiện không hỗ trợ chia sẻ bài viết.':
+      'Thiết bị hiện không hỗ trợ chia sẻ bài viết.',
+  'Không thể chia sẻ bài viết lúc này. Vui lòng thử lại.':
+      'Không thể chia sẻ bài viết lúc này. Vui lòng thử lại.',
+  'Đã sao chép liên kết bài viết.': 'Đã sao chép liên kết bài viết.',
+  'Không thể sao chép liên kết bài viết.':
+      'Không thể sao chép liên kết bài viết.',
+  'Không tìm thấy bài viết để chia sẻ.': 'Không tìm thấy bài viết để chia sẻ.',
+  'Mã bài viết không hợp lệ.': 'Mã bài viết không hợp lệ.',
+  'Bài viết đang được kiểm duyệt hoặc chưa được phê duyệt.':
+      'Bài viết đang được kiểm duyệt hoặc chưa được phê duyệt.',
+  'Chỉ bài viết công khai mới có thể chia sẻ ra bên ngoài.':
+      'Chỉ bài viết công khai mới có thể chia sẻ ra bên ngoài.',
+  'Bài viết không khả dụng': 'Bài viết không khả dụng',
+  'Bài viết đã bị xóa hoặc bạn không còn quyền xem.':
+      'Bài viết đã bị xóa hoặc bạn không còn quyền xem.',
+  'Không thể mở bài viết': 'Không thể mở bài viết',
+  'Vui lòng kiểm tra kết nối mạng và thử lại.':
+      'Vui lòng kiểm tra kết nối mạng và thử lại.',
   'Video đã được duyệt và bài viết có thể hiển thị theo quyền riêng tư đã chọn.':
       'Video đã được duyệt và bài viết sẽ hiển thị theo quyền riêng tư đã chọn.',
   'Video vi phạm tiêu chuẩn cộng đồng nên bài viết đã bị ẩn.':
@@ -336,6 +355,24 @@ const postEnglishTranslations = <String, String>{
       'Sharing will be available soon.',
   'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.':
       'Sharing will be available soon.',
+  'Thiết bị hiện không hỗ trợ chia sẻ bài viết.':
+      'This device does not support post sharing.',
+  'Không thể chia sẻ bài viết lúc này. Vui lòng thử lại.':
+      'Unable to share this post right now. Please try again.',
+  'Đã sao chép liên kết bài viết.': 'Post link copied.',
+  'Không thể sao chép liên kết bài viết.': 'Unable to copy the post link.',
+  'Không tìm thấy bài viết để chia sẻ.': 'The post to share was not found.',
+  'Mã bài viết không hợp lệ.': 'The post ID is invalid.',
+  'Bài viết đang được kiểm duyệt hoặc chưa được phê duyệt.':
+      'This post is under review or has not been approved.',
+  'Chỉ bài viết công khai mới có thể chia sẻ ra bên ngoài.':
+      'Only public posts can be shared outside MatchU.',
+  'Bài viết không khả dụng': 'Post unavailable',
+  'Bài viết đã bị xóa hoặc bạn không còn quyền xem.':
+      'The post was deleted or you no longer have access.',
+  'Không thể mở bài viết': 'Unable to open post',
+  'Vui lòng kiểm tra kết nối mạng và thử lại.':
+      'Check your network connection and try again.',
   'Video đã được duyệt và bài viết có thể hiển thị theo quyền riêng tư đã chọn.':
       'The video was approved and the post now follows your selected privacy setting.',
   'Video vi phạm tiêu chuẩn cộng đồng nên bài viết đã bị ẩn.':

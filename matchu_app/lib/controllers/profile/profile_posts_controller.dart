@@ -500,15 +500,6 @@ class ProfilePostsController extends GetxController {
     }
   }
 
-  void onShareTap() {
-    Get.snackbar(
-      ProfileTranslationKeys.notice.tr,
-      profileTr('Tính năng chia sẻ sẽ được triển khai ở bước tiếp theo.'),
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(12),
-    );
-  }
-
   Future<void> _loadPosts({
     required bool reset,
     bool isManualRefresh = false,

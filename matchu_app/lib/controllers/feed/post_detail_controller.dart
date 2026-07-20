@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
+import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/controllers/feed/post_comments_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
@@ -15,7 +16,9 @@ class PostDetailController extends GetxController {
     required this.args,
     PostService? postService,
     FeedController? feedController,
+    PostShareController? shareController,
   }) : _postService = postService ?? PostService(),
+       _shareController = shareController ?? Get.find<PostShareController>(),
        _feedController =
            feedController ??
            (Get.isRegistered<FeedController>()
@@ -34,6 +37,7 @@ class PostDetailController extends GetxController {
 
   final PostDetailRouteArgs args;
   final PostService _postService;
+  final PostShareController _shareController;
   final FeedController? _feedController;
   final ProfilePostsController? _profilePostsController;
   final Rx<PostModel> post;
@@ -150,19 +154,17 @@ class PostDetailController extends GetxController {
     await _toggleSaveFallback();
   }
 
-  void sharePost() {
-    final feedController = _feedController;
-    if (feedController != null) {
-      feedController.onShareTap();
-      return;
-    }
-
-    Get.snackbar(
-      PostTranslationKeys.notice.tr,
-      'Tính năng chia sẻ sẽ được cập nhật ở bước tiếp theo.'.tr,
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(12),
+  Future<void> sharePost() {
+    return _shareController.sharePost(
+      post.value,
+      sharePositionOrigin: PostShareController.shareOriginFromContext(
+        Get.context,
+      ),
     );
+  }
+
+  Future<void> copyPostLink() {
+    return _shareController.copyPostLink(post.value);
   }
 
   void dismissCommentComposer() {
@@ -312,8 +314,8 @@ class PostDetailController extends GetxController {
       ),
     );
 
-    _profilePostsController?.adjustShareCount(targetPostId, delta: delta);
-    _feedController?.adjustShareCount(targetPostId, delta: delta);
+    // PostCreationSync updates Feed/Profile independently. Propagating from
+    // here would increment the same optimistic count twice.
   }
 
   void applyRepostState(String targetPostId, {required bool isReposted}) {

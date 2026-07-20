@@ -91,6 +91,7 @@ class _PostDetailViewState extends State<PostDetailView> {
       post: post,
       isSaved: post.isSaved,
       onSaveTap: controller.toggleSave,
+      onCopyLinkTap: controller.copyPostLink,
       canHidePost: canHidePost,
       onHidePostTap:
           canHidePost ? () => controller.hidePostFromFeed(post) : null,

@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
+import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/controllers/profile/profile_posts_controller.dart';
 import 'package:matchu_app/models/feed/post_detail_route_args.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
@@ -432,7 +433,13 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
             displayPost,
             controllerTag: controllerTag,
           ),
-      onShareTap: controller.onShareTap,
+      onShareTap:
+          () => Get.find<PostShareController>().sharePost(
+            displayPost,
+            sharePositionOrigin: PostShareController.shareOriginFromContext(
+              context,
+            ),
+          ),
       onMoreTap:
           () => _openPostActionSheet(
             context,
@@ -566,6 +573,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       post: post,
       isSaved: post.isSaved,
       onSaveTap: () => controller.toggleSave(post.postId),
+      onCopyLinkTap: () => Get.find<PostShareController>().copyPostLink(post),
       canHidePost: canHidePost,
       onHidePostTap: canHidePost ? () => _hidePostFromFeed(post) : null,
       canHideAuthorPosts: canHidePost,
