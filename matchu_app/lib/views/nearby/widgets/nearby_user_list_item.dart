@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/models/nearby_user_vm.dart';
@@ -73,6 +74,8 @@ class NearbyUserListItem extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
+  static const double _size = 52;
+
   final String avatarUrl;
   final String displayName;
 
@@ -82,23 +85,61 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final normalizedUrl = avatarUrl.trim();
+    final cacheSize = (_size * MediaQuery.devicePixelRatioOf(context)).round();
 
-    return CircleAvatar(
-      radius: 26,
+    final fallback = _AvatarFallback(
+      displayName: displayName,
       backgroundColor: colorScheme.surfaceContainerHighest,
-      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-      child:
-          avatarUrl.isEmpty
-              ? Text(
-                displayName.isEmpty
-                    ? "U"
-                    : displayName.substring(0, 1).toUpperCase(),
-                style: textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+      textStyle: textTheme.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        color: colorScheme.onSurface.withValues(alpha: 0.7),
+      ),
+    );
+
+    return ClipOval(
+      child: SizedBox.square(
+        dimension: _size,
+        child:
+            normalizedUrl.isEmpty
+                ? fallback
+                : CachedNetworkImage(
+                  imageUrl: normalizedUrl,
+                  width: _size,
+                  height: _size,
+                  fit: BoxFit.cover,
+                  memCacheWidth: cacheSize,
+                  memCacheHeight: cacheSize,
+                  fadeInDuration: Duration.zero,
+                  placeholder: (_, __) => fallback,
+                  errorWidget: (_, __, ___) => fallback,
                 ),
-              )
-              : null,
+      ),
+    );
+  }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback({
+    required this.displayName,
+    required this.backgroundColor,
+    required this.textStyle,
+  });
+
+  final String displayName;
+  final Color backgroundColor;
+  final TextStyle? textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial =
+        displayName.trim().isEmpty
+            ? 'U'
+            : displayName.trim().characters.first.toUpperCase();
+
+    return ColoredBox(
+      color: backgroundColor,
+      child: Center(child: Text(initial, style: textStyle)),
     );
   }
 }

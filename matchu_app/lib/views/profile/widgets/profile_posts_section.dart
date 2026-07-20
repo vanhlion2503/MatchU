@@ -24,9 +24,7 @@ import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_chat_share_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:shimmer/shimmer.dart';
-
-const _profileInitialPostsShimmerHeight = 500.0;
-const _profileLoadMoreShimmerHeight = 250.0;
+import 'package:visibility_detector/visibility_detector.dart';
 
 class ProfilePostsSection extends StatefulWidget {
   const ProfilePostsSection({
@@ -154,55 +152,36 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
       final resolvedSavedController = savedController;
       final resolvedSavedControllerTag = savedControllerTag;
 
-      final activeController =
-          canShowSavedTab && tabIndex == 2
-              ? (resolvedSavedController ?? postsController)
-              : postsController;
-      final activeStatus =
-          canShowSavedTab && tabIndex == 2
-              ? savedStatus ?? ProfilePostsStatus.initial
-              : authoredStatus;
-      final activePosts =
-          canShowSavedTab && tabIndex == 2
-              ? savedPosts ?? const <PostModel>[]
-              : tabIndex == 1
-              ? repostPosts
-              : normalPosts;
-
+      // The profile page owns vertical scrolling. Render only the selected tab
+      // so each PostItem can use its real, content-dependent height.
       final tabChildren = <Widget>[
-        SingleChildScrollView(
-          physics: const NeverScrollableScrollPhysics(),
-          child: _buildPostsTab(
-            context: context,
-            controller: postsController,
-            controllerTag: widget.controllerTag,
-            palette: palette,
-            theme: theme,
-            status: authoredStatus,
-            posts: normalPosts,
-            isRepostTab: false,
-            emptyMessage:
-                widget.isOwnerView
-                    ? 'Bạn chưa có bài viết nào.'
-                    : 'Người dùng này chưa có bài viết công khai nào.',
-          ),
+        _buildPostsTab(
+          context: context,
+          controller: postsController,
+          controllerTag: widget.controllerTag,
+          palette: palette,
+          theme: theme,
+          status: authoredStatus,
+          posts: normalPosts,
+          isRepostTab: false,
+          emptyMessage:
+              widget.isOwnerView
+                  ? 'Bạn chưa có bài viết nào.'
+                  : 'Người dùng này chưa có bài viết công khai nào.',
         ),
-        SingleChildScrollView(
-          physics: const NeverScrollableScrollPhysics(),
-          child: _buildPostsTab(
-            context: context,
-            controller: postsController,
-            controllerTag: widget.controllerTag,
-            palette: palette,
-            theme: theme,
-            status: authoredStatus,
-            posts: repostPosts,
-            isRepostTab: true,
-            emptyMessage:
-                widget.isOwnerView
-                    ? 'Bạn chưa đăng lại bài viết nào.'
-                    : 'Người dùng này chưa có bài đăng lại công khai.',
-          ),
+        _buildPostsTab(
+          context: context,
+          controller: postsController,
+          controllerTag: widget.controllerTag,
+          palette: palette,
+          theme: theme,
+          status: authoredStatus,
+          posts: repostPosts,
+          isRepostTab: true,
+          emptyMessage:
+              widget.isOwnerView
+                  ? 'Bạn chưa đăng lại bài viết nào.'
+                  : 'Người dùng này chưa có bài đăng lại công khai.',
         ),
       ];
 
@@ -210,22 +189,21 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
           resolvedSavedController != null &&
           resolvedSavedControllerTag != null) {
         tabChildren.add(
-          SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            child: _buildPostsTab(
-              context: context,
-              controller: resolvedSavedController,
-              controllerTag: resolvedSavedControllerTag,
-              palette: palette,
-              theme: theme,
-              status: savedStatus ?? ProfilePostsStatus.initial,
-              posts: savedPosts ?? const <PostModel>[],
-              isRepostTab: false,
-              emptyMessage: 'Bạn chưa lưu bài viết nào.',
-            ),
+          _buildPostsTab(
+            context: context,
+            controller: resolvedSavedController,
+            controllerTag: resolvedSavedControllerTag,
+            palette: palette,
+            theme: theme,
+            status: savedStatus ?? ProfilePostsStatus.initial,
+            posts: savedPosts ?? const <PostModel>[],
+            isRepostTab: false,
+            emptyMessage: 'Bạn chưa lưu bài viết nào.',
           ),
         );
       }
+
+      final activeTabIndex = tabIndex.clamp(0, tabChildren.length - 1);
 
       return Padding(
         padding: const EdgeInsets.fromLTRB(0, 0, 0, 30),
@@ -237,62 +215,14 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
               showSavedTab: canShowSavedTab,
             ),
             _ProfilePostSubmissionStatusBar(isVisible: isPostSubmitting),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                height: _buildTabHeight(
-                  controller: activeController,
-                  status: activeStatus,
-                  visiblePosts: activePosts,
-                ),
-                child: TabBarView(
-                  controller: _tabController,
-                  children: tabChildren,
-                ),
-              ),
+            KeyedSubtree(
+              key: ValueKey<String>('profile_posts_tab_$activeTabIndex'),
+              child: tabChildren[activeTabIndex],
             ),
           ],
         ),
       );
     });
-  }
-
-  double _buildTabHeight({
-    required ProfilePostsController controller,
-    required ProfilePostsStatus status,
-    required List<PostModel> visiblePosts,
-  }) {
-    if ((status == ProfilePostsStatus.initial ||
-            status == ProfilePostsStatus.loading) &&
-        controller.posts.isEmpty) {
-      return _profileInitialPostsShimmerHeight;
-    }
-
-    if (status == ProfilePostsStatus.error && controller.posts.isEmpty) {
-      return 170;
-    }
-
-    if (status == ProfilePostsStatus.empty || visiblePosts.isEmpty) {
-      return 120;
-    }
-
-    final privateCount =
-        widget.isOwnerView
-            ? visiblePosts.where((post) => !post.isPublic).length
-            : 0;
-
-    final postsHeight = visiblePosts.length * 355.0;
-    final privateBannerHeight = privateCount * 28.0;
-    final loadMoreHeight =
-        controller.isLoadingMore.value
-            ? _profileLoadMoreShimmerHeight
-            : controller.hasMore.value
-            ? 56.0
-            : 0.0;
-
-    return postsHeight + privateBannerHeight + loadMoreHeight;
   }
 
   Widget _buildPostsTab({
@@ -344,19 +274,36 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     }
 
     if (status == ProfilePostsStatus.empty || posts.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: _SectionStateCard(
-          palette: palette,
-          child: Text(
-            emptyMessage,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: palette.textSecondary,
-              height: 1.5,
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _SectionStateCard(
+              palette: palette,
+              child: Text(
+                emptyMessage,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: palette.textSecondary,
+                  height: 1.5,
+                ),
+              ),
             ),
           ),
-        ),
+          // A page can contain only the other authored-post type. Keep paging
+          // until this tab finds matching posts or reaches the final page.
+          if (controller.isLoadingMore.value)
+            _ProfilePostsShimmer(
+              palette: palette,
+              itemCount: 1,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            )
+          else if (controller.hasMore.value)
+            _ProfilePostsLoadMore(
+              controller: controller,
+              controllerTag: controllerTag,
+            ),
+        ],
       );
     }
 
@@ -390,13 +337,12 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           )
         else if (controller.hasMore.value)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: TextButton(
-              onPressed: controller.loadMore,
-              child: const Text('Xem thêm bài viết'),
-            ),
-          ),
+          _ProfilePostsLoadMore(
+            controller: controller,
+            controllerTag: controllerTag,
+          )
+        else
+          _ProfilePostsEndIndicator(palette: palette),
       ],
     );
   }
@@ -769,6 +715,62 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
     if (userId.isEmpty) return;
 
     Get.to(() => OtherProfileView(userId: userId));
+  }
+}
+
+class _ProfilePostsLoadMore extends StatelessWidget {
+  const _ProfilePostsLoadMore({
+    required this.controller,
+    required this.controllerTag,
+  });
+
+  final ProfilePostsController controller;
+  final String controllerTag;
+
+  @override
+  Widget build(BuildContext context) {
+    return VisibilityDetector(
+      key: ValueKey<String>('profile_posts_load_more_$controllerTag'),
+      onVisibilityChanged: (info) {
+        if (info.visibleFraction <= 0 || !controller.hasMore.value) return;
+        unawaited(controller.loadMore());
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: TextButton(
+          onPressed: controller.loadMore,
+          child: const Text('Xem thêm bài viết'),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfilePostsEndIndicator extends StatelessWidget {
+  const _ProfilePostsEndIndicator({required this.palette});
+
+  final FeedPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: palette.border)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'Không còn bài viết'.tr,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+            ),
+          ),
+          Expanded(child: Divider(color: palette.border)),
+        ],
+      ),
+    );
   }
 }
 

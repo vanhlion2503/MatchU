@@ -11,6 +11,7 @@ import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/utils/presence_utils.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_body.dart';
+import 'package:matchu_app/views/chat/long_chat/long_chat_shimmer.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 
@@ -106,7 +107,7 @@ class _ChatViewState extends State<ChatView> {
           title: Obx(() {
             final otherUid = controller.otherUid.value;
             if (otherUid == null) {
-              return const Text("Đang tải...");
+              return const LongChatHeaderShimmer();
             }
 
             userCache.version.value;

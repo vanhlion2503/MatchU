@@ -72,7 +72,7 @@ class _PostChatShareSheetState extends State<PostChatShareSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final height = MediaQuery.sizeOf(context).height * 0.82;
+    final height = MediaQuery.sizeOf(context).height * 0.78;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
@@ -81,66 +81,129 @@ class _PostChatShareSheetState extends State<PostChatShareSheet> {
         height: height,
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 30,
+              offset: const Offset(0, -8),
+            ),
+          ],
         ),
         child: SafeArea(
           top: false,
           child: Column(
             children: [
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Container(
-                width: 40,
-                height: 4,
+                width: 36,
+                height: 3.5,
                 decoration: BoxDecoration(
-                  color: theme.dividerColor,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.7,
+                  ),
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 8, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        PostTranslationKeys.selectConversations.tr,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                child: SizedBox(
+                  height: 40,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 48),
+                        child: Text(
+                          PostTranslationKeys.selectConversations.tr,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip:
-                          MaterialLocalizations.of(context).closeButtonTooltip,
-                      onPressed:
-                          _isSending ? null : () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Material(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.65),
+                          shape: const CircleBorder(),
+                          child: IconButton(
+                            tooltip:
+                                MaterialLocalizations.of(
+                                  context,
+                                ).closeButtonTooltip,
+                            visualDensity: VisualDensity.compact,
+                            onPressed:
+                                _isSending
+                                    ? null
+                                    : () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                child: TextField(
-                  controller: _searchController,
-                  enabled: !_isSending,
-                  onChanged: (value) => setState(() => _query = value.trim()),
-                  decoration: InputDecoration(
-                    hintText: PostTranslationKeys.searchConversations.tr,
-                    prefixIcon: const Icon(Iconsax.search_normal_1, size: 20),
-                    suffixIcon:
-                        _query.isEmpty
-                            ? null
-                            : IconButton(
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                              icon: const Icon(Iconsax.close_circle, size: 20),
-                            ),
-                    filled: true,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: SizedBox(
+                  height: 46,
+                  child: TextField(
+                    controller: _searchController,
+                    enabled: !_isSending,
+                    textAlignVertical: TextAlignVertical.center,
+                    onChanged: (value) => setState(() => _query = value.trim()),
+                    decoration: InputDecoration(
+                      hintText: PostTranslationKeys.searchConversations.tr,
+                      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      prefixIcon: Icon(
+                        Iconsax.search_normal_1,
+                        size: 18,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 44),
+                      suffixIcon:
+                          _query.isEmpty
+                              ? null
+                              : IconButton(
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _query = '');
+                                },
+                                icon: const Icon(Icons.close_rounded, size: 18),
+                              ),
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.9),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: theme.colorScheme.outlineVariant.withValues(
+                            alpha: 0.85,
+                          ),
+                          width: 1.1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.65,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -174,7 +237,7 @@ class _PostChatShareSheetState extends State<PostChatShareSheet> {
       }
 
       return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
         itemCount: rooms.length,
         itemBuilder: (context, index) => _buildRoomTile(rooms[index]),
       );
@@ -205,69 +268,85 @@ class _PostChatShareSheetState extends State<PostChatShareSheet> {
     final isSelected = _selectedRoomIds.contains(room.id);
     final wasSent = _sentRoomIds.contains(room.id);
 
-    return ListTile(
-      enabled: !_isSending && !wasSent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      onTap: () => _toggleRoom(room.id),
-      leading: UserAvatar(userId: otherUid, radius: 24),
-      title: Text(
-        user?.fullname.trim().isNotEmpty == true
-            ? user!.fullname.trim()
-            : user?.nickname.trim().isNotEmpty == true
-            ? '@${user!.nickname.trim()}'
-            : PostTranslationKeys.matchuUser.tr,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
       ),
-      subtitle:
-          wasSent
-              ? Text(
-                PostTranslationKeys.sent.tr,
-                style: TextStyle(color: theme.colorScheme.primary),
-              )
-              : null,
-      trailing: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        width: 26,
-        height: 26,
-        decoration: BoxDecoration(
-          color:
-              isSelected || wasSent
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
-          shape: BoxShape.circle,
-          border: Border.all(
+      child: ListTile(
+        enabled: !_isSending && !wasSent,
+        dense: true,
+        minVerticalPadding: 8,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        onTap: () => _toggleRoom(room.id),
+        leading: UserAvatar(userId: otherUid, radius: 22),
+        title: Text(
+          user?.fullname.trim().isNotEmpty == true
+              ? user!.fullname.trim()
+              : user?.nickname.trim().isNotEmpty == true
+              ? '@${user!.nickname.trim()}'
+              : PostTranslationKeys.matchuUser.tr,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle:
+            wasSent
+                ? Text(
+                  PostTranslationKeys.sent.tr,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+                : null,
+        trailing: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
             color:
                 isSelected || wasSent
                     ? theme.colorScheme.primary
-                    : theme.dividerColor,
-            width: 1.5,
+                    : theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.9,
+                    ),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color:
+                  isSelected || wasSent
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.85,
+                      ),
+              width: isSelected || wasSent ? 1.5 : 1.1,
+            ),
           ),
+          child:
+              isSelected || wasSent
+                  ? Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: theme.colorScheme.onPrimary,
+                  )
+                  : null,
         ),
-        child:
-            isSelected || wasSent
-                ? Icon(
-                  Icons.check_rounded,
-                  size: 18,
-                  color: theme.colorScheme.onPrimary,
-                )
-                : null,
       ),
     );
   }
 
   Widget _buildSendBar(BuildContext context) {
-    final theme = Theme.of(context);
     final count = _selectedRoomIds.length;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: SizedBox(
         width: double.infinity,
+        height: 50,
         child: FilledButton.icon(
           onPressed: _isSending || count == 0 ? null : _sendSelected,
           icon:
@@ -286,9 +365,9 @@ class _PostChatShareSheetState extends State<PostChatShareSheet> {
                 : '${PostTranslationKeys.send.tr}${count > 0 ? ' ($count)' : ''}',
           ),
           style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 15),
+            elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
             ),
           ),
         ),

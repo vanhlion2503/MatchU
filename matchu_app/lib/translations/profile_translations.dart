@@ -212,6 +212,7 @@ const profileEnglishTranslations = <String, String>{
   'Bạn chưa lưu bài viết nào.': 'You have not saved any posts yet.',
   'Không thể tải bài viết lúc này.': 'Unable to load posts right now.',
   'Xem thêm bài viết': 'Load more posts',
+  'Không còn bài viết': 'No more posts',
   'Đang xử lý bài viết...': 'Processing post...',
   'Bài viết cho người theo dõi': 'Followers-only post',
   'Bài viết riêng tư': 'Private post',

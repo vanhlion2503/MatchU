@@ -1,14 +1,85 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
+import 'package:matchu_app/models/nearby_user_vm.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_empty_state.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_user_list_item.dart';
 import 'package:matchu_app/views/nearby/widgets/nearby_user_list_shimmer.dart';
 
-class NearbyUserList extends StatelessWidget {
+class NearbyUserList extends StatefulWidget {
   final NearbyController controller;
 
   const NearbyUserList({super.key, required this.controller});
+
+  @override
+  State<NearbyUserList> createState() => _NearbyUserListState();
+}
+
+class _NearbyUserListState extends State<NearbyUserList> {
+  static const int _initialAvatarPrecacheCount = 6;
+  static const double _avatarLogicalSize = 52;
+  static const Duration _avatarPrecacheTimeout = Duration(seconds: 4);
+
+  String? _preparedAvatarBatch;
+  String? _preparingAvatarBatch;
+
+  NearbyController get controller => widget.controller;
+
+  String _avatarBatchKey(List<NearbyUserVM> users) {
+    return users
+        .take(_initialAvatarPrecacheCount)
+        .map((user) => '${user.uid}:${user.avatarUrl.trim()}')
+        .join('|');
+  }
+
+  void _scheduleAvatarPrecache(List<NearbyUserVM> users, String batchKey) {
+    if (_preparedAvatarBatch == batchKey || _preparingAvatarBatch == batchKey) {
+      return;
+    }
+
+    _preparingAvatarBatch = batchKey;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _preparingAvatarBatch != batchKey) return;
+      unawaited(_precacheVisibleAvatars(users, batchKey));
+    });
+  }
+
+  Future<void> _precacheVisibleAvatars(
+    List<NearbyUserVM> users,
+    String batchKey,
+  ) async {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final cacheSize = (_avatarLogicalSize * devicePixelRatio).round();
+    final urls =
+        users
+            .take(_initialAvatarPrecacheCount)
+            .map((user) => user.avatarUrl.trim())
+            .where((url) => url.isNotEmpty)
+            .toSet();
+
+    final futures = urls.map((url) {
+      final provider = ResizeImage.resizeIfNeeded(
+        cacheSize,
+        cacheSize,
+        CachedNetworkImageProvider(url),
+      );
+      return precacheImage(provider, context, onError: (_, __) {});
+    });
+
+    // Do not let one slow/broken URL keep the whole Nearby page in shimmer.
+    await Future.wait(
+      futures,
+    ).timeout(_avatarPrecacheTimeout, onTimeout: () => <void>[]);
+
+    if (!mounted || _preparingAvatarBatch != batchKey) return;
+    setState(() {
+      _preparedAvatarBatch = batchKey;
+      _preparingAvatarBatch = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +149,12 @@ class NearbyUserList extends StatelessWidget {
       final items = controller.users;
       if (items.isEmpty) {
         return const NearbyEmptyState();
+      }
+
+      final avatarBatchKey = _avatarBatchKey(items);
+      if (_preparedAvatarBatch != avatarBatchKey) {
+        _scheduleAvatarPrecache(items.toList(growable: false), avatarBatchKey);
+        return const NearbyUserListShimmer();
       }
 
       return CustomScrollView(

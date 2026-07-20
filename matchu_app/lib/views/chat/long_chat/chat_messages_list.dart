@@ -8,6 +8,7 @@ import 'package:matchu_app/utils/format_date_lable.dart';
 import 'package:matchu_app/views/chat/chat_widget/reaction_picker.dart';
 import 'package:matchu_app/views/chat/long_chat/date_separator.dart';
 import 'package:matchu_app/views/chat/long_chat/messenger_typing_bubble.dart';
+import 'package:matchu_app/views/chat/long_chat/long_chat_shimmer.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
@@ -57,7 +58,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
     return Obx(() {
       final stream = widget.controller.messagesStream.value;
       if (stream == null) {
-        return const Center(child: CircularProgressIndicator());
+        return const LongChatMessagesShimmer();
       }
 
       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -86,7 +87,7 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
             const bottomPadding = 10.0;
 
             if (docs.isEmpty && !snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const LongChatMessagesShimmer();
             }
 
             // ✅ Đảm bảo itemCount hợp lệ
