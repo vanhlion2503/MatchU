@@ -81,6 +81,15 @@ class PostShareController extends GetxController {
     }
   }
 
+  Future<void> recordChatShare(PostModel post) async {
+    final payload = _service.buildPayload(post);
+    await _recordShare(
+      sourcePost: post,
+      targetPostId: payload.postId,
+      method: 'chat',
+    );
+  }
+
   Future<void> _recordShare({
     required PostModel sourcePost,
     required String targetPostId,

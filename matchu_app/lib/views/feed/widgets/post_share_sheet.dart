@@ -10,17 +10,20 @@ class PostShareSheet extends StatelessWidget {
   const PostShareSheet({
     super.key,
     required this.post,
+    required this.onMatchuTap,
     required this.onShareTap,
     required this.onCopyTap,
   });
 
   final PostModel post;
+  final Future<void> Function() onMatchuTap;
   final Future<void> Function(Rect? origin) onShareTap;
   final Future<void> Function() onCopyTap;
 
   static Future<void> show(
     BuildContext context, {
     required PostModel post,
+    required Future<void> Function() onMatchuTap,
     required Future<void> Function(Rect? origin) onShareTap,
     required Future<void> Function() onCopyTap,
   }) {
@@ -31,6 +34,7 @@ class PostShareSheet extends StatelessWidget {
       builder:
           (_) => PostShareSheet(
             post: post,
+            onMatchuTap: onMatchuTap,
             onShareTap: onShareTap,
             onCopyTap: onCopyTap,
           ),
@@ -89,6 +93,17 @@ class PostShareSheet extends StatelessWidget {
           const SizedBox(height: 12),
           _PostPreviewCard(preview: target, palette: palette),
           const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: _ShareActionButton(
+              icon: Iconsax.message,
+              label: PostTranslationKeys.sendViaMatchu.tr,
+              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              onTap: () => _shareInsideMatchu(context),
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -96,8 +111,8 @@ class PostShareSheet extends StatelessWidget {
                 child: _ShareActionButton(
                   icon: Iconsax.send_1,
                   label: PostTranslationKeys.shareVia.tr,
-                  foregroundColor: Colors.white,
-                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: palette.textPrimary,
+                  backgroundColor: palette.surfaceMuted,
                   onTap: () => _shareThroughAnotherApp(context),
                 ),
               ),
@@ -129,6 +144,11 @@ class PostShareSheet extends StatelessWidget {
       const Duration(milliseconds: 160),
       () => onShareTap(origin),
     );
+  }
+
+  void _shareInsideMatchu(BuildContext context) {
+    Navigator.of(context).pop();
+    Future<void>.delayed(const Duration(milliseconds: 160), onMatchuTap);
   }
 
   void _copyLink(BuildContext context) {

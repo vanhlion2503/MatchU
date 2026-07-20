@@ -144,6 +144,8 @@ class ChatService {
       "iv": encrypted["iv"],
       "keyId": keyId,
       "type": type,
+      if (type == 'post_share')
+        "notificationPreview": "Đã chia sẻ một bài viết",
       "replyToId": replyToId,
       "replyText": replyText,
       if (clientMessageId != null) "clientMessageId": clientMessageId,
@@ -153,7 +155,7 @@ class ChatService {
     // 2️⃣ CHAT ROOM METADATA (🔥 QUAN TRỌNG)
     batch.update(roomRef, {
       "lastMessage": "🔐 Tin nhắn được mã hóa",
-      "lastMessageType": "encrypted",
+      "lastMessageType": type == 'post_share' ? type : "encrypted",
 
       "lastMessageCipher": encrypted["ciphertext"],
       "lastMessageIv": encrypted["iv"],
@@ -193,7 +195,9 @@ class ChatService {
       return true;
     } on FirebaseFunctionsException catch (error) {
       // Keep old clients usable while the new function is being deployed.
-      if (error.code == 'not-found' || error.code == 'unimplemented') {
+      if (error.code == 'not-found' ||
+          error.code == 'unimplemented' ||
+          type == 'post_share' && error.code == 'invalid-argument') {
         return false;
       }
       rethrow;

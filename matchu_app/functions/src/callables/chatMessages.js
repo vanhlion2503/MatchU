@@ -5,7 +5,7 @@ const { admin, db } = require("../shared/firebase");
 const MAX_B64_FIELD_LENGTH = 8192;
 const MAX_REPLY_TEXT_LENGTH = 500;
 const MAX_WRAPPED_KEYS_PER_CALL = 20;
-const ALLOWED_MESSAGE_TYPES = new Set(["text"]);
+const ALLOWED_MESSAGE_TYPES = new Set(["text", "post_share"]);
 const BLOCKED_DEVICE_STATUSES = new Set(["inactive", "revoked", "stale"]);
 
 function cleanString(value) {
@@ -129,6 +129,9 @@ const sendEncryptedChatMessage = onCall(async (request) => {
     iv,
     keyId,
     type,
+    ...(type === "post_share"
+      ? { notificationPreview: "Đã chia sẻ một bài viết" }
+      : {}),
     replyToId,
     replyText,
     ...(clientMessageId ? { clientMessageId } : {}),
@@ -137,7 +140,7 @@ const sendEncryptedChatMessage = onCall(async (request) => {
 
   batch.update(roomRef, {
     lastMessage: "\uD83D\uDD10 Tin nh\u1EAFn \u0111\u01B0\u1EE3c m\u00E3 h\u00F3a",
-    lastMessageType: "encrypted",
+    lastMessageType: type === "post_share" ? type : "encrypted",
     lastMessageCipher: ciphertext,
     lastMessageIv: iv,
     lastMessageKeyId: keyId,

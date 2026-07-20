@@ -14,6 +14,17 @@ abstract final class PostTranslationKeys {
   static const shareVia = 'post.share_via';
   static const copy = 'post.copy';
   static const matchuUser = 'post.matchu_user';
+  static const sendViaMatchu = 'post.send_via_matchu';
+  static const selectConversations = 'post.select_conversations';
+  static const searchConversations = 'post.search_conversations';
+  static const noConversations = 'post.no_conversations';
+  static const send = 'post.send';
+  static const sent = 'post.sent';
+  static const sending = 'post.sending';
+  static const sharedPost = 'post.shared_post';
+  static const selectConversationRequired = 'post.select_conversation_required';
+  static const sentToConversations = 'post.sent_to_conversations';
+  static const sendSomeFailed = 'post.send_some_failed';
 }
 
 const postVietnameseTranslations = <String, String>{
@@ -34,6 +45,20 @@ const postVietnameseTranslations = <String, String>{
   PostTranslationKeys.shareVia: 'Chia sẻ qua…',
   PostTranslationKeys.copy: 'Sao chép',
   PostTranslationKeys.matchuUser: 'Người dùng MatchU',
+  PostTranslationKeys.sendViaMatchu: 'Gửi qua MatchU',
+  PostTranslationKeys.selectConversations: 'Chọn cuộc trò chuyện',
+  PostTranslationKeys.searchConversations: 'Tìm kiếm cuộc trò chuyện',
+  PostTranslationKeys.noConversations: 'Chưa có cuộc trò chuyện phù hợp',
+  PostTranslationKeys.send: 'Gửi',
+  PostTranslationKeys.sent: 'Đã gửi',
+  PostTranslationKeys.sending: 'Đang gửi…',
+  PostTranslationKeys.sharedPost: 'Đã chia sẻ một bài viết',
+  PostTranslationKeys.selectConversationRequired:
+      'Hãy chọn ít nhất một cuộc trò chuyện.',
+  PostTranslationKeys.sentToConversations:
+      'Đã gửi bài viết đến @count cuộc trò chuyện.',
+  PostTranslationKeys.sendSomeFailed:
+      'Một số cuộc trò chuyện chưa nhận được bài viết. Vui lòng thử lại.',
   'Nổi bật': 'Nổi bật',
   'Mới nhất': 'Mới nhất',
   'Đăng': 'Đăng',
@@ -292,6 +317,19 @@ const postEnglishTranslations = <String, String>{
   PostTranslationKeys.shareVia: 'Share via…',
   PostTranslationKeys.copy: 'Copy',
   PostTranslationKeys.matchuUser: 'MatchU user',
+  PostTranslationKeys.sendViaMatchu: 'Send via MatchU',
+  PostTranslationKeys.selectConversations: 'Select conversations',
+  PostTranslationKeys.searchConversations: 'Search conversations',
+  PostTranslationKeys.noConversations: 'No matching conversations',
+  PostTranslationKeys.send: 'Send',
+  PostTranslationKeys.sent: 'Sent',
+  PostTranslationKeys.sending: 'Sending…',
+  PostTranslationKeys.sharedPost: 'Shared a post',
+  PostTranslationKeys.selectConversationRequired:
+      'Select at least one conversation.',
+  PostTranslationKeys.sentToConversations: 'Post sent to @count conversations.',
+  PostTranslationKeys.sendSomeFailed:
+      'The post could not be sent to some conversations. Please try again.',
   'Nổi bật': 'Top',
   'Mới nhất': 'Latest',
   'Đăng': 'Post',

@@ -5,6 +5,7 @@ class ChatRoomModel {
   final List<String> participants;
   final String lastMessage;
   final String lastSenderId;
+  final String lastMessageType;
   final String? lastMessageCipher;
   final String? lastMessageIv;
   final int lastMessageKeyId;
@@ -18,6 +19,7 @@ class ChatRoomModel {
     required this.participants,
     required this.lastMessage,
     required this.lastSenderId,
+    this.lastMessageType = '',
     this.lastMessageCipher,
     this.lastMessageIv,
     this.lastMessageKeyId = 0,
@@ -34,6 +36,7 @@ class ChatRoomModel {
       participants: List<String>.from(data["participants"]),
       lastMessage: data["lastMessage"] ?? "",
       lastSenderId: data["lastSenderId"] ?? "",
+      lastMessageType: (data["lastMessageType"] ?? "").toString(),
       lastMessageCipher: data["lastMessageCipher"],
       lastMessageIv: data["lastMessageIv"],
       lastMessageKeyId: (data["lastMessageKeyId"] ?? 0) as int,

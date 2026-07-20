@@ -332,7 +332,7 @@ class PostDetailController extends GetxController {
     if (post.value.postId.trim() != targetPostId.trim()) return;
     final safeCount = count < 0 ? 0 : count;
     final currentPost = post.value;
-    if (currentPost.stats.externalShareCount == safeCount) return;
+    if (currentPost.stats.externalShareCount >= safeCount) return;
     post.value = currentPost.copyWith(
       stats: currentPost.stats.copyWith(externalShareCount: safeCount),
     );

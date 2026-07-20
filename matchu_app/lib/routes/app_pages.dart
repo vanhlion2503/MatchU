@@ -14,6 +14,7 @@ import 'package:matchu_app/controllers/chat/rating_controller.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_engagement_controller.dart';
+import 'package:matchu_app/controllers/feed/post_chat_share_controller.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
@@ -150,6 +151,10 @@ class AppPages {
 
         // 🔹 Chat / cache
         Get.put(ChatUserCacheController());
+        Get.lazyPut<PostChatShareController>(
+          () => PostChatShareController(),
+          fenix: true,
+        );
 
         // 🔹 Feature
         Get.put(AvatarController());

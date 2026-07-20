@@ -13,6 +13,8 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
+import 'package:matchu_app/controllers/feed/post_deep_link_controller.dart';
+import 'package:matchu_app/models/feed/post_chat_share_message.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_row_permanent.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/temp_chat/animate_message_bubble.dart';
@@ -352,6 +354,17 @@ class _ChatMessagesListState extends State<ChatMessagesList> {
                                                 imagePath: imagePath,
                                                 isLatest: isNewestMessage,
                                               )
+                                          : effectiveType ==
+                                              PostChatShareMessage.messageType
+                                          ? () {
+                                            final sharedPost =
+                                                PostChatShareMessage.tryDecode(
+                                                  displayText,
+                                                );
+                                            if (sharedPost == null) return;
+                                            Get.find<PostDeepLinkController>()
+                                                .handleUri(sharedPost.uri);
+                                          }
                                           : null,
                                   reactions: isDeleted ? null : reactions,
                                   callStatus: callStatus,

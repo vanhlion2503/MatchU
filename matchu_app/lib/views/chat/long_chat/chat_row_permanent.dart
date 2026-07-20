@@ -8,7 +8,9 @@ import 'package:matchu_app/views/chat/long_chat/animate_bubble.dart';
 import 'package:matchu_app/views/chat/long_chat/animate_emoji.dart';
 import 'package:matchu_app/views/chat/long_chat/call_message_bubble.dart';
 import 'package:matchu_app/models/message_status.dart';
+import 'package:matchu_app/models/feed/post_chat_share_message.dart';
 import 'package:matchu_app/views/chat/long_chat/seen_avatar_animated.dart';
+import 'package:matchu_app/views/chat/long_chat/post_chat_share_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 
 class ChatRowPermanent extends StatelessWidget {
@@ -98,6 +100,13 @@ class ChatRowPermanent extends StatelessWidget {
         isDeleted
             ? theme.colorScheme.onSurface.withValues(alpha: 0.6)
             : textColor;
+
+    if (type == PostChatShareMessage.messageType) {
+      final message = PostChatShareMessage.tryDecode(text);
+      if (message != null) {
+        return _buildPostShareMessage(context, bubbleColor, message);
+      }
+    }
 
     // ================= EMOJI ONLY =================
     final isEmojiOnly = _isEmojiOnly(text);
@@ -299,6 +308,79 @@ class ChatRowPermanent extends StatelessWidget {
                   ),
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostShareMessage(
+    BuildContext context,
+    Color bubbleColor,
+    PostChatShareMessage message,
+  ) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(top: smallMargin ? 6 : 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe)
+            SizedBox(
+              width: 36,
+              child:
+                  showAvatar ? UserAvatar(userId: senderId) : const SizedBox(),
+            ),
+          if (!isMe) const SizedBox(width: 6),
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: onTapMessage,
+                  onLongPress: onLongPress,
+                  onDoubleTap: onDoubleTap,
+                  child: Container(
+                    key: bubbleKey,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: bubbleColor,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: PostChatShareCard(message: message, isMe: isMe),
+                  ),
+                ),
+                if (showTime && time.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      time,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                if (isMe && status != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child:
+                        status == MessageStatus.seen
+                            ? SeenAvatarAnimated(userId: seenByUid, size: 14)
+                            : status == MessageStatus.sending
+                            ? _SendingStatusText()
+                            : Text(
+                              'Đã gửi',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                  ),
+              ],
             ),
           ),
         ],

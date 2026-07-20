@@ -13,6 +13,13 @@ test("validates share event identifiers", () => {
   assert.equal(_test.normalizeEventId("event_1"), "");
 });
 
+test("accepts native, copy, and in-app chat share methods", () => {
+  assert.equal(_test.isAllowedMethod("native"), true);
+  assert.equal(_test.isAllowedMethod("copy"), true);
+  assert.equal(_test.isAllowedMethod("chat"), true);
+  assert.equal(_test.isAllowedMethod("unknown"), false);
+});
+
 test("allows only public approved active posts", () => {
   const base = {
     visibility: "public",

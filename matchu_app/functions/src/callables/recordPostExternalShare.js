@@ -1,7 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { admin, db } = require("../shared/firebase");
 
-const ALLOWED_METHODS = new Set(["native", "copy"]);
+const ALLOWED_METHODS = new Set(["native", "copy", "chat"]);
 const MAX_SHARES_PER_USER_PER_DAY = 200;
 const MAX_SHARES_PER_POST_PER_DAY = 20;
 
@@ -17,6 +17,12 @@ function normalizeEventId(value) {
     .test(normalized)
     ? normalized
     : "";
+}
+
+function isAllowedMethod(value) {
+  return ALLOWED_METHODS.has(
+    typeof value === "string" ? value.trim().toLowerCase() : ""
+  );
 }
 
 function utcDayKey(date = new Date()) {
@@ -58,7 +64,7 @@ const recordPostExternalShare = onCall(
     const method = typeof request.data?.method === "string"
       ? request.data.method.trim().toLowerCase()
       : "";
-    if (!uid || !postId || !eventId || !ALLOWED_METHODS.has(method)) {
+    if (!uid || !postId || !eventId || !isAllowedMethod(method)) {
       throw new HttpsError("invalid-argument", "Invalid share event.");
     }
 
@@ -136,6 +142,7 @@ module.exports = {
   _test: {
     externalShareCountOf,
     isExternallyShareable,
+    isAllowedMethod,
     normalizeEventId,
     normalizeIdentifier,
     utcDayKey,

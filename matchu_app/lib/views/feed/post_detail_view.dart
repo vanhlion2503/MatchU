@@ -25,6 +25,7 @@ import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/post_chat_share_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
@@ -135,6 +136,7 @@ class _PostDetailViewState extends State<PostDetailView> {
     return PostShareSheet.show(
       context,
       post: post,
+      onMatchuTap: () => PostChatShareSheet.show(context, post: post),
       onShareTap:
           (origin) =>
               shareController.sharePost(post, sharePositionOrigin: origin),

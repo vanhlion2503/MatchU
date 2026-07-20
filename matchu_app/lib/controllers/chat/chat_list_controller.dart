@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
+import 'package:matchu_app/translations/post_translations.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
@@ -304,7 +305,10 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
     }
 
     if (room.lastMessageCipher == null || room.lastMessageIv == null) {
-      lastMessagePreviewCache[room.id] = room.lastMessage;
+      lastMessagePreviewCache[room.id] =
+          room.lastMessageType == 'post_share'
+              ? PostTranslationKeys.sharedPost.tr
+              : room.lastMessage;
       _previewMeta[room.id] = _PreviewMeta.fromRoom(room);
       if (searchText.value.trim().isNotEmpty) {
         _applySearch();
@@ -331,7 +335,10 @@ class ChatListController extends GetxController with WidgetsBindingObserver {
         iv: room.lastMessageIv!,
         keyId: keyId,
       );
-      lastMessagePreviewCache[room.id] = text;
+      lastMessagePreviewCache[room.id] =
+          room.lastMessageType == 'post_share'
+              ? PostTranslationKeys.sharedPost.tr
+              : text;
     } catch (e) {
       lastMessagePreviewCache[room.id] = room.lastMessage;
     } finally {

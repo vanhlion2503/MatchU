@@ -528,7 +528,7 @@ class FeedController extends GetxController {
     final currentPost = _findPost(postId);
     if (currentPost == null) return;
     final safeCount = count < 0 ? 0 : count;
-    if (currentPost.stats.externalShareCount == safeCount) return;
+    if (currentPost.stats.externalShareCount >= safeCount) return;
 
     _replacePost(
       currentPost.copyWith(

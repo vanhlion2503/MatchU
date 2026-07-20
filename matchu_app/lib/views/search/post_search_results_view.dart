@@ -14,6 +14,7 @@ import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/post_chat_share_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class PostSearchResultsView extends StatefulWidget {
@@ -90,6 +91,7 @@ class _PostSearchResultsViewState extends State<PostSearchResultsView> {
     PostShareSheet.show(
       context,
       post: post,
+      onMatchuTap: () => PostChatShareSheet.show(context, post: post),
       onShareTap:
           (origin) =>
               shareController.sharePost(post, sharePositionOrigin: origin),

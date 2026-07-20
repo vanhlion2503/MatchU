@@ -25,6 +25,7 @@ import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/post_chat_share_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -407,6 +408,7 @@ class _FeedScreenState extends State<FeedScreen>
       PostShareSheet.show(
         context,
         post: post,
+        onMatchuTap: () => PostChatShareSheet.show(context, post: post),
         onShareTap:
             (origin) =>
                 shareController.sharePost(post, sharePositionOrigin: origin),

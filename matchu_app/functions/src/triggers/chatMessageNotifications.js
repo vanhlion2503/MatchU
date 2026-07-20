@@ -57,7 +57,11 @@ const queueChatMessageNotification = onDocumentCreated(
       cleanString(senderProfile.nickname) ||
       "MatchU";
 
-    const messageType = messageData.type === "image" ? "image" : "text";
+    const messageType = messageData.type === "image"
+      ? "image"
+      : messageData.type === "post_share"
+        ? "post_share"
+        : "text";
     const messagePreview = extractMessagePreview(messageData, messageType);
     const nowMs = Date.now();
     const rateLimitDelayMs = await computeSenderDelayMs(senderUid, nowMs);
@@ -496,6 +500,10 @@ function extractMessagePreview(messageData, messageType) {
     return "\u0110\u00E3 g\u1EEDi m\u1ED9t \u1EA3nh";
   }
 
+  if (messageType === "post_share") {
+    return "Đã chia sẻ một bài viết";
+  }
+
   const plaintext = truncateNotificationText(cleanString(messageData.text));
   if (plaintext) {
     return plaintext;
@@ -513,6 +521,10 @@ function resolveQueuedPreview(queueData) {
 
   if (messageType === "image") {
     return "\u0110\u00E3 g\u1EEDi m\u1ED9t \u1EA3nh";
+  }
+
+  if (messageType === "post_share") {
+    return "Đã chia sẻ một bài viết";
   }
 
   return "\u0110\u00E3 g\u1EEDi m\u1ED9t tin nh\u1EAFn m\u1EDBi";
