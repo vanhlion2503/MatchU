@@ -9,8 +9,10 @@ import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
+import 'package:matchu_app/controllers/feed/post_deep_link_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/models/chat_notification_payload.dart';
+import 'package:matchu_app/models/notification/post_engagement_notification_payload.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/notification/app_notification_service.dart';
 import 'package:matchu_app/services/notification/push_device_repository.dart';
@@ -58,7 +60,10 @@ class NotificationController extends GetxController {
 
     _isInitialized = true;
 
-    await AppNotificationService.initialize(onTap: _handleLocalTap);
+    await AppNotificationService.initialize(
+      onTap: _handleLocalTap,
+      onPostTap: _handlePostTap,
+    );
     final launchDetails =
         await AppNotificationService.localNotifications
             .getNotificationAppLaunchDetails();
@@ -70,6 +75,11 @@ class NotificationController extends GetxController {
             : null;
     if (localLaunchPayload != null) {
       _addPendingNavigation(localLaunchPayload);
+    } else if (launchDetails?.didNotificationLaunchApp == true) {
+      final postPayload = PostEngagementNotificationPayload.fromPayloadString(
+        launchDetails?.notificationResponse?.payload,
+      );
+      if (postPayload != null) _queuePostNavigation(postPayload);
     }
     await _messaging.setAutoInitEnabled(true);
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -83,8 +93,15 @@ class NotificationController extends GetxController {
     );
     _messageOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen((message) {
       final payload = ChatNotificationPayload.fromRemoteMessage(message);
-      if (payload == null) return;
-      _enqueueNavigation(payload, allowImmediateRedirect: true);
+      if (payload != null) {
+        _enqueueNavigation(payload, allowImmediateRedirect: true);
+        return;
+      }
+
+      final postPayload = PostEngagementNotificationPayload.fromRemoteMessage(
+        message,
+      );
+      if (postPayload != null) _queuePostNavigation(postPayload);
     });
 
     if (!_initialMessageChecked) {
@@ -96,6 +113,11 @@ class NotificationController extends GetxController {
               : ChatNotificationPayload.fromRemoteMessage(initialMessage);
       if (payload != null) {
         _addPendingNavigation(payload);
+      } else if (initialMessage != null) {
+        final postPayload = PostEngagementNotificationPayload.fromRemoteMessage(
+          initialMessage,
+        );
+        if (postPayload != null) _queuePostNavigation(postPayload);
       }
     }
 
@@ -124,7 +146,17 @@ class NotificationController extends GetxController {
 
     final settings = await _requestPermissionAndReadSettings();
     if (!_isCurrentAuthOperation(user.uid, generation)) return;
-    await _syncCurrentToken(userId: user.uid, settings: settings);
+    try {
+      await _syncCurrentToken(userId: user.uid, settings: settings);
+    } catch (error) {
+      // APNs can take a moment to issue its token on a fresh iOS install. Keep
+      // the device permission state and let onTokenRefresh finish registration.
+      debugPrint('Push token is not ready yet: $error');
+      await _upsertDeviceNotificationState(
+        userId: user.uid,
+        settings: settings,
+      );
+    }
     if (!_isCurrentAuthOperation(user.uid, generation)) return;
 
     _tokenRefreshSub = _messaging.onTokenRefresh.listen((token) async {
@@ -145,6 +177,9 @@ class NotificationController extends GetxController {
     );
 
     unawaited(flushPendingNavigation());
+    if (Get.isRegistered<PostDeepLinkController>()) {
+      unawaited(Get.find<PostDeepLinkController>().flushPendingNavigation());
+    }
   }
 
   Future<NotificationSettings> _requestPermissionAndReadSettings() async {
@@ -189,7 +224,15 @@ class NotificationController extends GetxController {
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     final payload = ChatNotificationPayload.fromRemoteMessage(message);
-    if (payload == null) return;
+    if (payload == null) {
+      final postPayload = PostEngagementNotificationPayload.fromRemoteMessage(
+        message,
+      );
+      if (postPayload != null) {
+        await AppNotificationService.showLocalPostNotification(postPayload);
+      }
+      return;
+    }
     if (_shouldSuppressNotification(payload.roomId)) return;
     final sentAt = message.sentTime ?? DateTime.now();
 
@@ -396,6 +439,15 @@ class NotificationController extends GetxController {
 
   Future<void> _handleLocalTap(ChatNotificationPayload payload) async {
     _enqueueNavigation(payload, allowImmediateRedirect: true);
+  }
+
+  Future<void> _handlePostTap(PostEngagementNotificationPayload payload) async {
+    _queuePostNavigation(payload);
+  }
+
+  void _queuePostNavigation(PostEngagementNotificationPayload payload) {
+    if (!Get.isRegistered<PostDeepLinkController>()) return;
+    Get.find<PostDeepLinkController>().queuePostNavigation(payload.postId);
   }
 
   void _enqueueNavigation(

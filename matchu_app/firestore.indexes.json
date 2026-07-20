@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "postEngagementNotificationQueues",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "leaseExpiresAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "chatNotificationQueues",
       "queryScope": "COLLECTION",
       "fields": [

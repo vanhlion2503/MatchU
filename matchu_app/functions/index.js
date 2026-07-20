@@ -49,6 +49,8 @@ const {
   createPostLikeNotification,
   createPostCommentNotification,
   createModerationPenaltyNotification,
+  dispatchQueuedPostEngagementNotification,
+  maintainPostEngagementNotificationQueues,
 } = require("./src/triggers/socialNotifications");
 const {
   cleanupStaleUserDevices,
@@ -138,6 +140,10 @@ exports.createPostLikeNotification = createPostLikeNotification;
 exports.createPostCommentNotification = createPostCommentNotification;
 exports.createModerationPenaltyNotification =
   createModerationPenaltyNotification;
+exports.dispatchQueuedPostEngagementNotification =
+  dispatchQueuedPostEngagementNotification;
+exports.maintainPostEngagementNotificationQueues =
+  maintainPostEngagementNotificationQueues;
 exports.cleanupStaleUserDevices = cleanupStaleUserDevices;
 exports.migrateLegacyNotificationDevices = migrateLegacyNotificationDevices;
 exports.revokeAccountSessions = revokeAccountSessions;

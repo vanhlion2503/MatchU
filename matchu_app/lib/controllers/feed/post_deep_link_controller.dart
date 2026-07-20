@@ -45,9 +45,16 @@ class PostDeepLinkController extends GetxController {
 
   void handleUri(Uri uri) {
     final postId = _parser.parsePostId(uri);
-    if (postId == null || _wasRecentlyOpened(postId)) return;
+    if (postId == null) return;
+    queuePostNavigation(postId);
+  }
 
-    pendingPostId.value = postId;
+  /// Shares the same safe loading/navigation path for links and push taps.
+  void queuePostNavigation(String postId) {
+    final normalized = postId.trim();
+    if (normalized.isEmpty || _wasRecentlyOpened(normalized)) return;
+
+    pendingPostId.value = normalized;
     unawaited(flushPendingNavigation());
   }
 

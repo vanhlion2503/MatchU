@@ -6,10 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/models/chat_notification_payload.dart';
+import 'package:matchu_app/models/notification/post_engagement_notification_payload.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 
 typedef NotificationTapHandler =
     Future<void> Function(ChatNotificationPayload payload);
+typedef PostNotificationTapHandler =
+    Future<void> Function(PostEngagementNotificationPayload payload);
 
 class AppNotificationService {
   AppNotificationService._();
@@ -27,10 +30,19 @@ class AppNotificationService {
         importance: Importance.high,
       );
 
+  static const AndroidNotificationChannel postChannel =
+      AndroidNotificationChannel(
+        'post_engagement',
+        'Post activity',
+        description: 'Thong bao luot thich va binh luan bai viet MatchU',
+        importance: Importance.high,
+      );
+
   static final FlutterLocalNotificationsPlugin localNotifications =
       FlutterLocalNotificationsPlugin();
 
   static NotificationTapHandler? _tapHandler;
+  static PostNotificationTapHandler? _postTapHandler;
   static bool _initialized = false;
 
   static bool get isSupportedPlatform =>
@@ -40,8 +52,10 @@ class AppNotificationService {
 
   static Future<void> initialize({
     required NotificationTapHandler onTap,
+    PostNotificationTapHandler? onPostTap,
   }) async {
     _tapHandler = onTap;
+    _postTapHandler = onPostTap;
 
     if (!isSupportedPlatform || _initialized) {
       return;
@@ -64,11 +78,18 @@ class AppNotificationService {
     await localNotifications.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (response) async {
-        final payload = ChatNotificationPayload.fromPayloadString(
+        final chatPayload = ChatNotificationPayload.fromPayloadString(
           response.payload,
         );
-        if (payload == null) return;
-        await _tapHandler?.call(payload);
+        if (chatPayload != null) {
+          await _tapHandler?.call(chatPayload);
+          return;
+        }
+
+        final postPayload = PostEngagementNotificationPayload.fromPayloadString(
+          response.payload,
+        );
+        if (postPayload != null) await _postTapHandler?.call(postPayload);
       },
     );
 
@@ -77,8 +98,53 @@ class AppNotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.createNotificationChannel(chatChannel);
+    await localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(postChannel);
 
     _initialized = true;
+  }
+
+  static Future<void> showLocalPostNotification(
+    PostEngagementNotificationPayload payload,
+  ) async {
+    if (!isSupportedPlatform) return;
+    if (!_initialized) {
+      await initialize(onTap: (_) async {});
+    }
+
+    await localNotifications.show(
+      id: payload.postId.hashCode,
+      title: payload.title,
+      body: payload.body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          postChannel.id,
+          postChannel.name,
+          icon: androidNotificationIcon,
+          channelDescription: postChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.social,
+          color: AppTheme.primaryColor,
+          largeIcon: const DrawableResourceAndroidBitmap(_androidLargeIcon),
+          tag: 'post_${payload.postId}',
+          groupKey: 'matchu_post_engagement',
+          number: payload.pendingCount > 1 ? payload.pendingCount : null,
+        ),
+        iOS: DarwinNotificationDetails(
+          threadIdentifier: 'post_${payload.postId}',
+          presentAlert: true,
+          presentBadge: true,
+          presentBanner: true,
+          presentList: true,
+          presentSound: true,
+        ),
+      ),
+      payload: payload.toPayloadString(),
+    );
   }
 
   static Future<void> showLocalChatNotification(
@@ -210,12 +276,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final payload = ChatNotificationPayload.fromRemoteMessage(message);
-  if (payload == null) return;
-
-  if (message.notification == null) {
+  if (payload != null && message.notification == null) {
     await AppNotificationService.showLocalChatNotification(
       payload,
       sentAt: message.sentTime,
     );
+    return;
+  }
+
+  final postPayload = PostEngagementNotificationPayload.fromRemoteMessage(
+    message,
+  );
+  if (postPayload != null && message.notification == null) {
+    await AppNotificationService.showLocalPostNotification(postPayload);
   }
 }
