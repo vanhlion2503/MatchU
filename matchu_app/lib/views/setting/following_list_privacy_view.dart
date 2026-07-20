@@ -62,11 +62,6 @@ class FollowingListPrivacyView extends GetView<ProfilePrivacyController> {
               title: 'Chỉ mình tôi'.tr,
               subtitle: 'Chỉ bạn mới có thể xem danh sách này.'.tr,
             ),
-            if (controller.isSavingFollowingVisibility.value)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: LinearProgressIndicator(),
-              ),
           ],
         );
       }),

@@ -59,8 +59,6 @@ class PrivateAccountView extends GetView<ProfilePrivacyController> {
                       ? null
                       : controller.updatePrivateAccount,
             ),
-            if (controller.isSavingPrivateAccount.value)
-              const LinearProgressIndicator(),
             const SizedBox(height: 20),
             Text(
               controller.isPrivateAccount.value
