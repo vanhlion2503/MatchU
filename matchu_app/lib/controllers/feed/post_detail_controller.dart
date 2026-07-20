@@ -328,6 +328,16 @@ class PostDetailController extends GetxController {
     _updateLocalRepostState(isReposted: isReposted, isPending: false);
   }
 
+  void applyExternalShareCount(String targetPostId, int count) {
+    if (post.value.postId.trim() != targetPostId.trim()) return;
+    final safeCount = count < 0 ? 0 : count;
+    final currentPost = post.value;
+    if (currentPost.stats.externalShareCount == safeCount) return;
+    post.value = currentPost.copyWith(
+      stats: currentPost.stats.copyWith(externalShareCount: safeCount),
+    );
+  }
+
   void applyPostUpdate(PostModel updatedPost) {
     if (updatedPost.postId.trim() != postId.trim()) return;
     post.value = _withLocalInteractionState(updatedPost);

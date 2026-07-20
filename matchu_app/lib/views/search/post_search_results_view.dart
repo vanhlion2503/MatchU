@@ -13,6 +13,7 @@ import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
+import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 
 class PostSearchResultsView extends StatefulWidget {
@@ -84,9 +85,15 @@ class _PostSearchResultsViewState extends State<PostSearchResultsView> {
   }
 
   void _sharePost(PostModel post) {
-    Get.find<PostShareController>().sharePost(
-      post,
-      sharePositionOrigin: PostShareController.shareOriginFromContext(context),
+    final shareController = Get.find<PostShareController>();
+    if (!shareController.canShare(post)) return;
+    PostShareSheet.show(
+      context,
+      post: post,
+      onShareTap:
+          (origin) =>
+              shareController.sharePost(post, sharePositionOrigin: origin),
+      onCopyTap: () => shareController.copyPostLink(post),
     );
   }
 

@@ -72,6 +72,7 @@ function postRecommendationMetadataSignature(data) {
     likeCount: Number(stats.likeCount) || 0,
     commentCount: Number(stats.commentCount) || 0,
     shareCount: Number(stats.shareCount) || 0,
+    externalShareCount: Number(stats.externalShareCount) || 0,
     saveCount: Number(stats.saveCount) || 0,
     trendScore: Number(data?.trendScore) || 0,
     trendBucket: Number(data?.trendBucket) || 0,

@@ -22,6 +22,9 @@ const {
   suggestPostSearches,
 } = require("./src/callables/suggestPostSearches");
 const {
+  recordPostExternalShare,
+} = require("./src/callables/recordPostExternalShare");
+const {
   storeFaceRecoveryBackup,
   getFaceRecoveryBackupStatus,
   recoverBackupKeyWithFace,
@@ -119,6 +122,7 @@ exports.moderateImageContent = moderateImageContent;
 exports.recommendPosts = recommendPosts;
 exports.searchPosts = searchPosts;
 exports.suggestPostSearches = suggestPostSearches;
+exports.recordPostExternalShare = recordPostExternalShare;
 exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
 exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;
 exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;

@@ -524,6 +524,19 @@ class FeedController extends GetxController {
     if (delta > 0) _markPostInteracted(postId);
   }
 
+  void applyExternalShareCount(String postId, int count) {
+    final currentPost = _findPost(postId);
+    if (currentPost == null) return;
+    final safeCount = count < 0 ? 0 : count;
+    if (currentPost.stats.externalShareCount == safeCount) return;
+
+    _replacePost(
+      currentPost.copyWith(
+        stats: currentPost.stats.copyWith(externalShareCount: safeCount),
+      ),
+    );
+  }
+
   bool isPostReposted(PostModel sourcePost) {
     final targetPostId = _repostTargetPostIdOf(sourcePost);
     if (targetPostId.isEmpty) return false;

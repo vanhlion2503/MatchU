@@ -248,6 +248,7 @@ class PostDetailPostCard extends StatelessWidget {
               Expanded(
                 child: _PostDetailActionButton(
                   icon: Iconsax.send_1,
+                  label: _countLabelOrNull(post.stats.externalShareCount),
                   color: palette.iconMuted,
                   onTap: onShareTap,
                 ),

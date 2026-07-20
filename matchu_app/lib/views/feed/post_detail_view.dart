@@ -10,6 +10,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/feed/post_author_block_helper.dart';
 import 'package:matchu_app/controllers/feed/post_creation_sync.dart';
 import 'package:matchu_app/controllers/feed/post_detail_controller.dart';
+import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
@@ -23,6 +24,7 @@ import 'package:matchu_app/views/feed/widgets/post_detail_comment_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_detail_post_card.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
@@ -124,6 +126,19 @@ class _PostDetailViewState extends State<PostDetailView> {
       onRepostTap: _repostPost,
       onUndoRepostTap: _undoRepostPost,
       onQuoteTap: () => _quotePost(context, post),
+    );
+  }
+
+  Future<void> _openShareSheet(BuildContext context, PostModel post) {
+    final shareController = Get.find<PostShareController>();
+    if (!shareController.canShare(post)) return Future<void>.value();
+    return PostShareSheet.show(
+      context,
+      post: post,
+      onShareTap:
+          (origin) =>
+              shareController.sharePost(post, sharePositionOrigin: origin),
+      onCopyTap: () => shareController.copyPostLink(post),
     );
   }
 
@@ -240,7 +255,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                       onLikeTap: controller.toggleLike,
                       onCommentTap: controller.dismissCommentComposer,
                       onRepostTap: () => _openRepostSheet(context, post),
-                      onShareTap: controller.sharePost,
+                      onShareTap: () => _openShareSheet(context, post),
                       onMoreTap: () => _openPostActionSheet(context, post),
                       onAuthorTap: _openAuthorProfile,
                       onReferenceAuthorTap: _openAuthorProfile,

@@ -181,6 +181,9 @@ class PostItem extends StatelessWidget {
                           icon: Iconsax.send_1,
                           color: palette.iconMuted,
                           onTap: onShareTap,
+                          countLabel: _countLabelOrNull(
+                            post.stats.externalShareCount,
+                          ),
                         ),
                       ],
                     ),

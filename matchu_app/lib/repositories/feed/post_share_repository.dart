@@ -6,7 +6,7 @@ enum PostNativeShareStatus { success, dismissed, unavailable }
 abstract interface class PostShareRepository {
   Future<PostNativeShareStatus> share({
     required String title,
-    required String text,
+    required Uri uri,
     Rect? sharePositionOrigin,
   });
 
@@ -17,14 +17,14 @@ class PlatformPostShareRepository implements PostShareRepository {
   @override
   Future<PostNativeShareStatus> share({
     required String title,
-    required String text,
+    required Uri uri,
     Rect? sharePositionOrigin,
   }) async {
     final result = await SharePlus.instance.share(
       ShareParams(
         title: title,
         subject: title,
-        text: text,
+        uri: uri,
         sharePositionOrigin: sharePositionOrigin,
       ),
     );

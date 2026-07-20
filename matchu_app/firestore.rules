@@ -897,6 +897,18 @@ service cloud.firestore {
         );
       }
 
+      function hasValidPostStatsCreateDefaults() {
+        return request.resource.data.stats is map
+          && request.resource.data.stats.likeCount == 0
+          && request.resource.data.stats.commentCount == 0
+          && request.resource.data.stats.shareCount == 0
+          && request.resource.data.stats.saveCount == 0
+          && (
+            !("externalShareCount" in request.resource.data.stats)
+            || request.resource.data.stats.externalShareCount == 0
+          );
+      }
+
       function authorReputationScore() {
         let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
         return userData.reputationScore is number
@@ -1028,12 +1040,15 @@ service cloud.firestore {
         && canCreatePostByReputation()
         && hasValidPostVisibilityForWrite(request.resource.data)
         && hasValidPostModerationForCreate(request.resource.data)
+        && hasValidPostStatsCreateDefaults()
         && hasValidPostRecommendationCreateDefaults();
       allow update: if (
           isAuthor()
           && hasValidPostVisibilityForWrite(request.resource.data)
           && hasValidPostModerationForWrite(request.resource.data)
           && isAllowedAuthorPostModerationUpdate()
+          && newStatsValue("externalShareCount") ==
+            oldStatsValue("externalShareCount")
           && !touchesServerManagedPostRecommendationFields()
         ) || isStatsCounterOnlyUpdate();
       allow delete: if isAuthor();

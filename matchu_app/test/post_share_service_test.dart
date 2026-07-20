@@ -20,7 +20,7 @@ void main() {
       expect(payload.postId, 'post_123');
       expect(payload.uri.toString(), 'https://example.com/p/post_123');
       expect(payload.text, contains('Nội dung bài viết'));
-      expect(payload.text, endsWith('https://example.com/p/post_123'));
+      expect(payload.text, isNot(contains('https://example.com/p/post_123')));
     });
 
     test('a pure repost shares the stable original post link', () {
@@ -41,6 +41,22 @@ void main() {
       expect(payload.postId, 'original_1');
       expect(payload.uri.toString(), 'https://example.com/p/original_1');
       expect(payload.text, contains('Bài gốc'));
+    });
+
+    test('passes the canonical URI to the native share repository', () async {
+      final repository = _FakePostShareRepository();
+      final service = PostShareService(
+        repository: repository,
+        baseUri: Uri.parse('https://example.com'),
+      );
+
+      final outcome = await service.share(
+        _post(postId: 'post_123', content: 'Nội dung bài viết'),
+      );
+
+      expect(outcome.status, PostNativeShareStatus.success);
+      expect(repository.sharedUri, Uri.parse('https://example.com/p/post_123'));
+      expect(repository.sharedTitle, isNotEmpty);
     });
 
     test('rejects non-public posts', () {
@@ -116,15 +132,20 @@ PostModel _post({
 }
 
 class _FakePostShareRepository implements PostShareRepository {
+  Uri? sharedUri;
+  String? sharedTitle;
+
   @override
   Future<void> copyText(String text) async {}
 
   @override
   Future<PostNativeShareStatus> share({
     required String title,
-    required String text,
+    required Uri uri,
     dynamic sharePositionOrigin,
   }) async {
+    sharedTitle = title;
+    sharedUri = uri;
     return PostNativeShareStatus.success;
   }
 }

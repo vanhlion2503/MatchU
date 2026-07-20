@@ -57,7 +57,8 @@ function calculatePopularitySignal(post) {
     ((Number(stats.likeCount) || 0) * 1.0) +
     ((Number(stats.commentCount) || 0) * 0.8) +
     ((Number(stats.saveCount) || 0) * 1.3) +
-    ((Number(stats.shareCount) || 0) * 1.5);
+    ((Number(stats.shareCount) || 0) * 1.5) +
+    ((Number(stats.externalShareCount) || 0) * 1.5);
   const popularity = Math.max(
     0,
     engagement +

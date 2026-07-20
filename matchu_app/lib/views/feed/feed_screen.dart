@@ -24,6 +24,7 @@ import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -401,12 +402,15 @@ class _FeedScreenState extends State<FeedScreen>
   }
 
   void _sharePost(PostModel post) {
+    if (!shareController.canShare(post)) return;
     unawaited(
-      shareController.sharePost(
-        post,
-        sharePositionOrigin: PostShareController.shareOriginFromContext(
-          context,
-        ),
+      PostShareSheet.show(
+        context,
+        post: post,
+        onShareTap:
+            (origin) =>
+                shareController.sharePost(post, sharePositionOrigin: origin),
+        onCopyTap: () => shareController.copyPostLink(post),
       ),
     );
   }

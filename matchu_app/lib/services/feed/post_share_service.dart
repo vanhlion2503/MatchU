@@ -26,6 +26,13 @@ class PostSharePayload {
   final String text;
 }
 
+class PostShareOutcome {
+  const PostShareOutcome({required this.payload, required this.status});
+
+  final PostSharePayload payload;
+  final PostNativeShareStatus status;
+}
+
 class PostShareService {
   PostShareService({PostShareRepository? repository, Uri? baseUri})
     : _repository = repository ?? PlatformPostShareRepository(),
@@ -64,11 +71,9 @@ class PostShareService {
             ? 'Bài viết trên MatchU'
             : 'Bài viết của $authorName trên MatchU';
     final excerpt = _excerpt(content);
-    final text = <String>[
-      title,
-      if (excerpt.isNotEmpty) excerpt,
-      uri.toString(),
-    ].join('\n\n');
+    // Keep the visible message compact. The URL is passed separately as a
+    // structured URI so receiving apps can render their own link preview.
+    final text = <String>[title, if (excerpt.isNotEmpty) excerpt].join('\n\n');
 
     return PostSharePayload(
       postId: targetPostId,
@@ -92,22 +97,23 @@ class PostShareService {
     );
   }
 
-  Future<PostNativeShareStatus> share(
+  Future<PostShareOutcome> share(
     PostModel post, {
     Rect? sharePositionOrigin,
   }) async {
     final payload = buildPayload(post);
-    return _repository.share(
+    final status = await _repository.share(
       title: payload.title,
-      text: payload.text,
+      uri: payload.uri,
       sharePositionOrigin: sharePositionOrigin,
     );
+    return PostShareOutcome(payload: payload, status: status);
   }
 
-  Future<Uri> copyLink(PostModel post) async {
+  Future<PostSharePayload> copyLink(PostModel post) async {
     final payload = buildPayload(post);
     await _repository.copyText(payload.uri.toString());
-    return payload.uri;
+    return payload;
   }
 
   void _ensurePostCanBeShared(PostModel post) {

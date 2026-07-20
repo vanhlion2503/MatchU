@@ -20,6 +20,7 @@ import 'package:matchu_app/views/feed/widgets/post_action_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_privacy_sheet.dart';
 import 'package:matchu_app/views/feed/widgets/post_repost_sheet.dart';
+import 'package:matchu_app/views/feed/widgets/post_share_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
 import 'package:shimmer/shimmer.dart';
 
@@ -433,13 +434,7 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
             displayPost,
             controllerTag: controllerTag,
           ),
-      onShareTap:
-          () => Get.find<PostShareController>().sharePost(
-            displayPost,
-            sharePositionOrigin: PostShareController.shareOriginFromContext(
-              context,
-            ),
-          ),
+      onShareTap: () => _openShareSheet(context, displayPost),
       onMoreTap:
           () => _openPostActionSheet(
             context,
@@ -455,6 +450,19 @@ class _ProfilePostsSectionState extends State<ProfilePostsSection>
                 controllerTag: controllerTag,
               )
               : null,
+    );
+  }
+
+  Future<void> _openShareSheet(BuildContext context, PostModel post) {
+    final shareController = Get.find<PostShareController>();
+    if (!shareController.canShare(post)) return Future<void>.value();
+    return PostShareSheet.show(
+      context,
+      post: post,
+      onShareTap:
+          (origin) =>
+              shareController.sharePost(post, sharePositionOrigin: origin),
+      onCopyTap: () => shareController.copyPostLink(post),
     );
   }
 

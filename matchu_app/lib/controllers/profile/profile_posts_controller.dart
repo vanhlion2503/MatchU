@@ -256,6 +256,19 @@ class ProfilePostsController extends GetxController {
     );
   }
 
+  void applyExternalShareCount(String postId, int count) {
+    final currentPost = findPostById(postId);
+    if (currentPost == null) return;
+    final safeCount = count < 0 ? 0 : count;
+    if (currentPost.stats.externalShareCount == safeCount) return;
+
+    _replacePost(
+      currentPost.copyWith(
+        stats: currentPost.stats.copyWith(externalShareCount: safeCount),
+      ),
+    );
+  }
+
   bool isPostReposted(PostModel sourcePost) {
     final targetPostId = _repostTargetPostIdOf(sourcePost);
     if (targetPostId.isEmpty) return false;

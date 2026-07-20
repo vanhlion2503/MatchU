@@ -374,7 +374,8 @@ class RecommendationService {
     final rawEngagement =
         (post.stats.likeCount * 1.0) +
         (post.stats.commentCount * 0.8) +
-        (post.stats.shareCount * 1.5);
+        (post.stats.shareCount * 1.5) +
+        (post.stats.externalShareCount * 1.5);
     final freshness = calculateTimeDecay(post.createdAt, now: now);
     return (rawEngagement + post.trendScore + (post.trendBucket * 0.25)) *
         freshness;

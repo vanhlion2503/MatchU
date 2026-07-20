@@ -10,6 +10,10 @@ abstract final class PostTranslationKeys {
   static const maxAttachmentsMessage = 'post.max_attachments_message';
   static const moderationRejected = 'post.moderation_rejected';
   static const moderationReview = 'post.moderation_review';
+  static const shareSheetTitle = 'post.share_sheet_title';
+  static const shareVia = 'post.share_via';
+  static const copy = 'post.copy';
+  static const matchuUser = 'post.matchu_user';
 }
 
 const postVietnameseTranslations = <String, String>{
@@ -26,6 +30,10 @@ const postVietnameseTranslations = <String, String>{
       'Mỗi bài viết chỉ được có tối đa @max tệp đính kèm.',
   PostTranslationKeys.moderationRejected: 'Bài viết bị từ chối',
   PostTranslationKeys.moderationReview: 'Cần xem xét',
+  PostTranslationKeys.shareSheetTitle: 'Chia sẻ bài viết',
+  PostTranslationKeys.shareVia: 'Chia sẻ qua…',
+  PostTranslationKeys.copy: 'Sao chép',
+  PostTranslationKeys.matchuUser: 'Người dùng MatchU',
   'Nổi bật': 'Nổi bật',
   'Mới nhất': 'Mới nhất',
   'Đăng': 'Đăng',
@@ -280,6 +288,10 @@ const postEnglishTranslations = <String, String>{
       'Each post can contain up to @max attachments.',
   PostTranslationKeys.moderationRejected: 'Post rejected',
   PostTranslationKeys.moderationReview: 'Review required',
+  PostTranslationKeys.shareSheetTitle: 'Share post',
+  PostTranslationKeys.shareVia: 'Share via…',
+  PostTranslationKeys.copy: 'Copy',
+  PostTranslationKeys.matchuUser: 'MatchU user',
   'Nổi bật': 'Top',
   'Mới nhất': 'Latest',
   'Đăng': 'Post',
