@@ -4,6 +4,22 @@ const { GoogleGenAI } = require("@google/genai");
 const { admin } = require("../shared/firebase");
 const { GEMINI_API_KEY } = require("../shared/secrets");
 
+const TELEPATHY_AI_MODEL = "gemini-3-flash-preview";
+const TELEPATHY_AI_CONFIG = Object.freeze({
+  // This is a short, guided writing task. Minimal thinking avoids the model's
+  // default high reasoning latency without changing the prompt or response.
+  thinkingConfig: Object.freeze({ thinkingLevel: "minimal" }),
+  maxOutputTokens: 256,
+});
+
+let geminiClient;
+
+function getGeminiClient() {
+  // Reuse HTTP/client state while a warm Cloud Function instance is alive.
+  geminiClient ??= new GoogleGenAI({ apiKey: GEMINI_API_KEY.value() });
+  return geminiClient;
+}
+
 const generateTelepathyAiInsight = onDocumentUpdated(
   {
     document: "tempChats/{roomId}",
@@ -33,18 +49,23 @@ const generateTelepathyAiInsight = onDocumentUpdated(
     }
 
     try {
-      const genAI = new GoogleGenAI({
-        apiKey: GEMINI_API_KEY.value(),
-      });
-
+      const startedAt = Date.now();
+      const genAI = getGeminiClient();
       const prompt = buildTelepathyPrompt(payload);
 
       const result = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: TELEPATHY_AI_MODEL,
         contents: prompt,
+        config: TELEPATHY_AI_CONFIG,
       });
 
       const text = result.text ?? "Hai bạn có nhiều điểm thú vị để khám phá thêm.";
+
+      console.info("Telepathy AI insight generated", {
+        roomId: event.params.roomId,
+        model: TELEPATHY_AI_MODEL,
+        durationMs: Date.now() - startedAt,
+      });
 
       await event.data.after.ref.update({
         "minigame.aiInsight.status": "done",
@@ -65,18 +86,6 @@ const generateTelepathyAiInsight = onDocumentUpdated(
     }
   }
 );
-
-async function getSafeGeminiModel(genAI) {
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
-  try {
-    await model.generateContent("Ping");
-    return model;
-  } catch (error) {
-    console.error("Gemini model test failed:", error);
-    throw new Error("Gemini model is not usable");
-  }
-}
 
 function buildTelepathyPrompt(payload) {
   const { score, level, questions } = payload;
@@ -136,4 +145,9 @@ CHỈ TRẢ VỀ ĐOẠN VĂN HOÀN CHỈNH.
 
 module.exports = {
   generateTelepathyAiInsight,
+  __test: {
+    buildTelepathyPrompt,
+    TELEPATHY_AI_CONFIG,
+    TELEPATHY_AI_MODEL,
+  },
 };
