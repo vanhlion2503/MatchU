@@ -5,7 +5,7 @@ class SwipeChatItemMessage extends StatefulWidget {
   final Widget child;
   final VoidCallback onPin;
   final VoidCallback onDelete;
-  final ValueChanged<Offset> onMore;
+  final VoidCallback onMore;
 
   const SwipeChatItemMessage({
     super.key,
@@ -105,7 +105,7 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
                 ),
                 _actionTile(
                   color: Colors.orange,
-                  icon: Icons.push_pin,
+                  icon: Iconsax.save_2,
                   label: "Ghim",
                   index: 1,
                   onTap: () {
@@ -115,12 +115,12 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
                 ),
                 _actionTile(
                   color: Colors.red,
-                  icon: Icons.more_horiz,
+                  icon: Iconsax.more,
                   label: "Khác",
                   index: 0,
-                  onTapAt: (position) {
+                  onTap: () {
                     _close();
-                    widget.onMore(position);
+                    widget.onMore();
                   },
                 ),
               ],
@@ -198,10 +198,8 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
     required IconData icon,
     required String label,
     required int index,
-    VoidCallback? onTap,
-    ValueChanged<Offset>? onTapAt,
+    required VoidCallback onTap,
   }) {
-    Offset? globalTapPosition;
     // Vị trí bắt đầu của tile này (từ phải sang trái)
     final double revealStart = tileWidth * index;
 
@@ -218,18 +216,7 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTapDown:
-              onTapAt == null
-                  ? null
-                  : (details) => globalTapPosition = details.globalPosition,
-          onTap: () {
-            if (onTap != null) {
-              onTap();
-              return;
-            }
-            final position = globalTapPosition;
-            if (position != null) onTapAt?.call(position);
-          },
+          onTap: onTap,
           splashColor: Colors.white24,
           highlightColor: Colors.white12,
           child: Container(

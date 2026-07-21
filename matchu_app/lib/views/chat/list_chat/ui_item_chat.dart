@@ -11,6 +11,8 @@ import 'package:matchu_app/utils/highlight_text.dart';
 import 'package:matchu_app/views/chat/chat_widget/user_avatar.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 import 'package:matchu_app/translations/long_chat_translations.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/views/chat/list_chat/muted_notification_icon.dart';
 
 Widget chatItem({
   required BuildContext context,
@@ -36,6 +38,7 @@ Widget chatItem({
 
     final listC = Get.find<ChatListController>();
     final preview = listC.lastMessagePreviewCache[room.id] ?? room.lastMessage;
+    final isMuted = listC.isMuted(otherUid);
 
     final online = presence.isOnline(otherUid);
 
@@ -134,25 +137,39 @@ Widget chatItem({
                         ).textTheme.bodySmall?.copyWith(fontSize: 13),
                       ),
                       const SizedBox(height: 6),
-                      if (unread > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            unread.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isMuted)
+                            MutedNotificationIcon(
+                              size: 17,
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                             ),
-                          ),
-                        ),
+                          if (isMuted && unread > 0) const SizedBox(width: 7),
+                          if (unread > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: const BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                unread.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ],
@@ -164,7 +181,7 @@ Widget chatItem({
                 top: 6,
                 right: 12,
                 child: Icon(
-                  Icons.push_pin,
+                  Iconsax.save_2,
                   size: 16,
                   color: Theme.of(context).colorScheme.primary,
                 ),

@@ -29,6 +29,8 @@ const longChatEnglishTranslations = <String, String>{
   '3 giờ': '3 hours',
   '8 giờ': '8 hours',
   'Cho đến khi bật lại': 'Until turned back on',
+  'Tắt thông báo trong': 'Mute notifications for',
+  'Thông báo đã tắt': 'Notifications are muted',
   'Tin nhắn sẽ bị xóa vĩnh viễn khỏi tài khoản của bạn nhưng vẫn hiển thị với người kia. Tin nhắn mới từ họ sẽ xuất hiện như một cuộc trò chuyện mới.':
       'Messages will be permanently removed from your account but remain visible to the other person. New messages from them will appear as a new conversation.',
   'Không thể thực hiện thao tác.': 'Unable to complete the action.',
