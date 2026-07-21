@@ -77,6 +77,7 @@ class TempChatController extends GetxController {
   int? _lastHapticSecond;
   int _lastTimerSecond = 421;
   bool _hasNavigatedToMatch = false;
+  String? _otherUid;
 
   Timer? _typingTimer;
   Timer? _otherTypingExpiryTimer;
@@ -446,6 +447,9 @@ class TempChatController extends GetxController {
         data["anonymousAvatars"] ?? const {},
       );
       final otherUid = isA ? data["userB"] : data["userA"];
+      if (otherUid is String) {
+        _otherUid = otherUid;
+      }
       otherAnonymousAvatar.value = avatars[otherUid]?.toString();
 
       if (!_hasPeerPresence) {
@@ -725,28 +729,28 @@ class TempChatController extends GetxController {
   }
 
   Future<void> leaveByDislike() async {
-    if (hasLeft.value) return; // 🔒 chặn double tap
+    if (hasLeft.value) return;
     hasLeft.value = true;
     lifecycle.value = TempChatLifecycle.ending;
-
     _timer?.cancel();
 
     if (Get.isRegistered<MatchingController>()) {
       Get.find<MatchingController>().isMatched.value = false;
     }
-    // 🔹 Lấy snapshot room TRƯỚC khi end
-    final room = await service.getRoom(roomId);
-    final userA = room["userA"];
-    final userB = room["userB"];
-    final toUid = uid == userA ? userB : userA;
+    _hasNavigatedToMatch = true;
 
-    // ❗ Chỉ set dislike nếu chưa like
-    if (userLiked.value == null) {
-      await service.setLike(roomId: roomId, uid: uid, value: false);
-      userLiked.value = false;
+    // Do not make navigation depend on a Firestore transaction. In particular,
+    // Telepathy may still be finishing and writing to the same room document.
+    // The server update continues in the background while this route closes.
+    unawaited(_finishLeaveOnServer());
+
+    final toUid = _otherUid ?? await _resolveOtherUidForExit();
+    if (toUid == null) {
+      debugPrint('Temp chat exit could not resolve the peer for room $roomId');
+      Get.offAllNamed('/main');
+      return;
     }
 
-    await service.endRoom(roomId: roomId, uid: uid, reason: "left");
     Get.offAllNamed(
       "/rating",
       arguments: {
@@ -755,6 +759,34 @@ class TempChatController extends GetxController {
         "anonymousAvatar": otherAnonymousAvatar.value,
       },
     );
+  }
+
+  Future<void> _finishLeaveOnServer() async {
+    try {
+      await service.endRoom(roomId: roomId, uid: uid, reason: "left");
+    } catch (error, stackTrace) {
+      // Exiting the local route must remain possible when the device is
+      // temporarily offline. Firestore/server cleanup can recover separately.
+      debugPrint('Temp chat leave sync failed for room $roomId: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<String?> _resolveOtherUidForExit() async {
+    try {
+      final room = await service
+          .getRoom(roomId)
+          .timeout(const Duration(seconds: 2));
+      final userA = room["userA"];
+      final userB = room["userB"];
+      final otherUid = uid == userA ? userB : userA;
+      return otherUid is String ? otherUid : null;
+    } catch (error) {
+      debugPrint(
+        'Temp chat peer lookup failed during exit for room $roomId: $error',
+      );
+      return null;
+    }
   }
 
   void onTypingChanged(String text) {

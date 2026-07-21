@@ -581,7 +581,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
     );
 
     if (ok == true) {
-      controller.leaveByDislike();
+      await controller.leaveByDislike();
     }
   }
 

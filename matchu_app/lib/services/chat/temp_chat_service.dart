@@ -114,11 +114,22 @@ class TempChatService implements TempChatRepository {
       final participants = List<String>.from(room['participants'] ?? const []);
       if (!participants.contains(uid)) return;
 
+      final userA = room['userA'];
+      final userB = room['userB'];
+      if (userA is! String || userB is! String) return;
+
+      // Leaving used to require a separate setLike transaction before this
+      // transaction. Telepathy can update the same room at that moment, making
+      // both transactions retry and keeping the UI waiting. Persist the
+      // implicit dislike together with the terminal room state instead.
+      final likeField = userA == uid ? 'userALiked' : 'userBLiked';
+
       transaction.update(roomRef, {
         'status': 'ended',
         'endedBy': uid,
         'endedReason': reason,
         'endedAt': FieldValue.serverTimestamp(),
+        if (reason == 'left' && room[likeField] == null) likeField: false,
       });
       transaction.set(_messagesRef(roomId).doc(), {
         'type': 'system',
