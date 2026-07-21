@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/utils/emoji_utils.dart';
 import 'package:matchu_app/views/chat/temp_chat/icon_action.dart';
+import 'package:matchu_app/views/chat/temp_chat/temp_chat_exit_action.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/quick_message_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_invite_bar.dart';
 import 'package:matchu_app/views/chat/temp_chat/widgets/game_sheet_item.dart';
@@ -136,7 +137,7 @@ class _BottomActionBarState extends State<BottomActionBar> {
 
   Widget _buildLeaveAction(BuildContext context, ThemeData theme) {
     return ActionIcon(
-      onTap: () => _confirmLeave(context),
+      onTap: () => confirmTempChatExit(context, controller),
       child: Icon(
         Iconsax.close_circle,
         color:
@@ -560,29 +561,6 @@ class _BottomActionBarState extends State<BottomActionBar> {
         );
       }),
     );
-  }
-
-  Future<void> _confirmLeave(BuildContext context) async {
-    final ok = await Get.dialog<bool>(
-      AlertDialog(
-        title: const Text("Thoát phòng"),
-        content: const Text("Bạn có chắc muốn thoát phòng không?"),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text("Huỷ"),
-          ),
-          ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            child: const Text("Thoát"),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true) {
-      await controller.leaveByDislike();
-    }
   }
 
   bool _isEmojiOnly(String text) {

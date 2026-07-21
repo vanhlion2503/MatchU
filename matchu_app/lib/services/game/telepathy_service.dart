@@ -150,6 +150,46 @@ class TelepathyService {
     });
   }
 
+  Future<void> exitGame({required String roomId, required String uid}) async {
+    final ref = _roomRef(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data();
+      if (data == null || data['status'] != 'active') return;
+
+      final participants = _participants(data);
+      if (!participants.contains(uid)) return;
+
+      final rawGame = data['minigame'];
+      if (rawGame is! Map) return;
+      final game = Map<String, dynamic>.from(rawGame);
+      final status = game['status'];
+      if (status != 'countdown' &&
+          status != 'playing' &&
+          status != 'revealing' &&
+          status != 'finished') {
+        return;
+      }
+
+      final otherUid = participants.firstWhere((id) => id != uid);
+      tx.update(ref, {
+        'minigame.status': 'cancelled',
+        'minigame.cancelledBy': uid,
+        'minigame.cancelledAt': FieldValue.serverTimestamp(),
+      });
+      tx.set(ref.collection('messages').doc(), {
+        'type': 'system',
+        'systemCode': 'telepathy_game_exit',
+        'text': 'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.',
+        'senderId': uid,
+        'targetUid': otherUid,
+        ..._approvedSystemFields,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   Future<void> startCountdown(String roomId) async {
     final ref = _roomRef(roomId);
 

@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart';
 import 'package:matchu_app/views/chat/temp_chat/anonymous_avatar.dart';
+import 'package:matchu_app/views/chat/temp_chat/temp_chat_exit_action.dart';
 import 'package:matchu_app/views/chat/temp_chat/telepathy/telepathy_motion.dart';
 
 class TelepathyGameOverlay extends StatefulWidget {
@@ -164,9 +165,12 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
 
     return Obx(() {
       final status = telepathy.status.value;
-      if (status != TelepathyStatus.countdown &&
-          status != TelepathyStatus.playing &&
-          status != TelepathyStatus.revealing) {
+      final roomIsActive =
+          widget.controller.lifecycle.value == TempChatLifecycle.active;
+      if (!roomIsActive ||
+          (status != TelepathyStatus.countdown &&
+              status != TelepathyStatus.playing &&
+              status != TelepathyStatus.revealing)) {
         return const SizedBox.shrink();
       }
 
@@ -197,6 +201,17 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                 duration: const Duration(milliseconds: 120),
                 opacity: _flashOpacity,
                 child: Container(color: _flashColor),
+              ),
+            ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: TempChatGameExitButton(
+                    onExit: widget.controller.telepathy.exitGame,
+                  ),
+                ),
               ),
             ),
           ],
@@ -326,6 +341,8 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                     ),
                   ],
                 ),
+                // Reserve the top-right corner for the game exit action.
+                const SizedBox(width: 52),
               ],
             ),
             const SizedBox(height: 10),

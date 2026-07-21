@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/chat/temp_chat_controller.dart';
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_countdown_view.dart';
+import 'package:matchu_app/views/chat/temp_chat/temp_chat_exit_action.dart';
 import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_feedback_overlay.dart';
 import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_gameplay_view.dart';
 import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_winner_view.dart';
@@ -458,9 +459,12 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
 
     return Obx(() {
       final status = wordChain.status.value;
-      if (status != WordChainStatus.countdown &&
-          status != WordChainStatus.playing &&
-          status != WordChainStatus.reward) {
+      final roomIsActive =
+          widget.controller.lifecycle.value == TempChatLifecycle.active;
+      if (!roomIsActive ||
+          (status != WordChainStatus.countdown &&
+              status != WordChainStatus.playing &&
+              status != WordChainStatus.reward)) {
         return const SizedBox.shrink();
       }
 
@@ -476,6 +480,17 @@ class _WordChainPlayingBarState extends State<WordChainPlayingBar> {
                 ),
               ),
               if (_showHeartLoss) const WordChainHeartLossOverlay(),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: TempChatGameExitButton(
+                      onExit: widget.controller.wordChain.exitGame,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

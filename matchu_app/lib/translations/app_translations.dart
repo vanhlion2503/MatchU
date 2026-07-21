@@ -348,6 +348,17 @@ const _extendedVietnamese = <String, String>{
   'Muốn tìm...': 'Muốn tìm...',
   'Thoát phòng': 'Thoát phòng',
   'Bạn có chắc muốn thoát phòng không?': 'Bạn có chắc muốn thoát phòng không?',
+  'Thoát trò chơi': 'Thoát trò chơi',
+  'Thoát trò chơi?': 'Thoát trò chơi?',
+  'Ván chơi hiện tại sẽ kết thúc cho cả hai. Bạn vẫn ở lại phòng chat.':
+      'Ván chơi hiện tại sẽ kết thúc cho cả hai. Bạn vẫn ở lại phòng chat.',
+  'Tiếp tục chơi': 'Tiếp tục chơi',
+  'Thoát game': 'Thoát game',
+  'Không thể thoát trò chơi lúc này.': 'Không thể thoát trò chơi lúc này.',
+  'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.':
+      'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.',
+  'Đối phương đã thoát trò chơi Nối Từ.':
+      'Đối phương đã thoát trò chơi Nối Từ.',
   'Chọn trò chơi': 'Chọn trò chơi',
   'scam': 'Lừa đảo',
   'Cảnh báo': 'Cảnh báo',
@@ -578,6 +589,17 @@ const _extendedEnglish = <String, String>{
   'Thoát phòng': 'Leave room',
   'Bạn có chắc muốn thoát phòng không?':
       'Are you sure you want to leave the room?',
+  'Thoát trò chơi': 'Exit game',
+  'Thoát trò chơi?': 'Exit the game?',
+  'Ván chơi hiện tại sẽ kết thúc cho cả hai. Bạn vẫn ở lại phòng chat.':
+      'The current game will end for both players. You will stay in the chat room.',
+  'Tiếp tục chơi': 'Keep playing',
+  'Thoát game': 'Exit game',
+  'Không thể thoát trò chơi lúc này.': 'Unable to exit the game right now.',
+  'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.':
+      'Your partner left the Telepathy game.',
+  'Đối phương đã thoát trò chơi Nối Từ.':
+      'Your partner left the Word Chain game.',
   'Chọn trò chơi': 'Choose a game',
   'scam': 'Scam',
   'Cảnh báo': 'Warning',

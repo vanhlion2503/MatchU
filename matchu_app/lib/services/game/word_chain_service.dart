@@ -173,6 +173,50 @@ class WordChainService {
     });
   }
 
+  Future<void> exitGame({required String roomId, required String uid}) async {
+    final ref = _roomRef(roomId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data();
+      if (data == null || data['status'] != 'active') return;
+
+      final participants = List<String>.from(data['participants'] ?? const []);
+      if (participants.length < 2 || !participants.contains(uid)) return;
+
+      final rawGame = data['minigames']?['wordChain'];
+      if (rawGame is! Map) return;
+      final game = Map<String, dynamic>.from(rawGame);
+      final status = game['status'];
+      if (status != 'countdown' && status != 'playing' && status != 'reward') {
+        return;
+      }
+
+      final otherUid = participants.firstWhere((id) => id != uid);
+      tx.update(ref, {
+        'minigames.wordChain.status': 'finished',
+        'minigames.wordChain.cancelledBy': uid,
+        'minigames.wordChain.cancelledAt': FieldValue.serverTimestamp(),
+        'minigames.wordChain.reward': FieldValue.delete(),
+        'minigames.wordChain.pendingWord': FieldValue.delete(),
+        'minigames.wordChain.invalidReason': FieldValue.delete(),
+      });
+      tx.set(ref.collection('messages').doc(), {
+        'type': 'system',
+        'systemCode': 'word_chain_exit',
+        'text': 'Đối phương đã thoát trò chơi Nối Từ.',
+        'senderId': uid,
+        'targetUid': otherUid,
+        'status': 'approved',
+        'blockedBy': null,
+        'reason': null,
+        'warning': false,
+        'aiScore': null,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   Future<void> startCountdown(String roomId) async {
     final ref = _roomRef(roomId);
 

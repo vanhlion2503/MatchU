@@ -327,6 +327,10 @@ class WordChainController extends GetxController {
     await service.respond(roomId: roomId, uid: uid, accept: accept);
   }
 
+  Future<void> exitGame() async {
+    await service.exitGame(roomId: roomId, uid: uid);
+  }
+
   // ================= REWARD =================
   Future<void> submitRewardQuestion({
     required String question,

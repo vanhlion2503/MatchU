@@ -189,7 +189,8 @@ class _WordChainHeader extends StatelessWidget {
     const totalHearts = 3;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      // The full-screen game owns a close action in the top-right corner.
+      padding: const EdgeInsets.fromLTRB(20, 16, 76, 8),
       child: Row(
         children: [
           Row(

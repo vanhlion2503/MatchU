@@ -18,6 +18,10 @@ const matchingChatVietnameseTranslations = <String, String>{
   'Vui lòng thử lại sau ít phút.': 'Vui lòng thử lại sau ít phút.',
   'Không thể tạo phòng chat': 'Không thể tạo phòng chat',
   'Người kia đã rời phòng': 'Người kia đã rời phòng',
+  'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.':
+      'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.',
+  'Đối phương đã thoát trò chơi Nối Từ.':
+      'Đối phương đã thoát trò chơi Nối Từ.',
   'Không thể gửi tin nhắn lúc này.': 'Không thể gửi tin nhắn lúc này.',
   'Không thể tải tin nhắn. Vui lòng thử lại.':
       'Không thể tải tin nhắn. Vui lòng thử lại.',
@@ -127,6 +131,10 @@ const matchingChatEnglishTranslations = <String, String>{
   'Vui lòng thử lại sau ít phút.': 'Please try again in a few minutes.',
   'Không thể tạo phòng chat': 'Unable to create the chat room',
   'Người kia đã rời phòng': 'The other person left the room',
+  'Đối phương đã thoát trò chơi Thần Giao Cách Cảm.':
+      'Your partner left the Telepathy game.',
+  'Đối phương đã thoát trò chơi Nối Từ.':
+      'Your partner left the Word Chain game.',
   'Không thể gửi tin nhắn lúc này.': 'Unable to send your message right now.',
   'Không thể tải tin nhắn. Vui lòng thử lại.':
       'Unable to load messages. Please try again.',

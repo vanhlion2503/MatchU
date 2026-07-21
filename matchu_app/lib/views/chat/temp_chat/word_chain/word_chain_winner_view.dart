@@ -180,7 +180,8 @@ class _WordChainRewardViewState extends State<WordChainRewardView> {
 
       return SingleChildScrollView(
         key: const ValueKey('word_chain_reward'),
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        // Keep the reward card clear of the full-screen game exit action.
+        padding: const EdgeInsets.fromLTRB(20, 64, 20, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

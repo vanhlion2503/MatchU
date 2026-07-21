@@ -426,6 +426,10 @@ class TelepathyController extends GetxController {
     }
   }
 
+  Future<void> exitGame() async {
+    await _service.exitGame(roomId: roomId, uid: uid);
+  }
+
   Future<void> startGame() async {
     if (_isHost != true) return;
 
