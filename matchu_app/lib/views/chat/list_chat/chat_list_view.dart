@@ -14,6 +14,7 @@ import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/chat/list_chat/confirm_delete_chat.dart';
+import 'package:matchu_app/views/chat/list_chat/chat_more_menu.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/views/chat/list_chat/shimmer/chat_list_shimmer.dart';
 import 'package:matchu_app/views/chat/list_chat/swipe_chat_item.dart';
@@ -324,7 +325,14 @@ Widget _buildChatList({
               () => showConfirmDeleteChat(
                 onConfirm: () => controller.delete(room),
               ),
-          onMore: () {},
+          onMore:
+              (position) => showChatMoreMenu(
+                context: context,
+                controller: controller,
+                room: room,
+                myUid: myUid,
+                position: position,
+              ),
           child: chatItem(
             context: context,
             room: room,
@@ -352,7 +360,14 @@ Widget _buildChatList({
         onDelete:
             () =>
                 showConfirmDeleteChat(onConfirm: () => controller.delete(room)),
-        onMore: () {},
+        onMore:
+            (position) => showChatMoreMenu(
+              context: context,
+              controller: controller,
+              room: room,
+              myUid: myUid,
+              position: position,
+            ),
         child: chatItem(
           context: context,
           room: room,

@@ -30,3 +30,19 @@ test("notification text is bounded", () => {
   assert.equal(result.length, 163);
   assert.equal(result.endsWith("..."), true);
 });
+
+test("chat mute without an expiry stays active until manually disabled", () => {
+  assert.equal(__test.isChatMuteActive({ mutedUntil: null }, Date.now()), true);
+});
+
+test("timed chat mute is active only before its expiry", () => {
+  const now = 10_000;
+  assert.equal(
+    __test.isChatMuteActive({ mutedUntil: { toMillis: () => now + 1 } }, now),
+    true
+  );
+  assert.equal(
+    __test.isChatMuteActive({ mutedUntil: { toMillis: () => now } }, now),
+    false
+  );
+});

@@ -653,6 +653,35 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    match /users/{userId}/mutedChatUsers/{mutedUserId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function hasValidMutedChatUserData() {
+        return request.resource.data.keys().hasOnly([
+          "userId",
+          "mutedUserId",
+          "mutedAt",
+          "mutedUntil",
+          "updatedAt"
+        ])
+        && request.resource.data.userId == userId
+        && request.resource.data.mutedUserId == mutedUserId
+        && request.resource.data.mutedUserId != userId
+        && request.resource.data.mutedAt is timestamp
+        && (
+          request.resource.data.mutedUntil is timestamp
+          || request.resource.data.mutedUntil == null
+        )
+        && request.resource.data.updatedAt is timestamp;
+      }
+
+      allow get, list: if isOwner();
+      allow create, update: if isOwner() && hasValidMutedChatUserData();
+      allow delete: if isOwner();
+    }
+
     match /users/{userId}/hiddenPostAuthors/{authorId} {
       function isOwner() {
         return request.auth != null && request.auth.uid == userId;
@@ -1609,6 +1638,7 @@ service cloud.firestore {
             "unread",
             "pinned",
             "deletedFor",
+            "clearedAt",
             "typing",
             "currentKeyId",
             "currentKeyUpdatedAt",

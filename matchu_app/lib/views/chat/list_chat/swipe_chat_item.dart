@@ -5,7 +5,7 @@ class SwipeChatItemMessage extends StatefulWidget {
   final Widget child;
   final VoidCallback onPin;
   final VoidCallback onDelete;
-  final VoidCallback onMore;
+  final ValueChanged<Offset> onMore;
 
   const SwipeChatItemMessage({
     super.key,
@@ -118,9 +118,9 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
                   icon: Icons.more_horiz,
                   label: "Khác",
                   index: 0,
-                  onTap: () {
+                  onTapAt: (position) {
                     _close();
-                    widget.onMore();
+                    widget.onMore(position);
                   },
                 ),
               ],
@@ -198,8 +198,10 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
     required IconData icon,
     required String label,
     required int index,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    ValueChanged<Offset>? onTapAt,
   }) {
+    Offset? globalTapPosition;
     // Vị trí bắt đầu của tile này (từ phải sang trái)
     final double revealStart = tileWidth * index;
 
@@ -216,7 +218,18 @@ class _SwipeChatItemMessageState extends State<SwipeChatItemMessage>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTapDown:
+              onTapAt == null
+                  ? null
+                  : (details) => globalTapPosition = details.globalPosition,
+          onTap: () {
+            if (onTap != null) {
+              onTap();
+              return;
+            }
+            final position = globalTapPosition;
+            if (position != null) onTapAt?.call(position);
+          },
           splashColor: Colors.white24,
           highlightColor: Colors.white12,
           child: Container(

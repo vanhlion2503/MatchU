@@ -52,13 +52,21 @@ class ChatService {
     String? tempRoomId, {
     int limit = 20,
     DocumentSnapshot? startAfter,
+    DateTime? clearedAfter,
   }) {
     Query<Map<String, dynamic>> chatQuery = _db
         .collection("chatRooms")
         .doc(roomId)
-        .collection("messages")
-        .orderBy("createdAt", descending: true)
-        .limit(limit);
+        .collection("messages");
+
+    if (clearedAfter != null) {
+      chatQuery = chatQuery.where(
+        "createdAt",
+        isGreaterThan: Timestamp.fromDate(clearedAfter),
+      );
+    }
+
+    chatQuery = chatQuery.orderBy("createdAt", descending: true).limit(limit);
 
     if (startAfter != null) {
       chatQuery = chatQuery.startAfterDocument(startAfter);
@@ -71,9 +79,16 @@ class ChatService {
     Query<Map<String, dynamic>> tempQuery = _db
         .collection("tempChats")
         .doc(tempRoomId)
-        .collection("messages")
-        .orderBy("createdAt", descending: true)
-        .limit(limit);
+        .collection("messages");
+
+    if (clearedAfter != null) {
+      tempQuery = tempQuery.where(
+        "createdAt",
+        isGreaterThan: Timestamp.fromDate(clearedAfter),
+      );
+    }
+
+    tempQuery = tempQuery.orderBy("createdAt", descending: true).limit(limit);
 
     if (startAfter != null) {
       tempQuery = tempQuery.startAfterDocument(startAfter);
@@ -355,6 +370,10 @@ class ChatService {
     await _db.collection("chatRooms").doc(roomId).update({"unread.$uid": 0});
   }
 
+  Future<void> markAsUnread(String roomId) async {
+    await _db.collection("chatRooms").doc(roomId).update({"unread.$uid": 1});
+  }
+
   Future<void> setPinned(String roomId, bool value) async {
     await _db.collection("chatRooms").doc(roomId).update({
       "pinned.$uid": value ? true : FieldValue.delete(),
@@ -364,6 +383,9 @@ class ChatService {
   Future<void> hideRoom(String roomId) async {
     await _db.collection("chatRooms").doc(roomId).update({
       "deletedFor.$uid": true,
+      "clearedAt.$uid": FieldValue.serverTimestamp(),
+      "unread.$uid": 0,
+      "pinned.$uid": FieldValue.delete(),
     });
   }
 

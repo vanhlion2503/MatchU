@@ -116,6 +116,7 @@ class ChatController extends GetxController {
   _sessionKeyListenerSub; // Realtime listener cho session key
   StreamSubscription? _keyRequestSub;
   int _currentKeyId = 0;
+  DateTime? _clearedAt;
   Future<void>? _sessionKeySetupFuture;
   final encryptionSetupState = EncryptionSetupState.idle.obs;
   List<String> _roomParticipants = const [];
@@ -226,6 +227,11 @@ class ChatController extends GetxController {
     final participants = List<String>.from(data["participants"] ?? const []);
     _roomParticipants = participants;
 
+    final clearedAt = data["clearedAt"]?[uid];
+    if (clearedAt is Timestamp) {
+      _clearedAt = clearedAt.toDate();
+    }
+
     final roomKeyId = data["currentKeyId"];
     if (roomKeyId is int) {
       _currentKeyId = roomKeyId;
@@ -306,6 +312,7 @@ class ChatController extends GetxController {
       roomId,
       tempRoomId,
       limit: _pageSize, // Chỉ lấy 20 tin mới nhất để detect tin mới
+      clearedAfter: _clearedAt,
     );
   }
 
@@ -315,7 +322,12 @@ class ChatController extends GetxController {
 
     messagesStream.value =
         _service
-            .listenMessagesWithFallback(roomId, tempRoomId, limit: _pageSize)
+            .listenMessagesWithFallback(
+              roomId,
+              tempRoomId,
+              limit: _pageSize,
+              clearedAfter: _clearedAt,
+            )
             .asBroadcastStream();
   }
 
@@ -656,6 +668,7 @@ class ChatController extends GetxController {
                 tempRoomId,
                 limit: _pageSize,
                 startAfter: _oldestDocument,
+                clearedAfter: _clearedAt,
               )
               .first;
 

@@ -13,6 +13,7 @@ class ChatRoomModel {
   final Map<String, dynamic>? unread;
   final Map<String, dynamic>? pinned;
   final Map<String, dynamic>? deletedFor;
+  final Map<String, dynamic>? clearedAt;
 
   ChatRoomModel({
     required this.id,
@@ -27,6 +28,7 @@ class ChatRoomModel {
     this.unread,
     this.pinned,
     this.deletedFor,
+    this.clearedAt,
   });
 
   factory ChatRoomModel.fromDoc(DocumentSnapshot doc) {
@@ -44,11 +46,22 @@ class ChatRoomModel {
       unread: data["unread"],
       pinned: data["pinned"],
       deletedFor: data["deletedFor"],
+      clearedAt: data["clearedAt"],
     );
   }
 
   bool isPinned(String uid) => pinned?[uid] == true;
   bool isDeletedFor(String uid) => deletedFor?[uid] == true;
 
-  int unreadCount(String uid) => unread?[uid] ?? 0;
+  DateTime? clearedAtFor(String uid) {
+    final value = clearedAt?[uid];
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  int unreadCount(String uid) {
+    final value = unread?[uid];
+    return value is num ? value.toInt() : 0;
+  }
 }

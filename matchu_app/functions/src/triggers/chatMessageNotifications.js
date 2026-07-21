@@ -300,6 +300,21 @@ async function releaseFailedClaim(queueRef, claimedVersion, error) {
 }
 
 async function sendNotificationForQueue(queueData) {
+  if (
+    await isChatSenderMuted(
+      cleanString(queueData.recipientUid),
+      cleanString(queueData.senderUid)
+    )
+  ) {
+    return {
+      sentCount: 0,
+      failedCount: 0,
+      suppressedCount: 1,
+      eligibleCount: 0,
+      reason: "muted_sender",
+    };
+  }
+
   let devicesSnap = await db
     .collection("users")
     .doc(queueData.recipientUid)
@@ -544,6 +559,31 @@ function isDeviceInactiveForDelivery(deviceData) {
   return status === "inactive" || status === "revoked" || status === "stale";
 }
 
+async function isChatSenderMuted(recipientUid, senderUid) {
+  if (!recipientUid || !senderUid || recipientUid === senderUid) return false;
+
+  const muteRef = db
+    .collection("users")
+    .doc(recipientUid)
+    .collection("mutedChatUsers")
+    .doc(senderUid);
+  const muteSnap = await muteRef.get();
+  if (!muteSnap.exists) return false;
+
+  const muteData = muteSnap.data() || {};
+  if (isChatMuteActive(muteData, Date.now())) return true;
+
+  // Timed mute documents are removed lazily after expiry.
+  await muteRef.delete().catch(() => {});
+  return false;
+}
+
+function isChatMuteActive(muteData, nowMs) {
+  if (!muteData) return false;
+  if (muteData.mutedUntil == null) return true;
+  return timestampToMillis(muteData.mutedUntil) > nowMs;
+}
+
 async function computeSenderDelayMs(senderUid, nowMs) {
   const rateLimitRef = db.collection(SENDER_RATE_LIMIT_COLLECTION).doc(senderUid);
 
@@ -711,6 +751,7 @@ module.exports = {
   dispatchQueuedChatNotification,
   maintainChatNotificationQueues,
   __test: {
+    isChatMuteActive,
     isDeviceInactiveForDelivery,
     shouldFinalizeClaim,
     truncateNotificationText,

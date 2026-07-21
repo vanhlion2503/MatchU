@@ -5,17 +5,20 @@ import 'package:matchu_app/theme/app_theme.dart';
 Future<void> showConfirmDeleteChat({required VoidCallback onConfirm}) async {
   await Get.dialog(
     AlertDialog(
-      title: const Text("Xóa cuộc trò chuyện?"),
-      content: const Text("Cuộc trò chuyện sẽ bị ẩn khỏi danh sách của bạn."),
+      title: Text("Xóa cuộc trò chuyện?".tr),
+      content: Text(
+        "Tin nhắn sẽ bị xóa vĩnh viễn khỏi tài khoản của bạn nhưng vẫn hiển thị với người kia. Tin nhắn mới từ họ sẽ xuất hiện như một cuộc trò chuyện mới."
+            .tr,
+      ),
       actions: [
-        TextButton(onPressed: Get.back, child: const Text("Hủy")),
+        TextButton(onPressed: Get.back, child: Text("Hủy".tr)),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
           onPressed: () {
             Get.back();
             onConfirm();
           },
-          child: const Text("Xóa"),
+          child: Text("Xóa".tr),
         ),
       ],
     ),
