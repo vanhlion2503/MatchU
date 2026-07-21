@@ -77,7 +77,7 @@ class MessageCryptoService {
 
     final iv = _randomBytes(12);
 
-    final cipher = GCMBlockCipher(AESFastEngine())..init(
+    final cipher = GCMBlockCipher(AESEngine())..init(
       true,
       AEADParameters(
         KeyParameter(key),
@@ -110,7 +110,7 @@ class MessageCryptoService {
     }
 
     try {
-      final cipher = GCMBlockCipher(AESFastEngine())..init(
+      final cipher = GCMBlockCipher(AESEngine())..init(
         false,
         AEADParameters(KeyParameter(key), 128, base64Decode(iv), Uint8List(0)),
       );

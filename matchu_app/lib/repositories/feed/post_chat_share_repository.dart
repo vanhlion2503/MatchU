@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
 import 'package:matchu_app/models/feed/post_chat_share_message.dart';
 import 'package:matchu_app/services/chat/chat_service.dart';
@@ -52,6 +55,15 @@ class FirebasePostChatShareRepository implements PostChatShareRepository {
     final rawKeyId = data['currentKeyId'];
     final keyId = rawKeyId is num ? rawKeyId.toInt() : 0;
     if (await SessionKeyService.hasLocalSessionKey(roomId, keyId: keyId)) {
+      unawaited(
+        SessionKeyService.ensureDistributedToAllDevices(
+          roomId: roomId,
+          participantUids: participants,
+          keyId: keyId,
+        ).catchError((e) {
+          debugPrint('Post share key repair failed: $e');
+        }),
+      );
       return keyId;
     }
 
@@ -67,6 +79,12 @@ class FirebasePostChatShareRepository implements PostChatShareRepository {
       roomId: roomId,
       keyId: keyId,
     )) {
+      unawaited(
+        SessionKeyService.clearCurrentDeviceKeyRequest(
+          roomId: roomId,
+          keyId: keyId,
+        ),
+      );
       return keyId;
     }
 
@@ -83,9 +101,28 @@ class FirebasePostChatShareRepository implements PostChatShareRepository {
       return keyId;
     }
 
-    return SessionKeyService.rotateSessionKey(
+    try {
+      await SessionKeyService.requestSessionKey(roomId: roomId, keyId: keyId);
+      final received = await SessionKeyService.waitForLocalSessionKey(
+        roomId,
+        keyId: keyId,
+        timeout: const Duration(seconds: 5),
+      );
+      if (received) return keyId;
+    } catch (e) {
+      debugPrint('Post share key request failed: $e');
+    }
+
+    final rotatedKeyId = await SessionKeyService.rotateSessionKey(
       roomId: roomId,
       participantUids: participants,
     );
+    unawaited(
+      SessionKeyService.clearCurrentDeviceKeyRequest(
+        roomId: roomId,
+        keyId: keyId,
+      ),
+    );
+    return rotatedKeyId;
   }
 }

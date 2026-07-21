@@ -25,6 +25,7 @@ class SessionKeyService {
   static const int _keyCreationLockTtlMs = 20000;
   static const int _activeDeviceWindowDays = 60;
   static const int _maxSessionKeyDevicesPerUser = 5;
+  static const int _legacyDeviceQueryLimit = 5;
   static const String _activeDeviceStatus = 'active';
   static const String _revokedDeviceStatus = 'revoked';
   static const String _staleDeviceStatus = 'stale';
@@ -138,7 +139,7 @@ class SessionKeyService {
         roomId,
         keyId: keyId,
       );
-      print(
+      debugPrint(
         hasKeyForCurrentDevice
             ? "Room $roomId already has a session key for this device, skip creating new key"
             : "Room $roomId already has session keys for keyId=$keyId, skip creating duplicate key",
@@ -146,12 +147,12 @@ class SessionKeyService {
       return;
     }
 
-    final canCreate = await _acquireKeyCreationLock(
+    final lockNonce = await _acquireKeyCreationLock(
       roomId: roomId,
       keyId: keyId,
     );
-    if (!canCreate) {
-      print("Another device is creating session key for room $roomId");
+    if (lockNonce == null) {
+      debugPrint("Another device is creating session key for room $roomId");
       return;
     }
 
@@ -161,37 +162,39 @@ class SessionKeyService {
               ? await hasAnySessionKeys(roomId)
               : await hasAnySessionKeysForKeyId(roomId, keyId);
       if (hasAnyKeysAfterLock) {
-        print(
+        debugPrint(
           "Room $roomId received session key while waiting for lock, skip creating",
         );
         return;
       }
 
-      print("Creating session key for room $roomId");
+      debugPrint("Creating session key for room $roomId");
       final sessionKey = _generateAESKey();
       await _distributeSessionKeyToDevices(
         roomId: roomId,
         sessionKey: sessionKey,
         participantUids: participantUids,
         keyId: keyId,
+        progressive: true,
       );
-      _distributionChecks.add(_roomKeyToken(roomId, keyId));
 
+      // Local readiness is published only after both participants' primary
+      // envelopes have been acknowledged by the server.
       await _saveLocalSessionKey(
         roomId: roomId,
         keyId: keyId,
         sessionKey: sessionKey,
       );
 
-      try {
-        await PasscodeBackupService.backupSessionKey(
+      unawaited(
+        PasscodeBackupService.backupSessionKey(
           roomId: roomId,
           sessionKey: sessionKey,
           keyId: keyId,
-        );
-      } catch (e) {
-        print("Passcode backup failed: $e");
-      }
+        ).catchError((e) {
+          debugPrint("Passcode backup failed: $e");
+        }),
+      );
 
       final roomUpdate = <String, dynamic>{"currentKeyId": keyId};
       if (keyId > 0) {
@@ -205,7 +208,11 @@ class SessionKeyService {
       // Notify listeners
       notifyUpdated(roomId);
     } finally {
-      await _releaseKeyCreationLock(roomId: roomId, keyId: keyId);
+      await _releaseKeyCreationLock(
+        roomId: roomId,
+        keyId: keyId,
+        lockNonce: lockNonce,
+      );
     }
   }
 
@@ -221,8 +228,8 @@ class SessionKeyService {
       sessionKey: sessionKey,
       participantUids: participantUids,
       keyId: newKeyId,
+      progressive: true,
     );
-    _distributionChecks.add(_roomKeyToken(roomId, newKeyId));
 
     await _saveLocalSessionKey(
       roomId: roomId,
@@ -230,15 +237,15 @@ class SessionKeyService {
       sessionKey: sessionKey,
     );
 
-    try {
-      await PasscodeBackupService.backupSessionKey(
+    unawaited(
+      PasscodeBackupService.backupSessionKey(
         roomId: roomId,
         sessionKey: sessionKey,
         keyId: newKeyId,
-      );
-    } catch (e) {
-      print("Passcode backup failed: $e");
-    }
+      ).catchError((e) {
+        debugPrint("Passcode backup failed: $e");
+      }),
+    );
 
     notifyUpdated(roomId);
     return newKeyId;
@@ -330,20 +337,22 @@ class SessionKeyService {
   }) async {
     final data = snap.data();
     if (data == null) {
-      print("Session key document ${snap.id} is empty");
+      debugPrint("Session key document ${snap.id} is empty");
       return false;
     }
     if (data["keyId"] is int) {
       keyId = data["keyId"] as int;
     }
     if (data["userId"] is String && data["userId"] != uid) {
-      print("❌ Session key doc belongs to another user: ${data["userId"]}");
+      debugPrint(
+        "❌ Session key doc belongs to another user: ${data["userId"]}",
+      );
       return false;
     }
 
     final encryptedKeyB64 = data["encryptedKey"];
     if (encryptedKeyB64 is! String || encryptedKeyB64.isEmpty) {
-      print("Session key doc ${snap.id} is missing encryptedKey");
+      debugPrint("Session key doc ${snap.id} is missing encryptedKey");
       return false;
     }
 
@@ -351,7 +360,7 @@ class SessionKeyService {
     try {
       encrypted = base64Decode(encryptedKeyB64);
     } catch (e) {
-      print("Invalid encryptedKey encoding for ${snap.id}: $e");
+      debugPrint("Invalid encryptedKey encoding for ${snap.id}: $e");
       return false;
     }
     final privateKeyPem = await IdentityKeyService.readPrivateKey();
@@ -367,10 +376,10 @@ class SessionKeyService {
 
       // 🔒 Validate session key length (AES-256 = 32 bytes)
       if (sessionKey.length != 32) {
-        print(
+        debugPrint(
           "❌ Invalid session key length: ${sessionKey.length}, expected 32",
         );
-        print("🔍 Encrypted key length: ${encrypted.length}");
+        debugPrint("🔍 Encrypted key length: ${encrypted.length}");
         return false;
       }
 
@@ -387,13 +396,13 @@ class SessionKeyService {
           keyId: keyId,
         );
       } catch (e) {
-        print("Passcode backup failed: $e");
+        debugPrint("Passcode backup failed: $e");
       }
 
       notifyUpdated(roomId);
       return true;
     } catch (e) {
-      print("❌ RSA decrypt failed: $e");
+      debugPrint("❌ RSA decrypt failed: $e");
       return false;
     }
   }
@@ -424,7 +433,9 @@ class SessionKeyService {
     return stream.listen(
       (snap) async {
         if (snap.exists && snap.data() != null) {
-          print("🔒 Session key document created/updated for device $deviceId");
+          debugPrint(
+            "🔒 Session key document created/updated for device $deviceId",
+          );
           final success = await _decryptAndSaveSessionKey(
             roomId: roomId,
             snap: snap,
@@ -434,10 +445,137 @@ class SessionKeyService {
         }
       },
       onError: (e) {
-        print("❌ Error listening for session key: $e");
+        debugPrint("❌ Error listening for session key: $e");
         onKeyReceived(false);
       },
     );
+  }
+
+  static Future<bool> waitForLocalSessionKey(
+    String roomId, {
+    required int keyId,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    if (await hasLocalSessionKey(roomId, keyId: keyId)) return true;
+
+    final completer = Completer<bool>();
+    final localSubscription = onSessionKeyUpdated(roomId).listen((_) async {
+      if (completer.isCompleted) return;
+      if (await hasLocalSessionKey(roomId, keyId: keyId)) {
+        completer.complete(true);
+      }
+    });
+    final remoteSubscription = await listenForSessionKey(
+      roomId: roomId,
+      keyId: keyId,
+      onKeyReceived: (success) {
+        if (success && !completer.isCompleted) completer.complete(true);
+      },
+    );
+    final timer = Timer(timeout, () {
+      if (!completer.isCompleted) completer.complete(false);
+    });
+    if (await hasLocalSessionKey(roomId, keyId: keyId) &&
+        !completer.isCompleted) {
+      completer.complete(true);
+    }
+
+    try {
+      return await completer.future;
+    } finally {
+      timer.cancel();
+      await localSubscription.cancel();
+      await remoteSubscription.cancel();
+    }
+  }
+
+  static Future<void> requestSessionKey({
+    required String roomId,
+    required int keyId,
+  }) async {
+    final deviceId = await DeviceService.getDeviceId();
+    final requestId = _sessionKeyDocId(
+      participantUid: uid,
+      deviceId: deviceId,
+      keyId: keyId,
+    );
+    await _db
+        .collection('chatRooms')
+        .doc(roomId)
+        .collection('keyRequests')
+        .doc(requestId)
+        .set({
+          'userId': uid,
+          'deviceId': deviceId,
+          'keyId': keyId,
+          'status': 'pending',
+          'requestedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+  }
+
+  static StreamSubscription<QuerySnapshot<Map<String, dynamic>>>
+  listenForKeyRequests({
+    required String roomId,
+    required Future<void> Function(int keyId) onRequest,
+  }) {
+    return _db
+        .collection('chatRooms')
+        .doc(roomId)
+        .collection('keyRequests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .listen(
+          (snapshot) async {
+            final keyIds =
+                snapshot.docs
+                    .map((doc) => doc.data()['keyId'])
+                    .whereType<int>()
+                    .toSet();
+            for (final requestedKeyId in keyIds) {
+              if (!await hasLocalSessionKey(roomId, keyId: requestedKeyId)) {
+                continue;
+              }
+              try {
+                await onRequest(requestedKeyId);
+                final batch = _db.batch();
+                for (final doc in snapshot.docs.where(
+                  (doc) => doc.data()['keyId'] == requestedKeyId,
+                )) {
+                  batch.update(doc.reference, {
+                    'status': 'fulfilled',
+                    'fulfilledAt': FieldValue.serverTimestamp(),
+                  });
+                }
+                await batch.commit();
+              } catch (e) {
+                debugPrint('Unable to fulfill room key request: $e');
+              }
+            }
+          },
+          onError: (Object e) {
+            debugPrint('Room key request listener failed: $e');
+          },
+        );
+  }
+
+  static Future<void> clearCurrentDeviceKeyRequest({
+    required String roomId,
+    required int keyId,
+  }) async {
+    final deviceId = await DeviceService.getDeviceId();
+    final requestId = _sessionKeyDocId(
+      participantUid: uid,
+      deviceId: deviceId,
+      keyId: keyId,
+    );
+    try {
+      await _db
+          .collection('chatRooms')
+          .doc(roomId)
+          .collection('keyRequests')
+          .doc(requestId)
+          .delete();
+    } catch (_) {}
   }
 
   /// ===============================
@@ -613,19 +751,24 @@ class SessionKeyService {
 
   static String _keyCreationLockPath(int keyId) => "sessionKeyLocks.$keyId";
 
-  static Future<bool> _acquireKeyCreationLock({
+  static Future<String?> _acquireKeyCreationLock({
     required String roomId,
     required int keyId,
   }) async {
     final roomRef = _db.collection("chatRooms").doc(roomId);
+    final deviceId = await DeviceService.getDeviceId();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final expiresAtMs = nowMs + _keyCreationLockTtlMs;
+    final lockNonce = base64UrlEncode(
+      List<int>.generate(18, (_) => Random.secure().nextInt(256)),
+    );
 
-    return _db.runTransaction<bool>((tx) async {
+    return _db.runTransaction<String?>((tx) async {
       final snap = await tx.get(roomRef);
       final data = snap.data() ?? const <String, dynamic>{};
 
       String? lockUid;
+      String? lockDeviceId;
       int lockExpiresAt = 0;
 
       final locksRaw = data["sessionKeyLocks"];
@@ -633,9 +776,13 @@ class SessionKeyService {
         final currentLockRaw = locksRaw["$keyId"];
         if (currentLockRaw is Map) {
           final uidRaw = currentLockRaw["uid"];
+          final deviceIdRaw = currentLockRaw["deviceId"];
           final expiresRaw = currentLockRaw["expiresAtMs"];
           if (uidRaw is String && uidRaw.isNotEmpty) {
             lockUid = uidRaw;
+          }
+          if (deviceIdRaw is String && deviceIdRaw.isNotEmpty) {
+            lockDeviceId = deviceIdRaw;
           }
           if (expiresRaw is int) {
             lockExpiresAt = expiresRaw;
@@ -644,24 +791,37 @@ class SessionKeyService {
       }
 
       final lockActive = lockUid != null && lockExpiresAt > nowMs;
-      if (lockActive && lockUid != uid) {
-        return false;
+      if (lockActive) {
+        debugPrint("Session key creation is locked by $lockUid/$lockDeviceId");
+        return null;
       }
 
       tx.update(roomRef, {
-        _keyCreationLockPath(keyId): {"uid": uid, "expiresAtMs": expiresAtMs},
+        _keyCreationLockPath(keyId): {
+          "uid": uid,
+          "deviceId": deviceId,
+          "nonce": lockNonce,
+          "expiresAtMs": expiresAtMs,
+        },
       });
-      return true;
+      return lockNonce;
     });
   }
 
   static Future<void> _releaseKeyCreationLock({
     required String roomId,
     required int keyId,
+    required String lockNonce,
   }) async {
     final roomRef = _db.collection("chatRooms").doc(roomId);
     try {
-      await roomRef.update({_keyCreationLockPath(keyId): FieldValue.delete()});
+      await _db.runTransaction<void>((tx) async {
+        final snap = await tx.get(roomRef);
+        final locksRaw = snap.data()?["sessionKeyLocks"];
+        final lockRaw = locksRaw is Map ? locksRaw["$keyId"] : null;
+        if (lockRaw is! Map || lockRaw["nonce"] != lockNonce) return;
+        tx.update(roomRef, {_keyCreationLockPath(keyId): FieldValue.delete()});
+      });
     } catch (_) {}
   }
 
@@ -695,12 +855,18 @@ class SessionKeyService {
       return;
     }
 
-    await _distributeSessionKeyToDevices(
-      roomId: roomId,
-      sessionKey: sessionKey,
-      participantUids: participantUids,
-      keyId: keyId,
-    );
+    try {
+      await _distributeSessionKeyToDevices(
+        roomId: roomId,
+        sessionKey: sessionKey,
+        participantUids: participantUids,
+        keyId: keyId,
+      );
+    } finally {
+      // Only deduplicate concurrent checks. A permanent token would prevent a
+      // device enrolled later from ever receiving this room key.
+      _distributionChecks.remove(token);
+    }
   }
 
   /// Phân phối session key cho tất cả thiết bị của participants
@@ -709,96 +875,178 @@ class SessionKeyService {
     required Uint8List sessionKey,
     required List<String> participantUids,
     int keyId = 0,
+    bool progressive = false,
   }) async {
-    final uniqueParticipants = participantUids.toSet();
-    int distributedCount = 0;
-    int skippedCount = 0;
-    final pendingWrites = <_WrappedSessionKeyWrite>[];
-
-    for (final participantUid in uniqueParticipants) {
-      final devices = await _getDevices(participantUid);
-      if (devices.isEmpty) {
-        continue;
-      }
-
-      final existingDocIds = await _getExistingSessionKeyDocIds(
-        roomId: roomId,
-        participantUid: participantUid,
-        keyId: keyId,
-      );
-
-      for (final device in devices) {
-        final deviceId = device.deviceId;
-        final publicKeyPem = device.publicKeyPem;
-        final docId = _sessionKeyDocId(
+    final totalTimer = Stopwatch()..start();
+    final directoryTimer = Stopwatch()..start();
+    final participants = participantUids.toSet().toList(growable: false);
+    final states = await Future.wait(
+      participants.map((participantUid) async {
+        final devicesFuture = _getDevices(participantUid);
+        final existingFuture = _getExistingSessionKeyDocIds(
+          roomId: roomId,
           participantUid: participantUid,
-          deviceId: deviceId,
           keyId: keyId,
         );
+        return _ParticipantDistributionState(
+          userId: participantUid,
+          devices: await devicesFuture,
+          existingDocIds: await existingFuture,
+        );
+      }),
+    );
+    directoryTimer.stop();
 
-        final docRef = _db
-            .collection("chatRooms")
-            .doc(roomId)
-            .collection("sessionKeys")
-            .doc(docId);
+    final primaryTargets = <_SessionKeyTarget>[];
+    final backgroundTargets = <_SessionKeyTarget>[];
+    var skippedCount = 0;
 
-        // 🔒 Kiểm tra xem device đã có session key chưa (không ghi đè)
-        if (existingDocIds.contains(docId)) {
+    for (final state in states) {
+      if (state.devices.isEmpty) {
+        throw StateError(
+          'No eligible encryption device found for ${state.userId}.',
+        );
+      }
+
+      for (var index = 0; index < state.devices.length; index++) {
+        final device = state.devices[index];
+        final docId = _sessionKeyDocId(
+          participantUid: state.userId,
+          deviceId: device.deviceId,
+          keyId: keyId,
+        );
+        if (state.existingDocIds.contains(docId)) {
           skippedCount++;
-          continue; // Đã có key, bỏ qua
+          continue;
         }
 
-        try {
-          pendingWrites.add(
-            _WrappedSessionKeyWrite(
-              docRef: docRef,
-              userId: participantUid,
-              deviceId: deviceId,
-              encryptedKey: base64Encode(
-                _rsaEncrypt(sessionKey, _decodePublicKeyFromPem(publicKeyPem)),
-              ),
-            ),
-          );
-          distributedCount++;
-          print(
-            "🔒 Distributed session key to device $deviceId (user: $participantUid)",
-          );
-        } catch (e) {
-          // Log error nhưng không throw - tiếp tục với device khác
-          print("🔒 sessionKey write error for $deviceId: $e");
+        final target = _SessionKeyTarget(
+          docRef: _db
+              .collection("chatRooms")
+              .doc(roomId)
+              .collection("sessionKeys")
+              .doc(docId),
+          userId: state.userId,
+          device: device,
+        );
+        if (index == 0) {
+          primaryTargets.add(target);
+        } else {
+          backgroundTargets.add(target);
         }
       }
     }
 
-    if (pendingWrites.isNotEmpty) {
-      final publishedByFunction = await _publishWrappedSessionKeys(
+    final primaryTimer = Stopwatch()..start();
+    await _wrapAndPublishTargets(
+      roomId: roomId,
+      keyId: keyId,
+      sessionKey: sessionKey,
+      targets: primaryTargets,
+      requireCompleteAcceptance: true,
+    );
+    primaryTimer.stop();
+
+    if (backgroundTargets.isNotEmpty) {
+      final backgroundWork = _wrapAndPublishTargets(
         roomId: roomId,
         keyId: keyId,
-        writes: pendingWrites,
+        sessionKey: sessionKey,
+        targets: backgroundTargets,
       );
-      if (!publishedByFunction) {
-        await _writeWrappedSessionKeysDirect(pendingWrites, keyId: keyId);
+      if (progressive) {
+        unawaited(
+          backgroundWork.catchError((e, st) {
+            debugPrint('Background session key distribution failed: $e');
+          }),
+        );
+      } else {
+        await backgroundWork;
       }
     }
 
-    if (distributedCount > 0 || skippedCount > 0) {
-      print(
-        "🔒 Distribution summary: $distributedCount distributed, $skippedCount skipped",
+    debugPrint(
+      'E2EE_METRIC room=$roomId keyId=$keyId '
+      'directoryMs=${directoryTimer.elapsedMilliseconds} '
+      'primaryMs=${primaryTimer.elapsedMilliseconds} '
+      'readyMs=${totalTimer.elapsedMilliseconds} '
+      'primary=${primaryTargets.length} '
+      'background=${backgroundTargets.length} existing=$skippedCount',
+    );
+  }
+
+  static Future<void> _wrapAndPublishTargets({
+    required String roomId,
+    required int keyId,
+    required Uint8List sessionKey,
+    required List<_SessionKeyTarget> targets,
+    bool requireCompleteAcceptance = false,
+  }) async {
+    if (targets.isEmpty) return;
+
+    final encryptedKeys = await compute(_wrapSessionKeysInBackground, {
+      'sessionKey': base64Encode(sessionKey),
+      'publicKeys': targets
+          .map((target) => target.device.publicKeyPem)
+          .toList(growable: false),
+    });
+    final writes = <_WrappedSessionKeyWrite>[];
+    for (var index = 0; index < targets.length; index++) {
+      final encryptedKey = encryptedKeys[index];
+      if (encryptedKey == null) {
+        debugPrint(
+          'Unable to wrap room key for ${targets[index].device.deviceId}',
+        );
+        continue;
+      }
+      final target = targets[index];
+      writes.add(
+        _WrappedSessionKeyWrite(
+          docRef: target.docRef,
+          userId: target.userId,
+          deviceId: target.device.deviceId,
+          encryptedKey: encryptedKey,
+        ),
+      );
+    }
+
+    if (requireCompleteAcceptance && writes.length != targets.length) {
+      throw StateError('Unable to encrypt the room key for a primary device.');
+    }
+    if (writes.isEmpty) return;
+
+    final result = await _publishWrappedSessionKeys(
+      roomId: roomId,
+      keyId: keyId,
+      writes: writes,
+    );
+    if (requireCompleteAcceptance && result.accepted < writes.length) {
+      if (result.invalid == 0) {
+        // Compatibility with the previous callable, which silently skipped
+        // inactive (but still valid) devices and did not report invalidDevices.
+        await _writeWrappedSessionKeysDirect(writes, keyId: keyId);
+        return;
+      }
+      throw StateError(
+        'The server rejected one or more primary encryption devices.',
       );
     }
   }
 
-  static Future<bool> _publishWrappedSessionKeys({
+  static Future<_WrappedKeyPublishResult> _publishWrappedSessionKeys({
     required String roomId,
     required int keyId,
     required List<_WrappedSessionKeyWrite> writes,
   }) async {
     const chunkSize = 20;
+    var written = 0;
+    var existing = 0;
+    var invalid = 0;
     try {
       final callable = _functions.httpsCallable('publishWrappedRoomKeys');
       for (var i = 0; i < writes.length; i += chunkSize) {
         final chunk = writes.skip(i).take(chunkSize).toList(growable: false);
-        await callable.call(<String, dynamic>{
+        final response = await callable.call(<String, dynamic>{
           'roomId': roomId,
           'keyId': keyId,
           'keys': chunk
@@ -811,11 +1059,26 @@ class SessionKeyService {
               )
               .toList(growable: false),
         });
+        final data = response.data;
+        if (data is Map) {
+          written += (data['written'] as num?)?.toInt() ?? 0;
+          existing += (data['alreadyExists'] as num?)?.toInt() ?? 0;
+          invalid += (data['invalidDevices'] as num?)?.toInt() ?? 0;
+        }
       }
-      return true;
+      return _WrappedKeyPublishResult(
+        written: written,
+        existing: existing,
+        invalid: invalid,
+      );
     } catch (e) {
       debugPrint("publishWrappedRoomKeys failed, using direct fallback: $e");
-      return false;
+      await _writeWrappedSessionKeysDirect(writes, keyId: keyId);
+      return _WrappedKeyPublishResult(
+        written: writes.length,
+        existing: 0,
+        invalid: 0,
+      );
     }
   }
 
@@ -833,6 +1096,7 @@ class SessionKeyService {
         await batch.commit();
       } catch (e) {
         debugPrint("sessionKey batch write error: $e");
+        rethrow;
       } finally {
         batch = _db.batch();
         pendingWrites = 0;
@@ -859,24 +1123,50 @@ class SessionKeyService {
   static Future<List<_SessionDeviceInfo>> _getDevices(
     String participantUid,
   ) async {
-    final snap =
-        await _db
-            .collection('users')
-            .doc(participantUid)
-            .collection('devices')
-            .get();
-
     final currentDeviceId =
         participantUid == uid ? await DeviceService.getDeviceId() : null;
+    final devicesRef = _db
+        .collection('users')
+        .doc(participantUid)
+        .collection('devices');
+    final currentDeviceFuture =
+        currentDeviceId == null ? null : devicesRef.doc(currentDeviceId).get();
+    late final QuerySnapshot<Map<String, dynamic>> activeSnapshot;
+    try {
+      activeSnapshot =
+          await devicesRef
+              .where('e2eeStatus', isEqualTo: _activeDeviceStatus)
+              .orderBy('lastE2eeActiveAt', descending: true)
+              .limit(_maxSessionKeyDevicesPerUser)
+              .get();
+    } on FirebaseException catch (e) {
+      if (e.code != 'failed-precondition') rethrow;
+      // Safe during staged deployment before the composite index is ready.
+      activeSnapshot =
+          await devicesRef
+              .where('e2eeStatus', isEqualTo: _activeDeviceStatus)
+              .limit(_maxSessionKeyDevicesPerUser)
+              .get();
+    }
+    final currentDeviceSnapshot = await currentDeviceFuture;
+
+    final documents = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+    if (currentDeviceSnapshot?.exists ?? false) {
+      documents[currentDeviceSnapshot!.id] = currentDeviceSnapshot;
+    }
+    for (final doc in activeSnapshot.docs) {
+      documents[doc.id] = doc;
+    }
+
     final activeCutoff = DateTime.now().subtract(
       const Duration(days: _activeDeviceWindowDays),
     );
     final eligibleDevices = <_SessionDeviceInfo>[];
-    final fallbackDevices = <_SessionDeviceInfo>[];
     var skippedInvalid = 0;
 
-    for (final doc in snap.docs) {
+    for (final doc in documents.values) {
       final data = doc.data();
+      if (data == null) continue;
       final publicKey = data["publicKey"];
 
       if (publicKey is! String || publicKey.trim().isEmpty) {
@@ -909,13 +1199,11 @@ class SessionKeyService {
           (isActiveDevice && (isFresh || lastActiveAt == null)) ||
           (isLegacyDevice && isFresh)) {
         eligibleDevices.add(device);
-      } else {
-        fallbackDevices.add(device);
       }
     }
 
     if (skippedInvalid > 0) {
-      print(
+      debugPrint(
         "Skipping $skippedInvalid invalid device docs for user $participantUid because publicKey is missing",
       );
     }
@@ -924,8 +1212,37 @@ class SessionKeyService {
       return _limitSessionKeyDevices(eligibleDevices);
     }
 
-    // Transitional fallback for existing users whose device docs do not yet
-    // have lifecycle fields. Keep this narrow to avoid recreating the old fanout.
+    // Bounded compatibility query for signed-out and legacy devices. This keeps
+    // first-message recovery without downloading an unbounded device history.
+    var fallbackSnapshot =
+        await devicesRef
+            .orderBy('lastActiveAt', descending: true)
+            .limit(_legacyDeviceQueryLimit)
+            .get();
+    if (fallbackSnapshot.docs.isEmpty) {
+      fallbackSnapshot = await devicesRef.limit(1).get();
+    }
+
+    final fallbackDevices = <_SessionDeviceInfo>[];
+    for (final doc in fallbackSnapshot.docs) {
+      final data = doc.data();
+      final publicKey = data['publicKey'];
+      final status = data['e2eeStatus'];
+      final statusValue = status is String ? status.trim() : null;
+      if (publicKey is! String ||
+          publicKey.trim().isEmpty ||
+          _isDeviceStatusBlocked(statusValue)) {
+        continue;
+      }
+      fallbackDevices.add(
+        _SessionDeviceInfo(
+          deviceId: doc.id,
+          publicKeyPem: publicKey.trim(),
+          lastActiveAt: _readDeviceLastActiveAt(data),
+          isCurrentDevice: doc.id == currentDeviceId,
+        ),
+      );
+    }
     return _limitSessionKeyDevices(fallbackDevices, fallbackLimit: 1);
   }
 
@@ -1027,6 +1344,43 @@ class _SessionDeviceInfo {
   final bool isCurrentDevice;
 }
 
+class _ParticipantDistributionState {
+  const _ParticipantDistributionState({
+    required this.userId,
+    required this.devices,
+    required this.existingDocIds,
+  });
+
+  final String userId;
+  final List<_SessionDeviceInfo> devices;
+  final Set<String> existingDocIds;
+}
+
+class _SessionKeyTarget {
+  const _SessionKeyTarget({
+    required this.docRef,
+    required this.userId,
+    required this.device,
+  });
+
+  final DocumentReference<Map<String, dynamic>> docRef;
+  final String userId;
+  final _SessionDeviceInfo device;
+}
+
+class _WrappedKeyPublishResult {
+  const _WrappedKeyPublishResult({
+    required this.written,
+    required this.existing,
+    required this.invalid,
+  });
+
+  final int written;
+  final int existing;
+  final int invalid;
+  int get accepted => written + existing;
+}
+
 class _WrappedSessionKeyWrite {
   const _WrappedSessionKeyWrite({
     required this.docRef,
@@ -1039,4 +1393,24 @@ class _WrappedSessionKeyWrite {
   final String userId;
   final String deviceId;
   final String encryptedKey;
+}
+
+/// Runs PEM parsing and RSA-OAEP wrapping outside Flutter's UI isolate.
+List<String?> _wrapSessionKeysInBackground(Map<String, dynamic> input) {
+  final sessionKey = base64Decode(input['sessionKey'] as String);
+  final publicKeys = List<String>.from(input['publicKeys'] as List);
+  return publicKeys
+      .map<String?>((publicKeyPem) {
+        try {
+          final publicKey = SessionKeyService._decodePublicKeyFromPem(
+            publicKeyPem,
+          );
+          return base64Encode(
+            SessionKeyService._rsaEncrypt(sessionKey, publicKey),
+          );
+        } catch (_) {
+          return null;
+        }
+      })
+      .toList(growable: false);
 }

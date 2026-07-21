@@ -19,6 +19,8 @@ const matchingChatVietnameseTranslations = <String, String>{
   'Không thể tạo phòng chat': 'Không thể tạo phòng chat',
   'Người kia đã rời phòng': 'Người kia đã rời phòng',
   'Không thể gửi tin nhắn lúc này.': 'Không thể gửi tin nhắn lúc này.',
+  'Không thể tải tin nhắn. Vui lòng thử lại.':
+      'Không thể tải tin nhắn. Vui lòng thử lại.',
   'Tin nhắn này vi phạm nguyên tắc cộng đồng':
       'Tin nhắn này vi phạm nguyên tắc cộng đồng',
   '⏰ Sắp hết giờ! Còn 30 giây': '⏰ Sắp hết giờ! Còn 30 giây',
@@ -126,6 +128,8 @@ const matchingChatEnglishTranslations = <String, String>{
   'Không thể tạo phòng chat': 'Unable to create the chat room',
   'Người kia đã rời phòng': 'The other person left the room',
   'Không thể gửi tin nhắn lúc này.': 'Unable to send your message right now.',
+  'Không thể tải tin nhắn. Vui lòng thử lại.':
+      'Unable to load messages. Please try again.',
   'Tin nhắn này vi phạm nguyên tắc cộng đồng':
       'This message violates the Community Guidelines',
   '⏰ Sắp hết giờ! Còn 30 giây': '⏰ Time is almost up! 30 seconds left',

@@ -25,6 +25,8 @@ import 'package:matchu_app/controllers/user/presence_controller.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+enum EncryptionSetupState { idle, preparing, waitingForKey, ready, failed }
+
 class ChatController extends GetxController {
   final String roomId;
   ChatController(
@@ -112,8 +114,10 @@ class ChatController extends GetxController {
   StreamSubscription? _sessionKeySub;
   StreamSubscription?
   _sessionKeyListenerSub; // Realtime listener cho session key
+  StreamSubscription? _keyRequestSub;
   int _currentKeyId = 0;
-  bool _isEnsuringKey = false;
+  Future<void>? _sessionKeySetupFuture;
+  final encryptionSetupState = EncryptionSetupState.idle.obs;
   List<String> _roomParticipants = const [];
   final Map<int, Future<bool>> _localSessionKeyChecks = {};
   final Map<String, Map<String, dynamic>> _pendingDecryptQueue = {};
@@ -245,6 +249,22 @@ class ChatController extends GetxController {
     _ensureMessagesStreamReady();
 
     _listenRoomTyping();
+    _listenForKeyRequests();
+  }
+
+  void _listenForKeyRequests() {
+    _keyRequestSub?.cancel();
+    _keyRequestSub = SessionKeyService.listenForKeyRequests(
+      roomId: roomId,
+      onRequest: (keyId) async {
+        await SessionKeyService.ensureDistributedToAllDevices(
+          roomId: roomId,
+          participantUids: _roomParticipants,
+          keyId: keyId,
+          force: true,
+        );
+      },
+    );
   }
 
   // ================= ROOM LISTENER =================
@@ -718,8 +738,20 @@ class ChatController extends GetxController {
       );
     }
     if (!hasKey) {
+      encryptionSetupState.value = EncryptionSetupState.waitingForKey;
+      hasKey = await SessionKeyService.waitForLocalSessionKey(
+        roomId,
+        keyId: _currentKeyId,
+        timeout: const Duration(seconds: 15),
+      );
+    }
+    if (!hasKey) {
       Get.snackbar("🔐", longChatTr("Đang thiết lập mã hóa, vui lòng đợi..."));
       pendingTextMessages.remove(pending);
+      if (inputController.text.trim().isEmpty) {
+        inputController.text = text;
+      }
+      replyingMessage.value = reply;
       return;
     }
 
@@ -1479,128 +1511,198 @@ class ChatController extends GetxController {
   Future<void> _ensureSessionKey({
     bool allowRotateIfUnrecoverable = false,
   }) async {
-    if (_isEnsuringKey) return;
-    _isEnsuringKey = true;
-
-    try {
-      await IdentityKeyService.generateIfNotExists();
-
-      var participants = _roomParticipants;
-      if (participants.isEmpty) {
-        final roomSnap = await _service.getRoom(roomId);
-        final data = roomSnap.data();
-        if (data == null) return;
-
-        participants = List<String>.from(data["participants"] ?? []);
-        _roomParticipants = participants;
-
-        final roomKeyId = data["currentKeyId"];
-        _currentKeyId = roomKeyId is int ? roomKeyId : 0;
-      }
-
-      if (await SessionKeyService.hasLocalSessionKey(
-        roomId,
-        keyId: _currentKeyId,
-      )) {
+    final running = _sessionKeySetupFuture;
+    if (running != null) {
+      await running;
+      if (!allowRotateIfUnrecoverable ||
+          await SessionKeyService.hasLocalSessionKey(
+            roomId,
+            keyId: _currentKeyId,
+          )) {
         return;
       }
+    }
 
-      final hasAnyKeys =
-          _currentKeyId == 0
-              ? await SessionKeyService.hasAnySessionKeys(roomId)
-              : await SessionKeyService.hasAnySessionKeysForKeyId(
-                roomId,
-                _currentKeyId,
-              );
-      final hasKeyForCurrentDevice =
-          hasAnyKeys
-              ? await SessionKeyService.hasSessionKeyForCurrentDevice(
-                roomId,
-                keyId: _currentKeyId,
-              )
-              : false;
+    final setup = _ensureSessionKeyInternal(
+      allowRotateIfUnrecoverable: allowRotateIfUnrecoverable,
+    );
+    _sessionKeySetupFuture = setup;
+    encryptionSetupState.value = EncryptionSetupState.preparing;
 
-      final historyLocked = await PasscodeBackupService.isHistoryLocked();
-      if (!historyLocked) {
-        final restoredFromBackup =
-            await PasscodeBackupService.restoreSessionKeyForRoom(
+    try {
+      await setup;
+      final ready = await SessionKeyService.hasLocalSessionKey(
+        roomId,
+        keyId: _currentKeyId,
+      );
+      encryptionSetupState.value =
+          ready
+              ? EncryptionSetupState.ready
+              : EncryptionSetupState.waitingForKey;
+    } catch (e, st) {
+      encryptionSetupState.value = EncryptionSetupState.failed;
+      debugPrint("Session key setup failed for room $roomId: $e");
+      debugPrintStack(stackTrace: st);
+    } finally {
+      if (identical(_sessionKeySetupFuture, setup)) {
+        _sessionKeySetupFuture = null;
+      }
+    }
+  }
+
+  Future<void> _ensureSessionKeyInternal({
+    required bool allowRotateIfUnrecoverable,
+  }) async {
+    await IdentityKeyService.generateIfNotExists();
+
+    var participants = _roomParticipants;
+    if (participants.isEmpty) {
+      final roomSnap = await _service.getRoom(roomId);
+      final data = roomSnap.data();
+      if (data == null) return;
+
+      participants = List<String>.from(data["participants"] ?? []);
+      _roomParticipants = participants;
+
+      final roomKeyId = data["currentKeyId"];
+      _currentKeyId = roomKeyId is int ? roomKeyId : 0;
+    }
+
+    if (await SessionKeyService.hasLocalSessionKey(
+      roomId,
+      keyId: _currentKeyId,
+    )) {
+      unawaited(
+        SessionKeyService.ensureDistributedToAllDevices(
+          roomId: roomId,
+          participantUids: participants,
+          keyId: _currentKeyId,
+        ).catchError((e) {
+          debugPrint('Session key repair distribution failed: $e');
+        }),
+      );
+      return;
+    }
+
+    final hasAnyKeys =
+        _currentKeyId == 0
+            ? await SessionKeyService.hasAnySessionKeys(roomId)
+            : await SessionKeyService.hasAnySessionKeysForKeyId(
+              roomId,
+              _currentKeyId,
+            );
+    final hasKeyForCurrentDevice =
+        hasAnyKeys
+            ? await SessionKeyService.hasSessionKeyForCurrentDevice(
               roomId,
               keyId: _currentKeyId,
-            );
-        if (restoredFromBackup) {
-          unawaited(
-            SessionKeyService.ensureDistributedToAllDevices(
-              roomId: roomId,
-              participantUids: participants,
-              keyId: _currentKeyId,
-            ).catchError((e, st) {
-              debugPrint("Background session key distribution failed: $e");
-            }),
+            )
+            : false;
+
+    final historyLocked = await PasscodeBackupService.isHistoryLocked();
+    if (!historyLocked) {
+      final restoredFromBackup =
+          await PasscodeBackupService.restoreSessionKeyForRoom(
+            roomId,
+            keyId: _currentKeyId,
           );
-          SessionKeyService.notifyUpdated(roomId);
-          return;
-        }
-      } else if (hasAnyKeys && allowRotateIfUnrecoverable) {
+      if (restoredFromBackup) {
+        unawaited(
+          SessionKeyService.ensureDistributedToAllDevices(
+            roomId: roomId,
+            participantUids: participants,
+            keyId: _currentKeyId,
+          ).catchError((e, st) {
+            debugPrint("Background session key distribution failed: $e");
+          }),
+        );
+        SessionKeyService.notifyUpdated(roomId);
+        return;
+      }
+    }
+
+    final received = await SessionKeyService.receiveSessionKey(
+      roomId: roomId,
+      keyId: _currentKeyId,
+    );
+    if (received) {
+      unawaited(
+        SessionKeyService.clearCurrentDeviceKeyRequest(
+          roomId: roomId,
+          keyId: _currentKeyId,
+        ),
+      );
+      return;
+    }
+
+    if (hasAnyKeys) {
+      try {
+        await SessionKeyService.requestSessionKey(
+          roomId: roomId,
+          keyId: _currentKeyId,
+        );
+      } catch (e) {
+        // Remain compatible while the key-request rules are being deployed.
+        debugPrint('Unable to publish room key request: $e');
+      }
+
+      if (allowRotateIfUnrecoverable && !hasKeyForCurrentDevice) {
+        final receivedOnDemand = await SessionKeyService.waitForLocalSessionKey(
+          roomId,
+          keyId: _currentKeyId,
+          timeout: const Duration(seconds: 5),
+        );
+        if (receivedOnDemand) return;
+
+        debugPrint("Room $roomId key request timed out; rotating to a new key");
+        final previousKeyId = _currentKeyId;
         final newKeyId = await SessionKeyService.rotateSessionKey(
           roomId: roomId,
           participantUids: participants,
         );
         _currentKeyId = newKeyId;
-        return;
-      }
-
-      final received = await SessionKeyService.receiveSessionKey(
-        roomId: roomId,
-        keyId: _currentKeyId,
-      );
-      if (received) {
-        return;
-      }
-
-      if (hasAnyKeys) {
-        if (allowRotateIfUnrecoverable && !hasKeyForCurrentDevice) {
-          debugPrint(
-            "Room $roomId has existing session keys but this device cannot recover them, rotating to a new key",
-          );
-          final newKeyId = await SessionKeyService.rotateSessionKey(
+        unawaited(
+          SessionKeyService.clearCurrentDeviceKeyRequest(
             roomId: roomId,
-            participantUids: participants,
-          );
-          _currentKeyId = newKeyId;
-          return;
-        }
-
-        debugPrint("Room has keys, listening for session key...");
-        _sessionKeyListenerSub?.cancel();
-
-        _sessionKeyListenerSub = await SessionKeyService.listenForSessionKey(
-          roomId: roomId,
-          keyId: _currentKeyId,
-          onKeyReceived: (success) async {
-            if (success) {
-              debugPrint("Session key received from realtime listener");
-              _sessionKeyListenerSub?.cancel();
-              _sessionKeyListenerSub = null;
-            }
-          },
+            keyId: previousKeyId,
+          ),
         );
-
-        debugPrint("Waiting for another device to distribute key...");
         return;
       }
 
-      await SessionKeyService.createAndSendSessionKey(
+      debugPrint("Room has keys, listening for session key...");
+      _sessionKeyListenerSub?.cancel();
+      final awaitedKeyId = _currentKeyId;
+
+      _sessionKeyListenerSub = await SessionKeyService.listenForSessionKey(
         roomId: roomId,
-        participantUids: participants,
-        keyId: _currentKeyId,
+        keyId: awaitedKeyId,
+        onKeyReceived: (success) async {
+          if (success) {
+            debugPrint("Session key received from realtime listener");
+            encryptionSetupState.value = EncryptionSetupState.ready;
+            unawaited(
+              SessionKeyService.clearCurrentDeviceKeyRequest(
+                roomId: roomId,
+                keyId: awaitedKeyId,
+              ),
+            );
+            _sessionKeyListenerSub?.cancel();
+            _sessionKeyListenerSub = null;
+          }
+        },
       );
-    } catch (e, st) {
-      debugPrint("Session key setup failed for room $roomId: $e");
-      debugPrintStack(stackTrace: st);
-    } finally {
-      _localSessionKeyChecks.clear();
-      _isEnsuringKey = false;
+
+      debugPrint("Waiting for another device to distribute key...");
+      return;
     }
+
+    await SessionKeyService.createAndSendSessionKey(
+      roomId: roomId,
+      participantUids: participants,
+      keyId: _currentKeyId,
+    );
+    _localSessionKeyChecks.clear();
   }
 
   // ================= CLEAN UP =================
@@ -1622,6 +1724,7 @@ class ChatController extends GetxController {
     );
     _sessionKeySub?.cancel();
     _sessionKeyListenerSub?.cancel();
+    _keyRequestSub?.cancel();
     _localSessionKeyChecks.clear();
     _pendingDecryptQueue.clear();
     decryptedCache.clear();

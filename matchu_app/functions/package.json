@@ -16,6 +16,7 @@
     "test:post-share": "node --test test/post-external-share.test.js",
     "test:temp-chat": "node --test test/temp-chat-session.test.js",
     "test:notifications": "node --test test/chat-message-notifications.test.js",
+    "test:chat-messages": "node --test test/chat-messages.test.js",
     "test:post-notifications": "node --test test/post-engagement-notifications.test.js",
     "test:account-security": "node --test test/account-security.test.js"
   },

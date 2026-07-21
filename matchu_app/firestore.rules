@@ -1485,6 +1485,39 @@ service cloud.firestore {
 
       allow delete: if false;
 
+      // Ephemeral typing state lives outside the hot room document so typing
+      // does not wake room and minigame listeners.
+      match /presence/{presenceUid} {
+        function isRoomParticipant() {
+          return request.auth != null
+            && request.auth.uid in
+              get(/databases/$(database)/documents/tempChats/$(roomId))
+                .data.participants;
+        }
+
+        function isValidOwnPresence() {
+          return request.auth.uid == presenceUid
+            && request.resource.data.keys().hasOnly([
+              "uid",
+              "isTyping",
+              "updatedAt",
+              "expiresAt"
+            ])
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.isTyping is bool
+            && request.resource.data.updatedAt is timestamp
+            && request.resource.data.expiresAt is timestamp;
+        }
+
+        allow read: if isRoomParticipant();
+        allow create, update: if isRoomParticipant()
+          && get(/databases/$(database)/documents/tempChats/$(roomId))
+              .data.status == "active"
+          && isValidOwnPresence();
+        allow delete: if isRoomParticipant()
+          && request.auth.uid == presenceUid;
+      }
+
       // ================= MESSAGES Temp =================
       match /messages/{messageId} {
 
@@ -1501,6 +1534,12 @@ service cloud.firestore {
             || request.resource.data.type != "system"
           )
           && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && (
+            !request.resource.data.keys().hasAny(["clientMessageId"])
+            || request.resource.data.clientMessageId == messageId
+          )
           && request.resource.data.status == "pending"
           && request.resource.data.blockedBy == null
           && request.resource.data.reason == null
@@ -1617,6 +1656,52 @@ service cloud.firestore {
         allow read: if isRoomParticipant();
 
         allow delete: if false;
+      }
+
+      match /keyRequests/{requestId} {
+        function isRoomParticipant() {
+          return request.auth != null
+            && request.auth.uid in
+              get(/databases/$(database)/documents/chatRooms/$(roomId))
+                .data.participants;
+        }
+
+        function ownsRequestedDevice(data) {
+          return data.userId == request.auth.uid
+            && data.deviceId is string
+            && exists(
+              /databases/$(database)/documents/users/$(request.auth.uid)/devices/$(data.deviceId)
+            );
+        }
+
+        allow read: if isRoomParticipant();
+        allow create: if isRoomParticipant()
+          && request.resource.data.keys().hasOnly([
+            "userId",
+            "deviceId",
+            "keyId",
+            "status",
+            "requestedAt"
+          ])
+          && ownsRequestedDevice(request.resource.data)
+          && request.resource.data.keyId is int
+          && request.resource.data.status == "pending";
+        allow update: if isRoomParticipant()
+          && (
+            (
+              request.resource.data.diff(resource.data).changedKeys()
+                .hasOnly(["status", "fulfilledAt"])
+              && request.resource.data.status == "fulfilled"
+            )
+            || (
+              ownsRequestedDevice(request.resource.data)
+              && request.resource.data.diff(resource.data).changedKeys()
+                .hasOnly(["status", "requestedAt", "fulfilledAt"])
+              && request.resource.data.status == "pending"
+            )
+          );
+        allow delete: if isRoomParticipant()
+          && resource.data.userId == request.auth.uid;
       }
 
       // ================= MESSAGES Long =================

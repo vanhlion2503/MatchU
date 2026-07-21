@@ -14,6 +14,8 @@ class IdentityKeyService {
   static final _storage = FlutterSecureStorage();
   static final _db = FirebaseFirestore.instance;
   static const String _activeE2eeStatus = 'active';
+  static final Map<String, Future<void>> _preparationFutures = {};
+  static final Set<String> _preparedDevices = {};
 
   static String _privateKeyKey(String uid, String deviceId) =>
       'identity_${uid}_$deviceId';
@@ -41,6 +43,40 @@ class IdentityKeyService {
 
     final uid = user.uid;
     final deviceId = await DeviceService.getDeviceId();
+    final preparationToken = '$uid:$deviceId';
+
+    // Device registration is an app-session concern. Opening multiple rooms must
+    // not perform the same secure-storage and Firestore writes repeatedly.
+    if (_preparedDevices.contains(preparationToken)) return;
+
+    final inFlight = _preparationFutures[preparationToken];
+    if (inFlight != null) return inFlight;
+
+    final preparation = _generateAndRegister(uid: uid, deviceId: deviceId);
+    _preparationFutures[preparationToken] = preparation;
+    try {
+      await preparation;
+      _preparedDevices.add(preparationToken);
+    } finally {
+      _preparationFutures.remove(preparationToken);
+    }
+  }
+
+  static void resetPreparationCache({String? uid}) {
+    if (uid == null) {
+      _preparedDevices.clear();
+      _preparationFutures.clear();
+      return;
+    }
+    final prefix = '$uid:';
+    _preparedDevices.removeWhere((token) => token.startsWith(prefix));
+    _preparationFutures.removeWhere((token, _) => token.startsWith(prefix));
+  }
+
+  static Future<void> _generateAndRegister({
+    required String uid,
+    required String deviceId,
+  }) async {
     final keyKey = _privateKeyKey(uid, deviceId);
 
     String? privatePem = await _storage.read(key: keyKey);

@@ -235,6 +235,7 @@ class WordChainService {
         "minigames.wordChain.winnerUid": FieldValue.delete(),
         "minigames.wordChain.reward": FieldValue.delete(),
         "minigames.wordChain.startedAt": FieldValue.serverTimestamp(),
+        "minigames.wordChain.updatedAt": FieldValue.serverTimestamp(),
         "minigames.wordChain.countdownStartedAt": FieldValue.delete(),
       });
     });
@@ -364,7 +365,23 @@ class WordChainService {
               : rawRemaining is num
               ? rawRemaining.toInt()
               : null;
-      if (remainingSeconds != null && remainingSeconds > 0) return;
+      final turnStartedAt =
+          game?["updatedAt"] is Timestamp
+              ? (game?["updatedAt"] as Timestamp).toDate()
+              : game?["startedAt"] is Timestamp
+              ? (game?["startedAt"] as Timestamp).toDate()
+              : null;
+      final deadlineReached =
+          turnStartedAt != null &&
+          !DateTime.now().isBefore(
+            turnStartedAt.add(const Duration(seconds: 15)),
+          );
+      // Compatibility: legacy clients count remainingSeconds down in Firestore,
+      // while upgraded clients derive the countdown from the server timestamp.
+      if (!deadlineReached &&
+          (remainingSeconds == null || remainingSeconds > 0)) {
+        return;
+      }
 
       final participants = List<String>.from(data?["participants"] ?? []);
       if (participants.length < 2) return;

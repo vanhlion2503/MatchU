@@ -15,6 +15,7 @@ import '../../controllers/profile/profile_controller.dart';
 import '../../controllers/auth/avatar_controller.dart';
 import '../../services/user/presence_service.dart';
 import '../../services/security/device_service.dart';
+import '../../services/security/identity_key_service.dart';
 import '../../services/security/message_crypto_service.dart';
 import '../../services/notification/push_device_repository.dart';
 
@@ -176,6 +177,7 @@ class LogoutService {
         // the same physical device, the next account can still decrypt its
         // existing room after account switching.
         MessageCryptoService.clearSessionKeyCache();
+        IdentityKeyService.resetPreparationCache(uid: uid);
       } catch (e) {
         // Ignore errors - continue with logout
       }
@@ -194,6 +196,7 @@ class LogoutService {
 
       // 9️⃣ Firebase sign out
       await _auth.signOut();
+      IdentityKeyService.resetPreparationCache(uid: uid);
       return true;
     } catch (e) {
       debugPrint('Logout error: $e');

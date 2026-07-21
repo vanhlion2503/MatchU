@@ -102,6 +102,8 @@ const {
   convertTempChat,
   expireTempChatSessions,
   cleanupExpiredMatchingSessions,
+  cleanupExpiredTempChatPresence,
+  convertMutualTempChat,
   releaseEndedTempChatParticipants,
 } = require("./src/callables/tempChatSession");
 const {
@@ -197,4 +199,6 @@ exports.cancelTempChatMatching = cancelTempChatMatching;
 exports.convertTempChat = convertTempChat;
 exports.expireTempChatSessions = expireTempChatSessions;
 exports.cleanupExpiredMatchingSessions = cleanupExpiredMatchingSessions;
+exports.cleanupExpiredTempChatPresence = cleanupExpiredTempChatPresence;
+exports.convertMutualTempChat = convertMutualTempChat;
 exports.releaseEndedTempChatParticipants = releaseEndedTempChatParticipants;

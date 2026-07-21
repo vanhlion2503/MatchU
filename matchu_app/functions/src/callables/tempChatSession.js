@@ -40,6 +40,11 @@ function normalizeGender(value) {
   return "random";
 }
 
+function isActiveTempRoomForUser(room, uid) {
+  const participants = Array.isArray(room?.participants) ? room.participants : [];
+  return room?.status === "active" && participants.includes(uid);
+}
+
 function isMutualMatch(seeker, candidate) {
   const accepts = (target, gender) => target === "random" || target === gender;
   return accepts(seeker.targetGender, candidate.gender) &&
@@ -151,7 +156,14 @@ async function enqueueSeeker({ uid, sessionId, targetGender, avatar }) {
       throw new HttpsError("not-found", "User profile not found.");
     }
     const activeRoomId = cleanString(userSnap.get("activeTempRoomId"));
-    if (activeRoomId) return activeRoomId;
+    if (activeRoomId) {
+      const activeRoom = await tx.get(db.collection("tempChats").doc(activeRoomId));
+      if (activeRoom.exists && isActiveTempRoomForUser(activeRoom.data(), uid)) {
+        return activeRoomId;
+      }
+      // Recover from a stale lock left by an interrupted cleanup trigger.
+      tx.set(userRef, { activeTempRoomId: null }, { merge: true });
+    }
     // Validate quota now, but consume it only after a room is created.
     quotaPatch(userSnap.data() || {}, now);
 
@@ -335,13 +347,7 @@ const cancelTempChatMatching = onCall(async (request) => {
   return { cancelled: true };
 });
 
-const convertTempChat = onCall(async (request) => {
-  const uid = requireUid(request);
-  const tempRoomId = cleanString(request.data?.roomId);
-  if (!tempRoomId) {
-    throw new HttpsError("invalid-argument", "roomId is required.");
-  }
-
+async function convertTempRoom(tempRoomId, requesterUid = null) {
   const tempRef = db.collection("tempChats").doc(tempRoomId);
   const permanentRef = db.collection("chatRooms").doc(`temp_${tempRoomId}`);
 
@@ -350,7 +356,7 @@ const convertTempChat = onCall(async (request) => {
     if (!tempSnap.exists) throw new HttpsError("not-found", "Temp room not found.");
     const room = tempSnap.data() || {};
     const participants = Array.isArray(room.participants) ? room.participants : [];
-    if (!participants.includes(uid)) {
+    if (requesterUid && !participants.includes(requesterUid)) {
       throw new HttpsError("permission-denied", "User is not a room participant.");
     }
     if (room.status === "converted" && room.permanentRoomId) {
@@ -392,7 +398,28 @@ const convertTempChat = onCall(async (request) => {
     }
     return { roomId: permanentRef.id };
   });
+}
+
+const convertTempChat = onCall(async (request) => {
+  const uid = requireUid(request);
+  const tempRoomId = cleanString(request.data?.roomId);
+  if (!tempRoomId) {
+    throw new HttpsError("invalid-argument", "roomId is required.");
+  }
+  return convertTempRoom(tempRoomId, uid);
 });
+
+const convertMutualTempChat = onDocumentUpdated(
+  "tempChats/{roomId}",
+  async (event) => {
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+    const wasMutual = before.userALiked === true && before.userBLiked === true;
+    const isMutual = after.userALiked === true && after.userBLiked === true;
+    if (wasMutual || !isMutual || after.status !== "active") return;
+    await convertTempRoom(event.params.roomId);
+  }
+);
 
 const releaseEndedTempChatParticipants = onDocumentUpdated(
   "tempChats/{roomId}",
@@ -469,15 +496,37 @@ const cleanupExpiredMatchingSessions = onSchedule(
   }
 );
 
+const cleanupExpiredTempChatPresence = onSchedule(
+  { schedule: "every 5 minutes", timeZone: "Asia/Bangkok" },
+  async () => {
+    const expired = await db.collectionGroup("presence")
+      .where("expiresAt", "<=", admin.firestore.Timestamp.now())
+      .limit(400)
+      .get();
+    if (expired.empty) return;
+
+    const batch = db.batch();
+    for (const presence of expired.docs) {
+      // This collection group is currently reserved for temp-chat presence.
+      if (presence.ref.parent.parent?.parent.id !== "tempChats") continue;
+      batch.delete(presence.ref);
+    }
+    await batch.commit();
+  }
+);
+
 module.exports = {
   startTempChatMatching,
   cancelTempChatMatching,
   convertTempChat,
   expireTempChatSessions,
   cleanupExpiredMatchingSessions,
+  cleanupExpiredTempChatPresence,
+  convertMutualTempChat,
   releaseEndedTempChatParticipants,
   __test: {
     normalizeGender,
+    isActiveTempRoomForUser,
     isMutualMatch,
     isVerifiedAccount,
     bangkokDateKey,

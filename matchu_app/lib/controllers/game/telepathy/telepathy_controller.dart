@@ -24,7 +24,11 @@ enum TelepathySubmitAction { accept, decline }
 
 class TelepathyController extends GetxController {
   final String roomId;
-  TelepathyController(this.roomId);
+  TelepathyController(this.roomId, {this.usesExternalRoomState = false});
+
+  /// When true, [TempChatController] owns the only room subscription and
+  /// forwards snapshots through [syncRoomState].
+  final bool usesExternalRoomState;
 
   final TelepathyService _service = TelepathyService();
   final uid = Get.find<AuthController>().user!.uid;
@@ -82,24 +86,30 @@ class TelepathyController extends GetxController {
       onQuestionTimeout: _handleQuestionTimeout,
       onCountdownComplete: _handleCountdownComplete,
     );
-    _listenRoom();
+    if (!usesExternalRoomState) {
+      _listenRoom();
+    }
   }
 
   void _listenRoom() {
     _sub = _service.listenRoom(roomId).listen((doc) {
       final data = doc.data();
       if (data == null) return;
-
-      _syncParticipants(data);
-
-      final rawGame = data["minigame"];
-      if (rawGame is! Map) {
-        _resetGameState();
-        return;
-      }
-
-      _syncGameState(Map<String, dynamic>.from(rawGame));
+      syncRoomState(data);
     });
+  }
+
+  /// Applies the Telepathy slice from the shared temp-room snapshot.
+  void syncRoomState(Map<String, dynamic> data) {
+    _syncParticipants(data);
+
+    final rawGame = data["minigame"];
+    if (rawGame is! Map) {
+      _resetGameState();
+      return;
+    }
+
+    _syncGameState(Map<String, dynamic>.from(rawGame));
   }
 
   TelepathyStatus _parseStatus(dynamic raw) {

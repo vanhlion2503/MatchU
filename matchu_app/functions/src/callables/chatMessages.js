@@ -6,7 +6,9 @@ const MAX_B64_FIELD_LENGTH = 8192;
 const MAX_REPLY_TEXT_LENGTH = 500;
 const MAX_WRAPPED_KEYS_PER_CALL = 20;
 const ALLOWED_MESSAGE_TYPES = new Set(["text", "post_share"]);
-const BLOCKED_DEVICE_STATUSES = new Set(["inactive", "revoked", "stale"]);
+// Signing out does not invalidate an identity key. Recent inactive devices are
+// a bounded fallback on the client and must remain eligible for key recovery.
+const BLOCKED_DEVICE_STATUSES = new Set(["revoked", "stale"]);
 
 function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -52,6 +54,27 @@ function otherParticipant(participants, uid) {
 function sessionKeyDocId(userId, deviceId, keyId) {
   const base = `${userId}_${deviceId}`;
   return keyId === 0 ? base : `${base}_${keyId}`;
+}
+
+function normalizeWrappedKeyTargets(keys, participants, keyId) {
+  const normalizedKeys = [];
+  const seenTargets = new Set();
+  for (const rawKey of keys) {
+    const userId = cleanString(rawKey?.userId);
+    const deviceId = cleanString(rawKey?.deviceId);
+    const encryptedKey = assertBase64Field("encryptedKey", rawKey?.encryptedKey);
+
+    if (!userId || !deviceId || !participants.includes(userId)) {
+      throw new HttpsError("invalid-argument", "Wrapped key target is invalid.");
+    }
+    const targetId = sessionKeyDocId(userId, deviceId, keyId);
+    if (seenTargets.has(targetId)) {
+      throw new HttpsError("invalid-argument", "Duplicate wrapped key target.");
+    }
+    seenTargets.add(targetId);
+    normalizedKeys.push({ userId, deviceId, encryptedKey, targetId });
+  }
+  return normalizedKeys;
 }
 
 async function hasBlockRelationship(userA, userB) {
@@ -191,44 +214,48 @@ const publishWrappedRoomKeys = onCall(async (request) => {
     throw new HttpsError("permission-denied", "User is not a room participant.");
   }
 
+  const normalizedKeys = normalizeWrappedKeyTargets(keys, participants, keyId);
+
+  const deviceRefs = normalizedKeys.map(({ userId, deviceId }) =>
+    db.collection("users").doc(userId).collection("devices").doc(deviceId)
+  );
+  const envelopeRefs = normalizedKeys.map(({ targetId }) =>
+    roomRef.collection("sessionKeys").doc(targetId)
+  );
+  const [deviceSnapshots, envelopeSnapshots] = await Promise.all([
+    db.getAll(...deviceRefs),
+    db.getAll(...envelopeRefs),
+  ]);
+
   const batch = db.batch();
   let writeCount = 0;
+  let alreadyExists = 0;
+  let invalidDevices = 0;
 
-  for (const rawKey of keys) {
-    const userId = cleanString(rawKey?.userId);
-    const deviceId = cleanString(rawKey?.deviceId);
-    const encryptedKey = assertBase64Field("encryptedKey", rawKey?.encryptedKey);
-
-    if (!userId || !deviceId || !participants.includes(userId)) {
-      throw new HttpsError("invalid-argument", "Wrapped key target is invalid.");
-    }
-
-    const deviceSnap = await db
-      .collection("users")
-      .doc(userId)
-      .collection("devices")
-      .doc(deviceId)
-      .get();
+  for (let index = 0; index < normalizedKeys.length; index += 1) {
+    const { userId, encryptedKey } = normalizedKeys[index];
+    const deviceSnap = deviceSnapshots[index];
     if (!deviceSnap.exists) {
-      throw new HttpsError("failed-precondition", "Target device does not exist.");
+      invalidDevices += 1;
+      continue;
     }
 
     const deviceData = deviceSnap.data() || {};
     const status = cleanString(deviceData.e2eeStatus);
     if (BLOCKED_DEVICE_STATUSES.has(status)) {
+      invalidDevices += 1;
       continue;
     }
 
     const publicKey = cleanString(deviceData.publicKey);
     if (!publicKey) {
+      invalidDevices += 1;
       continue;
     }
 
-    const docRef = roomRef
-      .collection("sessionKeys")
-      .doc(sessionKeyDocId(userId, deviceId, keyId));
-    const existing = await docRef.get();
-    if (existing.exists) {
+    const docRef = envelopeRefs[index];
+    if (envelopeSnapshots[index].exists) {
+      alreadyExists += 1;
       continue;
     }
 
@@ -248,11 +275,18 @@ const publishWrappedRoomKeys = onCall(async (request) => {
   return {
     roomId,
     keyId,
+    requested: normalizedKeys.length,
     written: writeCount,
+    alreadyExists,
+    invalidDevices,
   };
 });
 
 module.exports = {
   sendEncryptedChatMessage,
   publishWrappedRoomKeys,
+  __test: {
+    normalizeWrappedKeyTargets,
+    sessionKeyDocId,
+  },
 };

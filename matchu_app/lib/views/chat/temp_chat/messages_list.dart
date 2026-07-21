@@ -103,6 +103,19 @@ class _MessagesListState extends State<MessagesList> {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: controller.service.listenMessages(roomId),
       builder: (context, snap) {
+        if (snap.hasError) {
+          debugPrint(
+            'Temp chat message stream failed for room $roomId: ${snap.error}',
+          );
+          return Center(
+            child: Text(
+              matchingChatTr('Không thể tải tin nhắn. Vui lòng thử lại.'),
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+
         // Auto scroll khi có tin nhắn mới
         if (snap.hasData) {
           final docs =
@@ -111,7 +124,7 @@ class _MessagesListState extends State<MessagesList> {
                   .toList();
 
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            controller.onNewMessages(docs.length, docs);
+            controller.onNewMessages(docs);
           });
         }
 
@@ -138,13 +151,16 @@ class _MessagesListState extends State<MessagesList> {
         }
 
         final aliveIds = allDocs.map((e) => e.id).toSet();
-        controller.cleanupMessageKeys(aliveIds);
+        controller.cleanupMessageState(aliveIds);
         _cleanupBubbleKeys(aliveIds);
         _cleanupSnackbarIds(aliveIds);
         _cleanupBlockedAlertIds(aliveIds);
         _cleanupMessageStatus(aliveIds);
         _didInitStatusCache = true;
 
+        // Keep the scroll view as the direct child of the Expanded area.
+        // A Stack made only from Positioned children can collapse its loose
+        // cross-axis constraints on some devices, shrinking every chat row.
         return ListView.builder(
           controller: controller.scrollController,
           padding: const EdgeInsets.all(16),
@@ -152,28 +168,37 @@ class _MessagesListState extends State<MessagesList> {
           itemBuilder: (_, i) {
             // ================= HEADER =================
             if (i == 0) {
-              return Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color:
-                          theme.brightness == Brightness.dark
-                              ? AppTheme.darkBorder
-                              : AppTheme.lightBorder,
+              return SizedBox(
+                width: double.infinity,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color:
+                              theme.brightness == Brightness.dark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.lightBorder,
+                        ),
+                      ),
+                      child: Text(
+                        "Bắt đầu cuộc trò chuyện",
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    "Bắt đầu cuộc trò chuyện",
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  ],
                 ),
               );
             }
@@ -273,22 +298,23 @@ class _MessagesListState extends State<MessagesList> {
             final grouped = _shouldGroup(docs, index);
             final showTime = _isLastInGroup(docs, index);
 
-            final key = controller.messageKeys.putIfAbsent(
-              doc.id,
-              () => GlobalKey(),
-            );
-
             // ✅ Lưu bubbleKey để show reaction picker
             final bubbleKey = _bubbleKeys.putIfAbsent(
               doc.id,
               () => GlobalKey(),
             );
+            final messageKey = controller.messageKeys.putIfAbsent(
+              doc.id,
+              () => GlobalKey(),
+            );
+            final highlighted = controller.highlightFor(doc.id);
 
             double dragDx = 0;
 
             return Container(
-              key: key,
+              key: messageKey,
               child: AnimatedMessageBubble(
+                key: ValueKey(doc.id),
                 child: StatefulBuilder(
                   builder: (context, setState) {
                     return GestureDetector(
@@ -351,7 +377,10 @@ class _MessagesListState extends State<MessagesList> {
                                   showAvatar: showTime && !isMe,
                                   smallMargin: grouped,
                                   showTime: showTime,
-                                  time: _formatTime(data["createdAt"]),
+                                  time: _formatTime(
+                                    data["createdAt"] ??
+                                        data["clientCreatedAt"],
+                                  ),
                                   isBlocked: isBlocked,
                                   isPending: isPending,
                                   scamWarning: isScamWarning,
@@ -362,9 +391,7 @@ class _MessagesListState extends State<MessagesList> {
                                           )
                                           : null,
                                   messageId: doc.id,
-                                  highlighted:
-                                      controller.highlightedMessageId.value ==
-                                      doc.id,
+                                  highlighted: highlighted.value,
                                   anonymousAvatarKey:
                                       isMe
                                           ? null

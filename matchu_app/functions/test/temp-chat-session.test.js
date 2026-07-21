@@ -56,3 +56,27 @@ test("daily quota rejects the eleventh unverified match", () => {
     (error) => error.code === "resource-exhausted"
   );
 });
+
+test("only resumes an active temp room that contains the user", () => {
+  assert.equal(
+    __test.isActiveTempRoomForUser(
+      { status: "active", participants: ["user-a", "user-b"] },
+      "user-a"
+    ),
+    true
+  );
+  assert.equal(
+    __test.isActiveTempRoomForUser(
+      { status: "ended", participants: ["user-a", "user-b"] },
+      "user-a"
+    ),
+    false
+  );
+  assert.equal(
+    __test.isActiveTempRoomForUser(
+      { status: "active", participants: ["user-b", "user-c"] },
+      "user-a"
+    ),
+    false
+  );
+});

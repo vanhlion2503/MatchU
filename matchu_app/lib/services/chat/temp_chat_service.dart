@@ -1,19 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
+import 'package:matchu_app/repositories/chat/temp_chat_repository.dart';
 
 /// Repository for temp-room state and message operations.
 ///
 /// Matching and permanent-room conversion are server-authoritative. Frequent
 /// room operations stay on Firestore so snapshots retain offline/optimistic UI.
-class TempChatService {
+class TempChatService implements TempChatRepository {
   TempChatService({FirebaseFirestore? db, FirebaseFunctions? functions})
     : _db = db ?? FirebaseFirestore.instance,
       _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFirestore _db;
   final FirebaseFunctions _functions;
-  final Map<String, String> _typingKeyCache = {};
 
   static const Map<String, dynamic> _approvedSystemFields = {
     'status': 'approved',
@@ -31,6 +31,7 @@ class TempChatService {
     return _roomRef(roomId).collection('messages');
   }
 
+  @override
   Future<Map<String, dynamic>> getRoom(String roomId) async {
     final snapshot = await _roomRef(roomId).get();
     final data = snapshot.data();
@@ -38,20 +39,31 @@ class TempChatService {
     return data;
   }
 
+  @override
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenRoom(String roomId) {
     return _roomRef(roomId).snapshots();
   }
 
+  @override
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessages(String roomId) {
     return _messagesRef(
       roomId,
     ).orderBy('createdAt').limitToLast(80).snapshots();
   }
 
-  Future<void> sendMessages(String roomId, TempMessageModel message) async {
-    await _messagesRef(roomId).add(message.toJson());
+  @override
+  Stream<QuerySnapshot<Map<String, dynamic>>> listenTyping(String roomId) {
+    return _roomRef(roomId).collection('presence').snapshots();
   }
 
+  @override
+  Future<String> sendMessages(String roomId, TempMessageModel message) async {
+    final messageRef = _messagesRef(roomId).doc(message.id);
+    await messageRef.set(message.toJson());
+    return messageRef.id;
+  }
+
+  @override
   Future<void> setLike({
     required String roomId,
     required String uid,
@@ -88,6 +100,7 @@ class TempChatService {
     });
   }
 
+  @override
   Future<void> endRoom({
     required String roomId,
     required String uid,
@@ -121,6 +134,7 @@ class TempChatService {
     });
   }
 
+  @override
   Future<String> convertToPermanent(String tempRoomId) async {
     final result = await _functions.httpsCallable('convertTempChat').call({
       'roomId': tempRoomId,
@@ -133,6 +147,7 @@ class TempChatService {
     return roomId;
   }
 
+  @override
   Future<void> sendSystemMessage({
     required String roomId,
     required String text,
@@ -149,33 +164,22 @@ class TempChatService {
     });
   }
 
-  Future<String?> _resolveTypingField({
-    required String roomId,
-    required String uid,
-  }) async {
-    final cached = _typingKeyCache[roomId];
-    if (cached != null) return cached;
-
-    final snapshot = await _roomRef(roomId).get();
-    final room = snapshot.data();
-    if (room == null) return null;
-    final userA = room['userA'];
-    final userB = room['userB'];
-    final field = userA == uid ? 'userA' : (userB == uid ? 'userB' : null);
-    if (field != null) _typingKeyCache[roomId] = field;
-    return field;
-  }
-
+  @override
   Future<void> setTyping({
     required String roomId,
     required String uid,
     required bool typing,
   }) async {
-    final field = await _resolveTypingField(roomId: roomId, uid: uid);
-    if (field == null) return;
-    await _roomRef(roomId).update({'typing.$field': typing});
+    final now = DateTime.now();
+    await _roomRef(roomId).collection('presence').doc(uid).set({
+      'uid': uid,
+      'isTyping': typing,
+      'updatedAt': FieldValue.serverTimestamp(),
+      'expiresAt': Timestamp.fromDate(now.add(const Duration(seconds: 10))),
+    });
   }
 
+  @override
   Future<void> toggleReaction({
     required String roomId,
     required String messageId,

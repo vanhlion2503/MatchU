@@ -452,17 +452,18 @@ class _BottomActionBarState extends State<BottomActionBar> {
                         isTyping
                             ? ActionIcon(
                               key: const ValueKey("send"),
-                              onTap: () {
+                              onTap: () async {
                                 final text =
                                     controller.inputController.text.trim();
                                 if (text.isEmpty) return;
 
                                 final isEmojiOnly = _isEmojiOnly(text);
 
-                                controller.send(
+                                final sent = await controller.send(
                                   text,
                                   type: isEmojiOnly ? "emoji" : "text",
                                 );
+                                if (!sent || !mounted) return;
 
                                 controller.inputController.clear();
                                 controller.stopTyping();

@@ -18,7 +18,10 @@ class WordChainSosResult {
 
 class WordChainController extends GetxController {
   final String roomId;
-  WordChainController(this.roomId);
+  WordChainController(this.roomId, {this.usesExternalRoomState = false});
+
+  /// When true, room snapshots are supplied by TempChatController.
+  final bool usesExternalRoomState;
 
   final _db = FirebaseFirestore.instance;
   final uid = Get.find<AuthController>().user!.uid;
@@ -83,6 +86,9 @@ class WordChainController extends GetxController {
   bool _autoEndingAskReward = false;
   bool _autoEndingAnswerReward = false;
   bool _timeoutInProgress = false;
+  String? _activeTurnKey;
+  DateTime? _turnDeadline;
+  bool _turnDeadlineWasEstimated = false;
   static const int _countdownTotalSeconds = 3;
   static const int rewardAskTimeoutSeconds = 60;
   static const int rewardAnswerTimeoutSeconds = 60;
@@ -93,7 +99,9 @@ class WordChainController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _listenRoom();
+    if (!usesExternalRoomState) {
+      _listenRoom();
+    }
   }
 
   // ================= LISTEN FIRESTORE =================
@@ -102,86 +110,134 @@ class WordChainController extends GetxController {
       final data = doc.data();
       if (data == null) return;
 
-      _syncParticipants(data);
-
-      final rawGame = data["minigames"]?["wordChain"];
-      if (rawGame is! Map) {
-        _resetGameState();
-        return;
-      }
-
-      final game = Map<String, dynamic>.from(rawGame);
-      final nextStatus = _parseStatus(game["status"]);
-      status.value = nextStatus;
-
-      if (nextStatus != WordChainStatus.inviting) {
-        submittingAction.value = null;
-        invitedAt.value = null;
-        opponentJustAccepted.value = false;
-        _startingCountdown = false;
-      }
-
-      currentWord.value = game["currentWord"] ?? "";
-      turnUid.value = game["turnUid"] ?? "";
-      remainingSeconds.value = game["remainingSeconds"] ?? 15;
-      winnerUid.value = game["winnerUid"];
-      final rawInvalidReason = game["invalidReason"];
-      invalidReason.value =
-          rawInvalidReason is String && rawInvalidReason.isNotEmpty
-              ? rawInvalidReason
-              : null;
-      final rawPendingWord = game["pendingWord"];
-      pendingWord.value =
-          rawPendingWord is Map
-              ? Map<String, dynamic>.from(rawPendingWord)
-              : null;
-
-      hearts.assignAll(Map<String, int>.from(game["hearts"] ?? {}));
-      usedWords.assignAll(List<String>.from(game["usedWords"] ?? []));
-      sosUsed.assignAll(Map<String, bool>.from(game["sosUsed"] ?? {}));
-
-      _syncConsent(game);
-      _syncReward(game);
-      _syncTimeoutGuard();
-
-      if (nextStatus == WordChainStatus.inviting) {
-        invitedAt.value = _parseTimestamp(game["invitedAt"]);
-        _maybeStartCountdown();
-      } else if (nextStatus == WordChainStatus.countdown) {
-        _handleCountdown(game);
-      } else {
-        _countdownTimer?.cancel();
-        _countdownStartedAt = null;
-        _localCountdownStartedAt = null;
-        countdownSeconds.value = _countdownTotalSeconds;
-        _startingGame = false;
-      }
-
-      if (nextStatus == WordChainStatus.playing && turnUid.value == uid) {
-        _startTimer();
-      } else {
-        _timer?.cancel();
-      }
+      syncRoomState(data);
     });
+  }
+
+  /// Applies the Word Chain slice from the shared temp-room snapshot.
+  void syncRoomState(Map<String, dynamic> data) {
+    _syncParticipants(data);
+
+    final rawGame = data["minigames"]?["wordChain"];
+    if (rawGame is! Map) {
+      _resetGameState();
+      return;
+    }
+
+    final game = Map<String, dynamic>.from(rawGame);
+    final nextStatus = _parseStatus(game["status"]);
+    status.value = nextStatus;
+
+    if (nextStatus != WordChainStatus.inviting) {
+      submittingAction.value = null;
+      invitedAt.value = null;
+      opponentJustAccepted.value = false;
+      _startingCountdown = false;
+    }
+
+    final nextWord = game["currentWord"]?.toString() ?? "";
+    final nextTurnUid = game["turnUid"]?.toString() ?? "";
+    currentWord.value = nextWord;
+    turnUid.value = nextTurnUid;
+    _syncTurnDeadline(game, nextStatus, nextTurnUid, nextWord);
+    winnerUid.value = game["winnerUid"];
+    final rawInvalidReason = game["invalidReason"];
+    invalidReason.value =
+        rawInvalidReason is String && rawInvalidReason.isNotEmpty
+            ? rawInvalidReason
+            : null;
+    final rawPendingWord = game["pendingWord"];
+    pendingWord.value =
+        rawPendingWord is Map
+            ? Map<String, dynamic>.from(rawPendingWord)
+            : null;
+
+    hearts.assignAll(Map<String, int>.from(game["hearts"] ?? {}));
+    usedWords.assignAll(List<String>.from(game["usedWords"] ?? []));
+    sosUsed.assignAll(Map<String, bool>.from(game["sosUsed"] ?? {}));
+
+    _syncConsent(game);
+    _syncReward(game);
+    _syncTimeoutGuard();
+
+    if (nextStatus == WordChainStatus.inviting) {
+      invitedAt.value = _parseTimestamp(game["invitedAt"]);
+      _maybeStartCountdown();
+    } else if (nextStatus == WordChainStatus.countdown) {
+      _handleCountdown(game);
+    } else {
+      _countdownTimer?.cancel();
+      _countdownStartedAt = null;
+      _localCountdownStartedAt = null;
+      countdownSeconds.value = _countdownTotalSeconds;
+      _startingGame = false;
+    }
+
+    if (nextStatus == WordChainStatus.playing) {
+      _startTimer();
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
   }
 
   // ================= TIMER =================
   void _startTimer() {
-    if (_timeoutInProgress) return;
-    _timer?.cancel();
+    if (_timer != null) return;
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      if (turnUid.value != uid || _timeoutInProgress) return;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final deadline = _turnDeadline;
+      if (status.value != WordChainStatus.playing || deadline == null) return;
 
-      final next = remainingSeconds.value - 1;
-      remainingSeconds.value = next > 0 ? next : 0;
+      final remainingMs = deadline.difference(DateTime.now()).inMilliseconds;
+      remainingSeconds.value =
+          remainingMs <= 0 ? 0 : ((remainingMs + 999) ~/ 1000);
 
-      await service.updateTimer(roomId, uid, remainingSeconds.value);
-
-      if (remainingSeconds.value <= 0) {
-        await _onTimeout();
+      if (remainingSeconds.value <= 0 &&
+          turnUid.value == uid &&
+          !_timeoutInProgress) {
+        unawaited(_onTimeout());
       }
     });
+  }
+
+  void _syncTurnDeadline(
+    Map<String, dynamic> game,
+    WordChainStatus nextStatus,
+    String nextTurnUid,
+    String nextWord,
+  ) {
+    if (nextStatus != WordChainStatus.playing) {
+      _activeTurnKey = null;
+      _turnDeadline = null;
+      _turnDeadlineWasEstimated = false;
+      remainingSeconds.value = 15;
+      return;
+    }
+
+    // A turn changes whenever its owner or accepted word changes. Unrelated
+    // room snapshots (typing/likes) must not restart the local countdown.
+    final nextTurnKey = '$nextTurnUid\u0000$nextWord';
+    final serverStartedAt =
+        _parseTimestamp(game["updatedAt"]) ??
+        _parseTimestamp(game["startedAt"]);
+    if (_activeTurnKey == nextTurnKey &&
+        _turnDeadline != null &&
+        !(_turnDeadlineWasEstimated && serverStartedAt != null)) {
+      return;
+    }
+
+    _activeTurnKey = nextTurnKey;
+    _timeoutInProgress = false;
+    final configuredSeconds = (game["remainingSeconds"] as num?)?.toInt() ?? 15;
+    _turnDeadlineWasEstimated = serverStartedAt == null;
+    final startedAt = serverStartedAt ?? DateTime.now();
+    _turnDeadline = startedAt.add(Duration(seconds: configuredSeconds));
+
+    final remainingMs =
+        _turnDeadline!.difference(DateTime.now()).inMilliseconds;
+    remainingSeconds.value =
+        remainingMs <= 0 ? 0 : ((remainingMs + 999) ~/ 1000);
   }
 
   // ================= TIMEOUT LOGIC =================
@@ -190,11 +246,15 @@ class WordChainController extends GetxController {
     _timeoutInProgress = true;
     HapticFeedback.heavyImpact();
     _timer?.cancel();
+    _timer = null;
 
     try {
       await service.handleTimeout(roomId: roomId, uid: uid);
     } catch (_) {
       _timeoutInProgress = false;
+      if (status.value == WordChainStatus.playing) {
+        _startTimer();
+      }
     }
   }
 
@@ -515,6 +575,9 @@ class WordChainController extends GetxController {
     currentWord.value = "";
     turnUid.value = "";
     remainingSeconds.value = 15;
+    _activeTurnKey = null;
+    _turnDeadline = null;
+    _turnDeadlineWasEstimated = false;
     countdownSeconds.value = _countdownTotalSeconds;
     winnerUid.value = null;
     invalidReason.value = null;
@@ -545,6 +608,7 @@ class WordChainController extends GetxController {
     _startingCountdown = false;
     _startingGame = false;
     _timer?.cancel();
+    _timer = null;
     _countdownTimer?.cancel();
     _rewardReviewTimer?.cancel();
     _rewardAskTimer?.cancel();

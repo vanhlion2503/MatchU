@@ -10,6 +10,7 @@ import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
+import 'package:matchu_app/repositories/chat/temp_chat_repository.dart';
 import 'package:matchu_app/views/matching/match_transition_view.dart';
 import 'package:matchu_app/translations/matching_chat_translations.dart';
 import '../auth/auth_controller.dart';
@@ -22,14 +23,25 @@ enum QuickMessagePhase {
   iceBreaker, // 💬 Câu hỏi
 }
 
+enum TempChatLifecycle { joining, active, ending, ended, converting, converted }
+
 class TempChatController extends GetxController {
   final String roomId;
-  TempChatController(this.roomId, {TempChatService? service})
-    : service = service ?? TempChatService();
+  TempChatController(
+    this.roomId, {
+    TempChatRepository? service,
+    TelepathyController? telepathyController,
+    WordChainController? wordChainController,
+  }) : service = service ?? TempChatService(),
+       _telepathyController = telepathyController,
+       _wordChainController = wordChainController;
 
-  final TempChatService service;
+  final TempChatRepository service;
+  final TelepathyController? _telepathyController;
+  final WordChainController? _wordChainController;
   final uid = Get.find<AuthController>().user!.uid;
   final remainingSeconds = 420.obs;
+  final lifecycle = TempChatLifecycle.joining.obs;
   final userLiked = RxnBool();
   final otherLiked = RxnBool();
   final isTyping = false.obs;
@@ -39,8 +51,10 @@ class TempChatController extends GetxController {
   final otherAvgRating = RxnDouble();
   final replyingMessage = Rxn<Map<String, dynamic>>();
   final scrollController = ScrollController();
-  final highlightedMessageId = RxnString();
   final Map<String, GlobalKey> messageKeys = {};
+  final Map<String, RxBool> _messageHighlights = {};
+  String? _highlightedMessageId;
+  final newMessagesBelow = 0.obs;
   final showEmoji = false.obs;
   final inputController = TextEditingController();
   final otherRatingCount = RxnInt();
@@ -49,20 +63,26 @@ class TempChatController extends GetxController {
   final otherIsFaceVerified = false.obs;
   final _justSentMessage = false.obs;
   final showQuickMessages = true.obs;
+  final isSendingMessage = false.obs;
   final quickPhase = QuickMessagePhase.intro.obs;
 
   bool _shownOtherLikeEffect = false;
   bool _isEnding = false;
   bool _roomStatusKnown = false;
   bool _roomIsActive = true;
-  int _lastMessageCount = 0;
+  bool? _isUserA;
+  bool _processingTimerEvents = false;
+  String? _lastMessageId;
+  bool _isNearMessageBottom = true;
   int? _lastHapticSecond;
   int _lastTimerSecond = 421;
   bool _hasNavigatedToMatch = false;
 
   Timer? _typingTimer;
+  Timer? _otherTypingExpiryTimer;
   Timer? _timer;
   StreamSubscription? _roomSub;
+  StreamSubscription? _typingSub;
   final List<Worker> _workers = [];
   DateTime? _expiresAt;
   VoidCallback? onOtherLiked;
@@ -119,7 +139,8 @@ class TempChatController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    telepathy = Get.put(TelepathyController(roomId), tag: roomId);
+    telepathy =
+        _telepathyController ?? Get.find<TelepathyController>(tag: roomId);
     _workers.add(
       ever<TelepathyStatus>(telepathy.status, (status) {
         if (_telepathyAccepted) return;
@@ -131,7 +152,8 @@ class TempChatController extends GetxController {
         }
       }),
     );
-    wordChain = Get.put(WordChainController(roomId), tag: roomId);
+    wordChain =
+        _wordChainController ?? Get.find<WordChainController>(tag: roomId);
     _workers.add(
       ever<WordChainStatus>(wordChain.status, (status) {
         if (status == WordChainStatus.inviting) {
@@ -148,6 +170,7 @@ class TempChatController extends GetxController {
     _setupWordChainInviteMoment();
     _startTimer();
     _listenRoom();
+    _listenTypingPresence();
     unawaited(_loadOtherUserRating().catchError((_) {}));
     // Listen typing ?? auto scroll
     currentQuickMessages.assignAll(_introMessages);
@@ -156,6 +179,7 @@ class TempChatController extends GetxController {
     quickPhase.value = QuickMessagePhase.intro;
     currentQuickMessages.assignAll(_introMessages);
     _workers.add(ever<bool>(otherTyping, _onOtherTypingChanged));
+    scrollController.addListener(_onMessageScroll);
   }
 
   List<QuickMessage> _pickRandomIceBreakers({int min = 6, int max = 7}) {
@@ -176,18 +200,18 @@ class TempChatController extends GetxController {
   }
 
   void _onOtherTypingChanged(bool isTyping) {
-    if (!isTyping) return;
+    if (isTyping && _isNearMessageBottom) {
+      _scrollToBottom(duration: const Duration(milliseconds: 180));
+    }
+  }
+
+  void _onMessageScroll() {
     if (!scrollController.hasClients) return;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!scrollController.hasClients) return;
-
-      scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
-    });
+    final position = scrollController.position;
+    _isNearMessageBottom = position.maxScrollExtent - position.pixels <= 120;
+    if (_isNearMessageBottom && newMessagesBelow.value != 0) {
+      newMessagesBelow.value = 0;
+    }
   }
 
   void toggleEmoji() {
@@ -208,10 +232,7 @@ class TempChatController extends GetxController {
   }
 
   void scrollToMessage(String messageId) {
-    final key = messageKeys[messageId];
-    if (key == null) return;
-
-    final context = key.currentContext;
+    final context = messageKeys[messageId]?.currentContext;
     if (context == null) return;
 
     Scrollable.ensureVisible(
@@ -221,13 +242,32 @@ class TempChatController extends GetxController {
       alignment: 0.3,
     );
 
-    highlightedMessageId.value = messageId;
+    final previous = _highlightedMessageId;
+    if (previous != null && previous != messageId) {
+      _messageHighlights[previous]?.value = false;
+    }
+    _highlightedMessageId = messageId;
+    highlightFor(messageId).value = true;
 
     Future.delayed(const Duration(milliseconds: 800), () {
-      if (highlightedMessageId.value == messageId) {
-        highlightedMessageId.value = null;
+      if (_highlightedMessageId == messageId) {
+        highlightFor(messageId).value = false;
+        _highlightedMessageId = null;
       }
     });
+  }
+
+  RxBool highlightFor(String messageId) {
+    return _messageHighlights.putIfAbsent(messageId, () => false.obs);
+  }
+
+  void cleanupMessageState(Set<String> aliveIds) {
+    _messageHighlights.removeWhere((id, _) => !aliveIds.contains(id));
+    messageKeys.removeWhere((id, _) => !aliveIds.contains(id));
+    if (_highlightedMessageId != null &&
+        !aliveIds.contains(_highlightedMessageId)) {
+      _highlightedMessageId = null;
+    }
   }
 
   void startReply(Map<String, dynamic> message) {
@@ -239,7 +279,7 @@ class TempChatController extends GetxController {
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       final expiresAt = _expiresAt;
       if (expiresAt == null) return;
       final remainingMs = expiresAt.difference(DateTime.now()).inMilliseconds;
@@ -247,8 +287,27 @@ class TempChatController extends GetxController {
           remainingMs <= 0 ? 0 : ((remainingMs + 999) ~/ 1000);
 
       final sec = remainingSeconds.value;
+      if (sec <= 10 && sec > 0 && _lastHapticSecond != sec) {
+        _lastHapticSecond = sec;
+        HapticFeedback.lightImpact();
+      }
+      if (sec <= 0) {
+        _timer?.cancel();
+        unawaited(endRoom("timeout").catchError((_) {}));
+        return;
+      }
+
+      // Serialize network work outside the periodic callback. Slow Firestore
+      // calls can no longer overlap subsequent timer ticks.
+      unawaited(_processTimerEvents(sec).catchError((_) {}));
+    });
+  }
+
+  Future<void> _processTimerEvents(int sec) async {
+    if (_processingTimerEvents || !_roomIsActive) return;
+    _processingTimerEvents = true;
+    try {
       if (!_telepathyAccepted) {
-        // 🔥 CHECK CÁC MỐC INVITE
         final crossedMoments =
             _telepathyInviteMoments
                 .where(
@@ -261,34 +320,22 @@ class TempChatController extends GetxController {
         _lastTimerSecond = sec;
         if (crossedMoments.isNotEmpty) {
           _telepathyShownMoments.addAll(crossedMoments);
-
-          final room = await service.getRoom(roomId);
-          final isA = room["userA"] == uid;
-          if (!isA) return;
-
-          final gameStatus = telepathy.status.value;
-          if (gameStatus == TelepathyStatus.idle ||
-              gameStatus == TelepathyStatus.cancelled ||
-              gameStatus == TelepathyStatus.finished) {
-            await telepathy.invite();
+          if (_isUserA == true) {
+            final gameStatus = telepathy.status.value;
+            if (gameStatus == TelepathyStatus.idle ||
+                gameStatus == TelepathyStatus.cancelled ||
+                gameStatus == TelepathyStatus.finished) {
+              await telepathy.invite();
+            }
           }
         }
       }
 
       await _maybeAutoInviteWordChain(sec);
 
-      if (sec <= 10 && sec > 0 && _lastHapticSecond != sec) {
-        _lastHapticSecond = sec;
-        HapticFeedback.lightImpact();
-      }
-
-      if (sec <= 30 && sec > 0 && hasSent30sWarning.value == false) {
+      if (sec <= 30 && sec > 0 && !hasSent30sWarning.value) {
         hasSent30sWarning.value = true;
-
-        final room = await service.getRoom(roomId);
-        final isA = room["userA"] == uid;
-
-        if (isA) {
+        if (_isUserA == true) {
           await service.sendSystemMessage(
             roomId: roomId,
             text: "⏰ Sắp hết giờ! Còn 30 giây",
@@ -297,11 +344,9 @@ class TempChatController extends GetxController {
           );
         }
       }
-      if (sec <= 0) {
-        _timer?.cancel();
-        unawaited(endRoom("timeout").catchError((_) {}));
-      }
-    });
+    } finally {
+      _processingTimerEvents = false;
+    }
   }
 
   void _setupWordChainInviteMoment() {
@@ -343,9 +388,7 @@ class TempChatController extends GetxController {
     if (!canInviteWordChain) return;
     if (!await _isRoomActive()) return;
 
-    final room = await service.getRoom(roomId);
-    final isA = room["userA"] == uid;
-    if (!isA) return;
+    if (_isUserA != true) return;
 
     _wordChainAutoInviteTriggered = true;
     await wordChain.invite();
@@ -361,6 +404,7 @@ class TempChatController extends GetxController {
   Future<void> endRoom(String reason) async {
     if (_isEnding) return;
     _isEnding = true;
+    lifecycle.value = TempChatLifecycle.ending;
 
     _timer?.cancel();
 
@@ -373,6 +417,7 @@ class TempChatController extends GetxController {
       await service.endRoom(roomId: roomId, uid: uid, reason: reason);
     } catch (e) {
       _isEnding = false; // cho retry nếu lỗi network
+      lifecycle.value = TempChatLifecycle.active;
       rethrow;
     }
   }
@@ -381,11 +426,21 @@ class TempChatController extends GetxController {
     _roomSub = service.listenRoom(roomId).listen((doc) async {
       if (!doc.exists) return;
       final data = doc.data() as Map<String, dynamic>;
+      // The parent owns the only room listener. Game controllers consume only
+      // their state slices, avoiding duplicate Firestore subscriptions.
+      telepathy.syncRoomState(data);
+      wordChain.syncRoomState(data);
       _syncServerExpiry(data);
       _roomStatusKnown = true;
       _roomIsActive = data["status"] == "active";
+      lifecycle.value = switch (data["status"]?.toString()) {
+        "ended" => TempChatLifecycle.ended,
+        "converted" => TempChatLifecycle.converted,
+        _ => TempChatLifecycle.active,
+      };
       final typing = data["typing"] ?? {};
       final isA = data["userA"] == uid;
+      _isUserA = isA;
 
       final avatars = Map<String, dynamic>.from(
         data["anonymousAvatars"] ?? const {},
@@ -393,8 +448,10 @@ class TempChatController extends GetxController {
       final otherUid = isA ? data["userB"] : data["userA"];
       otherAnonymousAvatar.value = avatars[otherUid]?.toString();
 
-      otherTyping.value =
-          isA ? typing["userB"] == true : typing["userA"] == true;
+      if (!_hasPeerPresence) {
+        otherTyping.value =
+            isA ? typing["userB"] == true : typing["userA"] == true;
+      }
 
       userLiked.value = isA ? data["userALiked"] : data["userBLiked"];
       final newOtherLiked = isA ? data["userBLiked"] : data["userALiked"];
@@ -410,23 +467,44 @@ class TempChatController extends GetxController {
 
       otherLiked.value = newOtherLiked;
 
+      if (data["status"] == "converted" && data["permanentRoomId"] is String) {
+        if (_hasNavigatedToMatch) return;
+        _hasNavigatedToMatch = true;
+        await _roomSub?.cancel();
+        if (Get.isRegistered<MatchingController>()) {
+          Get.find<MatchingController>().isMatched.value = false;
+        }
+        Get.offNamed(
+          "/chat",
+          arguments: {"roomId": data["permanentRoomId"] as String},
+        );
+        return;
+      }
+
       if (data["status"] == "ended") {
         if (_hasNavigatedToMatch) return;
         if (hasLeft.value == true) return;
         _hasNavigatedToMatch = true;
         await _roomSub?.cancel();
 
-        final matchController = Get.find<MatchingController>();
-        matchController.isMatched.value = false;
+        if (Get.isRegistered<MatchingController>()) {
+          Get.find<MatchingController>().isMatched.value = false;
+        }
         if (hasLeft.value == true) {
           return;
         }
         final myUid = uid;
         final toUid = myUid == data["userA"] ? data["userB"] : data["userA"];
         // 👉 Người ở lại
+        final endedBy = data["endedBy"]?.toString();
+        final endedReason = data["endedReason"]?.toString();
+        final notice =
+            endedReason == "timeout" || endedBy == "system"
+                ? "Cuộc trò chuyện đã kết thúc"
+                : "Người kia đã rời phòng";
         Get.snackbar(
           MatchingChatTranslationKeys.notice.tr,
-          matchingChatTr("Người kia đã rời phòng"),
+          matchingChatTr(notice),
           snackPosition: SnackPosition.TOP,
           duration: const Duration(seconds: 2),
         );
@@ -447,12 +525,14 @@ class TempChatController extends GetxController {
       if (data["userALiked"] == true &&
           data["userBLiked"] == true &&
           data["status"] == "active") {
+        lifecycle.value = TempChatLifecycle.converting;
         if (_hasNavigatedToMatch) return;
         _hasNavigatedToMatch = true;
         await _roomSub?.cancel();
 
-        final matchController = Get.find<MatchingController>();
-        matchController.isMatched.value = false;
+        if (Get.isRegistered<MatchingController>()) {
+          Get.find<MatchingController>().isMatched.value = false;
+        }
 
         final myUid = uid;
         final userA = data["userA"];
@@ -484,10 +564,46 @@ class TempChatController extends GetxController {
     });
   }
 
-  Future<void> send(String text, {String type = "text"}) async {
-    switchToIceBreaker();
+  bool _hasPeerPresence = false;
 
-    if (!_canUseRoomActions) return;
+  void _listenTypingPresence() {
+    _typingSub = service.listenTyping(roomId).listen((snapshot) {
+      QueryDocumentSnapshot<Map<String, dynamic>>? peer;
+      for (final doc in snapshot.docs) {
+        if (doc.id != uid) {
+          peer = doc;
+          break;
+        }
+      }
+      if (peer == null) return; // Keep the legacy room.typing fallback.
+
+      _hasPeerPresence = true;
+      _otherTypingExpiryTimer?.cancel();
+      final data = peer.data();
+      final rawExpiry = data['expiresAt'];
+      final expiry = rawExpiry is Timestamp ? rawExpiry.toDate() : null;
+      final active =
+          data['isTyping'] == true &&
+          expiry != null &&
+          expiry.isAfter(DateTime.now());
+      otherTyping.value = active;
+
+      if (active) {
+        _otherTypingExpiryTimer = Timer(
+          expiry.difference(DateTime.now()),
+          () => otherTyping.value = false,
+        );
+      }
+    });
+  }
+
+  Future<bool> send(String text, {String type = "text"}) async {
+    final normalizedText = text.trim();
+    if (normalizedText.isEmpty || normalizedText.length > 1000) return false;
+    if (isSendingMessage.value || !_canUseRoomActions) return false;
+
+    isSendingMessage.value = true;
+    switchToIceBreaker();
 
     final reply = replyingMessage.value;
 
@@ -498,13 +614,16 @@ class TempChatController extends GetxController {
         roomId,
         TempMessageModel(
           senderId: uid,
-          text: text,
+          text: normalizedText,
           type: type,
           replyToId: reply?["id"],
           replyText: reply?["text"],
         ),
       );
     } on FirebaseException catch (e) {
+      debugPrint(
+        'Temp chat send failed for room $roomId (${e.code}): ${e.message}',
+      );
       if (e.code == 'permission-denied') {
         _justSentMessage.value = false;
         Get.snackbar(
@@ -513,10 +632,29 @@ class TempChatController extends GetxController {
           snackPosition: SnackPosition.TOP,
           duration: const Duration(seconds: 2),
         );
-        return;
+        return false;
       }
       _justSentMessage.value = false;
-      rethrow;
+      Get.snackbar(
+        MatchingChatTranslationKeys.notice.tr,
+        matchingChatTr("Không thể gửi tin nhắn lúc này."),
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+      return false;
+    } catch (error, stackTrace) {
+      debugPrint('Temp chat send failed for room $roomId: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      _justSentMessage.value = false;
+      Get.snackbar(
+        MatchingChatTranslationKeys.notice.tr,
+        matchingChatTr("Không thể gửi tin nhắn lúc này."),
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 2),
+      );
+      return false;
+    } finally {
+      isSendingMessage.value = false;
     }
 
     // 🔥 clear reply SAU KHI GỬI
@@ -528,21 +666,12 @@ class TempChatController extends GetxController {
         showQuickMessages.value = true;
       }
     });
-
-    Future.delayed(const Duration(milliseconds: 120), () {
-      if (!scrollController.hasClients) return;
-
-      scrollController.animateTo(
-        scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeOutCubic,
-      );
-    });
+    return true;
   }
 
   bool get _canUseRoomActions {
-    if (!_roomStatusKnown) return true;
-    return _roomIsActive;
+    return lifecycle.value == TempChatLifecycle.joining ||
+        lifecycle.value == TempChatLifecycle.active;
   }
 
   Future<bool> _isRoomActive() async {
@@ -554,39 +683,38 @@ class TempChatController extends GetxController {
   }
 
   /// Auto scroll khi có tin nhắn mới (giống long_chat)
-  void onNewMessages(
-    int newCount,
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) {
+  void onNewMessages(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
     if (docs.isEmpty) return;
 
-    final hasNewMessage = newCount > _lastMessageCount;
-    _lastMessageCount = newCount;
-
-    if (!hasNewMessage) return;
-
     final newest = docs.last; // Vì orderBy createdAt, tin mới nhất ở cuối
+    final previousMessageId = _lastMessageId;
+    if (newest.id == previousMessageId) return;
+    _lastMessageId = newest.id;
     final isFromMe = newest["senderId"] == uid;
 
-    if (_justSentMessage.value && isFromMe) {
+    if (previousMessageId == null || isFromMe || _isNearMessageBottom) {
       _justSentMessage.value = false;
       _scrollToBottom();
-    } else if (!isFromMe) {
-      _scrollToBottom();
+    } else {
+      newMessagesBelow.value++;
     }
   }
 
-  void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
+  void _scrollToBottom({
+    Duration duration = const Duration(milliseconds: 260),
+  }) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!scrollController.hasClients) return;
-
       scrollController.animateTo(
         scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 260),
+        duration: duration,
         curve: Curves.easeOutCubic,
       );
+      newMessagesBelow.value = 0;
     });
   }
+
+  void scrollToLatestMessages() => _scrollToBottom();
 
   Future<void> like(bool value) async {
     if (userLiked.value != null) return;
@@ -599,11 +727,13 @@ class TempChatController extends GetxController {
   Future<void> leaveByDislike() async {
     if (hasLeft.value) return; // 🔒 chặn double tap
     hasLeft.value = true;
+    lifecycle.value = TempChatLifecycle.ending;
 
     _timer?.cancel();
 
-    final matchController = Get.find<MatchingController>();
-    matchController.isMatched.value = false;
+    if (Get.isRegistered<MatchingController>()) {
+      Get.find<MatchingController>().isMatched.value = false;
+    }
     // 🔹 Lấy snapshot room TRƯỚC khi end
     final room = await service.getRoom(roomId);
     final userA = room["userA"];
@@ -731,10 +861,6 @@ class TempChatController extends GetxController {
     }
   }
 
-  void cleanupMessageKeys(Set<String> aliveIds) {
-    messageKeys.removeWhere((key, _) => !aliveIds.contains(key));
-  }
-
   void markTelepathyAccepted() {
     _telepathyAccepted = true;
   }
@@ -743,11 +869,14 @@ class TempChatController extends GetxController {
   void onClose() {
     _setTypingSafely(false);
     _typingTimer?.cancel();
+    _otherTypingExpiryTimer?.cancel();
     _timer?.cancel();
     _roomSub?.cancel();
+    _typingSub?.cancel();
     for (final worker in _workers) {
       worker.dispose();
     }
+    scrollController.removeListener(_onMessageScroll);
     scrollController.dispose();
     inputController.dispose();
     super.onClose();
