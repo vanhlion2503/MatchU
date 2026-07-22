@@ -10,37 +10,39 @@ class VideoMatchingView extends GetView<VideoMatchingController> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        final currentPhase = controller.phase.value;
-        if (currentPhase == VideoMatchingPhase.searching ||
-            currentPhase == VideoMatchingPhase.preparing ||
-            currentPhase == VideoMatchingPhase.error) {
-          controller.cancelSearch();
-        } else {
-          controller.leaveRoom(findNext: false);
-        }
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Obx(() {
-          switch (controller.phase.value) {
-            case VideoMatchingPhase.preparing:
-            case VideoMatchingPhase.searching:
-              return VideoSearchingStage(controller: controller);
-            case VideoMatchingPhase.connecting:
-            case VideoMatchingPhase.active:
-            case VideoMatchingPhase.ending:
-            case VideoMatchingPhase.converting:
-              return VideoCallStage(controller: controller);
-            case VideoMatchingPhase.ended:
-              return _EndedStage(controller: controller);
-            case VideoMatchingPhase.error:
-              return _ErrorStage(controller: controller);
+    return Obx(
+      () => PopScope(
+        canPop: controller.allowRoutePop.value,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          final currentPhase = controller.phase.value;
+          if (currentPhase == VideoMatchingPhase.searching ||
+              currentPhase == VideoMatchingPhase.preparing ||
+              currentPhase == VideoMatchingPhase.error) {
+            controller.cancelSearch();
+          } else {
+            controller.leaveRoom(findNext: false);
           }
-        }),
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Obx(() {
+            switch (controller.phase.value) {
+              case VideoMatchingPhase.preparing:
+              case VideoMatchingPhase.searching:
+                return VideoSearchingStage(controller: controller);
+              case VideoMatchingPhase.connecting:
+              case VideoMatchingPhase.active:
+              case VideoMatchingPhase.ending:
+              case VideoMatchingPhase.converting:
+                return VideoCallStage(controller: controller);
+              case VideoMatchingPhase.ended:
+                return _EndedStage(controller: controller);
+              case VideoMatchingPhase.error:
+                return _ErrorStage(controller: controller);
+            }
+          }),
+        ),
       ),
     );
   }

@@ -12,6 +12,7 @@ import 'package:matchu_app/controllers/feed/post_share_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/call_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
+import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/controllers/system/app_lifecycle_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/firebase_options.dart';
@@ -118,6 +119,7 @@ void main() async {
   Get.put(CallController(), permanent: true);
   Get.put(AnonymousAvatarController(), permanent: true);
   Get.put(MatchingController(), permanent: true);
+  Get.put(VideoMatchingSessionCoordinator(), permanent: true);
   runApp(const MyApp());
 
   // Notification setup may access the network and request permission. Start it

@@ -10,6 +10,7 @@ const videoMatchingVietnameseTranslations = <String, String>{
   'Camera xem trước chỉ hiển thị trên thiết bị của bạn.':
       'Camera xem trước chỉ hiển thị trên thiết bị của bạn.',
   'Hủy tìm kiếm': 'Hủy tìm kiếm',
+  'Thu nhỏ tìm kiếm': 'Thu nhỏ tìm kiếm',
   'Bạn': 'Bạn',
   'Người lạ': 'Người lạ',
   'Đang kết nối âm thanh...': 'Đang kết nối âm thanh...',
@@ -60,6 +61,7 @@ const videoMatchingEnglishTranslations = <String, String>{
   'Camera xem trước chỉ hiển thị trên thiết bị của bạn.':
       'This camera preview is only visible on your device.',
   'Hủy tìm kiếm': 'Cancel search',
+  'Thu nhỏ tìm kiếm': 'Minimize search',
   'Bạn': 'You',
   'Người lạ': 'Stranger',
   'Đang kết nối âm thanh...': 'Connecting audio...',

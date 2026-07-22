@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/models/matching/matching_mode.dart';
 import 'package:matchu_app/models/queue_user_model.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
@@ -40,5 +41,27 @@ void main() {
     });
 
     expect(user.matchingMode, MatchingMode.chat);
+  });
+
+  test('minimized video matching session can be restored without ending', () {
+    final coordinator = VideoMatchingSessionCoordinator();
+    var restored = false;
+
+    coordinator.begin(onRestore: () => restored = true);
+    coordinator.updateElapsed(12);
+
+    expect(coordinator.minimize(), isTrue);
+    expect(coordinator.isActive.value, isTrue);
+    expect(coordinator.isMinimized.value, isTrue);
+    expect(coordinator.elapsedSeconds.value, 12);
+
+    coordinator.restore();
+
+    expect(restored, isTrue);
+    expect(coordinator.isActive.value, isTrue);
+    expect(coordinator.isMinimized.value, isFalse);
+
+    coordinator.finish();
+    expect(coordinator.isActive.value, isFalse);
   });
 }

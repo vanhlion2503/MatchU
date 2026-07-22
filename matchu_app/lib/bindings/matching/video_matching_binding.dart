@@ -15,13 +15,20 @@ class VideoMatchingBinding extends Bindings {
       );
     }
 
-    Get.lazyPut<VideoMatchingRepository>(() => VideoMatchingService());
-    Get.lazyPut<VideoMatchingController>(
-      () => VideoMatchingController(
+    // A minimized matching session outlives its route. Reopening the route must
+    // reuse the same controller instead of creating a second queue session.
+    if (Get.isRegistered<VideoMatchingController>()) return;
+
+    if (!Get.isRegistered<VideoMatchingRepository>()) {
+      Get.lazyPut<VideoMatchingRepository>(() => VideoMatchingService());
+    }
+    Get.put<VideoMatchingController>(
+      VideoMatchingController(
         targetGender: arguments['targetGender'] as String,
         anonymousAvatar: arguments['anonymousAvatar'] as String,
         repository: Get.find<VideoMatchingRepository>(),
       ),
+      permanent: true,
     );
   }
 }

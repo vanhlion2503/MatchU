@@ -8,6 +8,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
+import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
@@ -78,6 +79,7 @@ class _RandomChatViewState extends State<RandomChatView>
   Timer? _onlineCountTimer;
 
   final controller = Get.find<MatchingController>();
+  final videoMatchingSession = Get.find<VideoMatchingSessionCoordinator>();
   final anonAvatarC = Get.find<AnonymousAvatarController>();
   final _matchingService = MatchingService();
   final _box = GetStorage();
@@ -342,6 +344,13 @@ class _RandomChatViewState extends State<RandomChatView>
   Future<void> _onStartPressed() async {
     if (_isStarting || _isLoadingQuota) return;
 
+    // A minimized video search is still active; restore it instead of creating
+    // another queue session from the matching selector.
+    if (videoMatchingSession.isActive.value) {
+      videoMatchingSession.restore();
+      return;
+    }
+
     if (_isOutOfQuota) {
       await _showOutOfQuotaDialog();
       return;
@@ -473,7 +482,7 @@ class _RandomChatViewState extends State<RandomChatView>
             final isNarrowWidth = constraints.maxWidth < 360;
             final horizontalPadding = isNarrowWidth ? 16.0 : 24.0;
             final topPadding = isCompactHeight ? 12.0 : 20.0;
-            final sectionGap = isCompactHeight ? 12.0 : 18.0;
+            final sectionGap = isCompactHeight ? 16.0 : 20.0;
             final buttonHeight = isCompactHeight ? 54.0 : 60.0;
             final titleFontSize =
                 isNarrowWidth

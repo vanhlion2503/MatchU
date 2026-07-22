@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
+import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
@@ -42,6 +43,7 @@ class VideoMatchingController extends GetxController {
   final IceServerService _iceServerService;
 
   final phase = VideoMatchingPhase.preparing.obs;
+  final allowRoutePop = false.obs;
   final previewReady = false.obs;
   final canCancel = false.obs;
   final searchElapsedSeconds = 0.obs;
@@ -63,6 +65,11 @@ class VideoMatchingController extends GetxController {
 
   String get formattedSearchTime => _formatDuration(searchElapsedSeconds.value);
   String get formattedRoomTime => _formatDuration(roomRemainingSeconds.value);
+
+  VideoMatchingSessionCoordinator? get _sessionCoordinator {
+    if (!Get.isRegistered<VideoMatchingSessionCoordinator>()) return null;
+    return Get.find<VideoMatchingSessionCoordinator>();
+  }
 
   String? _sessionId;
   String? _roomId;
@@ -124,6 +131,7 @@ class VideoMatchingController extends GetxController {
     await _cancelRoomSubscriptions();
     await _webRTC.resetConnection();
     _resetForSearch();
+    _sessionCoordinator?.begin(onRestore: restoreMinimizedSearch);
 
     try {
       phase.value = VideoMatchingPhase.preparing;
@@ -201,7 +209,9 @@ class VideoMatchingController extends GetxController {
 
     _exitInProgress = false;
     if (closeRoute && !_disposed) {
-      _closeMatchingRoute();
+      _sessionCoordinator?.finish();
+      await _closeMatchingRoute();
+      _scheduleControllerRelease();
       return;
     }
     await _webRTC.resetConnection();
@@ -217,8 +227,13 @@ class VideoMatchingController extends GetxController {
     }
   }
 
-  void _closeMatchingRoute() {
+  Future<void> _closeMatchingRoute() async {
     if (Get.currentRoute != AppRouter.videoMatching) return;
+
+    allowRoutePop.value = true;
+    // Wait until PopScope receives canPop=true before issuing the controlled
+    // pop; otherwise it would interpret Home as a destructive back action.
+    await WidgetsBinding.instance.endOfFrame;
 
     // A matching route opened after Rating is the root route because Rating
     // uses offAllNamed. In that case Get.back() cannot pop anything and leaves
@@ -229,10 +244,57 @@ class VideoMatchingController extends GetxController {
     } else {
       Get.offAllNamed(AppRouter.main);
     }
+    await Future<void>.delayed(Duration.zero);
+    allowRoutePop.value = false;
+  }
+
+  Future<void> minimizeSearch() async {
+    if (_disposed || _exitInProgress) return;
+    if (phase.value != VideoMatchingPhase.preparing &&
+        phase.value != VideoMatchingPhase.searching) {
+      return;
+    }
+    if (_sessionCoordinator?.minimize() != true) return;
+    await _closeMatchingRoute();
+  }
+
+  void restoreMinimizedSearch() {
+    if (_disposed) return;
+    _sessionCoordinator?.markVisible();
+    if (Get.currentRoute == AppRouter.videoMatching) return;
+    Future<void>.microtask(() {
+      if (_disposed || Get.currentRoute == AppRouter.videoMatching) return;
+      Get.toNamed(
+        AppRouter.videoMatching,
+        arguments: {
+          'targetGender': targetGender,
+          'anonymousAvatar': anonymousAvatar,
+        },
+      );
+    });
+  }
+
+  void _restoreRouteIfMinimized() {
+    final coordinator = _sessionCoordinator;
+    if (coordinator?.isMinimized.value != true) return;
+    restoreMinimizedSearch();
+  }
+
+  void _scheduleControllerRelease() {
+    _sessionCoordinator?.finish();
+    Future<void>.delayed(const Duration(milliseconds: 300), () async {
+      if (!Get.isRegistered<VideoMatchingController>()) return;
+      final registered = Get.find<VideoMatchingController>();
+      if (identical(registered, this)) {
+        await Get.delete<VideoMatchingController>(force: true);
+      }
+    });
   }
 
   Future<void> _openRoom(String roomId) async {
     if (_handlingRoom || _disposed) return;
+    _restoreRouteIfMinimized();
+    _sessionCoordinator?.finish();
     _handlingRoom = true;
     _roomId = roomId;
     _sessionId = null;
@@ -736,6 +798,7 @@ class VideoMatchingController extends GetxController {
         otherAvatar: peerAvatar,
       ),
     );
+    _scheduleControllerRelease();
   }
 
   Future<void> _goToPermanentRoom(String permanentRoomId) async {
@@ -747,6 +810,7 @@ class VideoMatchingController extends GetxController {
     await _webRTC.resetConnection();
     if (!_disposed) {
       Get.offNamed('/chat', arguments: {'roomId': permanentRoomId});
+      _scheduleControllerRelease();
     }
   }
 
@@ -780,6 +844,7 @@ class VideoMatchingController extends GetxController {
         await startSearch();
       } else {
         Get.offAllNamed(AppRouter.main);
+        _scheduleControllerRelease();
       }
       return;
     }
@@ -799,6 +864,7 @@ class VideoMatchingController extends GetxController {
           },
       },
     );
+    _scheduleControllerRelease();
   }
 
   Future<void> retry() async {
@@ -811,7 +877,10 @@ class VideoMatchingController extends GetxController {
   Future<void> closeError() async {
     await _cancelAllSubscriptions();
     await _webRTC.resetConnection();
-    if (!_disposed) _closeMatchingRoute();
+    if (!_disposed) {
+      await _closeMatchingRoute();
+      _scheduleControllerRelease();
+    }
   }
 
   Future<void> _showConnectionError() async {
@@ -820,6 +889,8 @@ class VideoMatchingController extends GetxController {
 
   Future<void> _fail(Object error) async {
     if (_disposed || _navigatingToChat || _navigatingToRating) return;
+    _restoreRouteIfMinimized();
+    _sessionCoordinator?.finish();
     debugPrint('Anonymous video matching error: $error');
     errorMessage.value = videoMatchingTr(
       'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.',
@@ -899,6 +970,7 @@ class VideoMatchingController extends GetxController {
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (phase.value == VideoMatchingPhase.searching) {
         searchElapsedSeconds.value++;
+        _sessionCoordinator?.updateElapsed(searchElapsedSeconds.value);
       } else if (_roomId != null) {
         _syncRoomClock();
       }
@@ -971,6 +1043,7 @@ class VideoMatchingController extends GetxController {
   @override
   void onClose() {
     _disposed = true;
+    _sessionCoordinator?.finish();
     _stopClock();
     _disconnectTimer?.cancel();
     _connectivitySub?.cancel();

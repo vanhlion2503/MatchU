@@ -81,6 +81,15 @@ class _VideoSearchingStageState extends State<VideoSearchingStage>
               ),
             ),
           ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10, right: 14),
+                child: _HomeActionButton(onTap: controller.minimizeSearch),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -775,6 +784,35 @@ class _CancelSearchButton extends StatelessWidget {
             'Hủy tìm kiếm',
             maxLines: 1,
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeActionButton extends StatelessWidget {
+  const _HomeActionButton({required this.onTap});
+
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Thu nhỏ tìm kiếm'.tr,
+      child: Material(
+        color: const Color(0xFF071521).withValues(alpha: 0.42),
+        shape: CircleBorder(
+          side: BorderSide(
+            color: AppTheme.secondaryColor.withValues(alpha: 0.32),
+          ),
+        ),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () => onTap(),
+          child: const SizedBox.square(
+            dimension: 44,
+            child: Icon(Iconsax.home_2, color: Colors.white, size: 21),
           ),
         ),
       ),
