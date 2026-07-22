@@ -14,6 +14,8 @@ import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
+import 'package:matchu_app/widgets/chat_rating_safety_notice.dart';
+import 'package:matchu_app/translations/chat_safety_translations.dart';
 
 class TempChatView extends StatefulWidget {
   const TempChatView({super.key});
@@ -116,6 +118,7 @@ class _TempChatViewState extends State<TempChatView> {
         title: Obx(() {
           final rating = controller.otherAvgRating.value;
           final ratingCount = controller.otherRatingCount.value;
+          final peerSummary = controller.otherPeerSummary.value;
 
           return Row(
             children: [
@@ -235,6 +238,25 @@ class _TempChatViewState extends State<TempChatView> {
                           ],
                         ],
                       ),
+                    ] else if (peerSummary != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person_outline_rounded,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            ChatSafetyTranslationKeys.newcomer.tr,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ],
                 ),
@@ -290,6 +312,16 @@ class _TempChatViewState extends State<TempChatView> {
                 padding: const EdgeInsets.all(8),
                 child: Column(
                   children: [
+                    Obx(() {
+                      final summary = controller.otherPeerSummary.value;
+                      if (summary?.shouldShowSafetyCaution != true) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ChatRatingSafetyNotice(summary: summary),
+                      );
+                    }),
                     TelepathyPinnedBanner(controller: controller),
                     Expanded(child: MessagesList(roomId, controller)),
                     BottomActionBar(controller),

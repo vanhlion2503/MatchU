@@ -7,6 +7,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
@@ -61,6 +62,7 @@ class VideoMatchingController extends GetxController {
   final otherLiked = false.obs;
   final otherAnonymousAvatar = 'avt_01'.obs;
   final otherAvgRating = RxnDouble();
+  final otherPeerSummary = Rxn<ChatPeerSummary>();
   final errorMessage = RxnString();
 
   RTCVideoRenderer get localRenderer => _webRTC.localRenderer;
@@ -418,9 +420,11 @@ class VideoMatchingController extends GetxController {
 
   Future<void> _loadOtherRating(String peerUid) async {
     try {
-      final rating = await _repository.getAverageChatRating(peerUid);
+      final summary = await _repository.getPeerSummary(peerUid);
       if (!_disposed && _otherUid == peerUid) {
-        otherAvgRating.value = rating.clamp(0, 5).toDouble();
+        otherPeerSummary.value = summary;
+        otherAvgRating.value =
+            summary?.hasRatings == true ? summary!.averageRating : null;
       }
     } catch (error) {
       // Rating is supporting information and must not interrupt a video call.
@@ -1081,6 +1085,7 @@ class VideoMatchingController extends GetxController {
     otherLiked.value = false;
     otherAnonymousAvatar.value = 'avt_01';
     otherAvgRating.value = null;
+    otherPeerSummary.value = null;
     _ratingLoadedForUid = null;
     errorMessage.value = null;
     _handlingRoom = false;

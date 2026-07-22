@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/services/chat/call_signaling_service.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
@@ -62,9 +63,10 @@ class VideoMatchingService implements VideoMatchingRepository {
   }
 
   @override
-  Future<double> getAverageChatRating(String uid) async {
+  Future<ChatPeerSummary?> getPeerSummary(String uid) async {
     final snapshot = await _firestore.collection('users').doc(uid).get();
-    return (snapshot.data()?['avgChatRating'] as num?)?.toDouble() ?? 5.0;
+    final data = snapshot.data();
+    return data == null ? null : ChatPeerSummary.fromMap(data);
   }
 
   @override

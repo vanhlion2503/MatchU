@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
 
 /// Data boundary for anonymous video matching and its WebRTC signaling.
 abstract class VideoMatchingRepository {
@@ -17,7 +18,7 @@ abstract class VideoMatchingRepository {
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenRoom(String roomId);
 
-  Future<double> getAverageChatRating(String uid);
+  Future<ChatPeerSummary?> getPeerSummary(String uid);
 
   Future<void> setLike({required String roomId, required String uid});
 

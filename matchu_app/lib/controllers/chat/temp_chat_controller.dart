@@ -6,6 +6,7 @@ import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart'
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/quick_message.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
@@ -49,6 +50,7 @@ class TempChatController extends GetxController {
   final hasLeft = false.obs;
   final hasSent30sWarning = false.obs;
   final otherAvgRating = RxnDouble();
+  final otherPeerSummary = Rxn<ChatPeerSummary>();
   final replyingMessage = Rxn<Map<String, dynamic>>();
   final scrollController = ScrollController();
   final Map<String, GlobalKey> messageKeys = {};
@@ -860,23 +862,18 @@ class TempChatController extends GetxController {
   Future<void> _loadOtherUserRating() async {
     final room = await service.getRoom(roomId);
     final isA = room["userA"] == uid;
-    final otherUid = isA ? room["userB"] : room["userA"];
+    final otherUid = (isA ? room["userB"] : room["userA"])?.toString();
+    if (otherUid == null || otherUid.isEmpty) return;
 
-    final userSnap =
-        await FirebaseFirestore.instance
-            .collection("users")
-            .doc(otherUid)
-            .get();
+    final summary = await service.getPeerSummary(otherUid);
+    if (summary == null) return;
 
-    if (!userSnap.exists) return;
-    final data = userSnap.data()!;
-
-    otherAvgRating.value = (data["avgChatRating"] ?? 5.0).toDouble();
-
-    otherRatingCount.value = (data["totalChatRatings"] ?? 0) as int;
-
-    otherGender.value = data["gender"];
-    otherIsFaceVerified.value = data["isFaceVerified"] == true;
+    otherPeerSummary.value = summary;
+    // Do not present an artificial 5.0 score when the user has no ratings.
+    otherAvgRating.value = summary.hasRatings ? summary.averageRating : null;
+    otherRatingCount.value = summary.totalRatings;
+    otherGender.value = summary.gender;
+    otherIsFaceVerified.value = summary.isFaceVerified;
   }
 
   void _syncServerExpiry(Map<String, dynamic> room) {

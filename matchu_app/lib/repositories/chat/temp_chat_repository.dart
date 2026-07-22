@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 
 /// Data contract for a temporary chat session.
 abstract class TempChatRepository {
   Future<Map<String, dynamic>> getRoom(String roomId);
+  Future<ChatPeerSummary?> getPeerSummary(String uid);
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenRoom(String roomId);
   Stream<QuerySnapshot<Map<String, dynamic>>> listenMessages(String roomId);
   Stream<QuerySnapshot<Map<String, dynamic>>> listenTyping(String roomId);

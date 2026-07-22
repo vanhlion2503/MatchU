@@ -6,8 +6,11 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/matching/video_matching_controller.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
+import 'package:matchu_app/translations/chat_safety_translations.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
+import 'package:matchu_app/widgets/chat_rating_safety_notice.dart';
 
 enum _ExitChoice { stay, leave }
 
@@ -300,6 +303,7 @@ class _VideoCanvas extends StatelessWidget {
                 renderer: controller.remoteRenderer,
                 label: 'Người lạ'.tr,
                 rating: controller.otherAvgRating.value,
+                peerSummary: controller.otherPeerSummary.value,
                 labelAtTop: true,
                 avatarAsset:
                     'assets/anonymous/${controller.otherAnonymousAvatar.value}.png',
@@ -510,6 +514,7 @@ class _VideoTile extends StatelessWidget {
     required this.muted,
     required this.voiceLevel,
     this.rating,
+    this.peerSummary,
     this.labelAtTop = false,
   });
 
@@ -524,6 +529,7 @@ class _VideoTile extends StatelessWidget {
   final bool muted;
   final double voiceLevel;
   final double? rating;
+  final ChatPeerSummary? peerSummary;
   final bool labelAtTop;
 
   @override
@@ -596,7 +602,7 @@ class _VideoTile extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (labelAtTop) ...[
+                    if (labelAtTop && rating != null) ...[
                       const SizedBox(width: 7),
                       const Icon(
                         Icons.star_rounded,
@@ -605,11 +611,27 @@ class _VideoTile extends StatelessWidget {
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        rating?.toStringAsFixed(1) ?? '—',
+                        rating!.toStringAsFixed(1),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ] else if (labelAtTop && peerSummary != null) ...[
+                      const SizedBox(width: 7),
+                      const Icon(
+                        Icons.person_outline_rounded,
+                        color: Colors.white70,
+                        size: 15,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        ChatSafetyTranslationKeys.newcomer.tr,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -625,6 +647,15 @@ class _VideoTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (labelAtTop && peerSummary?.shouldShowSafetyCaution == true)
+              Positioned(
+                left: 14,
+                top: 49,
+                child: ChatRatingSafetyNotice(
+                  summary: peerSummary,
+                  compact: true,
+                ),
+              ),
           ],
         );
       },

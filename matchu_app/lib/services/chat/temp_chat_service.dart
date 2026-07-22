@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/repositories/chat/temp_chat_repository.dart';
 
@@ -37,6 +38,13 @@ class TempChatService implements TempChatRepository {
     final data = snapshot.data();
     if (data == null) throw StateError('Temp room not found: $roomId');
     return data;
+  }
+
+  @override
+  Future<ChatPeerSummary?> getPeerSummary(String uid) async {
+    final snapshot = await _db.collection('users').doc(uid).get();
+    final data = snapshot.data();
+    return data == null ? null : ChatPeerSummary.fromMap(data);
   }
 
   @override
