@@ -500,13 +500,11 @@ class _RandomChatViewState extends State<RandomChatView>
                         subtitleFontSize: subtitleFontSize,
                       ),
                       SizedBox(height: isCompactHeight ? 10 : 14),
-                      _buildExperienceSelector(theme, compact: isCompactHeight),
-                      SizedBox(height: isCompactHeight ? 8 : 12),
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, middleConstraints) {
                             final middleHeight = middleConstraints.maxHeight;
-                            if (middleHeight < 240) {
+                            if (middleHeight < 306) {
                               return SingleChildScrollView(
                                 physics: const ClampingScrollPhysics(),
                                 child: ConstrainedBox(
@@ -523,42 +521,38 @@ class _RandomChatViewState extends State<RandomChatView>
 
                             final middleGap =
                                 middleHeight < 340 ? 10.0 : sectionGap;
-                            final targetHeight =
-                                (middleHeight * (isCompactHeight ? 0.34 : 0.3))
-                                    .clamp(108.0, 132.0)
-                                    .toDouble();
-                            final avatarAreaHeight =
-                                (middleHeight - targetHeight - middleGap)
-                                    .clamp(120.0, middleHeight)
-                                    .toDouble();
-                            final rippleSize =
-                                avatarAreaHeight.clamp(120.0, 250.0).toDouble();
-                            final avatarRadius =
-                                (rippleSize * 0.38)
-                                    .clamp(38.0, 56.0)
-                                    .toDouble();
                             final compactMiddle =
-                                isCompactHeight || middleHeight < 420;
+                                isCompactHeight || middleHeight < 460;
 
                             return Column(
                               children: [
-                                SizedBox(
-                                  height: avatarAreaHeight,
-                                  child: Center(
-                                    child: _buildAvatarStage(
-                                      theme,
-                                      rippleSize: rippleSize,
-                                      avatarRadius: avatarRadius,
-                                      compact: compactMiddle,
-                                    ),
+                                Expanded(
+                                  child: LayoutBuilder(
+                                    builder: (context, avatarConstraints) {
+                                      final rippleSize =
+                                          avatarConstraints.maxHeight
+                                              .clamp(0.0, 250.0)
+                                              .toDouble();
+                                      final avatarRadius =
+                                          (rippleSize * 0.38)
+                                              .clamp(24.0, 56.0)
+                                              .toDouble();
+
+                                      return Center(
+                                        child: _buildAvatarStage(
+                                          theme,
+                                          rippleSize: rippleSize,
+                                          avatarRadius: avatarRadius,
+                                          compact: compactMiddle,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ),
-                                SizedBox(
-                                  height: targetHeight,
-                                  child: _buildTargetSection(
-                                    theme,
-                                    compact: compactMiddle,
-                                  ),
+                                SizedBox(height: middleGap),
+                                _buildTargetSection(
+                                  theme,
+                                  compact: compactMiddle,
                                 ),
                               ],
                             );
@@ -616,18 +610,20 @@ class _RandomChatViewState extends State<RandomChatView>
   }
 
   Widget _buildExperienceSelector(ThemeData theme, {required bool compact}) {
-    final scheme = theme.colorScheme;
+    final color = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
+    final segmentPadding = compact ? 4.0 : 6.0;
 
     return Container(
-      height: compact ? 46 : 52,
-      padding: const EdgeInsets.all(4),
+      width: double.infinity,
+      height: compact ? 46 : 60,
+      padding: EdgeInsets.all(segmentPadding),
       decoration: BoxDecoration(
         color:
             isLight
-                ? const Color(0xFFF1F4F7)
-                : scheme.surfaceContainerHighest.withValues(alpha: 0.64),
-        borderRadius: BorderRadius.circular(17),
+                ? const Color(0xFFF1F4F7).withValues(alpha: 0.9)
+                : color.surface.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
@@ -635,17 +631,17 @@ class _RandomChatViewState extends State<RandomChatView>
             child: _experienceChip(
               theme,
               experience: _MatchingExperience.chat,
-              icon: Iconsax.message,
               label: 'Trò chuyện',
+              compact: compact,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Expanded(
             child: _experienceChip(
               theme,
               experience: _MatchingExperience.video,
-              icon: Iconsax.video,
               label: 'Video call',
+              compact: compact,
             ),
           ),
         ],
@@ -656,16 +652,18 @@ class _RandomChatViewState extends State<RandomChatView>
   Widget _experienceChip(
     ThemeData theme, {
     required _MatchingExperience experience,
-    required IconData icon,
     required String label,
+    required bool compact,
   }) {
     final selected = _selectedExperience == experience;
-    final scheme = theme.colorScheme;
+    final color = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
+    final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle();
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(14),
         onTap:
             selected
                 ? null
@@ -673,37 +671,31 @@ class _RandomChatViewState extends State<RandomChatView>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(vertical: compact ? 8 : 12),
           decoration: BoxDecoration(
-            color: selected ? scheme.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(13),
-            boxShadow:
+            color:
                 selected
-                    ? [
-                      BoxShadow(
-                        color: scheme.primary.withValues(alpha: 0.22),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                    : null,
+                    ? (isLight
+                        ? const Color(0xFF2A2F36).withValues(alpha: 0.8)
+                        : Colors.white.withValues(alpha: 0.2))
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            style: baseStyle.copyWith(
+              fontSize: compact ? 14 : 16,
+              fontWeight: FontWeight.w600,
+              color:
+                  selected
+                      ? Colors.white
+                      : (isLight
+                          ? const Color(0xFF2A2F36).withValues(alpha: 0.7)
+                          : color.onSurface.withValues(alpha: 0.7)),
+            ),
+            child: Text(label, textAlign: TextAlign.center, maxLines: 1),
           ),
         ),
       ),
@@ -823,7 +815,8 @@ class _RandomChatViewState extends State<RandomChatView>
     final color = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
     final outerPadding = compact ? 1.0 : 6.0;
-    final contentGap = compact ? 10.0 : 16.0;
+    final contentGap = compact ? 8.0 : 12.0;
+    final groupGap = compact ? 14.0 : 18.0;
     final segmentPadding = compact ? 4.0 : 6.0;
 
     return Container(
@@ -833,6 +826,15 @@ class _RandomChatViewState extends State<RandomChatView>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          Text(
+            'Loại hình...',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: contentGap),
+          _buildExperienceSelector(theme, compact: compact),
+          SizedBox(height: groupGap),
           Text(
             'Muốn tìm...',
             style: theme.textTheme.bodyLarge?.copyWith(

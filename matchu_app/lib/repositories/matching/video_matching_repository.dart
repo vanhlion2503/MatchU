@@ -19,6 +19,12 @@ abstract class VideoMatchingRepository {
 
   Future<void> setLike({required String roomId, required String uid});
 
+  Future<void> autoRateSuccessfulMatch({
+    required String roomId,
+    required String fromUid,
+    required String toUid,
+  });
+
   Future<void> setCameraEnabled({
     required String roomId,
     required String uid,

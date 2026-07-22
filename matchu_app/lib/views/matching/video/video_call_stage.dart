@@ -17,29 +17,80 @@ class VideoCallStage extends StatelessWidget {
     final choice = await showDialog<_ExitChoice>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Rời phòng video?'),
-          content: const Text(
-            'Bạn muốn tìm người mới hay kết thúc phiên làm quen?',
+        final theme = Theme.of(dialogContext);
+        final buttonStyle = ButtonStyle(
+          minimumSize: WidgetStateProperty.all(const Size(0, 44)),
+          padding: WidgetStateProperty.all(
+            const EdgeInsets.symmetric(horizontal: 4),
           ),
-          actions: [
-            TextButton(
-              onPressed:
-                  () => Navigator.of(dialogContext).pop(_ExitChoice.stay),
-              child: const Text('Ở lại'),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        );
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Rời phòng video?',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Bạn muốn tìm người mới hay kết thúc phiên làm quen?',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: buttonStyle,
+                          onPressed:
+                              () => Navigator.of(
+                                dialogContext,
+                              ).pop(_ExitChoice.stay),
+                          child: const _ExitActionLabel('Ở lại'),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: TextButton(
+                          style: buttonStyle,
+                          onPressed:
+                              () => Navigator.of(
+                                dialogContext,
+                              ).pop(_ExitChoice.leave),
+                          child: const _ExitActionLabel('Thoát'),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: FilledButton(
+                          style: buttonStyle,
+                          onPressed:
+                              () => Navigator.of(
+                                dialogContext,
+                              ).pop(_ExitChoice.next),
+                          child: const _ExitActionLabel('Tìm người mới'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            TextButton(
-              onPressed:
-                  () => Navigator.of(dialogContext).pop(_ExitChoice.leave),
-              child: const Text('Thoát'),
-            ),
-            FilledButton.icon(
-              onPressed:
-                  () => Navigator.of(dialogContext).pop(_ExitChoice.next),
-              icon: const Icon(Iconsax.refresh, size: 18),
-              label: const Text('Tìm người mới'),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -201,8 +252,11 @@ class VideoCallStage extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 10,
+                        runSpacing: 8,
                         children: [
                           _CompactAction(
                             icon: Iconsax.refresh,
@@ -213,7 +267,6 @@ class VideoCallStage extends StatelessWidget {
                                     : () =>
                                         controller.leaveRoom(findNext: true),
                           ),
-                          const SizedBox(width: 10),
                           if (controller.otherLiked.value)
                             const _PeerLikedBadge(),
                         ],
@@ -247,6 +300,24 @@ class VideoCallStage extends StatelessWidget {
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
     final remainder = (seconds % 60).toString().padLeft(2, '0');
     return videoMatchingTr('Có thể mở camera sau $minutes:$remainder');
+  }
+}
+
+class _ExitActionLabel extends StatelessWidget {
+  const _ExitActionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        label,
+        maxLines: 1,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    );
   }
 }
 
@@ -552,26 +623,35 @@ class _PeerLikedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: const Color(0xFFBE185D).withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Iconsax.heart5, color: Colors.white, size: 16),
-          SizedBox(width: 6),
-          Text(
-            'Đối phương đã thích bạn',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+    final maxWidth =
+        (MediaQuery.sizeOf(context).width * 0.82).clamp(0.0, 280.0).toDouble();
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFFBE185D).withValues(alpha: 0.84),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Iconsax.heart5, color: Colors.white, size: 16),
+            SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                'Đối phương đã thích bạn',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

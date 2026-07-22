@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/services/chat/call_signaling_service.dart';
+import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
 
 class VideoMatchingService implements VideoMatchingRepository {
@@ -63,6 +64,19 @@ class VideoMatchingService implements VideoMatchingRepository {
   @override
   Future<void> setLike({required String roomId, required String uid}) {
     return _tempChatService.setLike(roomId: roomId, uid: uid, value: true);
+  }
+
+  @override
+  Future<void> autoRateSuccessfulMatch({
+    required String roomId,
+    required String fromUid,
+    required String toUid,
+  }) {
+    return RatingService.autoRate(
+      roomId: roomId,
+      fromUid: fromUid,
+      toUid: toUid,
+    );
   }
 
   @override

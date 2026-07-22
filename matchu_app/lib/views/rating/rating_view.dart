@@ -18,8 +18,8 @@ class RatingView extends StatelessWidget {
     final theme = Theme.of(context);
     final colorTheme = theme.colorScheme;
     const double appBarCircleSize = 45;
-    return WillPopScope(
-      onWillPop: () async => false,
+    return PopScope(
+      canPop: false,
       child: Scaffold(
         appBar: AppBar(
           centerTitle: true,
@@ -142,7 +142,9 @@ class RatingView extends StatelessWidget {
               const SizedBox(height: 14),
 
               Text(
-                "Cuộc trò chuyện đã kết thúc.\nBạn cảm thấy trải nghiệm thế nào?",
+                controller.isVideoCall
+                    ? "Cuộc gọi video đã kết thúc.\nBạn cảm thấy trải nghiệm thế nào?"
+                    : "Cuộc trò chuyện đã kết thúc.\nBạn cảm thấy trải nghiệm thế nào?",
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium,
               ),
@@ -181,7 +183,7 @@ class RatingView extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Color(0xFFFFC107).withOpacity(0.12),
+                          color: Color(0xFFFFC107).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(

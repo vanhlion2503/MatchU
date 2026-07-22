@@ -45,6 +45,7 @@ const randomChatEnglishTranslations = <String, String>{
   'Đang bắt đầu...': 'Starting...',
   'Đang tải lượt...': 'Loading turns...',
   'Bắt đầu tìm kiếm': 'Start searching',
+  'Loại hình...': 'Experience...',
   'Vui lòng chọn avatar trước khi bắt đầu':
       'Choose an avatar before you start.',
   'Thiết lập mã PIN': 'Set up a PIN',

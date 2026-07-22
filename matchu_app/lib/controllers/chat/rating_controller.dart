@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/models/chat_rating_model.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
 
@@ -10,6 +11,9 @@ class RatingController extends GetxController {
   late final String roomId;
   late final String myUid;
   late final String toUid;
+  late final bool isVideoCall;
+  String? _nextRoute;
+  Map<String, dynamic>? _nextRouteArguments;
 
   final RxnString otherAnonymousAvatar = RxnString();
   final RxnString otherGender = RxnString();
@@ -22,11 +26,17 @@ class RatingController extends GetxController {
   void onInit() {
     super.onInit();
 
-    final args = Get.arguments as Map<String, dynamic>;
+    final args = Map<String, dynamic>.from(Get.arguments as Map);
 
     roomId = args["roomId"];
     toUid = args["toUid"];
     myUid = Get.find<AuthController>().user!.uid;
+    isVideoCall = args['experience'] == 'video';
+    _nextRoute = args['nextRoute']?.toString();
+    final nextArguments = args['nextRouteArguments'];
+    if (nextArguments is Map) {
+      _nextRouteArguments = Map<String, dynamic>.from(nextArguments);
+    }
 
     otherAnonymousAvatar.value = args["anonymousAvatar"];
     otherGender.value = args["gender"];
@@ -55,7 +65,7 @@ class RatingController extends GetxController {
         ),
       );
 
-      Get.offAllNamed("/main");
+      _finishRating();
     } finally {
       isSubmitting.value = false;
     }
@@ -77,9 +87,18 @@ class RatingController extends GetxController {
         ),
       );
 
-      Get.offAllNamed("/main");
+      _finishRating();
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  void _finishRating() {
+    final nextRoute = _nextRoute;
+    if (nextRoute != null && nextRoute.isNotEmpty) {
+      Get.offAllNamed(nextRoute, arguments: _nextRouteArguments);
+      return;
+    }
+    Get.offAllNamed(AppRouter.main);
   }
 }

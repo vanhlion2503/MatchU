@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
+import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
 import 'package:matchu_app/services/chat/webrtc_service.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
@@ -66,6 +66,7 @@ class VideoMatchingController extends GetxController {
 
   String? _sessionId;
   String? _roomId;
+  String? _otherUid;
   String? _callId;
   DateTime? _expiresAt;
   DateTime? _cameraUnlockAt;
@@ -88,6 +89,7 @@ class VideoMatchingController extends GetxController {
   bool _handlingRoom = false;
   bool _exitInProgress = false;
   bool _navigatingToChat = false;
+  bool _navigatingToRating = false;
   bool _disposed = false;
   String? _lastOfferSdp;
   String? _lastAnswerSdp;
@@ -189,19 +191,38 @@ class VideoMatchingController extends GetxController {
     _queueSub = null;
 
     if (sessionId != null) {
-      try {
-        await _repository
-            .cancelMatching(sessionId: sessionId)
-            .timeout(const Duration(seconds: 3));
-      } catch (error) {
-        debugPrint('Video matching cancellation sync failed: $error');
-      }
+      unawaited(_cancelSearchOnServer(sessionId));
     }
 
-    await _webRTC.resetConnection();
     _exitInProgress = false;
-    if (closeRoute && !_disposed && Get.currentRoute == '/video-matching') {
+    if (closeRoute && !_disposed) {
+      _closeMatchingRoute();
+      return;
+    }
+    await _webRTC.resetConnection();
+  }
+
+  Future<void> _cancelSearchOnServer(String sessionId) async {
+    try {
+      await _repository
+          .cancelMatching(sessionId: sessionId)
+          .timeout(const Duration(seconds: 3));
+    } catch (error) {
+      debugPrint('Video matching cancellation sync failed: $error');
+    }
+  }
+
+  void _closeMatchingRoute() {
+    if (Get.currentRoute != AppRouter.videoMatching) return;
+
+    // A matching route opened after Rating is the root route because Rating
+    // uses offAllNamed. In that case Get.back() cannot pop anything and leaves
+    // a stopped matching screen visible, which looks like the app is frozen.
+    final canPop = Get.key.currentState?.canPop() ?? false;
+    if (canPop) {
       Get.back();
+    } else {
+      Get.offAllNamed(AppRouter.main);
     }
   }
 
@@ -224,7 +245,7 @@ class VideoMatchingController extends GetxController {
   }
 
   Future<void> _handleRoomSnapshot(Map<String, dynamic> data) async {
-    if (_disposed || _navigatingToChat) return;
+    if (_disposed || _navigatingToChat || _navigatingToRating) return;
     if (data['matchingMode'] != 'video') {
       await _fail(StateError('Matched room is not a video room.'));
       return;
@@ -241,6 +262,7 @@ class VideoMatchingController extends GetxController {
     final isUserA = data['userA'] == uid;
     final otherUid = isUserA ? data['userB'] : data['userA'];
     _isCaller = isUserA;
+    _otherUid = otherUid?.toString();
 
     final avatars = Map<String, dynamic>.from(
       data['anonymousAvatars'] ?? const <String, dynamic>{},
@@ -262,6 +284,9 @@ class VideoMatchingController extends GetxController {
         videoMatchingTr('Có người vừa thả tim bạn'),
         videoMatchingTr('Hãy thả tim nếu bạn cũng muốn tiếp tục làm quen.'),
         snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(12),
+        maxWidth: 420,
+        duration: const Duration(seconds: 3),
       );
     }
     otherLiked.value = peerLiked;
@@ -534,16 +559,36 @@ class VideoMatchingController extends GetxController {
   }
 
   Future<void> leaveRoom({required bool findNext}) async {
-    if (_exitInProgress || _navigatingToChat) return;
+    await _finishWithoutMatch(reason: 'left', findNext: findNext);
+  }
+
+  Future<void> _finishWithoutMatch({
+    required String reason,
+    required bool findNext,
+  }) async {
+    if (_exitInProgress ||
+        _navigatingToChat ||
+        _navigatingToRating ||
+        _disposed) {
+      return;
+    }
     _exitInProgress = true;
+    _navigatingToRating = true;
     phase.value = VideoMatchingPhase.ending;
     final roomId = _roomId;
+    final otherUid = _otherUid;
+    final peerAvatar = otherAnonymousAvatar.value;
     final callId = _callId;
+
+    // Stop room snapshots before writing the terminal state so both the local
+    // exit and the remote listener cannot start rating navigation together.
+    await _roomSub?.cancel();
+    _roomSub = null;
 
     try {
       if (roomId != null) {
         await _repository
-            .endRoom(roomId: roomId, uid: uid, reason: 'left')
+            .endRoom(roomId: roomId, uid: uid, reason: reason)
             .timeout(const Duration(seconds: 3));
       }
     } catch (error) {
@@ -562,41 +607,48 @@ class VideoMatchingController extends GetxController {
     await _cancelRoomSubscriptions();
     await _webRTC.resetConnection();
     _clearRoomIdentity();
+    _handlingRoom = false;
     _exitInProgress = false;
 
     if (_disposed) return;
-    if (findNext) {
-      await startSearch();
-    } else if (Get.currentRoute == '/video-matching') {
-      Get.back();
-    }
+    await _openRating(
+      roomId: roomId,
+      otherUid: otherUid,
+      peerAvatar: peerAvatar,
+      findNext: findNext,
+    );
   }
 
   Future<void> _expireRoom() async {
-    if (_exitInProgress || _navigatingToChat || _roomId == null) return;
-    _exitInProgress = true;
-    final roomId = _roomId!;
-    final callId = _callId;
-    try {
-      await _repository.endRoom(roomId: roomId, uid: uid, reason: 'timeout');
-      if (callId != null) await _repository.endCallSession(callId);
-    } catch (error) {
-      debugPrint('Video room timeout sync failed: $error');
-    }
-    _exitInProgress = false;
-    await _showEnded();
+    if (_roomId == null) return;
+    await _finishWithoutMatch(reason: 'timeout', findNext: false);
   }
 
   Future<void> _showEnded() async {
-    if (_disposed || _navigatingToChat) return;
+    if (_disposed || _navigatingToChat || _navigatingToRating) return;
+    _navigatingToRating = true;
+    final roomId = _roomId;
+    final otherUid = _otherUid;
+    final peerAvatar = otherAnonymousAvatar.value;
     phase.value = VideoMatchingPhase.ended;
     _stopClock();
     _disconnectTimer?.cancel();
+    await _roomSub?.cancel();
     await _callSub?.cancel();
     await _remoteIceSub?.cancel();
+    _roomSub = null;
     _callSub = null;
     _remoteIceSub = null;
     await _webRTC.resetConnection();
+    _clearRoomIdentity();
+    _handlingRoom = false;
+    if (_disposed) return;
+    await _openRating(
+      roomId: roomId,
+      otherUid: otherUid,
+      peerAvatar: peerAvatar,
+      findNext: false,
+    );
   }
 
   Future<void> _showMutualMatch() async {
@@ -604,7 +656,9 @@ class VideoMatchingController extends GetxController {
     _navigatingToChat = true;
     phase.value = VideoMatchingPhase.converting;
     final roomId = _roomId!;
+    final otherUid = _otherUid;
     final peerAvatar = otherAnonymousAvatar.value;
+    await _autoRateSuccessfulMatch(roomId: roomId, otherUid: otherUid);
     await _cancelAllSubscriptions();
     await _webRTC.resetConnection();
     if (_disposed) return;
@@ -618,15 +672,67 @@ class VideoMatchingController extends GetxController {
     );
   }
 
-  Future<void> _goToPermanentRoom(String roomId) async {
+  Future<void> _goToPermanentRoom(String permanentRoomId) async {
     if (_navigatingToChat || _disposed) return;
     _navigatingToChat = true;
     phase.value = VideoMatchingPhase.converting;
+    await _autoRateSuccessfulMatch(roomId: _roomId, otherUid: _otherUid);
     await _cancelAllSubscriptions();
     await _webRTC.resetConnection();
     if (!_disposed) {
-      Get.offNamed('/chat', arguments: {'roomId': roomId});
+      Get.offNamed('/chat', arguments: {'roomId': permanentRoomId});
     }
+  }
+
+  Future<void> _autoRateSuccessfulMatch({
+    required String? roomId,
+    required String? otherUid,
+  }) async {
+    if (roomId == null || otherUid == null || otherUid.isEmpty) return;
+    try {
+      await _repository.autoRateSuccessfulMatch(
+        roomId: roomId,
+        fromUid: uid,
+        toUid: otherUid,
+      );
+    } catch (error) {
+      // Rating must never block a successful mutual-match transition.
+      debugPrint('Video mutual-match auto rating failed: $error');
+    }
+  }
+
+  Future<void> _openRating({
+    required String? roomId,
+    required String? otherUid,
+    required String peerAvatar,
+    required bool findNext,
+  }) async {
+    if (_disposed) return;
+    if (roomId == null || otherUid == null || otherUid.isEmpty) {
+      _navigatingToRating = false;
+      if (findNext) {
+        await startSearch();
+      } else {
+        Get.offAllNamed(AppRouter.main);
+      }
+      return;
+    }
+
+    Get.offAllNamed(
+      AppRouter.rating,
+      arguments: {
+        'roomId': roomId,
+        'toUid': otherUid,
+        'anonymousAvatar': peerAvatar,
+        'experience': 'video',
+        if (findNext) 'nextRoute': AppRouter.videoMatching,
+        if (findNext)
+          'nextRouteArguments': {
+            'targetGender': targetGender,
+            'anonymousAvatar': anonymousAvatar,
+          },
+      },
+    );
   }
 
   Future<void> retry() async {
@@ -639,7 +745,7 @@ class VideoMatchingController extends GetxController {
   Future<void> closeError() async {
     await _cancelAllSubscriptions();
     await _webRTC.resetConnection();
-    if (!_disposed && Get.currentRoute == '/video-matching') Get.back();
+    if (!_disposed) _closeMatchingRoute();
   }
 
   Future<void> _showConnectionError() async {
@@ -647,7 +753,7 @@ class VideoMatchingController extends GetxController {
   }
 
   Future<void> _fail(Object error) async {
-    if (_disposed || _navigatingToChat) return;
+    if (_disposed || _navigatingToChat || _navigatingToRating) return;
     debugPrint('Anonymous video matching error: $error');
     errorMessage.value = videoMatchingTr(
       'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.',
@@ -702,6 +808,7 @@ class VideoMatchingController extends GetxController {
 
   void _clearRoomIdentity() {
     _roomId = null;
+    _otherUid = null;
     _callId = null;
     _expiresAt = null;
     _cameraUnlockAt = null;

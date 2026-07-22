@@ -26,6 +26,8 @@ const videoMatchingVietnameseTranslations = <String, String>{
   'Đối phương đã thích bạn': 'Đối phương đã thích bạn',
   'Phòng video ẩn danh • tối đa 8 phút': 'Phòng video ẩn danh • tối đa 8 phút',
   'Cuộc gọi đã kết thúc': 'Cuộc gọi đã kết thúc',
+  'Cuộc gọi video đã kết thúc.\nBạn cảm thấy trải nghiệm thế nào?':
+      'Cuộc gọi video đã kết thúc.\nBạn cảm thấy trải nghiệm thế nào?',
   'Bạn có thể tìm một người mới hoặc quay lại.':
       'Bạn có thể tìm một người mới hoặc quay lại.',
   'Quay lại': 'Quay lại',
@@ -73,6 +75,8 @@ const videoMatchingEnglishTranslations = <String, String>{
   'Phòng video ẩn danh • tối đa 8 phút':
       'Anonymous video room • up to 8 minutes',
   'Cuộc gọi đã kết thúc': 'The call has ended',
+  'Cuộc gọi video đã kết thúc.\nBạn cảm thấy trải nghiệm thế nào?':
+      'The video call has ended.\nHow was your experience?',
   'Bạn có thể tìm một người mới hoặc quay lại.':
       'You can find someone new or go back.',
   'Quay lại': 'Go back',
