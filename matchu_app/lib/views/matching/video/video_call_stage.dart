@@ -18,18 +18,14 @@ class VideoCallStage extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
-        final buttonStyle = ButtonStyle(
-          minimumSize: WidgetStateProperty.all(const Size(0, 44)),
-          padding: WidgetStateProperty.all(
-            const EdgeInsets.symmetric(horizontal: 4),
-          ),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        );
 
         return Dialog(
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 24,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
           ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
@@ -51,41 +47,52 @@ class VideoCallStage extends StatelessWidget {
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 22),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          style: buttonStyle,
-                          onPressed:
-                              () => Navigator.of(
-                                dialogContext,
-                              ).pop(_ExitChoice.stay),
-                          child: const _ExitActionLabel('Ở lại'),
+                  SizedBox(
+                    height: 54,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 9,
+                          child: _ExitChoiceButton(
+                            icon: Icons.pause_rounded,
+                            label: 'Ở lại'.tr,
+                            kind: _ExitButtonKind.stay,
+                            onTap:
+                                () => Navigator.of(
+                                  dialogContext,
+                                ).pop(_ExitChoice.stay),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: TextButton(
-                          style: buttonStyle,
-                          onPressed:
-                              () => Navigator.of(
-                                dialogContext,
-                              ).pop(_ExitChoice.leave),
-                          child: const _ExitActionLabel('Thoát'),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 10,
+                          child: _ExitChoiceButton(
+                            icon: Icons.logout_rounded,
+                            label: 'Thoát'.tr,
+                            kind: _ExitButtonKind.leave,
+                            alignLeft: true,
+                            onTap:
+                                () => Navigator.of(
+                                  dialogContext,
+                                ).pop(_ExitChoice.leave),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: FilledButton(
-                          style: buttonStyle,
-                          onPressed:
-                              () => Navigator.of(
-                                dialogContext,
-                              ).pop(_ExitChoice.next),
-                          child: const _ExitActionLabel('Tìm người mới'),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 15,
+                          child: _ExitChoiceButton(
+                            icon: Iconsax.user_add,
+                            label: 'Tìm người mới'.tr,
+                            kind: _ExitButtonKind.primary,
+                            onTap:
+                                () => Navigator.of(
+                                  dialogContext,
+                                ).pop(_ExitChoice.next),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -110,189 +117,36 @@ class VideoCallStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final connecting =
-          controller.phase.value == VideoMatchingPhase.connecting;
-      final ending = controller.phase.value == VideoMatchingPhase.ending;
-      final lockText = _cameraLockText(
-        controller.cameraUnlockRemainingSeconds.value,
-      );
-
-      return ColoredBox(
-        color: Colors.black,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: _VideoTile(
-                    renderer: controller.localRenderer,
-                    label: 'Bạn'.tr,
-                    avatarAsset:
-                        'assets/anonymous/${controller.anonymousAvatar}.png',
-                    cameraEnabled: controller.localCameraEnabled.value,
-                    cameraUnlocked: controller.cameraUnlocked.value,
-                    cameraOffText: 'Camera đang tắt'.tr,
-                    cameraLockText: lockText,
-                    mirror: true,
-                  ),
-                ),
-                Container(height: 1, color: Colors.white24),
-                Expanded(
-                  child: _VideoTile(
-                    renderer: controller.remoteRenderer,
-                    label: 'Người lạ'.tr,
-                    avatarAsset:
-                        'assets/anonymous/${controller.otherAnonymousAvatar.value}.png',
-                    cameraEnabled: controller.remoteCameraEnabled.value,
-                    cameraUnlocked: controller.cameraUnlocked.value,
-                    cameraOffText: 'Camera của đối phương đang tắt'.tr,
-                    cameraLockText: lockText,
-                    mirror: false,
-                  ),
-                ),
-              ],
-            ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Row(
-                    children: [
-                      _GlassIconButton(
-                        tooltip: 'Kết thúc'.tr,
-                        icon: Icons.close_rounded,
-                        onTap: ending ? null : () => _showExitChoices(context),
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _VideoCanvas(controller: controller, lockText: _cameraLockText),
+          const _CallRevealOverlay(),
+          _CallTopBar(
+            controller: controller,
+            onExit: () => _showExitChoices(context),
+          ),
+          _ConnectionStatus(controller: controller, lockText: _cameraLockText),
+          _CallBottomControls(
+            controller: controller,
+            onExit: () => _showExitChoices(context),
+          ),
+          Obx(
+            () =>
+                controller.phase.value == VideoMatchingPhase.ending
+                    ? ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.36),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
                       ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.48),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              controller.formattedRoomTime,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            Text(
-                              'Phòng video ẩn danh • tối đa 8 phút'.tr,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.68),
-                                fontSize: 10,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      _GlassIconButton(
-                        tooltip:
-                            controller.hasLiked.value
-                                ? 'Đã thả tim'.tr
-                                : 'Thả tim'.tr,
-                        icon:
-                            controller.hasLiked.value
-                                ? Iconsax.heart5
-                                : Iconsax.heart,
-                        foreground:
-                            controller.hasLiked.value
-                                ? const Color(0xFFFF5A83)
-                                : Colors.white,
-                        onTap:
-                            controller.hasLiked.value || ending
-                                ? null
-                                : controller.like,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.64),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: Text(
-                  connecting ? 'Đang kết nối âm thanh...'.tr : lockText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            SafeArea(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 10,
-                        runSpacing: 8,
-                        children: [
-                          _CompactAction(
-                            icon: Iconsax.refresh,
-                            label: 'Tìm người mới'.tr,
-                            onTap:
-                                ending
-                                    ? null
-                                    : () =>
-                                        controller.leaveRoom(findNext: true),
-                          ),
-                          if (controller.otherLiked.value)
-                            const _PeerLikedBadge(),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      _CallControlDock(
-                        controller: controller,
-                        disabled: ending,
-                        onEnd: () => _showExitChoices(context),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            if (ending)
-              ColoredBox(
-                color: Colors.black.withValues(alpha: 0.36),
-                child: const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
-              ),
-          ],
-        ),
-      );
-    });
+                    )
+                    : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
   }
 
   String _cameraLockText(int seconds) {
@@ -303,19 +157,318 @@ class VideoCallStage extends StatelessWidget {
   }
 }
 
-class _ExitActionLabel extends StatelessWidget {
-  const _ExitActionLabel(this.label);
+enum _ExitButtonKind { stay, leave, primary }
 
+class _ExitChoiceButton extends StatelessWidget {
+  const _ExitChoiceButton({
+    required this.icon,
+    required this.label,
+    required this.kind,
+    required this.onTap,
+    this.alignLeft = false,
+  });
+
+  final IconData icon;
   final String label;
+  final _ExitButtonKind kind;
+  final VoidCallback onTap;
+  final bool alignLeft;
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(
-        label,
-        maxLines: 1,
-        style: const TextStyle(fontWeight: FontWeight.w700),
+    final scheme = Theme.of(context).colorScheme;
+    final isPrimary = kind == _ExitButtonKind.primary;
+    final isLeave = kind == _ExitButtonKind.leave;
+    final foreground =
+        isPrimary
+            ? scheme.onPrimary
+            : isLeave
+            ? scheme.error
+            : scheme.primary;
+
+    return Material(
+      color:
+          isPrimary
+              ? scheme.primary
+              : isLeave
+              ? scheme.surfaceContainerLow
+              : scheme.primary.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color:
+              isPrimary
+                  ? scheme.primary
+                  : isLeave
+                  ? scheme.outlineVariant.withValues(alpha: 0.7)
+                  : scheme.primary.withValues(alpha: 0.42),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: alignLeft ? 9 : 6,
+            right: alignLeft ? 4 : 6,
+          ),
+          child: Row(
+            mainAxisAlignment:
+                alignLeft ? MainAxisAlignment.start : MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: foreground),
+              const SizedBox(width: 6),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoCanvas extends StatelessWidget {
+  const _VideoCanvas({required this.controller, required this.lockText});
+
+  final VideoMatchingController controller;
+  final String Function(int seconds) lockText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: Obx(() {
+            final seconds = controller.cameraUnlockRemainingSeconds.value;
+            return RepaintBoundary(
+              child: _VideoTile(
+                renderer: controller.localRenderer,
+                label: 'Bạn'.tr,
+                avatarAsset:
+                    'assets/anonymous/${controller.anonymousAvatar}.png',
+                cameraEnabled: controller.localCameraEnabled.value,
+                cameraUnlocked: controller.cameraUnlocked.value,
+                cameraOffText: 'Camera đang tắt'.tr,
+                cameraLockText: lockText(seconds),
+                mirror: true,
+              ),
+            );
+          }),
+        ),
+        Container(height: 1, color: Colors.white24),
+        Expanded(
+          child: Obx(() {
+            final seconds = controller.cameraUnlockRemainingSeconds.value;
+            return RepaintBoundary(
+              child: _VideoTile(
+                renderer: controller.remoteRenderer,
+                label: 'Người lạ'.tr,
+                rating: controller.otherAvgRating.value,
+                labelAtTop: true,
+                avatarAsset:
+                    'assets/anonymous/${controller.otherAnonymousAvatar.value}.png',
+                cameraEnabled: controller.remoteCameraEnabled.value,
+                cameraUnlocked: controller.cameraUnlocked.value,
+                cameraOffText: 'Camera của đối phương đang tắt'.tr,
+                cameraLockText: lockText(seconds),
+                mirror: false,
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+class _CallRevealOverlay extends StatelessWidget {
+  const _CallRevealOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1, end: 0),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        builder:
+            (_, value, __) =>
+                ColoredBox(color: Colors.black.withValues(alpha: value * 0.52)),
+      ),
+    );
+  }
+}
+
+class _CallTopBar extends StatelessWidget {
+  const _CallTopBar({required this.controller, required this.onExit});
+
+  final VideoMatchingController controller;
+  final Future<void> Function() onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Obx(() {
+            final ending = controller.phase.value == VideoMatchingPhase.ending;
+            final liked = controller.hasLiked.value;
+            return Row(
+              children: [
+                _GlassIconButton(
+                  tooltip: 'Kết thúc'.tr,
+                  icon: Icons.close_rounded,
+                  onTap: ending ? null : onExit,
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.48),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        controller.formattedRoomTime,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      Text(
+                        'Phòng video ẩn danh • tối đa 8 phút'.tr,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.68),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                _GlassIconButton(
+                  tooltip: liked ? 'Đã thả tim'.tr : 'Thả tim'.tr,
+                  icon: liked ? Iconsax.heart5 : Iconsax.heart,
+                  foreground: liked ? const Color(0xFFFF5A83) : Colors.white,
+                  onTap: liked || ending ? null : controller.like,
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectionStatus extends StatelessWidget {
+  const _ConnectionStatus({required this.controller, required this.lockText});
+
+  final VideoMatchingController controller;
+  final String Function(int seconds) lockText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.center,
+      child: Obx(() {
+        final connecting =
+            controller.phase.value == VideoMatchingPhase.connecting;
+        final text =
+            connecting
+                ? 'Đang kết nối âm thanh...'.tr
+                : lockText(controller.cameraUnlockRemainingSeconds.value);
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          child: Container(
+            key: ValueKey(text),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.64),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _CallBottomControls extends StatelessWidget {
+  const _CallBottomControls({required this.controller, required this.onExit});
+
+  final VideoMatchingController controller;
+  final Future<void> Function() onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+          child: Obx(() {
+            final ending = controller.phase.value == VideoMatchingPhase.ending;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _CompactAction(
+                      icon: Iconsax.refresh,
+                      label: 'Tìm người mới'.tr,
+                      onTap:
+                          ending
+                              ? null
+                              : () => controller.leaveRoom(findNext: true),
+                    ),
+                    if (controller.otherLiked.value) const _PeerLikedBadge(),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _CallControlDock(
+                  controller: controller,
+                  disabled: ending,
+                  onEnd: onExit,
+                ),
+              ],
+            );
+          }),
+        ),
       ),
     );
   }
@@ -331,6 +484,8 @@ class _VideoTile extends StatelessWidget {
     required this.cameraOffText,
     required this.cameraLockText,
     required this.mirror,
+    this.rating,
+    this.labelAtTop = false,
   });
 
   final RTCVideoRenderer renderer;
@@ -341,6 +496,8 @@ class _VideoTile extends StatelessWidget {
   final String cameraOffText;
   final String cameraLockText;
   final bool mirror;
+  final double? rating;
+  final bool labelAtTop;
 
   @override
   Widget build(BuildContext context) {
@@ -408,20 +565,43 @@ class _VideoTile extends StatelessWidget {
         ),
         Positioned(
           left: 14,
-          bottom: 12,
+          top: labelAtTop ? 12 : null,
+          bottom: labelAtTop ? null : 12,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.45),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (labelAtTop) ...[
+                  const SizedBox(width: 7),
+                  const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFFFC857),
+                    size: 15,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    rating?.toStringAsFixed(1) ?? '—',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),

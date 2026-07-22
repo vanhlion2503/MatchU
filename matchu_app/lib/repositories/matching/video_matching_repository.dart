@@ -17,6 +17,8 @@ abstract class VideoMatchingRepository {
 
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenRoom(String roomId);
 
+  Future<double> getAverageChatRating(String uid);
+
   Future<void> setLike({required String roomId, required String uid});
 
   Future<void> autoRateSuccessfulMatch({

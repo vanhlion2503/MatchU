@@ -56,6 +56,7 @@ class VideoMatchingController extends GetxController {
   final hasLiked = false.obs;
   final otherLiked = false.obs;
   final otherAnonymousAvatar = 'avt_01'.obs;
+  final otherAvgRating = RxnDouble();
   final errorMessage = RxnString();
 
   RTCVideoRenderer get localRenderer => _webRTC.localRenderer;
@@ -74,6 +75,7 @@ class VideoMatchingController extends GetxController {
   String? _sessionId;
   String? _roomId;
   String? _otherUid;
+  String? _ratingLoadedForUid;
   String? _callId;
   DateTime? _expiresAt;
   DateTime? _cameraUnlockAt;
@@ -331,6 +333,12 @@ class VideoMatchingController extends GetxController {
     _isCaller = isUserA;
     _otherUid = otherUid?.toString();
 
+    final peerUid = _otherUid;
+    if (peerUid != null && _ratingLoadedForUid != peerUid) {
+      _ratingLoadedForUid = peerUid;
+      unawaited(_loadOtherRating(peerUid));
+    }
+
     final avatars = Map<String, dynamic>.from(
       data['anonymousAvatars'] ?? const <String, dynamic>{},
     );
@@ -393,6 +401,18 @@ class VideoMatchingController extends GetxController {
     }
 
     _scheduleVideoRenegotiation();
+  }
+
+  Future<void> _loadOtherRating(String peerUid) async {
+    try {
+      final rating = await _repository.getAverageChatRating(peerUid);
+      if (!_disposed && _otherUid == peerUid) {
+        otherAvgRating.value = rating.clamp(0, 5).toDouble();
+      }
+    } catch (error) {
+      // Rating is supporting information and must not interrupt a video call.
+      debugPrint('Unable to load video peer rating: $error');
+    }
   }
 
   Future<void> _startPeerConnection(String callId) async {
@@ -786,10 +806,20 @@ class VideoMatchingController extends GetxController {
     final roomId = _roomId!;
     final otherUid = _otherUid;
     final peerAvatar = otherAnonymousAvatar.value;
-    await _autoRateSuccessfulMatch(roomId: roomId, otherUid: otherUid);
+
+    // Rating is best-effort and must not delay the success transition.
+    unawaited(_autoRateSuccessfulMatch(roomId: roomId, otherUid: otherUid));
     await _cancelAllSubscriptions();
-    await _webRTC.resetConnection();
     if (_disposed) return;
+
+    // Stop captured audio immediately, then release the heavier peer
+    // connection after the route animation has had time to render its first
+    // frames. Resetting it before navigation caused a visible black-frame jolt.
+    unawaited(
+      _webRTC.setMicrophoneEnabled(false).catchError((Object error) {
+        debugPrint('Unable to mute completed video match: $error');
+      }),
+    );
 
     Get.off(
       () => MatchTransitionView(
@@ -797,8 +827,18 @@ class VideoMatchingController extends GetxController {
         myAvatar: anonymousAvatar,
         otherAvatar: peerAvatar,
       ),
+      transition: Transition.fadeIn,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
     );
-    _scheduleControllerRelease();
+    Future<void>.delayed(const Duration(milliseconds: 320), () async {
+      if (_disposed) return;
+      await _webRTC.resetConnection();
+    });
+    Future<void>.delayed(
+      const Duration(milliseconds: 700),
+      _scheduleControllerRelease,
+    );
   }
 
   Future<void> _goToPermanentRoom(String permanentRoomId) async {
@@ -939,6 +979,8 @@ class VideoMatchingController extends GetxController {
     hasLiked.value = false;
     otherLiked.value = false;
     otherAnonymousAvatar.value = 'avt_01';
+    otherAvgRating.value = null;
+    _ratingLoadedForUid = null;
     errorMessage.value = null;
     _handlingRoom = false;
   }
@@ -946,6 +988,7 @@ class VideoMatchingController extends GetxController {
   void _clearRoomIdentity() {
     _roomId = null;
     _otherUid = null;
+    _ratingLoadedForUid = null;
     _callId = null;
     _expiresAt = null;
     _cameraUnlockAt = null;

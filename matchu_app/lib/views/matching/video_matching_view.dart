@@ -26,25 +26,68 @@ class VideoMatchingView extends GetView<VideoMatchingController> {
         },
         child: Scaffold(
           backgroundColor: Colors.black,
-          body: Obx(() {
-            switch (controller.phase.value) {
-              case VideoMatchingPhase.preparing:
-              case VideoMatchingPhase.searching:
-                return VideoSearchingStage(controller: controller);
-              case VideoMatchingPhase.connecting:
-              case VideoMatchingPhase.active:
-              case VideoMatchingPhase.ending:
-              case VideoMatchingPhase.converting:
-                return VideoCallStage(controller: controller);
-              case VideoMatchingPhase.ended:
-                return _EndedStage(controller: controller);
-              case VideoMatchingPhase.error:
-                return _ErrorStage(controller: controller);
-            }
-          }),
+          body: _VideoStageHost(controller: controller),
         ),
       ),
     );
+  }
+}
+
+enum _VideoStageGroup { searching, call, ended, error }
+
+class _VideoStageHost extends StatefulWidget {
+  const _VideoStageHost({required this.controller});
+
+  final VideoMatchingController controller;
+
+  @override
+  State<_VideoStageHost> createState() => _VideoStageHostState();
+}
+
+class _VideoStageHostState extends State<_VideoStageHost> {
+  late _VideoStageGroup _group;
+  late final Worker _phaseWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    _group = _groupFor(widget.controller.phase.value);
+    _phaseWorker = ever<VideoMatchingPhase>(widget.controller.phase, (phase) {
+      final nextGroup = _groupFor(phase);
+      if (nextGroup == _group || !mounted) return;
+      setState(() => _group = nextGroup);
+    });
+  }
+
+  @override
+  void dispose() {
+    _phaseWorker.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (_group) {
+      _VideoStageGroup.searching => VideoSearchingStage(
+        controller: widget.controller,
+      ),
+      _VideoStageGroup.call => VideoCallStage(controller: widget.controller),
+      _VideoStageGroup.ended => _EndedStage(controller: widget.controller),
+      _VideoStageGroup.error => _ErrorStage(controller: widget.controller),
+    };
+  }
+
+  _VideoStageGroup _groupFor(VideoMatchingPhase phase) {
+    return switch (phase) {
+      VideoMatchingPhase.preparing ||
+      VideoMatchingPhase.searching => _VideoStageGroup.searching,
+      VideoMatchingPhase.connecting ||
+      VideoMatchingPhase.active ||
+      VideoMatchingPhase.ending ||
+      VideoMatchingPhase.converting => _VideoStageGroup.call,
+      VideoMatchingPhase.ended => _VideoStageGroup.ended,
+      VideoMatchingPhase.error => _VideoStageGroup.error,
+    };
   }
 }
 

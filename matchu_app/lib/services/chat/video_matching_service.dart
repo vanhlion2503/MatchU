@@ -62,6 +62,12 @@ class VideoMatchingService implements VideoMatchingRepository {
   }
 
   @override
+  Future<double> getAverageChatRating(String uid) async {
+    final snapshot = await _firestore.collection('users').doc(uid).get();
+    return (snapshot.data()?['avgChatRating'] as num?)?.toDouble() ?? 5.0;
+  }
+
+  @override
   Future<void> setLike({required String roomId, required String uid}) {
     return _tempChatService.setLike(roomId: roomId, uid: uid, value: true);
   }

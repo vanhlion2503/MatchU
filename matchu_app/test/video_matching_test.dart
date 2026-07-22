@@ -3,6 +3,7 @@ import 'package:matchu_app/controllers/matching/video_matching_session_coordinat
 import 'package:matchu_app/models/matching/matching_mode.dart';
 import 'package:matchu_app/models/queue_user_model.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
+import 'package:matchu_app/views/matching/video_matching_view.dart';
 
 void main() {
   test('video matching dictionaries contain identical keys', () {
@@ -63,5 +64,9 @@ void main() {
 
     coordinator.finish();
     expect(coordinator.isActive.value, isFalse);
+  });
+
+  test('video matching screen can be constructed', () {
+    expect(const VideoMatchingView(), isA<VideoMatchingView>());
   });
 }

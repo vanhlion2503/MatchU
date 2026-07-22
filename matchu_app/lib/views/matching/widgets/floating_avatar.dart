@@ -58,42 +58,42 @@ class _FloatingAvatarState extends State<FloatingAvatar>
 
     return AnimatedBuilder(
       animation: _controller,
-      builder: (_, __) {
+      child: RepaintBoundary(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleAvatar(
+              radius: avatarRadius,
+              backgroundColor: Colors.white,
+              child: CircleAvatar(
+                radius: innerRadius,
+                backgroundImage: AssetImage(widget.image),
+              ),
+            ),
+            Positioned(
+              bottom: avatarRadius * 0.05,
+              right: widget.offsetX < 0 ? avatarRadius * 0.05 : null,
+              left: widget.offsetX > 0 ? avatarRadius * 0.05 : null,
+              child: CircleAvatar(
+                radius: badgeRadius,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  widget.badge,
+                  size: badgeIconSize,
+                  color: widget.badgeColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      builder: (_, child) {
         final baseDy = (_controller.value - 0.5) * (widget.size * 0.18);
         final dy = widget.offsetX < 0 ? baseDy : -baseDy;
 
         return Transform.translate(
           offset: Offset(widget.offsetX, dy),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              /// ===== AVATAR =====
-              CircleAvatar(
-                radius: avatarRadius,
-                backgroundColor: Colors.white,
-                child: CircleAvatar(
-                  radius: innerRadius,
-                  backgroundImage: AssetImage(widget.image),
-                ),
-              ),
-
-              /// ===== BADGE =====
-              Positioned(
-                bottom: avatarRadius * 0.05,
-                right: widget.offsetX < 0 ? avatarRadius * 0.05 : null,
-                left: widget.offsetX > 0 ? avatarRadius * 0.05 : null,
-                child: CircleAvatar(
-                  radius: badgeRadius,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    widget.badge,
-                    size: badgeIconSize,
-                    color: widget.badgeColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: child,
         );
       },
     );
