@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -44,48 +43,47 @@ class _VideoSearchingStageState extends State<VideoSearchingStage>
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final controller = widget.controller;
-      final preparing =
-          controller.phase.value == VideoMatchingPhase.preparing ||
-          !controller.previewReady.value;
+    final controller = widget.controller;
 
-      return ColoredBox(
-        color: const Color(0xFF090A12),
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: _SelfPreview(
+    return ColoredBox(
+      color: const Color(0xFF090A12),
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              Expanded(
+                child: Obx(() {
+                  final preparing =
+                      controller.phase.value == VideoMatchingPhase.preparing ||
+                      !controller.previewReady.value;
+                  return _SelfPreview(
                     controller: controller,
                     preparing: preparing,
                     scanAnimation: _scanController,
-                  ),
-                ),
-                Container(height: 1, color: Colors.white12),
-                Expanded(
-                  child: _DiscoveryField(
-                    animation: _motionController,
-                    elapsed: controller.formattedSearchTime,
-                    onCancel: controller.cancelSearch,
-                  ),
-                ),
-              ],
-            ),
-            SafeArea(
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: _SearchingHeader(animation: _motionController),
+                  );
+                }),
+              ),
+              Container(height: 1, color: Colors.white12),
+              Expanded(
+                child: _DiscoveryField(
+                  animation: _motionController,
+                  controller: controller,
                 ),
               ),
+            ],
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: _SearchingHeader(animation: _motionController),
+              ),
             ),
-          ],
-        ),
-      );
-    });
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -173,7 +171,8 @@ class _BlurredAnonymousPreview extends StatelessWidget {
               child: Image.asset(
                 avatarAsset,
                 fit: BoxFit.cover,
-                filterQuality: FilterQuality.high,
+                filterQuality: FilterQuality.low,
+                cacheWidth: 720,
               ),
             ),
           ),
@@ -191,93 +190,86 @@ class _CameraScanOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: animation,
-          builder: (context, _) {
-            return CustomPaint(
-              painter: _CameraScanPainter(animation.value),
-              size: Size.infinite,
-            );
-          },
-        ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const beamHeight = 52.0;
+        final travel = constraints.maxHeight + beamHeight;
+
+        return IgnorePointer(
+          child: ClipRect(
+            child: AnimatedBuilder(
+              animation: animation,
+              child: const RepaintBoundary(child: _CameraScanBeam()),
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, (travel * animation.value) - beamHeight),
+                  child: Align(alignment: Alignment.topCenter, child: child),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CameraScanBeam extends StatelessWidget {
+  const _CameraScanBeam();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Color(0x246FE6FC)],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              height: 2,
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Color(0xCC6FE6FC),
+                    Colors.white,
+                    Color(0xCC6FE6FC),
+                    Colors.transparent,
+                  ],
+                  stops: [0, 0.16, 0.5, 0.84, 1],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.secondaryColor.withValues(alpha: 0.58),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _CameraScanPainter extends CustomPainter {
-  const _CameraScanPainter(this.progress);
-
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-
-    final y = progress * size.height;
-    final trailTop = math.max(0.0, y - 52);
-    final trailHeight = y - trailTop;
-
-    if (trailHeight > 0) {
-      final trailRect = Rect.fromLTWH(0, trailTop, size.width, trailHeight);
-      canvas.drawRect(
-        trailRect,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.transparent, Color(0x246FE6FC)],
-          ).createShader(trailRect),
-      );
-    }
-
-    final lineRect = Rect.fromLTWH(12, y - 1, size.width - 24, 2);
-    final lineShader = const LinearGradient(
-      colors: [
-        Colors.transparent,
-        Color(0xCC6FE6FC),
-        Colors.white,
-        Color(0xCC6FE6FC),
-        Colors.transparent,
-      ],
-      stops: [0, 0.16, 0.5, 0.84, 1],
-    ).createShader(lineRect);
-
-    canvas.drawLine(
-      Offset(12, y),
-      Offset(size.width - 12, y),
-      Paint()
-        ..shader = lineShader
-        ..strokeWidth = 5
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
-    );
-    canvas.drawLine(
-      Offset(12, y),
-      Offset(size.width - 12, y),
-      Paint()
-        ..shader = lineShader
-        ..strokeWidth = 1.5,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _CameraScanPainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
-}
-
 class _DiscoveryField extends StatelessWidget {
-  const _DiscoveryField({
-    required this.animation,
-    required this.elapsed,
-    required this.onCancel,
-  });
+  const _DiscoveryField({required this.animation, required this.controller});
 
   final Animation<double> animation;
-  final String elapsed;
-  final Future<void> Function() onCancel;
+  final VideoMatchingController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -312,14 +304,16 @@ class _DiscoveryField extends StatelessWidget {
           Center(
             child: Transform.translate(
               offset: const Offset(0, -30),
-              child: AnimatedBuilder(
-                animation: animation,
-                builder: (context, _) {
-                  return CustomPaint(
-                    size: const Size.square(260),
-                    painter: _PulsePainter(animation.value),
-                  );
-                },
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: animation,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      size: const Size.square(260),
+                      painter: _PulsePainter(animation.value),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -368,17 +362,19 @@ class _DiscoveryField extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 7),
-                Text(
-                  elapsed,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 15,
-                    letterSpacing: 1.4,
-                    fontWeight: FontWeight.w600,
+                Obx(
+                  () => Text(
+                    controller.formattedSearchTime,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 15,
+                      letterSpacing: 1.4,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
-                _CancelSearchButton(onTap: onCancel),
+                _CancelSearchButton(onTap: controller.cancelSearch),
               ],
             ),
           ),
@@ -560,52 +556,56 @@ class _AnimatedFloatingProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final opacityAnimation = Tween<double>(
+      begin: spec.opacity * 0.86,
+      end: spec.opacity,
+    ).animate(animation);
+    final positionAnimation = Tween<Offset>(
+      begin: Offset(-spec.driftX / spec.width, -spec.driftY / spec.height),
+      end: Offset(spec.driftX / spec.width, spec.driftY / spec.height),
+    ).animate(animation);
+    final rotationAnimation = Tween<double>(
+      begin: (spec.rotationDegrees - 0.1) / 360,
+      end: (spec.rotationDegrees + 0.1) / 360,
+    ).animate(animation);
+    final scaleAnimation = Tween<double>(
+      begin: spec.scale * 0.985,
+      end: spec.scale * 1.015,
+    ).animate(animation);
+
     return Align(
       alignment: spec.alignment,
-      child: RepaintBoundary(
-        child: AnimatedBuilder(
-          animation: animation,
-          child: SizedBox(
-            width: spec.width,
-            height: spec.height,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(
-                  sigmaX: spec.blur,
-                  sigmaY: spec.blur,
-                ),
-                child: Image.asset(
-                  spec.asset,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
-                  cacheWidth: 220,
+      child: FadeTransition(
+        opacity: opacityAnimation,
+        child: SlideTransition(
+          position: positionAnimation,
+          child: RotationTransition(
+            turns: rotationAnimation,
+            child: ScaleTransition(
+              scale: scaleAnimation,
+              child: RepaintBoundary(
+                child: SizedBox(
+                  width: spec.width,
+                  height: spec.height,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: spec.blur,
+                        sigmaY: spec.blur,
+                      ),
+                      child: Image.asset(
+                        spec.asset,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.low,
+                        cacheWidth: 220,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-          builder: (context, child) {
-            final value = animation.value;
-            final direction = (value * 2) - 1;
-            final animatedScale = spec.scale * (0.985 + (value * 0.03));
-            final opacity = spec.opacity * (0.86 + (value * 0.14));
-            final rotation =
-                (spec.rotationDegrees + (direction * 0.1)) * math.pi / 180;
-
-            return Opacity(
-              opacity: opacity,
-              child: Transform.translate(
-                offset: Offset(
-                  direction * spec.driftX,
-                  direction * spec.driftY,
-                ),
-                child: Transform.rotate(
-                  angle: rotation,
-                  child: Transform.scale(scale: animatedScale, child: child),
-                ),
-              ),
-            );
-          },
         ),
       ),
     );
@@ -678,68 +678,72 @@ class _SearchingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF071521).withValues(alpha: 0.64),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: AppTheme.secondaryColor.withValues(alpha: 0.3),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primaryColor.withValues(alpha: 0.16),
-                blurRadius: 18,
-              ),
-            ],
+    final pulseAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 0.88,
+          end: 1,
+        ).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(
+          begin: 1.0,
+          end: 0.88,
+        ).chain(CurveTween(curve: Curves.easeIn)),
+        weight: 50,
+      ),
+    ]).animate(animation);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF071521).withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppTheme.secondaryColor.withValues(alpha: 0.38),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withValues(alpha: 0.12),
+            blurRadius: 14,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedBuilder(
-                animation: animation,
-                builder: (context, _) {
-                  final pulse =
-                      0.88 + (math.sin(animation.value * math.pi * 2) * 0.12);
-                  return Transform.scale(
-                    scale: pulse,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppTheme.secondaryColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.secondaryColor.withValues(
-                              alpha: 0.7,
-                            ),
-                            blurRadius: 9,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ScaleTransition(
+            scale: pulseAnimation,
+            child: RepaintBoundary(
+              child: Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.secondaryColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.secondaryColor.withValues(alpha: 0.7),
+                      blurRadius: 9,
+                      spreadRadius: 1,
                     ),
-                  );
-                },
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Đang tìm bạn',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(width: 10),
+          const Text(
+            'Đang tìm bạn',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -758,10 +762,10 @@ class _CancelSearchButton extends StatelessWidget {
       child: FilledButton(
         style: FilledButton.styleFrom(
           elevation: 0,
-          backgroundColor: AppTheme.errorColor,
+          backgroundColor: AppTheme.errorColor.withValues(alpha: 0.72),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 18),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
           shape: const StadiumBorder(),
         ),
         onPressed: () => onTap(),
