@@ -35,6 +35,14 @@ const videoMatchingVietnameseTranslations = <String, String>{
       'Bạn có thể tìm một người mới hoặc quay lại.',
   'Quay lại': 'Quay lại',
   'Rời phòng video?': 'Rời phòng video?',
+  'Bạn muốn ở lại hay rời khỏi phòng hiện tại?':
+      'Bạn muốn ở lại hay rời khỏi phòng hiện tại?',
+  'Rời đi': 'Rời đi',
+  'Bạn muốn làm gì tiếp theo?': 'Bạn muốn làm gì tiếp theo?',
+  'Thoát khỏi phòng hoặc tiếp tục tìm một người mới.':
+      'Thoát khỏi phòng hoặc tiếp tục tìm một người mới.',
+  'Thoát khỏi phòng': 'Thoát khỏi phòng',
+  'Tiếp tục tìm': 'Tiếp tục tìm',
   'Bạn muốn tìm người mới hay kết thúc phiên làm quen?':
       'Bạn muốn tìm người mới hay kết thúc phiên làm quen?',
   'Ở lại': 'Ở lại',
@@ -87,6 +95,14 @@ const videoMatchingEnglishTranslations = <String, String>{
       'You can find someone new or go back.',
   'Quay lại': 'Go back',
   'Rời phòng video?': 'Leave the video room?',
+  'Bạn muốn ở lại hay rời khỏi phòng hiện tại?':
+      'Would you like to stay or leave the current room?',
+  'Rời đi': 'Leave',
+  'Bạn muốn làm gì tiếp theo?': 'What would you like to do next?',
+  'Thoát khỏi phòng hoặc tiếp tục tìm một người mới.':
+      'Exit the room or continue finding someone new.',
+  'Thoát khỏi phòng': 'Exit room',
+  'Tiếp tục tìm': 'Keep searching',
   'Bạn muốn tìm người mới hay kết thúc phiên làm quen?':
       'Would you like to find someone new or end this session?',
   'Ở lại': 'Stay',

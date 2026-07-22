@@ -6,7 +6,9 @@ import 'package:matchu_app/controllers/matching/video_matching_controller.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
 
-enum _ExitChoice { stay, next, leave }
+enum _ExitChoice { stay, leave }
+
+enum _LeaveChoice { exitRoom, findNext }
 
 class VideoCallStage extends StatelessWidget {
   const VideoCallStage({super.key, required this.controller});
@@ -16,102 +18,68 @@ class VideoCallStage extends StatelessWidget {
   Future<void> _showExitChoices(BuildContext context) async {
     final choice = await showDialog<_ExitChoice>(
       context: context,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 24,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Rời phòng video?',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Bạn muốn tìm người mới hay kết thúc phiên làm quen?',
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    height: 54,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 9,
-                          child: _ExitChoiceButton(
-                            icon: Icons.pause_rounded,
-                            label: 'Ở lại'.tr,
-                            kind: _ExitButtonKind.stay,
-                            onTap:
-                                () => Navigator.of(
-                                  dialogContext,
-                                ).pop(_ExitChoice.stay),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 10,
-                          child: _ExitChoiceButton(
-                            icon: Icons.logout_rounded,
-                            label: 'Thoát'.tr,
-                            kind: _ExitButtonKind.leave,
-                            alignLeft: true,
-                            onTap:
-                                () => Navigator.of(
-                                  dialogContext,
-                                ).pop(_ExitChoice.leave),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 15,
-                          child: _ExitChoiceButton(
-                            icon: Iconsax.user_add,
-                            label: 'Tìm người mới'.tr,
-                            kind: _ExitButtonKind.primary,
-                            onTap:
-                                () => Navigator.of(
-                                  dialogContext,
-                                ).pop(_ExitChoice.next),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+      builder:
+          (dialogContext) => _ExitDialog(
+            title: 'Rời phòng video?'.tr,
+            description: 'Bạn muốn ở lại hay rời khỏi phòng hiện tại?'.tr,
+            actions: [
+              _ExitDialogAction(
+                icon: Icons.logout_rounded,
+                label: 'Rời đi'.tr,
+                kind: _ExitButtonKind.leave,
+                onTap: () => Navigator.of(dialogContext).pop(_ExitChoice.leave),
               ),
-            ),
+              _ExitDialogAction(
+                icon: Icons.pause_rounded,
+                label: 'Ở lại'.tr,
+                kind: _ExitButtonKind.primary,
+                onTap: () => Navigator.of(dialogContext).pop(_ExitChoice.stay),
+              ),
+            ],
           ),
-        );
-      },
+    );
+
+    if (choice != _ExitChoice.leave || !context.mounted) return;
+    await _showLeaveChoices(context);
+  }
+
+  Future<void> _showLeaveChoices(BuildContext context) async {
+    final choice = await showDialog<_LeaveChoice>(
+      context: context,
+      builder:
+          (dialogContext) => _ExitDialog(
+            title: 'Bạn muốn làm gì tiếp theo?'.tr,
+            description: 'Thoát khỏi phòng hoặc tiếp tục tìm một người mới.'.tr,
+            actions: [
+              _ExitDialogAction(
+                icon: Icons.logout_rounded,
+                label: 'Thoát khỏi phòng'.tr,
+                kind: _ExitButtonKind.leave,
+                onTap:
+                    () =>
+                        Navigator.of(dialogContext).pop(_LeaveChoice.exitRoom),
+              ),
+              _ExitDialogAction(
+                icon: Iconsax.user_add,
+                label: 'Tiếp tục tìm'.tr,
+                kind: _ExitButtonKind.primary,
+                onTap:
+                    () =>
+                        Navigator.of(dialogContext).pop(_LeaveChoice.findNext),
+              ),
+            ],
+          ),
     );
 
     switch (choice) {
-      case _ExitChoice.next:
-        await controller.leaveRoom(findNext: true);
-        break;
-      case _ExitChoice.leave:
+      case _LeaveChoice.exitRoom:
         await controller.leaveRoom(findNext: false);
-        break;
-      case _ExitChoice.stay:
+        return;
+      case _LeaveChoice.findNext:
+        await controller.leaveRoom(findNext: true);
+        return;
       case null:
-        break;
+        return;
     }
   }
 
@@ -157,7 +125,82 @@ class VideoCallStage extends StatelessWidget {
   }
 }
 
-enum _ExitButtonKind { stay, leave, primary }
+enum _ExitButtonKind { leave, primary }
+
+class _ExitDialogAction {
+  const _ExitDialogAction({
+    required this.icon,
+    required this.label,
+    required this.kind,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final _ExitButtonKind kind;
+  final VoidCallback onTap;
+}
+
+class _ExitDialog extends StatelessWidget {
+  const _ExitDialog({
+    required this.title,
+    required this.description,
+    required this.actions,
+  });
+
+  final String title;
+  final String description;
+  final List<_ExitDialogAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(description, style: theme.textTheme.bodyMedium),
+              const SizedBox(height: 22),
+              SizedBox(
+                height: 54,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var index = 0; index < actions.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: _ExitChoiceButton(
+                          icon: actions[index].icon,
+                          label: actions[index].label,
+                          kind: actions[index].kind,
+                          onTap: actions[index].onTap,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ExitChoiceButton extends StatelessWidget {
   const _ExitChoiceButton({
@@ -165,56 +208,32 @@ class _ExitChoiceButton extends StatelessWidget {
     required this.label,
     required this.kind,
     required this.onTap,
-    this.alignLeft = false,
   });
 
   final IconData icon;
   final String label;
   final _ExitButtonKind kind;
   final VoidCallback onTap;
-  final bool alignLeft;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isPrimary = kind == _ExitButtonKind.primary;
     final isLeave = kind == _ExitButtonKind.leave;
-    final foreground =
-        isPrimary
-            ? scheme.onPrimary
-            : isLeave
-            ? scheme.error
-            : scheme.primary;
+    final foreground = isLeave ? scheme.onError : scheme.onPrimary;
 
     return Material(
-      color:
-          isPrimary
-              ? scheme.primary
-              : isLeave
-              ? scheme.surfaceContainerLow
-              : scheme.primary.withValues(alpha: 0.08),
+      color: isLeave ? scheme.error : scheme.primary,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color:
-              isPrimary
-                  ? scheme.primary
-                  : isLeave
-                  ? scheme.outlineVariant.withValues(alpha: 0.7)
-                  : scheme.primary.withValues(alpha: 0.42),
-        ),
+        side: BorderSide(color: isLeave ? scheme.error : scheme.primary),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.only(
-            left: alignLeft ? 9 : 6,
-            right: alignLeft ? 4 : 6,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
-            mainAxisAlignment:
-                alignLeft ? MainAxisAlignment.start : MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 20, color: foreground),
               const SizedBox(width: 6),
