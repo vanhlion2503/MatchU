@@ -5,6 +5,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/controllers/matching/video_matching_controller.dart';
+import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 
 class VideoSearchingStage extends StatefulWidget {
@@ -17,8 +18,9 @@ class VideoSearchingStage extends StatefulWidget {
 }
 
 class _VideoSearchingStageState extends State<VideoSearchingStage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _motionController;
+  late final AnimationController _scanController;
 
   @override
   void initState() {
@@ -27,11 +29,16 @@ class _VideoSearchingStageState extends State<VideoSearchingStage>
       vsync: this,
       duration: const Duration(seconds: 5),
     )..repeat();
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
   }
 
   @override
   void dispose() {
     _motionController.dispose();
+    _scanController.dispose();
     super.dispose();
   }
 
@@ -53,6 +60,7 @@ class _VideoSearchingStageState extends State<VideoSearchingStage>
                   child: _SelfPreview(
                     controller: controller,
                     preparing: preparing,
+                    scanAnimation: _scanController,
                   ),
                 ),
                 Container(height: 1, color: Colors.white12),
@@ -60,21 +68,17 @@ class _VideoSearchingStageState extends State<VideoSearchingStage>
                   child: _DiscoveryField(
                     animation: _motionController,
                     elapsed: controller.formattedSearchTime,
-                    preparing: preparing,
+                    onCancel: controller.cancelSearch,
                   ),
                 ),
               ],
             ),
             SafeArea(
               child: Align(
-                alignment: Alignment.topRight,
+                alignment: Alignment.topCenter,
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: _RoundAction(
-                    tooltip: 'Hủy tìm kiếm'.tr,
-                    icon: Icons.close_rounded,
-                    onTap: () => controller.cancelSearch(),
-                  ),
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _SearchingHeader(animation: _motionController),
                 ),
               ),
             ),
@@ -86,10 +90,15 @@ class _VideoSearchingStageState extends State<VideoSearchingStage>
 }
 
 class _SelfPreview extends StatelessWidget {
-  const _SelfPreview({required this.controller, required this.preparing});
+  const _SelfPreview({
+    required this.controller,
+    required this.preparing,
+    required this.scanAnimation,
+  });
 
   final VideoMatchingController controller;
   final bool preparing;
+  final Animation<double> scanAnimation;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +112,9 @@ class _SelfPreview extends StatelessWidget {
             objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
           )
         else
-          const ColoredBox(color: Color(0xFF171925)),
+          _BlurredAnonymousPreview(
+            avatarAsset: 'assets/anonymous/${controller.anonymousAvatar}.png',
+          ),
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -117,47 +128,26 @@ class _SelfPreview extends StatelessWidget {
             ),
           ),
         ),
-        if (preparing)
-          const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text(
-                  'Đang chuẩn bị camera...',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ],
-            ),
-          ),
+        // The scan remains visible after the preview is ready to reinforce the
+        // active matching state without touching the WebRTC camera lifecycle.
+        _CameraScanOverlay(animation: scanAnimation),
         Positioned(
-          left: 18,
-          right: 72,
-          bottom: 18,
-          child: Row(
-            children: [
-              Container(
-                width: 9,
-                height: 9,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF4ADE80),
-                ),
+          left: 14,
+          bottom: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Text(
+              'Bạn',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Camera xem trước chỉ hiển thị trên thiết bị của bạn.',
-                  maxLines: 2,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
@@ -165,16 +155,129 @@ class _SelfPreview extends StatelessWidget {
   }
 }
 
+class _BlurredAnonymousPreview extends StatelessWidget {
+  const _BlurredAnonymousPreview({required this.avatarAsset});
+
+  final String avatarAsset;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Transform.scale(
+            scale: 1.1,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Image.asset(
+                avatarAsset,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.high,
+              ),
+            ),
+          ),
+          ColoredBox(color: const Color(0xFF111320).withValues(alpha: 0.42)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CameraScanOverlay extends StatelessWidget {
+  const _CameraScanOverlay({required this.animation});
+
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, _) {
+            return CustomPaint(
+              painter: _CameraScanPainter(animation.value),
+              size: Size.infinite,
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraScanPainter extends CustomPainter {
+  const _CameraScanPainter(this.progress);
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    final y = progress * size.height;
+    final trailTop = math.max(0.0, y - 52);
+    final trailHeight = y - trailTop;
+
+    if (trailHeight > 0) {
+      final trailRect = Rect.fromLTWH(0, trailTop, size.width, trailHeight);
+      canvas.drawRect(
+        trailRect,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.transparent, Color(0x246FE6FC)],
+          ).createShader(trailRect),
+      );
+    }
+
+    final lineRect = Rect.fromLTWH(12, y - 1, size.width - 24, 2);
+    final lineShader = const LinearGradient(
+      colors: [
+        Colors.transparent,
+        Color(0xCC6FE6FC),
+        Colors.white,
+        Color(0xCC6FE6FC),
+        Colors.transparent,
+      ],
+      stops: [0, 0.16, 0.5, 0.84, 1],
+    ).createShader(lineRect);
+
+    canvas.drawLine(
+      Offset(12, y),
+      Offset(size.width - 12, y),
+      Paint()
+        ..shader = lineShader
+        ..strokeWidth = 5
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+    );
+    canvas.drawLine(
+      Offset(12, y),
+      Offset(size.width - 12, y),
+      Paint()
+        ..shader = lineShader
+        ..strokeWidth = 1.5,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CameraScanPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
 class _DiscoveryField extends StatelessWidget {
   const _DiscoveryField({
     required this.animation,
     required this.elapsed,
-    required this.preparing,
+    required this.onCancel,
   });
 
   final Animation<double> animation;
   final String elapsed;
-  final bool preparing;
+  final Future<void> Function() onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -188,22 +291,25 @@ class _DiscoveryField extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF15142A),
-                  Color(0xFF261448),
-                  Color(0xFF0E172A),
+                  Color(0xFF071521),
+                  Color(0xFF0B2A3D),
+                  Color(0xFF08121F),
                 ],
               ),
             ),
           ),
           Center(
-            child: AnimatedBuilder(
-              animation: animation,
-              builder: (context, _) {
-                return CustomPaint(
-                  size: const Size.square(260),
-                  painter: _PulsePainter(animation.value),
-                );
-              },
+            child: Transform.translate(
+              offset: const Offset(0, -30),
+              child: AnimatedBuilder(
+                animation: animation,
+                builder: (context, _) {
+                  return CustomPaint(
+                    size: const Size.square(260),
+                    painter: _PulsePainter(animation.value),
+                  );
+                },
+              ),
             ),
           ),
           _FloatingBlurCard(
@@ -231,37 +337,44 @@ class _DiscoveryField extends StatelessWidget {
             asset: 'assets/anonymous/avt_23.png',
           ),
           Center(
-            child: Container(
-              width: 92,
-              height: 92,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.42),
-                    blurRadius: 34,
-                    spreadRadius: 4,
+            child: Transform.translate(
+              offset: const Offset(0, -30),
+              child: Container(
+                width: 92,
+                height: 92,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppTheme.secondaryColor, AppTheme.primaryColor],
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.48),
+                      blurRadius: 34,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Iconsax.radar_1,
+                  color: Colors.white,
+                  size: 38,
+                ),
               ),
-              child: const Icon(Iconsax.radar_1, color: Colors.white, size: 38),
             ),
           ),
           Positioned(
             left: 24,
             right: 24,
-            bottom: 28,
+            bottom: 20,
             child: Column(
               children: [
-                Text(
-                  preparing
-                      ? 'Đang chuẩn bị camera...'
-                      : 'Đang tìm vibe phù hợp',
+                const Text(
+                  'Đang tìm kiếm...',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 21,
                     fontWeight: FontWeight.w800,
@@ -277,6 +390,8 @@ class _DiscoveryField extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                const SizedBox(height: 14),
+                _CancelSearchButton(onTap: onCancel),
               ],
             ),
           ),
@@ -324,9 +439,11 @@ class _FloatingBlurCard extends StatelessWidget {
               height: 72,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.14),
+                color: AppTheme.primaryColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white24),
+                border: Border.all(
+                  color: AppTheme.secondaryColor.withValues(alpha: 0.28),
+                ),
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
@@ -358,7 +475,7 @@ class _PulsePainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2
-          ..color = const Color(0xFFB794F4).withValues(alpha: opacity),
+          ..color = AppTheme.secondaryColor.withValues(alpha: opacity),
       );
     }
   }
@@ -369,27 +486,107 @@ class _PulsePainter extends CustomPainter {
   }
 }
 
-class _RoundAction extends StatelessWidget {
-  const _RoundAction({
-    required this.tooltip,
-    required this.icon,
-    required this.onTap,
-  });
+class _SearchingHeader extends StatelessWidget {
+  const _SearchingHeader({required this.animation});
 
-  final String tooltip;
-  final IconData icon;
+  final Animation<double> animation;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF071521).withValues(alpha: 0.64),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppTheme.secondaryColor.withValues(alpha: 0.3),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withValues(alpha: 0.16),
+                blurRadius: 18,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBuilder(
+                animation: animation,
+                builder: (context, _) {
+                  final pulse =
+                      0.88 + (math.sin(animation.value * math.pi * 2) * 0.12);
+                  return Transform.scale(
+                    scale: pulse,
+                    child: Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppTheme.secondaryColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.secondaryColor.withValues(
+                              alpha: 0.7,
+                            ),
+                            blurRadius: 9,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Đang tìm bạn',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CancelSearchButton extends StatelessWidget {
+  const _CancelSearchButton({required this.onTap});
+
   final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.38),
-        shape: const CircleBorder(),
-        child: IconButton(
-          onPressed: () => onTap(),
-          icon: Icon(icon, color: Colors.white),
+    return SizedBox(
+      width: 220,
+      height: 46,
+      child: FilledButton(
+        style: FilledButton.styleFrom(
+          elevation: 0,
+          backgroundColor: AppTheme.errorColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+          shape: const StadiumBorder(),
+        ),
+        onPressed: () => onTap(),
+        child: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'Hủy tìm kiếm',
+            maxLines: 1,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+          ),
         ),
       ),
     );

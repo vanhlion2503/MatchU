@@ -5,6 +5,8 @@ const videoMatchingVietnameseTranslations = <String, String>{
   'Video call': 'Video call',
   'Đang chuẩn bị camera...': 'Đang chuẩn bị camera...',
   'Đang tìm vibe phù hợp': 'Đang tìm vibe phù hợp',
+  'Đang tìm bạn': 'Đang tìm bạn',
+  'Đang tìm kiếm...': 'Đang tìm kiếm...',
   'Camera xem trước chỉ hiển thị trên thiết bị của bạn.':
       'Camera xem trước chỉ hiển thị trên thiết bị của bạn.',
   'Hủy tìm kiếm': 'Hủy tìm kiếm',
@@ -53,6 +55,8 @@ const videoMatchingEnglishTranslations = <String, String>{
   'Video call': 'Video call',
   'Đang chuẩn bị camera...': 'Preparing camera...',
   'Đang tìm vibe phù hợp': 'Finding your vibe',
+  'Đang tìm bạn': 'Finding someone',
+  'Đang tìm kiếm...': 'Searching...',
   'Camera xem trước chỉ hiển thị trên thiết bị của bạn.':
       'This camera preview is only visible on your device.',
   'Hủy tìm kiếm': 'Cancel search',
