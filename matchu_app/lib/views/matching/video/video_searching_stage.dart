@@ -298,6 +298,17 @@ class _DiscoveryField extends StatelessWidget {
               ),
             ),
           ),
+          const _FloatingProfileBackdrop(),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.18),
+                radius: 1.08,
+                colors: [Color(0x18071521), Color(0xA607111C)],
+                stops: [0.18, 1],
+              ),
+            ),
+          ),
           Center(
             child: Transform.translate(
               offset: const Offset(0, -30),
@@ -311,30 +322,6 @@ class _DiscoveryField extends StatelessWidget {
                 },
               ),
             ),
-          ),
-          _FloatingBlurCard(
-            animation: animation,
-            phase: 0.0,
-            alignment: const Alignment(-0.82, -0.48),
-            asset: 'assets/anonymous/avt_04.png',
-          ),
-          _FloatingBlurCard(
-            animation: animation,
-            phase: 1.7,
-            alignment: const Alignment(0.78, -0.58),
-            asset: 'assets/anonymous/avt_12.png',
-          ),
-          _FloatingBlurCard(
-            animation: animation,
-            phase: 3.1,
-            alignment: const Alignment(-0.68, 0.68),
-            asset: 'assets/anonymous/avt_18.png',
-          ),
-          _FloatingBlurCard(
-            animation: animation,
-            phase: 4.2,
-            alignment: const Alignment(0.72, 0.62),
-            asset: 'assets/anonymous/avt_23.png',
           ),
           Center(
             child: Transform.translate(
@@ -401,60 +388,258 @@ class _DiscoveryField extends StatelessWidget {
   }
 }
 
-class _FloatingBlurCard extends StatelessWidget {
-  const _FloatingBlurCard({
+class _FloatingProfileBackdrop extends StatefulWidget {
+  const _FloatingProfileBackdrop();
+
+  @override
+  State<_FloatingProfileBackdrop> createState() =>
+      _FloatingProfileBackdropState();
+}
+
+class _FloatingProfileBackdropState extends State<_FloatingProfileBackdrop>
+    with TickerProviderStateMixin {
+  static const _cards = <_FloatingProfileCardSpec>[
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_02.png',
+      alignment: Alignment(-1.08, -0.72),
+      width: 62,
+      height: 86,
+      blur: 14,
+      opacity: 0.13,
+      scale: 0.87,
+      rotationDegrees: -1.8,
+      driftX: 5,
+      driftY: 12,
+      duration: Duration(milliseconds: 7200),
+      phase: 0.12,
+    ),
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_07.png',
+      alignment: Alignment(1.04, -0.7),
+      width: 70,
+      height: 96,
+      blur: 12,
+      opacity: 0.16,
+      scale: 0.92,
+      rotationDegrees: 1.6,
+      driftX: -7,
+      driftY: 10,
+      duration: Duration(milliseconds: 5800),
+      phase: 0.64,
+    ),
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_11.png',
+      alignment: Alignment(-0.78, -0.02),
+      width: 78,
+      height: 106,
+      blur: 8,
+      opacity: 0.22,
+      scale: 1,
+      rotationDegrees: -1.2,
+      driftX: 8,
+      driftY: 14,
+      duration: Duration(milliseconds: 4600),
+      phase: 0.38,
+    ),
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_15.png',
+      alignment: Alignment(0.04, -0.3),
+      width: 92,
+      height: 122,
+      blur: 6,
+      opacity: 0.28,
+      scale: 1.08,
+      rotationDegrees: 0.8,
+      driftX: -5,
+      driftY: 9,
+      duration: Duration(milliseconds: 6400),
+      phase: 0.82,
+    ),
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_19.png',
+      alignment: Alignment(0.84, 0.04),
+      width: 80,
+      height: 110,
+      blur: 8,
+      opacity: 0.22,
+      scale: 1.02,
+      rotationDegrees: 1.4,
+      driftX: 7,
+      driftY: 13,
+      duration: Duration(milliseconds: 5200),
+      phase: 0.24,
+    ),
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_22.png',
+      alignment: Alignment(-1.1, 0.74),
+      width: 64,
+      height: 90,
+      blur: 13,
+      opacity: 0.12,
+      scale: 0.89,
+      rotationDegrees: 1.9,
+      driftX: -6,
+      driftY: 15,
+      duration: Duration(milliseconds: 7800),
+      phase: 0.52,
+    ),
+    _FloatingProfileCardSpec(
+      asset: 'assets/anonymous/avt_24.png',
+      alignment: Alignment(1.08, 0.72),
+      width: 68,
+      height: 94,
+      blur: 11,
+      opacity: 0.15,
+      scale: 0.93,
+      rotationDegrees: -1.7,
+      driftX: 9,
+      driftY: 11,
+      duration: Duration(milliseconds: 6900),
+      phase: 0.7,
+    ),
+  ];
+
+  late final List<AnimationController> _controllers;
+  late final List<CurvedAnimation> _animations;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = [
+      for (final card in _cards)
+        AnimationController(vsync: this, duration: card.duration)
+          ..value = card.phase
+          ..repeat(reverse: true),
+    ];
+    _animations = [
+      for (final controller in _controllers)
+        CurvedAnimation(
+          parent: controller,
+          curve: Curves.easeInOut,
+          reverseCurve: Curves.easeInOut,
+        ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    for (final animation in _animations) {
+      animation.dispose();
+    }
+    for (final controller in _controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          for (var index = 0; index < _cards.length; index++)
+            _AnimatedFloatingProfileCard(
+              spec: _cards[index],
+              animation: _animations[index],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimatedFloatingProfileCard extends StatelessWidget {
+  const _AnimatedFloatingProfileCard({
+    required this.spec,
     required this.animation,
-    required this.phase,
-    required this.alignment,
-    required this.asset,
   });
 
+  final _FloatingProfileCardSpec spec;
   final Animation<double> animation;
-  final double phase;
-  final Alignment alignment;
-  final String asset;
 
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: alignment,
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, child) {
-          final angle = (animation.value * math.pi * 2) + phase;
-          return Transform.translate(
-            offset: Offset(math.sin(angle) * 9, math.cos(angle) * 7),
-            child: Transform.rotate(
-              angle: math.sin(angle) * 0.045,
-              child: child,
-            ),
-          );
-        },
-        child: Opacity(
-          opacity: 0.38,
-          child: ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
-            child: Container(
-              width: 58,
-              height: 72,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: AppTheme.secondaryColor.withValues(alpha: 0.28),
+      alignment: spec.alignment,
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: animation,
+          child: SizedBox(
+            width: spec.width,
+            height: spec.height,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(
+                  sigmaX: spec.blur,
+                  sigmaY: spec.blur,
                 ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.asset(asset, fit: BoxFit.cover),
+                child: Image.asset(
+                  spec.asset,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: 220,
+                ),
               ),
             ),
           ),
+          builder: (context, child) {
+            final value = animation.value;
+            final direction = (value * 2) - 1;
+            final animatedScale = spec.scale * (0.985 + (value * 0.03));
+            final opacity = spec.opacity * (0.86 + (value * 0.14));
+            final rotation =
+                (spec.rotationDegrees + (direction * 0.1)) * math.pi / 180;
+
+            return Opacity(
+              opacity: opacity,
+              child: Transform.translate(
+                offset: Offset(
+                  direction * spec.driftX,
+                  direction * spec.driftY,
+                ),
+                child: Transform.rotate(
+                  angle: rotation,
+                  child: Transform.scale(scale: animatedScale, child: child),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
+}
+
+class _FloatingProfileCardSpec {
+  const _FloatingProfileCardSpec({
+    required this.asset,
+    required this.alignment,
+    required this.width,
+    required this.height,
+    required this.blur,
+    required this.opacity,
+    required this.scale,
+    required this.rotationDegrees,
+    required this.driftX,
+    required this.driftY,
+    required this.duration,
+    required this.phase,
+  });
+
+  final String asset;
+  final Alignment alignment;
+  final double width;
+  final double height;
+  final double blur;
+  final double opacity;
+  final double scale;
+  final double rotationDegrees;
+  final double driftX;
+  final double driftY;
+  final Duration duration;
+  final double phase;
 }
 
 class _PulsePainter extends CustomPainter {
