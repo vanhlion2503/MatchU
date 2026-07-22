@@ -184,7 +184,7 @@ class VideoMatchingController extends GetxController {
     _exitInProgress = true;
     final sessionId = _sessionId;
     _sessionId = null;
-    _clock?.cancel();
+    _stopClock();
     await _queueSub?.cancel();
     _queueSub = null;
 
@@ -211,7 +211,7 @@ class VideoMatchingController extends GetxController {
     _roomId = roomId;
     _sessionId = null;
     canCancel.value = false;
-    _clock?.cancel();
+    _stopClock();
     await _queueSub?.cancel();
     _queueSub = null;
     phase.value = VideoMatchingPhase.connecting;
@@ -590,7 +590,7 @@ class VideoMatchingController extends GetxController {
   Future<void> _showEnded() async {
     if (_disposed || _navigatingToChat) return;
     phase.value = VideoMatchingPhase.ended;
-    _clock?.cancel();
+    _stopClock();
     _disconnectTimer?.cancel();
     await _callSub?.cancel();
     await _remoteIceSub?.cancel();
@@ -716,7 +716,8 @@ class VideoMatchingController extends GetxController {
   }
 
   void _startClock() {
-    if (_clock != null) return;
+    if (_clock?.isActive == true) return;
+    _stopClock();
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (phase.value == VideoMatchingPhase.searching) {
         searchElapsedSeconds.value++;
@@ -724,6 +725,11 @@ class VideoMatchingController extends GetxController {
         _syncRoomClock();
       }
     });
+  }
+
+  void _stopClock() {
+    _clock?.cancel();
+    _clock = null;
   }
 
   void _syncRoomClock() {
@@ -746,8 +752,7 @@ class VideoMatchingController extends GetxController {
   }
 
   Future<void> _cancelRoomSubscriptions() async {
-    _clock?.cancel();
-    _clock = null;
+    _stopClock();
     _disconnectTimer?.cancel();
     _disconnectTimer = null;
     await _roomSub?.cancel();
@@ -788,7 +793,7 @@ class VideoMatchingController extends GetxController {
   @override
   void onClose() {
     _disposed = true;
-    _clock?.cancel();
+    _stopClock();
     _disconnectTimer?.cancel();
     _connectivitySub?.cancel();
     unawaited(_cancelAllSubscriptions());
