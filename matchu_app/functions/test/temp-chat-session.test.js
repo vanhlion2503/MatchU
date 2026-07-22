@@ -26,6 +26,18 @@ test("matching preference must be mutual", () => {
   );
 });
 
+test("matching mode must be mutual", () => {
+  assert.equal(__test.normalizeMatchingMode("VIDEO"), "video");
+  assert.equal(__test.normalizeMatchingMode("unknown"), "chat");
+  assert.equal(
+    __test.isMutualMatch(
+      { gender: "male", targetGender: "random", matchingMode: "video" },
+      { gender: "female", targetGender: "random", matchingMode: "chat" }
+    ),
+    false
+  );
+});
+
 test("verified users do not consume daily quota", () => {
   const patch = __test.quotaPatch(
     { isFaceVerified: true, dailyMatchingCount: 10 },

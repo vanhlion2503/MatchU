@@ -16,9 +16,9 @@
 		</dict>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Cho phép dùng camera để chụp ảnh avatar, xác thực khuôn mặt và quét mã QR</string>
+	<string>Cho phép MatchU dùng camera để gọi video ẩn danh, chụp ảnh avatar, xác thực khuôn mặt và quét mã QR</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Cho phep ghi am de dang giong noi trong bai viet va binh luan</string>
+	<string>Cho phép MatchU dùng micro để gọi ẩn danh và đăng giọng nói trong bài viết, bình luận</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Cho phép chọn ảnh từ thư viện để cập nhật avatar, đăng bài viết và gửi tin nhắn</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

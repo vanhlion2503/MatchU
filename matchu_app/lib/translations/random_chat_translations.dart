@@ -8,6 +8,8 @@ const randomChatEnglishTranslations = <String, String>{
       'Match by your preferred gender: Male, Female, or Random.',
   'Mỗi phiên bắt đầu từ avatar ẩn danh để tăng an toàn khi làm quen.':
       'Each session starts with an anonymous avatar for a safer introduction.',
+  'Chọn Trò chuyện hoặc Video call ẩn danh trước khi bắt đầu.':
+      'Choose anonymous Chat or Video call before you start.',
   'Tài khoản đã xác thực khuôn mặt dùng matching không giới hạn.':
       'Face-verified accounts can use matching without a daily limit.',
   'Cách chơi': 'How it works',
@@ -19,8 +21,12 @@ const randomChatEnglishTranslations = <String, String>{
       'Step 2: Choose who you want to meet (Male/Female/Random).',
   'Bước 3: Nhấn nút Bắt đầu tìm kiếm và chờ hệ thống ghép cặp.':
       'Step 3: Tap Start searching and wait for a match.',
+  'Bước 3: Chọn Trò chuyện hoặc Video call rồi bắt đầu tìm kiếm.':
+      'Step 3: Choose Chat or Video call, then start searching.',
   'Bước 4: Vào phòng chat tạm 7 phút để trò chuyện và quyết định tiếp tục.':
       'Step 4: Chat for seven minutes, then decide whether to continue.',
+  'Bước 4: Làm quen trong phòng tạm và cùng thả tim nếu muốn tiếp tục.':
+      'Step 4: Get acquainted in the temporary room and both like to continue.',
   'Luật chơi': 'Rules',
   'Bộ luật áp dụng cho matching chat để đảm bảo công bằng và an toàn.':
       'These matching rules help keep conversations fair and safe.',
@@ -30,6 +36,8 @@ const randomChatEnglishTranslations = <String, String>{
       'Unverified accounts get up to 10 successful matches per day, resetting at midnight.',
   'Nếu cả hai cùng thích nhau, hệ thống chuyển sang phòng chat lâu dài.':
       'If you both like each other, the conversation becomes a permanent chat.',
+  'Phòng video kéo dài tối đa 8 phút; camera chỉ mở được sau 1 phút 30 giây.':
+      'Video rooms last up to eight minutes; cameras unlock after 1 minute 30 seconds.',
   'Không spam, xúc phạm, quấy rối hoặc chia sẻ nội dung nhạy cảm.':
       'Do not spam, insult, harass, or share sensitive content.',
   'Vi phạm nhiều lần có thể bị cảnh báo, hạn chế hoặc khóa tính năng.':

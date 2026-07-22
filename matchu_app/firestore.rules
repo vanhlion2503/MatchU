@@ -1428,6 +1428,30 @@ service cloud.firestore {
           && !(changed.hasAny(["userBLiked"]) && request.auth.uid != resource.data.userB);
       }
 
+      function onlyUpdatesOwnVideoCameraState() {
+        let changed = request.resource.data.diff(resource.data).changedKeys();
+        return !changed.hasAny(["videoCameraStates"])
+          || (
+            resource.data.matchingMode == "video"
+            && resource.data.cameraUnlockAt is timestamp
+            && request.time >= resource.data.cameraUnlockAt
+            && request.resource.data.videoCameraStates is map
+            && request.resource.data.videoCameraStates.keys()
+              .hasAll(resource.data.participants)
+            && request.resource.data.videoCameraStates.keys()
+              .hasOnly(resource.data.participants)
+            && request.resource.data.videoCameraStates[request.auth.uid] is bool
+            && (
+              request.auth.uid == resource.data.userA
+              && request.resource.data.videoCameraStates[resource.data.userB]
+                == resource.data.videoCameraStates[resource.data.userB]
+              || request.auth.uid == resource.data.userB
+              && request.resource.data.videoCameraStates[resource.data.userA]
+                == resource.data.videoCameraStates[resource.data.userA]
+            )
+          );
+      }
+
       function onlyUpdatesOwnTyping() {
         let changed = request.resource.data.diff(resource.data).changedKeys();
         return !changed.hasAny(["typing"])
@@ -1471,6 +1495,7 @@ service cloud.firestore {
       // ✏️ Update
       allow update: if isParticipant()
         && onlyUpdatesOwnLike()
+        && onlyUpdatesOwnVideoCameraState()
         && onlyUpdatesOwnTyping()
         && isValidClientEndTransition()
         && (
@@ -1478,6 +1503,7 @@ service cloud.firestore {
             .hasOnly([
               "userALiked",
               "userBLiked",
+              "videoCameraStates",
               "typing",
               "status",
               "endedBy",

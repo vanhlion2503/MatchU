@@ -9,6 +9,7 @@ import 'package:matchu_app/translations/long_chat_translations.dart';
 import 'package:matchu_app/translations/profile_translations.dart';
 import 'package:matchu_app/translations/auth_translations.dart';
 import 'package:matchu_app/translations/account_security_translations.dart';
+import 'package:matchu_app/translations/video_matching_translations.dart';
 
 const _legacyVietnamese = <String, String>{
   'Đăng nhập': 'Đăng nhập',
@@ -790,6 +791,7 @@ class AppTranslations extends Translations {
       ...profileVietnameseTranslations,
       ...authVietnameseTranslations,
       ...accountSecurityVietnameseTranslations,
+      ...videoMatchingVietnameseTranslations,
       TranslationKeys.language: 'Ngôn ngữ',
       TranslationKeys.vietnamese: 'Tiếng Việt',
       TranslationKeys.english: 'Tiếng Anh',
@@ -845,6 +847,7 @@ class AppTranslations extends Translations {
       ...profileEnglishTranslations,
       ...authEnglishTranslations,
       ...accountSecurityEnglishTranslations,
+      ...videoMatchingEnglishTranslations,
       TranslationKeys.language: 'Language',
       TranslationKeys.vietnamese: 'Vietnamese',
       TranslationKeys.english: 'English',

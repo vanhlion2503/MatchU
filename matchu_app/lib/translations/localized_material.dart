@@ -7,6 +7,7 @@ import 'package:matchu_app/translations/random_chat_translations.dart';
 import 'package:matchu_app/translations/long_chat_translations.dart';
 import 'package:matchu_app/translations/profile_translations.dart';
 import 'package:matchu_app/translations/auth_translations.dart';
+import 'package:matchu_app/translations/video_matching_translations.dart';
 
 export 'package:flutter/material.dart' hide Text;
 
@@ -110,6 +111,8 @@ class Text extends material.StatelessWidget {
   String _translate(String source) {
     final authTranslation = authTr(source);
     if (authTranslation != source) return authTranslation;
+    final videoMatchingTranslation = videoMatchingTr(source);
+    if (videoMatchingTranslation != source) return videoMatchingTranslation;
     final profileTranslation = profileTr(source);
     if (profileTranslation != source) return profileTranslation;
     final longChatTranslation = longChatTr(source);

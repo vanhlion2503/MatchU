@@ -13,6 +13,7 @@ class WebRTCService {
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
+  MediaStream? _cameraStream;
   bool _renderersInitialized = false;
 
   Future<void> initPeerConnection({
@@ -49,18 +50,17 @@ class WebRTCService {
     _renderersInitialized = true;
   }
 
+  Map<String, dynamic> get _videoConstraints => <String, dynamic>{
+    'facingMode': 'user',
+    'width': {'ideal': 1280},
+    'height': {'ideal': 720},
+    'frameRate': {'ideal': 24},
+  };
+
   Future<MediaStream> _getUserMedia({required bool withVideo}) {
     return navigator.mediaDevices.getUserMedia({
       'audio': true,
-      'video':
-          withVideo
-              ? <String, dynamic>{
-                'facingMode': 'user',
-                'width': {'ideal': 1280},
-                'height': {'ideal': 720},
-                'frameRate': {'ideal': 24},
-              }
-              : false,
+      'video': withVideo ? _videoConstraints : false,
     });
   }
 
@@ -109,9 +109,15 @@ class WebRTCService {
     return peer;
   }
 
-  Future<RTCSessionDescription> createOffer({bool iceRestart = false}) async {
+  Future<RTCSessionDescription> createOffer({
+    bool iceRestart = false,
+    bool? receiveVideo,
+  }) async {
     final peer = _requirePeerConnection();
-    final withVideo = (_localStream?.getVideoTracks().isNotEmpty ?? false);
+    final withVideo =
+        receiveVideo ??
+        ((_localStream?.getVideoTracks().isNotEmpty ?? false) ||
+            (_cameraStream?.getVideoTracks().isNotEmpty ?? false));
     final offer = await peer.createOffer(<String, dynamic>{
       'offerToReceiveAudio': true,
       'offerToReceiveVideo': withVideo,
@@ -121,9 +127,12 @@ class WebRTCService {
     return offer;
   }
 
-  Future<RTCSessionDescription> createAnswer() async {
+  Future<RTCSessionDescription> createAnswer({bool? receiveVideo}) async {
     final peer = _requirePeerConnection();
-    final withVideo = (_localStream?.getVideoTracks().isNotEmpty ?? false);
+    final withVideo =
+        receiveVideo ??
+        ((_localStream?.getVideoTracks().isNotEmpty ?? false) ||
+            (_cameraStream?.getVideoTracks().isNotEmpty ?? false));
     final answer = await peer.createAnswer(<String, dynamic>{
       'offerToReceiveAudio': true,
       'offerToReceiveVideo': withVideo,
@@ -170,16 +179,45 @@ class WebRTCService {
   }
 
   Future<void> setCameraEnabled(bool enabled) async {
-    final stream = _localStream;
-    if (stream == null) return;
-
-    for (final track in stream.getVideoTracks()) {
-      track.enabled = enabled;
+    final streams = <MediaStream?>[_localStream, _cameraStream];
+    for (final stream in streams) {
+      if (stream == null) continue;
+      for (final track in stream.getVideoTracks()) {
+        track.enabled = enabled;
+      }
     }
   }
 
+  /// Adds a camera sender to an audio-only peer connection on first use.
+  /// Returns true only when a new video track was added and SDP renegotiation
+  /// is therefore required.
+  Future<bool> ensureLocalVideoTrack() async {
+    if ((_localStream?.getVideoTracks().isNotEmpty ?? false) ||
+        (_cameraStream?.getVideoTracks().isNotEmpty ?? false)) {
+      return false;
+    }
+
+    final peer = _requirePeerConnection();
+    final cameraStream = await navigator.mediaDevices.getUserMedia({
+      'audio': false,
+      'video': _videoConstraints,
+    });
+    final tracks = cameraStream.getVideoTracks();
+    if (tracks.isEmpty) {
+      await cameraStream.dispose();
+      throw StateError('Camera did not provide a video track.');
+    }
+
+    _cameraStream = cameraStream;
+    localRenderer.srcObject = cameraStream;
+    for (final track in tracks) {
+      await peer.addTrack(track, cameraStream);
+    }
+    return true;
+  }
+
   Future<void> switchCamera() async {
-    final stream = _localStream;
+    final stream = _cameraStream ?? _localStream;
     if (stream == null) return;
 
     final tracks = stream.getVideoTracks();
@@ -214,6 +252,15 @@ class WebRTCService {
           track.stop();
         }
         await local.dispose();
+      }
+
+      final camera = _cameraStream;
+      _cameraStream = null;
+      if (camera != null && !identical(camera, local)) {
+        for (final track in camera.getTracks()) {
+          track.stop();
+        }
+        await camera.dispose();
       }
     } catch (error) {
       debugPrint('WebRTC local stream dispose error: $error');

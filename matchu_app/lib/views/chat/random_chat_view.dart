@@ -14,6 +14,7 @@ import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
 import 'package:matchu_app/widgets/chat_widget/ripple_animation_widget.dart';
 import 'package:matchu_app/translations/matching_chat_translations.dart';
 import 'package:matchu_app/translations/random_chat_translations.dart';
+import 'package:matchu_app/routes/app_router.dart';
 
 class RandomChatView extends StatefulWidget {
   const RandomChatView({super.key});
@@ -23,6 +24,8 @@ class RandomChatView extends StatefulWidget {
 }
 
 enum _GuideTab { overview, howTo, rules }
+
+enum _MatchingExperience { chat, video }
 
 class _RandomChatViewState extends State<RandomChatView>
     with SingleTickerProviderStateMixin {
@@ -36,6 +39,7 @@ class _RandomChatViewState extends State<RandomChatView>
           'MatchU ghép cặp ẩn danh theo tiêu chí của bạn và mở phòng chat tạm để làm quen nhanh.',
       icon: Iconsax.flash_1,
       bullets: [
+        'Chọn Trò chuyện hoặc Video call ẩn danh trước khi bắt đầu.',
         'Ghép cặp theo giới tính bạn chọn: Nam, Nữ hoặc Ngẫu nhiên.',
         'Mỗi phiên bắt đầu từ avatar ẩn danh để tăng an toàn khi làm quen.',
         'Tài khoản đã xác thực khuôn mặt dùng matching không giới hạn.',
@@ -48,8 +52,8 @@ class _RandomChatViewState extends State<RandomChatView>
       bullets: [
         'Bước 1: Chọn avatar ẩn danh của bạn.',
         'Bước 2: Chọn đối tượng muốn ghép (Nam/Nữ/Ngẫu nhiên).',
-        'Bước 3: Nhấn nút Bắt đầu tìm kiếm và chờ hệ thống ghép cặp.',
-        'Bước 4: Vào phòng chat tạm 7 phút để trò chuyện và quyết định tiếp tục.',
+        'Bước 3: Chọn Trò chuyện hoặc Video call rồi bắt đầu tìm kiếm.',
+        'Bước 4: Làm quen trong phòng tạm và cùng thả tim nếu muốn tiếp tục.',
       ],
     ),
     _GuideTab.rules: _GuideSectionData(
@@ -61,6 +65,7 @@ class _RandomChatViewState extends State<RandomChatView>
         'Chỉ tính lượt khi ghép cặp thành công (không trừ lượt khi chỉ bấm tìm).',
         'Tài khoản chưa xác thực: tối đa 10 lượt ghép thành công/ngày, reset lúc 00:00.',
         'Nếu cả hai cùng thích nhau, hệ thống chuyển sang phòng chat lâu dài.',
+        'Phòng video kéo dài tối đa 8 phút; camera chỉ mở được sau 1 phút 30 giây.',
         'Không spam, xúc phạm, quấy rối hoặc chia sẻ nội dung nhạy cảm.',
         'Vi phạm nhiều lần có thể bị cảnh báo, hạn chế hoặc khóa tính năng.',
       ],
@@ -78,6 +83,7 @@ class _RandomChatViewState extends State<RandomChatView>
   final _box = GetStorage();
 
   String selectedTarget = 'random';
+  _MatchingExperience _selectedExperience = _MatchingExperience.chat;
   MatchingQuotaPreview? _quotaPreview;
   bool _isLoadingQuota = true;
   bool _isStarting = false;
@@ -380,8 +386,12 @@ class _RandomChatViewState extends State<RandomChatView>
       }
 
       controller.isMinimized.value = false;
+      final route =
+          _selectedExperience == _MatchingExperience.video
+              ? AppRouter.videoMatching
+              : AppRouter.matching;
       await Get.toNamed(
-        '/matching',
+        route,
         arguments: {
           'targetGender': selectedTarget,
           'anonymousAvatar': anonAvatarC.selectedAvatar.value,
@@ -489,6 +499,9 @@ class _RandomChatViewState extends State<RandomChatView>
                         titleFontSize: titleFontSize,
                         subtitleFontSize: subtitleFontSize,
                       ),
+                      SizedBox(height: isCompactHeight ? 10 : 14),
+                      _buildExperienceSelector(theme, compact: isCompactHeight),
+                      SizedBox(height: isCompactHeight ? 8 : 12),
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, middleConstraints) {
@@ -599,6 +612,101 @@ class _RandomChatViewState extends State<RandomChatView>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildExperienceSelector(ThemeData theme, {required bool compact}) {
+    final scheme = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
+
+    return Container(
+      height: compact ? 46 : 52,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color:
+            isLight
+                ? const Color(0xFFF1F4F7)
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.64),
+        borderRadius: BorderRadius.circular(17),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _experienceChip(
+              theme,
+              experience: _MatchingExperience.chat,
+              icon: Iconsax.message,
+              label: 'Trò chuyện',
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _experienceChip(
+              theme,
+              experience: _MatchingExperience.video,
+              icon: Iconsax.video,
+              label: 'Video call',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _experienceChip(
+    ThemeData theme, {
+    required _MatchingExperience experience,
+    required IconData icon,
+    required String label,
+  }) {
+    final selected = _selectedExperience == experience;
+    final scheme = theme.colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(13),
+        onTap:
+            selected
+                ? null
+                : () => setState(() => _selectedExperience = experience),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            color: selected ? scheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow:
+                selected
+                    ? [
+                      BoxShadow(
+                        color: scheme.primary.withValues(alpha: 0.22),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                    : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 19,
+                color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

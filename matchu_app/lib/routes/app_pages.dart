@@ -8,6 +8,7 @@ import 'package:matchu_app/bindings/user/account_security_binding.dart';
 import 'package:matchu_app/bindings/profile/profile_privacy_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
 import 'package:matchu_app/bindings/chat/temp_chat_binding.dart';
+import 'package:matchu_app/bindings/matching/video_matching_binding.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
@@ -33,6 +34,7 @@ import 'package:matchu_app/views/chat/call/screens/call_view.dart';
 import 'package:matchu_app/views/chat/call/screens/incoming_call_view.dart';
 import 'package:matchu_app/views/chat/long_chat/chat_view.dart';
 import 'package:matchu_app/views/matching/matching_view.dart';
+import 'package:matchu_app/views/matching/video_matching_view.dart';
 import 'package:matchu_app/views/notification/notification_inbox_view.dart';
 import 'package:matchu_app/views/rating/rating_view.dart';
 import 'package:matchu_app/views/reputation/reputation_view.dart';
@@ -262,6 +264,12 @@ class AppPages {
     ),
 
     GetPage(name: AppRouter.matching, page: () => MatchingView()),
+
+    GetPage(
+      name: AppRouter.videoMatching,
+      page: () => const VideoMatchingView(),
+      binding: VideoMatchingBinding(),
+    ),
 
     GetPage(
       name: AppRouter.rating,

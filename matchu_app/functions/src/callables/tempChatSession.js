@@ -6,6 +6,8 @@ const { admin, db } = require("../shared/firebase");
 
 const QUEUE_COLLECTION = "tempChatMatchingQueue";
 const TEMP_CHAT_DURATION_MS = 7 * 60 * 1000;
+const VIDEO_CHAT_DURATION_MS = 8 * 60 * 1000;
+const VIDEO_CAMERA_LOCK_MS = 90 * 1000;
 const QUEUE_TTL_MS = 90 * 1000;
 const DAILY_MATCH_LIMIT = 10;
 const MATCH_SCAN_LIMIT = 50;
@@ -40,6 +42,10 @@ function normalizeGender(value) {
   return "random";
 }
 
+function normalizeMatchingMode(value) {
+  return cleanString(value, 16).toLowerCase() === "video" ? "video" : "chat";
+}
+
 function isActiveTempRoomForUser(room, uid) {
   const participants = Array.isArray(room?.participants) ? room.participants : [];
   return room?.status === "active" && participants.includes(uid);
@@ -47,7 +53,9 @@ function isActiveTempRoomForUser(room, uid) {
 
 function isMutualMatch(seeker, candidate) {
   const accepts = (target, gender) => target === "random" || target === gender;
-  return accepts(seeker.targetGender, candidate.gender) &&
+  return normalizeMatchingMode(seeker.matchingMode) ===
+      normalizeMatchingMode(candidate.matchingMode) &&
+    accepts(seeker.targetGender, candidate.gender) &&
     accepts(candidate.targetGender, seeker.gender);
 }
 
@@ -145,7 +153,13 @@ async function hasBlockInTransaction(tx, uidA, uidB) {
   return snapshots.some((snapshot) => snapshot.exists);
 }
 
-async function enqueueSeeker({ uid, sessionId, targetGender, avatar }) {
+async function enqueueSeeker({
+  uid,
+  sessionId,
+  targetGender,
+  avatar,
+  matchingMode,
+}) {
   const userRef = db.collection("users").doc(uid);
   const queueRef = db.collection(QUEUE_COLLECTION).doc(uid);
   const now = new Date();
@@ -159,6 +173,12 @@ async function enqueueSeeker({ uid, sessionId, targetGender, avatar }) {
     if (activeRoomId) {
       const activeRoom = await tx.get(db.collection("tempChats").doc(activeRoomId));
       if (activeRoom.exists && isActiveTempRoomForUser(activeRoom.data(), uid)) {
+        if (normalizeMatchingMode(activeRoom.get("matchingMode")) !== matchingMode) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Another temporary session is already active."
+          );
+        }
         return activeRoomId;
       }
       // Recover from a stale lock left by an interrupted cleanup trigger.
@@ -173,6 +193,7 @@ async function enqueueSeeker({ uid, sessionId, targetGender, avatar }) {
       sessionId,
       gender,
       targetGender,
+      matchingMode,
       anonymousAvatar: avatar,
       status: "waiting",
       createdAt: admin.firestore.Timestamp.fromDate(now),
@@ -187,11 +208,12 @@ async function enqueueSeeker({ uid, sessionId, targetGender, avatar }) {
   });
 }
 
-async function tryCreateMatch({ uid, sessionId }) {
+async function tryCreateMatch({ uid, sessionId, matchingMode }) {
   const seekerRef = db.collection(QUEUE_COLLECTION).doc(uid);
   const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - QUEUE_TTL_MS);
   const candidates = await db.collection(QUEUE_COLLECTION)
     .where("status", "==", "waiting")
+    .where("matchingMode", "==", matchingMode)
     .where("createdAt", ">=", cutoff)
     .orderBy("createdAt", "asc")
     .limit(MATCH_SCAN_LIMIT)
@@ -202,6 +224,7 @@ async function tryCreateMatch({ uid, sessionId }) {
     const candidateUid = candidateDoc.id;
     const candidateRef = candidateDoc.ref;
     const roomRef = db.collection("tempChats").doc();
+    const callRef = db.collection("callSessions").doc(`video_${roomRef.id}`);
 
     try {
       const roomId = await db.runTransaction(async (tx) => {
@@ -225,11 +248,18 @@ async function tryCreateMatch({ uid, sessionId }) {
         if (await hasBlockInTransaction(tx, uid, candidateUid)) return null;
 
         const now = new Date();
+        const matchingMode = normalizeMatchingMode(seeker.matchingMode);
+        const durationMs = matchingMode === "video"
+          ? VIDEO_CHAT_DURATION_MS
+          : TEMP_CHAT_DURATION_MS;
         const seekerQuota = quotaPatch(seekerUser.data() || {}, now);
         const candidateQuota = quotaPatch(candidateUser.data() || {}, now);
         const createdAt = admin.firestore.Timestamp.fromDate(now);
         const expiresAt = admin.firestore.Timestamp.fromMillis(
-          now.getTime() + TEMP_CHAT_DURATION_MS
+          now.getTime() + durationMs
+        );
+        const cameraUnlockAt = admin.firestore.Timestamp.fromMillis(
+          now.getTime() + VIDEO_CAMERA_LOCK_MS
         );
 
         tx.create(roomRef, {
@@ -239,7 +269,8 @@ async function tryCreateMatch({ uid, sessionId }) {
           participants: [uid, candidateUid],
           createdAt,
           expiresAt,
-          durationSeconds: TEMP_CHAT_DURATION_MS / 1000,
+          durationSeconds: durationMs / 1000,
+          matchingMode,
           sessionA: seeker.sessionId,
           sessionB: candidate.sessionId,
           sessionIds: [seeker.sessionId, candidate.sessionId],
@@ -253,7 +284,32 @@ async function tryCreateMatch({ uid, sessionId }) {
             [uid]: seeker.anonymousAvatar,
             [candidateUid]: candidate.anonymousAvatar,
           },
+          ...(matchingMode === "video" ? {
+            cameraUnlockAt,
+            callSessionId: callRef.id,
+            videoCameraStates: {
+              [uid]: false,
+              [candidateUid]: false,
+            },
+          } : {}),
         });
+        if (matchingMode === "video") {
+          // The session starts as active so the normal incoming-call listener,
+          // which only watches "ringing", never exposes either anonymous user.
+          tx.create(callRef, {
+            callId: callRef.id,
+            roomChatId: roomRef.id,
+            callerId: uid,
+            receiverId: candidateUid,
+            participants: [uid, candidateUid],
+            type: "video",
+            status: "active",
+            offer: null,
+            answer: null,
+            createdAt,
+            updatedAt: createdAt,
+          });
+        }
         tx.update(seekerRef, {
           status: "matched",
           roomId: roomRef.id,
@@ -301,6 +357,7 @@ const startTempChatMatching = onCall(async (request) => {
   const uid = requireUid(request);
   const sessionId = cleanString(request.data?.sessionId);
   const targetGender = normalizeGender(request.data?.targetGender);
+  const matchingMode = normalizeMatchingMode(request.data?.matchingMode);
   const avatar = cleanString(request.data?.anonymousAvatar, 32);
   if (!sessionId) {
     throw new HttpsError("invalid-argument", "sessionId is required.");
@@ -314,11 +371,12 @@ const startTempChatMatching = onCall(async (request) => {
     sessionId,
     targetGender,
     avatar,
+    matchingMode,
   });
   if (activeRoomId) {
     return { status: "matched", roomId: activeRoomId, resumed: true };
   }
-  const roomId = await tryCreateMatch({ uid, sessionId });
+  const roomId = await tryCreateMatch({ uid, sessionId, matchingMode });
   return { status: roomId ? "matched" : "waiting", roomId };
 });
 
@@ -391,6 +449,14 @@ async function convertTempRoom(tempRoomId, requesterUid = null) {
       conversionStatus: "ready",
       convertedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+    const callSessionId = cleanString(room.callSessionId);
+    if (callSessionId) {
+      tx.set(db.collection("callSessions").doc(callSessionId), {
+        status: "ended",
+        endedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
     for (const participant of participants) {
       tx.set(db.collection("users").doc(participant), {
         activeTempRoomId: null,
@@ -429,6 +495,15 @@ const releaseEndedTempChatParticipants = onDocumentUpdated(
     if (before.status !== "active" || after.status === "active") return;
     const participants = Array.isArray(after.participants) ? after.participants : [];
     const roomId = event.params.roomId;
+
+    const callSessionId = cleanString(after.callSessionId);
+    if (callSessionId) {
+      await db.collection("callSessions").doc(callSessionId).set({
+        status: "ended",
+        endedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
 
     await Promise.all(participants.map(async (participant) => {
       const userRef = db.collection("users").doc(participant);
@@ -526,6 +601,7 @@ module.exports = {
   releaseEndedTempChatParticipants,
   __test: {
     normalizeGender,
+    normalizeMatchingMode,
     isActiveTempRoomForUser,
     isMutualMatch,
     isVerifiedAccount,

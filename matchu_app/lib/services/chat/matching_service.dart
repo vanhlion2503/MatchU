@@ -26,6 +26,7 @@ class MatchingService {
           'sessionId': sessionId,
           'targetGender': seeker.targetGender,
           'anonymousAvatar': myAnonymousAvatar,
+          'matchingMode': seeker.matchingMode.value,
         });
     final data = Map<String, dynamic>.from(result.data as Map);
     return data['roomId']?.toString();
