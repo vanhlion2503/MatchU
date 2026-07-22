@@ -33,6 +33,12 @@ abstract class VideoMatchingRepository {
     required bool enabled,
   });
 
+  Future<void> setMuted({
+    required String roomId,
+    required String uid,
+    required bool muted,
+  });
+
   Future<void> endRoom({
     required String roomId,
     required String uid,

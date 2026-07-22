@@ -291,6 +291,10 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
               [uid]: false,
               [candidateUid]: false,
             },
+            videoMutedStates: {
+              [uid]: false,
+              [candidateUid]: false,
+            },
           } : {}),
         });
         if (matchingMode === "video") {

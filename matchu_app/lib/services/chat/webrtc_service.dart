@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -6,6 +7,22 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 typedef IceCandidateCallback = Future<void> Function(RTCIceCandidate candidate);
 typedef PeerConnectionStateCallback =
     void Function(RTCPeerConnectionState state);
+
+class WebRTCAudioLevels {
+  const WebRTCAudioLevels({required this.local, required this.remote});
+
+  const WebRTCAudioLevels.silent() : local = 0, remote = 0;
+
+  final double local;
+  final double remote;
+}
+
+class _AudioEnergySample {
+  const _AudioEnergySample(this.energy, this.duration);
+
+  final double energy;
+  final double duration;
+}
 
 class WebRTCService {
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
@@ -17,6 +34,8 @@ class WebRTCService {
   MediaStream? _remoteFallbackStream;
   Future<MediaStream>? _remoteFallbackStreamFuture;
   bool _renderersInitialized = false;
+  _AudioEnergySample? _localAudioSample;
+  _AudioEnergySample? _remoteAudioSample;
 
   Future<void> initPeerConnection({
     required bool withVideo,
@@ -201,6 +220,82 @@ class WebRTCService {
     }
   }
 
+  /// Reads WebRTC audio statistics without opening another microphone stream.
+  /// Direct `audioLevel` is preferred; energy deltas cover native platforms
+  /// that only expose cumulative audio energy.
+  Future<WebRTCAudioLevels> readAudioLevels() async {
+    final peer = _peerConnection;
+    if (peer == null) return const WebRTCAudioLevels.silent();
+
+    final reports = await peer.getStats();
+    return WebRTCAudioLevels(
+      local: _readAudioLevel(reports, remote: false),
+      remote: _readAudioLevel(reports, remote: true),
+    );
+  }
+
+  double _readAudioLevel(List<StatsReport> reports, {required bool remote}) {
+    var directLevel = 0.0;
+    _AudioEnergySample? newestSample;
+
+    for (final report in reports) {
+      final values = report.values;
+      final kind =
+          (values['kind'] ?? values['mediaType'] ?? '')
+              .toString()
+              .toLowerCase();
+      if (kind.isNotEmpty && kind != 'audio') continue;
+
+      final type = report.type.toLowerCase();
+      final remoteSource = values['remoteSource'] == true;
+      final isRemoteReport =
+          type == 'inbound-rtp' ||
+          type.contains('remote-inbound') ||
+          (type == 'track' && remoteSource);
+      final isLocalReport =
+          type == 'media-source' ||
+          type == 'outbound-rtp' ||
+          (type == 'track' && !remoteSource);
+      if (remote ? !isRemoteReport : !isLocalReport) continue;
+
+      final rawLevel =
+          values['audioLevel'] ??
+          values[remote ? 'audioOutputLevel' : 'audioInputLevel'] ??
+          values[remote ? 'googAudioOutputLevel' : 'googAudioInputLevel'];
+      final normalized = _normalizeAudioLevel(rawLevel);
+      if (normalized > directLevel) directLevel = normalized;
+
+      final energy = (values['totalAudioEnergy'] as num?)?.toDouble();
+      final duration = (values['totalSamplesDuration'] as num?)?.toDouble();
+      if (energy != null && duration != null) {
+        newestSample = _AudioEnergySample(energy, duration);
+      }
+    }
+
+    final previous = remote ? _remoteAudioSample : _localAudioSample;
+    if (remote) {
+      _remoteAudioSample = newestSample;
+    } else {
+      _localAudioSample = newestSample;
+    }
+
+    if (directLevel > 0 || newestSample == null || previous == null) {
+      return directLevel.clamp(0, 1).toDouble();
+    }
+    final energyDelta = newestSample.energy - previous.energy;
+    final durationDelta = newestSample.duration - previous.duration;
+    if (energyDelta <= 0 || durationDelta <= 0) return 0;
+    return math.sqrt(energyDelta / durationDelta).clamp(0, 1).toDouble();
+  }
+
+  double _normalizeAudioLevel(Object? value) {
+    if (value is! num) return 0;
+    final level = value.toDouble();
+    if (level <= 0) return 0;
+    // Legacy WebRTC stats use a 0..32767 integer range.
+    return (level > 1 ? level / 32767 : level).clamp(0, 1).toDouble();
+  }
+
   Future<void> setCameraEnabled(bool enabled) async {
     final streams = <MediaStream?>[_localStream, _cameraStream];
     for (final stream in streams) {
@@ -292,6 +387,8 @@ class WebRTCService {
       if (remoteFallback != null) {
         await remoteFallback.dispose();
       }
+      _localAudioSample = null;
+      _remoteAudioSample = null;
     } catch (error) {
       debugPrint('WebRTC local stream dispose error: $error');
     }

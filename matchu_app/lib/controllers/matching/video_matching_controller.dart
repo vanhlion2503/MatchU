@@ -51,7 +51,11 @@ class VideoMatchingController extends GetxController {
   final cameraUnlockRemainingSeconds = 90.obs;
   final cameraUnlocked = false.obs;
   final isMuted = false.obs;
+  final remoteMuted = false.obs;
+  final localVoiceLevel = 0.0.obs;
+  final remoteVoiceLevel = 0.0.obs;
   final localCameraEnabled = false.obs;
+  final cameraToggleInProgress = false.obs;
   final remoteCameraEnabled = false.obs;
   final hasLiked = false.obs;
   final otherLiked = false.obs;
@@ -87,6 +91,7 @@ class VideoMatchingController extends GetxController {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   Timer? _clock;
   Timer? _disconnectTimer;
+  Timer? _audioLevelTimer;
 
   final Set<String> _handledRemoteCandidateIds = <String>{};
   final Set<String> _videoParticipantsSeenEnabled = <String>{};
@@ -103,6 +108,7 @@ class VideoMatchingController extends GetxController {
   bool _navigatingToChat = false;
   bool _navigatingToRating = false;
   bool _disposed = false;
+  bool _pollingAudioLevels = false;
   String? _lastOfferSdp;
   String? _lastAnswerSdp;
   String? _videoOfferSignature;
@@ -354,7 +360,14 @@ class VideoMatchingController extends GetxController {
       _videoParticipantsSeenEnabled.add(otherUid);
     }
     remoteCameraEnabled.value = cameraStates[otherUid] == true;
-    localCameraEnabled.value = cameraStates[uid] == true;
+    if (!cameraToggleInProgress.value) {
+      localCameraEnabled.value = cameraStates[uid] == true;
+    }
+
+    final mutedStates = Map<String, dynamic>.from(
+      data['videoMutedStates'] ?? const <String, dynamic>{},
+    );
+    remoteMuted.value = mutedStates[otherUid] == true;
 
     hasLiked.value =
         (isUserA ? data['userALiked'] : data['userBLiked']) == true;
@@ -591,6 +604,7 @@ class VideoMatchingController extends GetxController {
     switch (state) {
       case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
         _disconnectTimer?.cancel();
+        _startAudioLevelMeter();
         if (phase.value == VideoMatchingPhase.connecting) {
           phase.value = VideoMatchingPhase.active;
         }
@@ -612,19 +626,86 @@ class VideoMatchingController extends GetxController {
   }
 
   Future<void> toggleMute() async {
+    final roomId = _roomId;
+    if (roomId == null || _exitInProgress) return;
     final next = !isMuted.value;
-    await _webRTC.setMicrophoneEnabled(!next);
-    isMuted.value = next;
+    try {
+      await _webRTC.setMicrophoneEnabled(!next);
+      isMuted.value = next;
+      if (next) localVoiceLevel.value = 0;
+      await _repository.setMuted(roomId: roomId, uid: uid, muted: next);
+    } catch (error) {
+      // Never turn the microphone back on after a failed sync. Local privacy
+      // takes priority; the next room update/toggle can retry Firestore.
+      Get.snackbar(
+        videoMatchingTr('Không thể đổi trạng thái micro'),
+        videoMatchingTr('Vui lòng thử lại sau một chút.'),
+        snackPosition: SnackPosition.TOP,
+      );
+    }
+  }
+
+  void _startAudioLevelMeter() {
+    if (_audioLevelTimer?.isActive == true) return;
+    _stopAudioLevelMeter();
+    unawaited(_pollAudioLevels());
+    _audioLevelTimer = Timer.periodic(
+      const Duration(milliseconds: 250),
+      (_) => unawaited(_pollAudioLevels()),
+    );
+  }
+
+  Future<void> _pollAudioLevels() async {
+    if (_pollingAudioLevels || _disposed || _roomId == null) return;
+    _pollingAudioLevels = true;
+    try {
+      final levels = await _webRTC.readAudioLevels();
+      if (_disposed || _roomId == null) return;
+      _updateVoiceLevel(localVoiceLevel, isMuted.value ? 0 : levels.local);
+      _updateVoiceLevel(
+        remoteVoiceLevel,
+        remoteMuted.value ? 0 : levels.remote,
+      );
+    } catch (error) {
+      debugPrint('Unable to read WebRTC audio levels: $error');
+    } finally {
+      _pollingAudioLevels = false;
+    }
+  }
+
+  void _updateVoiceLevel(RxDouble target, double rawLevel) {
+    final next =
+        rawLevel <= 0.012
+            ? 0.0
+            : ((rawLevel - 0.012) * 8).clamp(0.0, 1.0).toDouble();
+    if ((target.value - next).abs() >= 0.025 || next == 0) {
+      target.value = next;
+    }
+  }
+
+  void _stopAudioLevelMeter() {
+    _audioLevelTimer?.cancel();
+    _audioLevelTimer = null;
+    _pollingAudioLevels = false;
+    localVoiceLevel.value = 0;
+    remoteVoiceLevel.value = 0;
   }
 
   Future<void> toggleCamera() async {
     final roomId = _roomId;
-    if (!cameraUnlocked.value || roomId == null || _exitInProgress) return;
+    if (!cameraUnlocked.value ||
+        roomId == null ||
+        _exitInProgress ||
+        cameraToggleInProgress.value) {
+      return;
+    }
 
     final previous = localCameraEnabled.value;
     final next = !previous;
+    cameraToggleInProgress.value = true;
     try {
       if (next) await _webRTC.ensureLocalVideoTrack();
+      if (_disposed || _roomId != roomId) return;
       await _webRTC.setCameraEnabled(next);
       localCameraEnabled.value = next;
       await _repository.setCameraEnabled(
@@ -634,17 +715,27 @@ class VideoMatchingController extends GetxController {
       );
     } catch (error) {
       localCameraEnabled.value = previous;
-      await _webRTC.setCameraEnabled(previous);
+      try {
+        await _webRTC.setCameraEnabled(previous);
+      } catch (rollbackError) {
+        debugPrint('Unable to restore camera state: $rollbackError');
+      }
       Get.snackbar(
         videoMatchingTr('Không thể đổi trạng thái camera'),
         videoMatchingTr('Vui lòng thử lại sau một chút.'),
         snackPosition: SnackPosition.TOP,
       );
+    } finally {
+      cameraToggleInProgress.value = false;
     }
   }
 
   Future<void> switchCamera() async {
-    if (!cameraUnlocked.value || !localCameraEnabled.value) return;
+    if (!cameraUnlocked.value ||
+        !localCameraEnabled.value ||
+        cameraToggleInProgress.value) {
+      return;
+    }
     await _webRTC.switchCamera();
   }
 
@@ -778,7 +869,6 @@ class VideoMatchingController extends GetxController {
     final roomId = _roomId;
     final otherUid = _otherUid;
     final peerAvatar = otherAnonymousAvatar.value;
-    phase.value = VideoMatchingPhase.ended;
     _stopClock();
     _disconnectTimer?.cancel();
     await _roomSub?.cancel();
@@ -787,7 +877,14 @@ class VideoMatchingController extends GetxController {
     _roomSub = null;
     _callSub = null;
     _remoteIceSub = null;
-    await _webRTC.resetConnection();
+    // Keep the current call surface until Rating replaces it. The controller
+    // release disposes WebRTC after the route transition, avoiding the
+    // unnecessary ended screen and a black-frame flash.
+    unawaited(
+      _webRTC.setMicrophoneEnabled(false).catchError((Object error) {
+        debugPrint('Unable to mute ended video room: $error');
+      }),
+    );
     _clearRoomIdentity();
     _handlingRoom = false;
     if (_disposed) return;
@@ -974,7 +1071,11 @@ class VideoMatchingController extends GetxController {
     cameraUnlockRemainingSeconds.value = 90;
     cameraUnlocked.value = false;
     isMuted.value = false;
+    remoteMuted.value = false;
+    localVoiceLevel.value = 0;
+    remoteVoiceLevel.value = 0;
     localCameraEnabled.value = false;
+    cameraToggleInProgress.value = false;
     remoteCameraEnabled.value = false;
     hasLiked.value = false;
     otherLiked.value = false;
@@ -1046,6 +1147,7 @@ class VideoMatchingController extends GetxController {
 
   Future<void> _cancelRoomSubscriptions() async {
     _stopClock();
+    _stopAudioLevelMeter();
     _disconnectTimer?.cancel();
     _disconnectTimer = null;
     await _roomSub?.cancel();
@@ -1088,6 +1190,7 @@ class VideoMatchingController extends GetxController {
     _disposed = true;
     _sessionCoordinator?.finish();
     _stopClock();
+    _stopAudioLevelMeter();
     _disconnectTimer?.cancel();
     _connectivitySub?.cancel();
     unawaited(_cancelAllSubscriptions());

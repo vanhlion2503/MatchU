@@ -33,7 +33,7 @@ class VideoMatchingView extends GetView<VideoMatchingController> {
   }
 }
 
-enum _VideoStageGroup { searching, call, ended, error }
+enum _VideoStageGroup { searching, call, error }
 
 class _VideoStageHost extends StatefulWidget {
   const _VideoStageHost({required this.controller});
@@ -72,7 +72,6 @@ class _VideoStageHostState extends State<_VideoStageHost> {
         controller: widget.controller,
       ),
       _VideoStageGroup.call => VideoCallStage(controller: widget.controller),
-      _VideoStageGroup.ended => _EndedStage(controller: widget.controller),
       _VideoStageGroup.error => _ErrorStage(controller: widget.controller),
     };
   }
@@ -85,74 +84,9 @@ class _VideoStageHostState extends State<_VideoStageHost> {
       VideoMatchingPhase.active ||
       VideoMatchingPhase.ending ||
       VideoMatchingPhase.converting => _VideoStageGroup.call,
-      VideoMatchingPhase.ended => _VideoStageGroup.ended,
+      VideoMatchingPhase.ended => _VideoStageGroup.call,
       VideoMatchingPhase.error => _VideoStageGroup.error,
     };
-  }
-}
-
-class _EndedStage extends StatelessWidget {
-  const _EndedStage({required this.controller});
-
-  final VideoMatchingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 82,
-                height: 82,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Theme.of(context).colorScheme.errorContainer,
-                ),
-                child: Icon(
-                  Iconsax.call_slash,
-                  size: 34,
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                ),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'Cuộc gọi đã kết thúc',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Bạn có thể tìm một người mới hoặc quay lại.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => controller.leaveRoom(findNext: true),
-                  icon: const Icon(Iconsax.refresh),
-                  label: const Text('Tìm người mới'),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => controller.leaveRoom(findNext: false),
-                  child: const Text('Quay lại'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

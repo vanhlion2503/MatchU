@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
@@ -97,10 +100,7 @@ class VideoCallStage extends StatelessWidget {
             onExit: () => _showExitChoices(context),
           ),
           _ConnectionStatus(controller: controller, lockText: _cameraLockText),
-          _CallBottomControls(
-            controller: controller,
-            onExit: () => _showExitChoices(context),
-          ),
+          _CallBottomControls(controller: controller),
           Obx(
             () =>
                 controller.phase.value == VideoMatchingPhase.ending
@@ -271,17 +271,21 @@ class _VideoCanvas extends StatelessWidget {
         Expanded(
           child: Obx(() {
             final seconds = controller.cameraUnlockRemainingSeconds.value;
+            final cameraEnabled = controller.localCameraEnabled.value;
             return RepaintBoundary(
               child: _VideoTile(
                 renderer: controller.localRenderer,
                 label: 'Bạn'.tr,
                 avatarAsset:
                     'assets/anonymous/${controller.anonymousAvatar}.png',
-                cameraEnabled: controller.localCameraEnabled.value,
+                cameraEnabled: cameraEnabled,
                 cameraUnlocked: controller.cameraUnlocked.value,
                 cameraOffText: 'Camera đang tắt'.tr,
                 cameraLockText: lockText(seconds),
                 mirror: true,
+                muted: controller.isMuted.value,
+                voiceLevel:
+                    cameraEnabled ? 0 : controller.localVoiceLevel.value,
               ),
             );
           }),
@@ -290,6 +294,7 @@ class _VideoCanvas extends StatelessWidget {
         Expanded(
           child: Obx(() {
             final seconds = controller.cameraUnlockRemainingSeconds.value;
+            final cameraEnabled = controller.remoteCameraEnabled.value;
             return RepaintBoundary(
               child: _VideoTile(
                 renderer: controller.remoteRenderer,
@@ -298,11 +303,14 @@ class _VideoCanvas extends StatelessWidget {
                 labelAtTop: true,
                 avatarAsset:
                     'assets/anonymous/${controller.otherAnonymousAvatar.value}.png',
-                cameraEnabled: controller.remoteCameraEnabled.value,
+                cameraEnabled: cameraEnabled,
                 cameraUnlocked: controller.cameraUnlocked.value,
                 cameraOffText: 'Camera của đối phương đang tắt'.tr,
                 cameraLockText: lockText(seconds),
                 mirror: false,
+                muted: controller.remoteMuted.value,
+                voiceLevel:
+                    cameraEnabled ? 0 : controller.remoteVoiceLevel.value,
               ),
             );
           }),
@@ -389,7 +397,8 @@ class _CallTopBar extends StatelessWidget {
                 _GlassIconButton(
                   tooltip: liked ? 'Đã thả tim'.tr : 'Thả tim'.tr,
                   icon: liked ? Iconsax.heart5 : Iconsax.heart,
-                  foreground: liked ? const Color(0xFFFF5A83) : Colors.white,
+                  foreground: liked ? const Color(0xFFFF3B4E) : Colors.white,
+                  disabledForeground: liked ? const Color(0xFFFF3B4E) : null,
                   onTap: liked || ending ? null : controller.like,
                 ),
               ],
@@ -444,10 +453,9 @@ class _ConnectionStatus extends StatelessWidget {
 }
 
 class _CallBottomControls extends StatelessWidget {
-  const _CallBottomControls({required this.controller, required this.onExit});
+  const _CallBottomControls({required this.controller});
 
   final VideoMatchingController controller;
-  final Future<void> Function() onExit;
 
   @override
   Widget build(BuildContext context) {
@@ -479,11 +487,7 @@ class _CallBottomControls extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                _CallControlDock(
-                  controller: controller,
-                  disabled: ending,
-                  onEnd: onExit,
-                ),
+                _CallControlDock(controller: controller, disabled: ending),
               ],
             );
           }),
@@ -503,6 +507,8 @@ class _VideoTile extends StatelessWidget {
     required this.cameraOffText,
     required this.cameraLockText,
     required this.mirror,
+    required this.muted,
+    required this.voiceLevel,
     this.rating,
     this.labelAtTop = false,
   });
@@ -515,113 +521,164 @@ class _VideoTile extends StatelessWidget {
   final String cameraOffText;
   final String cameraLockText;
   final bool mirror;
+  final bool muted;
+  final double voiceLevel;
   final double? rating;
   final bool labelAtTop;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<RTCVideoValue>(
+      valueListenable: renderer,
+      builder: (context, rendererValue, _) {
+        final frameReady =
+            cameraEnabled &&
+            rendererValue.renderVideo &&
+            rendererValue.width > 0 &&
+            rendererValue.height > 0;
+        final statusText =
+            cameraEnabled
+                ? 'Đang kết nối camera...'.tr
+                : cameraUnlocked
+                ? cameraOffText
+                : cameraLockText;
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (cameraEnabled)
+              RTCVideoView(
+                renderer,
+                mirror: mirror,
+                objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+              ),
+            if (!frameReady)
+              _VideoAvatarPlaceholder(
+                avatarAsset: avatarAsset,
+                statusText: statusText,
+                muted: muted,
+                voiceLevel: voiceLevel,
+              ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.28),
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.4),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              top: labelAtTop ? 12 : null,
+              bottom: labelAtTop ? null : 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (labelAtTop) ...[
+                      const SizedBox(width: 7),
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFFFC857),
+                        size: 15,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        rating?.toStringAsFixed(1) ?? '—',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    if (muted) ...[
+                      const SizedBox(width: 7),
+                      const Icon(
+                        Icons.mic_off_rounded,
+                        color: Color(0xFFFF667A),
+                        size: 16,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _VideoAvatarPlaceholder extends StatelessWidget {
+  const _VideoAvatarPlaceholder({
+    required this.avatarAsset,
+    required this.statusText,
+    required this.muted,
+    required this.voiceLevel,
+  });
+
+  final String avatarAsset;
+  final String statusText;
+  final bool muted;
+  final double voiceLevel;
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (cameraEnabled)
-          RTCVideoView(
-            renderer,
-            mirror: mirror,
-            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-          )
-        else
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF171925), Color(0xFF111827)],
-              ),
-            ),
-          ),
-        if (!cameraEnabled)
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white24, width: 2),
-                  ),
-                  child: ClipOval(
-                    child: Image.asset(avatarAsset, fit: BoxFit.cover),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  cameraUnlocked ? cameraOffText : cameraLockText,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.72),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withValues(alpha: 0.28),
-                Colors.transparent,
-                Colors.black.withValues(alpha: 0.4),
-              ],
+        RepaintBoundary(
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Transform.scale(
+              scale: 1.12,
+              child: Image.asset(avatarAsset, fit: BoxFit.cover),
             ),
           ),
         ),
-        Positioned(
-          left: 14,
-          top: labelAtTop ? 12 : null,
-          bottom: labelAtTop ? null : 12,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+        ColoredBox(color: const Color(0xFF080B14).withValues(alpha: 0.66)),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _VoiceReactiveAvatar(
+                avatarAsset: avatarAsset,
+                level: muted ? 0 : voiceLevel,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                statusText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.78),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
-                if (labelAtTop) ...[
-                  const SizedBox(width: 7),
-                  const Icon(
-                    Icons.star_rounded,
-                    color: Color(0xFFFFC857),
-                    size: 15,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    rating?.toStringAsFixed(1) ?? '—',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],
@@ -629,82 +686,201 @@ class _VideoTile extends StatelessWidget {
   }
 }
 
-class _CallControlDock extends StatelessWidget {
-  const _CallControlDock({
-    required this.controller,
-    required this.disabled,
-    required this.onEnd,
-  });
+class _VoiceReactiveAvatar extends StatefulWidget {
+  const _VoiceReactiveAvatar({required this.avatarAsset, required this.level});
 
-  final VideoMatchingController controller;
-  final bool disabled;
-  final Future<void> Function() onEnd;
+  final String avatarAsset;
+  final double level;
+
+  @override
+  State<_VoiceReactiveAvatar> createState() => _VoiceReactiveAvatarState();
+}
+
+class _VoiceReactiveAvatarState extends State<_VoiceReactiveAvatar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  bool get _isSpeaking => widget.level > 0.04;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _VoiceReactiveAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((oldWidget.level > 0.04) != _isSpeaking) _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (_isSpeaking) {
+      _controller.repeat();
+    } else {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cameraUnlocked = controller.cameraUnlocked.value;
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 350),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111827).withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white12),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black38,
-            blurRadius: 20,
-            offset: Offset(0, 8),
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: Container(
+          width: 88,
+          height: 88,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.black.withValues(alpha: 0.18),
+            border: Border.all(color: Colors.white38, width: 2),
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _DockButton(
-            tooltip: controller.isMuted.value ? 'Bật micro'.tr : 'Tắt micro'.tr,
-            icon:
-                controller.isMuted.value
-                    ? Icons.mic_off_rounded
-                    : Icons.mic_rounded,
-            onTap: disabled ? null : controller.toggleMute,
+          child: ClipOval(
+            child: Image.asset(widget.avatarAsset, fit: BoxFit.cover),
           ),
-          _DockButton(
-            tooltip:
-                cameraUnlocked
-                    ? (controller.localCameraEnabled.value
-                        ? 'Tắt camera'.tr
-                        : 'Bật camera'.tr)
-                    : videoMatchingTr(
-                      'Có thể mở camera sau ${_shortDuration(controller.cameraUnlockRemainingSeconds.value)}',
-                    ),
-            icon:
-                cameraUnlocked
-                    ? (controller.localCameraEnabled.value
-                        ? Icons.videocam_rounded
-                        : Icons.videocam_off_rounded)
-                    : Icons.lock_clock_rounded,
-            onTap: disabled || !cameraUnlocked ? null : controller.toggleCamera,
-          ),
-          _DockButton(
-            tooltip: 'Kết thúc'.tr,
-            icon: Icons.call_end_rounded,
-            backgroundColor: const Color(0xFFE33D55),
-            onTap: disabled ? null : onEnd,
-          ),
-          _DockButton(
-            tooltip: 'Đổi camera'.tr,
-            icon: Icons.cameraswitch_rounded,
-            onTap:
-                disabled ||
-                        !cameraUnlocked ||
-                        !controller.localCameraEnabled.value
-                    ? null
-                    : controller.switchCamera,
-          ),
-        ],
+        ),
+        builder: (_, avatar) {
+          final phase = _controller.value;
+          final strength = widget.level.clamp(0.0, 1.0);
+          final shake = math.sin(phase * math.pi * 6) * 2.2 * strength;
+          return SizedBox.square(
+            dimension: 126,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (_isSpeaking) ...[
+                  _VoiceRing(phase: phase, strength: strength),
+                  _VoiceRing(
+                    phase: (phase + 0.5) % 1,
+                    strength: strength * 0.72,
+                  ),
+                ],
+                Transform.translate(
+                  offset: Offset(shake, -shake * 0.35),
+                  child: Transform.scale(
+                    scale: 1 + strength * 0.035,
+                    child: avatar,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
+  }
+}
+
+class _VoiceRing extends StatelessWidget {
+  const _VoiceRing({required this.phase, required this.strength});
+
+  final double phase;
+  final double strength;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: ((1 - phase) * strength * 0.72).clamp(0.0, 1.0),
+      child: Transform.scale(
+        scale: 0.82 + phase * (0.34 + strength * 0.18),
+        child: Container(
+          width: 112,
+          height: 112,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 2.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CallControlDock extends StatelessWidget {
+  const _CallControlDock({required this.controller, required this.disabled});
+
+  final VideoMatchingController controller;
+  final bool disabled;
+
+  @override
+  Widget build(BuildContext context) {
+    // This dock owns its reactive boundary. Reading these values only from
+    // the parent widget left the buttons with their initial disabled state.
+    return Obx(() {
+      final cameraUnlocked = controller.cameraUnlocked.value;
+      final cameraEnabled = controller.localCameraEnabled.value;
+      final cameraBusy = controller.cameraToggleInProgress.value;
+      final isMuted = controller.isMuted.value;
+      final unlockRemaining = controller.cameraUnlockRemainingSeconds.value;
+
+      return Container(
+        constraints: const BoxConstraints(maxWidth: 350),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111827).withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white12),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black38,
+              blurRadius: 20,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _DockButton(
+              tooltip: isMuted ? 'Bật micro'.tr : 'Tắt micro'.tr,
+              icon: isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
+              onTap: disabled ? null : controller.toggleMute,
+            ),
+            _DockButton(
+              tooltip:
+                  cameraUnlocked
+                      ? (cameraEnabled ? 'Tắt camera'.tr : 'Bật camera'.tr)
+                      : videoMatchingTr(
+                        'Có thể mở camera sau ${_shortDuration(unlockRemaining)}',
+                      ),
+              icon:
+                  cameraUnlocked
+                      ? (cameraEnabled
+                          ? Icons.videocam_rounded
+                          : Icons.videocam_off_rounded)
+                      : Icons.lock_clock_rounded,
+              onTap:
+                  disabled || !cameraUnlocked || cameraBusy
+                      ? null
+                      : controller.toggleCamera,
+            ),
+            _DockButton(
+              tooltip: 'Đổi camera'.tr,
+              icon: Icons.cameraswitch_rounded,
+              onTap:
+                  disabled || !cameraUnlocked || !cameraEnabled || cameraBusy
+                      ? null
+                      : controller.switchCamera,
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   static String _shortDuration(int seconds) {
@@ -719,13 +895,11 @@ class _DockButton extends StatelessWidget {
     required this.tooltip,
     required this.icon,
     required this.onTap,
-    this.backgroundColor = const Color(0xFF2A3342),
   });
 
   final String tooltip;
   final IconData icon;
   final Future<void> Function()? onTap;
-  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -739,8 +913,8 @@ class _DockButton extends StatelessWidget {
         child: Material(
           color:
               enabled
-                  ? backgroundColor
-                  : backgroundColor.withValues(alpha: 0.45),
+                  ? const Color(0xFF2A3342)
+                  : const Color(0xFF2A3342).withValues(alpha: 0.45),
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -768,12 +942,14 @@ class _GlassIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.foreground = Colors.white,
+    this.disabledForeground,
   });
 
   final String tooltip;
   final IconData icon;
   final Future<void> Function()? onTap;
   final Color foreground;
+  final Color? disabledForeground;
 
   @override
   Widget build(BuildContext context) {
@@ -784,7 +960,13 @@ class _GlassIconButton extends StatelessWidget {
         shape: const CircleBorder(),
         child: IconButton(
           onPressed: onTap == null ? null : () => onTap!(),
-          icon: Icon(icon, color: onTap == null ? Colors.white38 : foreground),
+          icon: Icon(
+            icon,
+            color:
+                onTap == null
+                    ? disabledForeground ?? Colors.white38
+                    : foreground,
+          ),
         ),
       ),
     );

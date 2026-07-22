@@ -1452,6 +1452,28 @@ service cloud.firestore {
           );
       }
 
+      function onlyUpdatesOwnVideoMutedState() {
+        let changed = request.resource.data.diff(resource.data).changedKeys();
+        return !changed.hasAny(["videoMutedStates"])
+          || (
+            resource.data.matchingMode == "video"
+            && request.resource.data.videoMutedStates is map
+            && request.resource.data.videoMutedStates.keys()
+              .hasAll(resource.data.participants)
+            && request.resource.data.videoMutedStates.keys()
+              .hasOnly(resource.data.participants)
+            && request.resource.data.videoMutedStates[request.auth.uid] is bool
+            && (
+              request.auth.uid == resource.data.userA
+              && request.resource.data.videoMutedStates[resource.data.userB]
+                == resource.data.videoMutedStates[resource.data.userB]
+              || request.auth.uid == resource.data.userB
+              && request.resource.data.videoMutedStates[resource.data.userA]
+                == resource.data.videoMutedStates[resource.data.userA]
+            )
+          );
+      }
+
       function onlyUpdatesOwnTyping() {
         let changed = request.resource.data.diff(resource.data).changedKeys();
         return !changed.hasAny(["typing"])
@@ -1496,6 +1518,7 @@ service cloud.firestore {
       allow update: if isParticipant()
         && onlyUpdatesOwnLike()
         && onlyUpdatesOwnVideoCameraState()
+        && onlyUpdatesOwnVideoMutedState()
         && onlyUpdatesOwnTyping()
         && isValidClientEndTransition()
         && (
@@ -1504,6 +1527,7 @@ service cloud.firestore {
               "userALiked",
               "userBLiked",
               "videoCameraStates",
+              "videoMutedStates",
               "typing",
               "status",
               "endedBy",

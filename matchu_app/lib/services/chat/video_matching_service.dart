@@ -119,6 +119,41 @@ class VideoMatchingService implements VideoMatchingRepository {
   }
 
   @override
+  Future<void> setMuted({
+    required String roomId,
+    required String uid,
+    required bool muted,
+  }) async {
+    final roomRef = _firestore.collection('tempChats').doc(roomId);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(roomRef);
+      final data = snapshot.data();
+      if (data == null ||
+          data['status'] != 'active' ||
+          data['matchingMode'] != 'video') {
+        throw StateError('Video room is no longer active.');
+      }
+
+      final participants = List<String>.from(
+        data['participants'] ?? const <String>[],
+      );
+      if (!participants.contains(uid)) {
+        throw StateError('Current user is not a room participant.');
+      }
+
+      final current = Map<String, dynamic>.from(
+        data['videoMutedStates'] ?? const <String, dynamic>{},
+      );
+      final next = <String, bool>{
+        for (final participant in participants)
+          participant: current[participant] == true,
+      };
+      next[uid] = muted;
+      transaction.update(roomRef, {'videoMutedStates': next});
+    });
+  }
+
+  @override
   Future<void> endRoom({
     required String roomId,
     required String uid,
