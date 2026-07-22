@@ -80,12 +80,15 @@ class VideoMatchingController extends GetxController {
   Timer? _disconnectTimer;
 
   final Set<String> _handledRemoteCandidateIds = <String>{};
+  final Set<String> _videoParticipantsSeenEnabled = <String>{};
   final List<Map<String, dynamic>> _pendingRemoteCandidates = [];
+  Map<String, dynamic>? _pendingCallSessionData;
   bool _isCaller = false;
   bool _remoteDescriptionSet = false;
   bool _processingDescription = false;
   bool _connectionStarted = false;
-  bool _videoNegotiationStarted = false;
+  bool _initialNegotiationComplete = false;
+  bool _videoNegotiationInFlight = false;
   bool _handlingRoom = false;
   bool _exitInProgress = false;
   bool _navigatingToChat = false;
@@ -93,6 +96,8 @@ class VideoMatchingController extends GetxController {
   bool _disposed = false;
   String? _lastOfferSdp;
   String? _lastAnswerSdp;
+  String? _videoOfferSignature;
+  String _negotiatedVideoSignature = '';
 
   @override
   void onInit() {
@@ -272,6 +277,12 @@ class VideoMatchingController extends GetxController {
     final cameraStates = Map<String, dynamic>.from(
       data['videoCameraStates'] ?? const <String, dynamic>{},
     );
+    if (cameraStates[uid] == true) {
+      _videoParticipantsSeenEnabled.add(uid);
+    }
+    if (cameraStates[otherUid] == true && otherUid is String) {
+      _videoParticipantsSeenEnabled.add(otherUid);
+    }
     remoteCameraEnabled.value = cameraStates[otherUid] == true;
     localCameraEnabled.value = cameraStates[uid] == true;
 
@@ -319,12 +330,7 @@ class VideoMatchingController extends GetxController {
       await _startPeerConnection(callId);
     }
 
-    if (_connectionStarted &&
-        _isCaller &&
-        !_videoNegotiationStarted &&
-        cameraStates.values.any((value) => value == true)) {
-      unawaited(_renegotiateForVideo());
-    }
+    _scheduleVideoRenegotiation();
   }
 
   Future<void> _startPeerConnection(String callId) async {
@@ -368,12 +374,47 @@ class VideoMatchingController extends GetxController {
     _callSub = _repository.listenCallSession(callId).listen((snapshot) {
       final data = snapshot.data();
       if (data == null) return;
-      unawaited(_handleCallSession(data));
+      _pendingCallSessionData = Map<String, dynamic>.from(data);
+      unawaited(_drainCallSessionUpdates());
     }, onError: (Object error) => unawaited(_fail(error)));
   }
 
-  Future<void> _handleCallSession(Map<String, dynamic> data) async {
-    if (_processingDescription || _disposed || _navigatingToChat) return;
+  Future<void> _drainCallSessionUpdates() async {
+    if (_processingDescription ||
+        _disposed ||
+        _navigatingToChat ||
+        _navigatingToRating) {
+      return;
+    }
+
+    _processingDescription = true;
+    try {
+      while (_pendingCallSessionData != null &&
+          !_disposed &&
+          !_navigatingToChat &&
+          !_navigatingToRating) {
+        final data = _pendingCallSessionData!;
+        _pendingCallSessionData = null;
+        await _applyCallSessionUpdate(data);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Anonymous video SDP processing failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!_disposed && !_navigatingToChat && !_navigatingToRating) {
+        await _fail(error);
+      }
+    } finally {
+      _processingDescription = false;
+      if (_pendingCallSessionData != null &&
+          !_disposed &&
+          !_navigatingToChat &&
+          !_navigatingToRating) {
+        unawaited(_drainCallSessionUpdates());
+      }
+    }
+  }
+
+  Future<void> _applyCallSessionUpdate(Map<String, dynamic> data) async {
     final status = data['status']?.toString();
     if (status == 'ended' || status == 'rejected' || status == 'missed') {
       await _showEnded();
@@ -389,15 +430,20 @@ class VideoMatchingController extends GetxController {
           answerSdp == _lastAnswerSdp) {
         return;
       }
-      _processingDescription = true;
-      try {
-        await _webRTC.setRemoteDescription(answer);
-        _lastAnswerSdp = answerSdp;
-        _remoteDescriptionSet = true;
-        await _flushRemoteCandidates();
-      } finally {
-        _processingDescription = false;
+      await _webRTC.setRemoteDescription(answer);
+      _lastAnswerSdp = answerSdp;
+      _remoteDescriptionSet = true;
+      await _flushRemoteCandidates();
+
+      if (_videoNegotiationInFlight) {
+        _negotiatedVideoSignature =
+            _videoOfferSignature ?? _currentVideoSignature;
+        _videoOfferSignature = null;
+        _videoNegotiationInFlight = false;
+      } else {
+        _initialNegotiationComplete = true;
       }
+      _scheduleVideoRenegotiation();
       return;
     }
 
@@ -410,22 +456,17 @@ class VideoMatchingController extends GetxController {
       return;
     }
 
-    _processingDescription = true;
-    try {
-      await _webRTC.setRemoteDescription(offer);
-      _lastOfferSdp = offerSdp;
-      _remoteDescriptionSet = true;
-      await _flushRemoteCandidates();
-      final answer = await _webRTC.createAnswer(
-        receiveVideo: offerSdp.contains('m=video'),
-      );
-      await _repository.updateAnswer(
-        callId: _callId!,
-        answer: _descriptionMap(answer),
-      );
-    } finally {
-      _processingDescription = false;
-    }
+    await _webRTC.setRemoteDescription(offer);
+    _lastOfferSdp = offerSdp;
+    _remoteDescriptionSet = true;
+    await _flushRemoteCandidates();
+    final answer = await _webRTC.createAnswer(
+      receiveVideo: offerSdp.contains('m=video'),
+    );
+    await _repository.updateAnswer(
+      callId: _callId!,
+      answer: _descriptionMap(answer),
+    );
   }
 
   void _subscribeToRemoteCandidates(String callId) {
@@ -525,10 +566,34 @@ class VideoMatchingController extends GetxController {
     await _webRTC.switchCamera();
   }
 
-  Future<void> _renegotiateForVideo() async {
+  String get _currentVideoSignature {
+    final participants = _videoParticipantsSeenEnabled.toList()..sort();
+    return participants.join('|');
+  }
+
+  void _scheduleVideoRenegotiation() {
+    if (!_isCaller ||
+        !_connectionStarted ||
+        !_initialNegotiationComplete ||
+        _videoNegotiationInFlight ||
+        _disposed ||
+        _navigatingToChat ||
+        _navigatingToRating) {
+      return;
+    }
+    final desiredSignature = _currentVideoSignature;
+    if (desiredSignature.isEmpty ||
+        desiredSignature == _negotiatedVideoSignature) {
+      return;
+    }
+    unawaited(_renegotiateForVideo(desiredSignature));
+  }
+
+  Future<void> _renegotiateForVideo(String desiredSignature) async {
     final callId = _callId;
-    if (callId == null || _videoNegotiationStarted || !_isCaller) return;
-    _videoNegotiationStarted = true;
+    if (callId == null || _videoNegotiationInFlight || !_isCaller) return;
+    _videoNegotiationInFlight = true;
+    _videoOfferSignature = desiredSignature;
     try {
       final offer = await _webRTC.createOffer(receiveVideo: true);
       await _repository.updateOffer(
@@ -536,7 +601,8 @@ class VideoMatchingController extends GetxController {
         offer: _descriptionMap(offer),
       );
     } catch (error) {
-      _videoNegotiationStarted = false;
+      _videoNegotiationInFlight = false;
+      _videoOfferSignature = null;
       debugPrint('Video renegotiation failed: $error');
       await _fail(error);
     }
@@ -813,13 +879,18 @@ class VideoMatchingController extends GetxController {
     _expiresAt = null;
     _cameraUnlockAt = null;
     _connectionStarted = false;
-    _videoNegotiationStarted = false;
+    _initialNegotiationComplete = false;
+    _videoNegotiationInFlight = false;
     _remoteDescriptionSet = false;
     _processingDescription = false;
+    _pendingCallSessionData = null;
     _pendingRemoteCandidates.clear();
     _handledRemoteCandidateIds.clear();
+    _videoParticipantsSeenEnabled.clear();
     _lastOfferSdp = null;
     _lastAnswerSdp = null;
+    _videoOfferSignature = null;
+    _negotiatedVideoSignature = '';
   }
 
   void _startClock() {

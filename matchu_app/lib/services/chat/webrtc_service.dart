@@ -14,6 +14,8 @@ class WebRTCService {
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
   MediaStream? _cameraStream;
+  MediaStream? _remoteFallbackStream;
+  Future<MediaStream>? _remoteFallbackStreamFuture;
   bool _renderersInitialized = false;
 
   Future<void> initPeerConnection({
@@ -93,20 +95,41 @@ class WebRTCService {
 
     peer.onConnectionState = onConnectionStateChanged;
 
-    // Bind the first remote stream to renderer for call UI.
+    // Some native WebRTC implementations deliver a track without a stream.
+    // Always attach that track to a fallback stream instead of leaving the
+    // renderer with a null srcObject and displaying a black frame.
     peer.onTrack = (event) {
-      if (event.streams.isNotEmpty) {
-        remoteRenderer.srcObject = event.streams.first;
-        return;
-      }
-
-      final remote = remoteRenderer.srcObject;
-      if (remote != null) {
-        remote.addTrack(event.track);
-      }
+      unawaited(_attachRemoteTrack(peer, event));
     };
 
     return peer;
+  }
+
+  Future<void> _attachRemoteTrack(
+    RTCPeerConnection sourcePeer,
+    RTCTrackEvent event,
+  ) async {
+    if (!identical(sourcePeer, _peerConnection)) return;
+    if (event.streams.isNotEmpty) {
+      remoteRenderer.srcObject = event.streams.first;
+      return;
+    }
+
+    final streamFuture =
+        _remoteFallbackStreamFuture ??= createLocalMediaStream(
+          'matchu_remote_video',
+        );
+    final remoteStream = await streamFuture;
+    if (!identical(sourcePeer, _peerConnection)) {
+      if (!identical(remoteStream, _remoteFallbackStream)) {
+        await remoteStream.dispose();
+      }
+      return;
+    }
+
+    _remoteFallbackStream = remoteStream;
+    await remoteStream.addTrack(event.track);
+    remoteRenderer.srcObject = remoteStream;
   }
 
   Future<RTCSessionDescription> createOffer({
@@ -261,6 +284,13 @@ class WebRTCService {
           track.stop();
         }
         await camera.dispose();
+      }
+
+      final remoteFallback = _remoteFallbackStream;
+      _remoteFallbackStream = null;
+      _remoteFallbackStreamFuture = null;
+      if (remoteFallback != null) {
+        await remoteFallback.dispose();
       }
     } catch (error) {
       debugPrint('WebRTC local stream dispose error: $error');
