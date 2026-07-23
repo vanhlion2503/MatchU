@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 import 'package:matchu_app/translations/auth_translations.dart';
 
@@ -306,9 +307,10 @@ class AuthService {
       "updatedAt": FieldValue.serverTimestamp(),
     };
 
-    // ⭐⭐⭐ CHỈ GHI KHI CÓ AVATAR
+    // Chỉ cấp các giá trị khởi tạo một lần khi tạo hồ sơ mới.
     if (isCreatingUserDoc) {
       data.addAll({
+        "gem": UserModel.initialGemBalance,
         "reputationScore": 100,
         "reputationTodayDateKey": null,
         "reputationTodayClaimed": 0,

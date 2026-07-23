@@ -248,6 +248,17 @@ service cloud.firestore {
         ]);
       }
 
+      function touchesServerManagedGemField() {
+        return request.resource.data.diff(resource.data).changedKeys().hasAny([
+          "gem"
+        ]);
+      }
+
+      function hasValidGemCreateDefault() {
+        return request.resource.data.gem is int
+          && request.resource.data.gem == 15;
+      }
+
       function touchesServerManagedRecommendationFields() {
         return request.resource.data.diff(resource.data).changedKeys().hasAny([
           "interestVector",
@@ -350,6 +361,7 @@ service cloud.firestore {
 
       function isOwnerSafeCreate() {
         return isOwner()
+          && hasValidGemCreateDefault()
           && isValidReputationCreateDefaults()
           && isValidFaceVerificationCreateDefaults()
           && isValidRecommendationCreateDefaults()
@@ -373,6 +385,7 @@ service cloud.firestore {
 
       function isOwnerSafeUpdate() {
         return isOwner()
+          && !touchesServerManagedGemField()
           && !touchesServerManagedReputationFields()
           && !touchesServerManagedFaceVerificationFields()
           && !touchesServerManagedRecommendationFields()

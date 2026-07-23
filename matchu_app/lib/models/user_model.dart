@@ -2,11 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:matchu_app/models/profile_privacy_settings.dart';
 
 class UserModel {
+  static const int initialGemBalance = 15;
+
   final String uid;
   final String email;
   final String fullname;
   final String nickname;
   final String phonenumber;
+  final int gem;
 
   final String? googleId; // Đăng nhập Google
   final DateTime? birthday;
@@ -65,6 +68,7 @@ class UserModel {
     required this.fullname,
     required this.nickname,
     required this.phonenumber,
+    this.gem = initialGemBalance,
 
     this.googleId,
 
@@ -128,6 +132,7 @@ class UserModel {
       "fullname": fullname,
       "nickname": nickname,
       "phonenumber": phonenumber,
+      "gem": gem,
 
       "googleId": googleId,
 
@@ -211,6 +216,10 @@ class UserModel {
       fullname: json["fullname"] ?? "",
       nickname: json["nickname"] ?? "",
       phonenumber: json["phonenumber"] ?? "",
+      gem:
+          json.containsKey("gem")
+              ? _parseNonNegativeInt(json["gem"])
+              : initialGemBalance,
 
       googleId: json["googleId"],
 
@@ -282,6 +291,7 @@ class UserModel {
     String? fullname,
     String? nickname,
     String? phonenumber,
+    int? gem,
 
     String? googleId,
 
@@ -341,6 +351,7 @@ class UserModel {
       fullname: fullname ?? this.fullname,
       nickname: nickname ?? this.nickname,
       phonenumber: phonenumber ?? this.phonenumber,
+      gem: gem ?? this.gem,
 
       googleId: googleId ?? this.googleId,
 
@@ -404,6 +415,12 @@ class UserModel {
     if (value is double) return value;
     if (value is num) return value.toDouble();
     return 0;
+  }
+
+  static int _parseNonNegativeInt(dynamic value) {
+    if (value is! num) return 0;
+    final parsed = value.toInt();
+    return parsed < 0 ? 0 : parsed;
   }
 
   static List<double> _parseDoubleList(dynamic value) {

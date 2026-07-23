@@ -135,6 +135,7 @@ class ProfileController extends GetxController {
   int get followersCount => user.value?.followers.length ?? 0;
   int get followingCount => user.value?.following.length ?? 0;
   int get rank => user.value?.rank ?? 1;
+  int get gem => user.value?.gem ?? 0;
 
   Future<void> updateBio(String newBio) async {
     final uid = _auth.currentUser?.uid;

@@ -198,15 +198,22 @@ class ProfileView extends StatelessWidget {
                                       size: 30,
                                     ),
                                   ),
-                                  IconButton(
-                                    onPressed: () {
-                                      RightSideMenu.open(context);
-                                    },
-                                    icon: Icon(
-                                      Iconsax.more_circle,
-                                      color: colorScheme.onPrimary,
-                                      size: 30,
-                                    ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _CompactGemBalance(gem: c.gem),
+                                      const SizedBox(width: 2),
+                                      IconButton(
+                                        onPressed: () {
+                                          RightSideMenu.open(context);
+                                        },
+                                        icon: Icon(
+                                          Iconsax.more_circle,
+                                          color: colorScheme.onPrimary,
+                                          size: 30,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -468,8 +475,55 @@ class ProfileView extends StatelessWidget {
 }
 
 const _profileAvatarAsset = "assets/avatas/avataMd.png";
+const _profileGemAsset = "assets/icon/gem.png";
 const _profileAvatarSize = 100.0;
 const _profileAvatarCacheSize = 220;
+
+class _CompactGemBalance extends StatelessWidget {
+  const _CompactGemBalance({required this.gem});
+
+  final int gem;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: "Gem: $gem",
+      child: Semantics(
+        label: "Gem: $gem",
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.25),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                _profileGemAsset,
+                width: 20,
+                height: 20,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                "$gem",
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onPrimary,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _ProfileAvatarButton extends StatelessWidget {
   const _ProfileAvatarButton({

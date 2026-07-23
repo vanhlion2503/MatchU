@@ -115,6 +115,7 @@ class UserController extends GetxController {
   String get fullname => user?.fullname ?? "";
   String get email => user?.email ?? "";
   String get status => user?.activeStatus ?? "offline";
+  int get gem => user?.gem ?? 0;
 
   bool get isLoggedIn => user != null;
 
