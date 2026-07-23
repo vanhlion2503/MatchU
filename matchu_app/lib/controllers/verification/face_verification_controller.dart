@@ -76,6 +76,9 @@ class FaceVerificationController extends GetxController
   Uint8List? _nv21ReusableBuffer;
   double? _straightYawBaseline;
   int _straightStableFrames = 0;
+  int _blinkOpenStableFrames = 0;
+  bool _blinkSawOpen = false;
+  bool _blinkSawClosed = false;
   DateTime _lastLivenessStepAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastFrameProcessedAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _frameProcessInterval = Duration(milliseconds: 120);
@@ -84,6 +87,9 @@ class FaceVerificationController extends GetxController
   static const double _straightYawTolerance = 8;
   static const double _straightRollTolerance = 10;
   static const double _turnYawThreshold = 14;
+  static const double _blinkOpenThreshold = 0.65;
+  static const double _blinkClosedThreshold = 0.25;
+  static const int _blinkOpenRequiredFrames = 2;
   static FaceVerificationMode _readMode(dynamic arguments) {
     if (arguments is Map && arguments["mode"] == "reauth") {
       return FaceVerificationMode.reauthentication;
@@ -128,6 +134,8 @@ class FaceVerificationController extends GetxController
   }
 
   List<String> get livenessStepLabels => _challengeStepLabels.toList();
+  List<String> get livenessStepActions =>
+      _livenessChallenge?.actions.toList(growable: false) ?? const <String>[];
 
   bool isLivenessStepDone(int index) {
     if (index < 0 || index >= livenessStepDone.length) {
@@ -432,6 +440,7 @@ class FaceVerificationController extends GetxController
     );
     _straightYawBaseline = null;
     _straightStableFrames = 0;
+    _resetBlinkTracking();
     _lastLivenessStepAt = DateTime.fromMillisecondsSinceEpoch(0);
     if (updateInstruction) {
       _updateInstructionForCurrentStep();
@@ -452,6 +461,7 @@ class FaceVerificationController extends GetxController
   String _labelForLivenessAction(String action) {
     return switch (action) {
       "center" => "Nhìn thẳng vào camera",
+      "blink" => "Chớp cả hai mắt một lần",
       "turn_left" => "Quay đầu sang trái và giữ nguyên",
       "turn_right" => "Quay đầu sang phải và giữ nguyên",
       _ => "Làm theo hướng dẫn",
@@ -529,23 +539,82 @@ class FaceVerificationController extends GetxController
           _scheduleCurrentStepEvidenceCapture();
         }
         return;
+      case "blink":
+        _processBlinkStep(face, yaw: yaw, roll: roll);
+        return;
       case "turn_left":
         final baseline = _straightYawBaseline ?? 0;
-        final deltaYaw = yaw - baseline;
-        if (deltaYaw <= -_turnYawThreshold) {
+        final normalizedYaw = _normalizedUserYaw(yaw - baseline);
+        if (normalizedYaw <= -_turnYawThreshold) {
           _scheduleCurrentStepEvidenceCapture();
         }
         return;
       case "turn_right":
         final baseline = _straightYawBaseline ?? 0;
-        final deltaYaw = yaw - baseline;
-        if (deltaYaw >= _turnYawThreshold) {
+        final normalizedYaw = _normalizedUserYaw(yaw - baseline);
+        if (normalizedYaw >= _turnYawThreshold) {
           _scheduleCurrentStepEvidenceCapture();
         }
         return;
       default:
         return;
     }
+  }
+
+  void _processBlinkStep(
+    Face face, {
+    required double yaw,
+    required double roll,
+  }) {
+    if (yaw.abs() > _straightYawTolerance ||
+        roll.abs() > _straightRollTolerance) {
+      _resetBlinkTracking();
+      return;
+    }
+
+    final left = face.leftEyeOpenProbability;
+    final right = face.rightEyeOpenProbability;
+    if (left == null || right == null) {
+      return;
+    }
+
+    final bothOpen =
+        left >= _blinkOpenThreshold && right >= _blinkOpenThreshold;
+    final bothClosed =
+        left <= _blinkClosedThreshold && right <= _blinkClosedThreshold;
+
+    if (!_blinkSawOpen) {
+      _blinkOpenStableFrames = bothOpen ? _blinkOpenStableFrames + 1 : 0;
+      if (_blinkOpenStableFrames >= _blinkOpenRequiredFrames) {
+        _blinkSawOpen = true;
+      }
+      return;
+    }
+
+    if (!_blinkSawClosed) {
+      if (bothClosed) {
+        _blinkSawClosed = true;
+      }
+      return;
+    }
+
+    // Require the eyes to reopen so a single low-confidence frame cannot pass.
+    if (bothOpen) {
+      _scheduleCurrentStepEvidenceCapture();
+    }
+  }
+
+  void _resetBlinkTracking() {
+    _blinkOpenStableFrames = 0;
+    _blinkSawOpen = false;
+    _blinkSawClosed = false;
+  }
+
+  double _normalizedUserYaw(double rawYaw) {
+    final lensDirection = cameraController?.description.lensDirection;
+    // ML Kit reports yaw in image coordinates. The front-camera preview is
+    // mirrored, so invert it to express left/right from the user's viewpoint.
+    return lensDirection == CameraLensDirection.front ? -rawYaw : rawYaw;
   }
 
   Future<void> _captureCurrentStepEvidence(int step) async {
@@ -576,6 +645,7 @@ class FaceVerificationController extends GetxController
 
       currentLivenessStep.value = step + 1;
       _straightStableFrames = 0;
+      _resetBlinkTracking();
       _updateInstructionForCurrentStep();
       _stepEvidenceCaptureInProgress = false;
       await _startLivenessImageStream();

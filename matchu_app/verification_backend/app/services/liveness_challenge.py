@@ -59,6 +59,7 @@ def create_liveness_challenge(
     uid: str,
     device_id: str,
     purpose: str,
+    liveness_version: int = 1,
 ) -> LivenessChallenge:
     clean_device_id = (device_id or "").strip()
     if not clean_device_id:
@@ -68,7 +69,13 @@ def create_liveness_challenge(
     assert_not_rate_limited(uid, clean_device_id, now)
     turns = ["turn_left", "turn_right"]
     _random.shuffle(turns)
-    actions = ("center", *turns)
+    # Keep v1 available for already-released clients. Clients advertising v2
+    # receive the additional blink action.
+    actions = (
+        ("center", "blink", *turns)
+        if liveness_version >= 2
+        else ("center", *turns)
+    )
     expires_at = now + CHALLENGE_TTL
     challenge_id = secrets.token_urlsafe(24)
     _db().collection("faceLivenessChallenges").document(challenge_id).set(
@@ -76,6 +83,7 @@ def create_liveness_challenge(
             "uid": uid,
             "deviceId": clean_device_id,
             "purpose": normalize_purpose(purpose),
+            "livenessVersion": 2 if liveness_version >= 2 else 1,
             "actions": list(actions),
             "status": "pending",
             "createdAt": firestore.SERVER_TIMESTAMP,
@@ -186,7 +194,9 @@ def reserve_evidence_fingerprints(
     challenge_id: str,
     fingerprints: list[str],
 ) -> None:
-    if len(fingerprints) != 3 or len(set(fingerprints)) != 3:
+    if len(fingerprints) not in {3, 4} or len(set(fingerprints)) != len(
+        fingerprints
+    ):
         raise LivenessChallengeError("challenge_replay_detected")
 
     db = _db()

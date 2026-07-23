@@ -68,6 +68,43 @@ class LivenessChallengeValidationTest(unittest.TestCase):
         ):
             validate_pose_evidence(actions, [1.0, -18.0, 17.0])
 
+    def test_accepts_v2_challenge_with_blink(self) -> None:
+        data = {
+            **self.data,
+            "livenessVersion": 2,
+            "actions": ["center", "blink", "turn_right", "turn_left"],
+        }
+        actions = validate_challenge_payload(
+            data=data,
+            uid="user-a",
+            device_id="device-a",
+            purpose="video_matching",
+            response_actions=["center", "blink", "turn_right", "turn_left"],
+            now=self.now,
+        )
+        self.assertEqual(
+            actions,
+            ("center", "blink", "turn_right", "turn_left"),
+        )
+        validate_pose_evidence(actions, [1.0, 2.0, -18.0, 19.0])
+
+    def test_v2_blink_evidence_must_remain_centered(self) -> None:
+        actions = ("center", "blink", "turn_left", "turn_right")
+        with self.assertRaisesRegex(
+            LivenessChallengeError,
+            "challenge_blink_pose_invalid",
+        ):
+            validate_pose_evidence(actions, [1.0, 20.0, 18.0, -19.0])
+
+    def test_v2_turns_use_front_camera_user_directions(self) -> None:
+        actions = ("center", "blink", "turn_left", "turn_right")
+        validate_pose_evidence(actions, [1.0, 2.0, 18.0, -19.0])
+        with self.assertRaisesRegex(
+            LivenessChallengeError,
+            "challenge_turn_pose_invalid",
+        ):
+            validate_pose_evidence(actions, [1.0, 2.0, -18.0, 19.0])
+
 
 if __name__ == "__main__":
     unittest.main()

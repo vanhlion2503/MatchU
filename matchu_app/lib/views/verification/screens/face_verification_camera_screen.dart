@@ -13,6 +13,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     required this.cameraController,
     required this.isCameraReady,
     required this.isCaptureLocked,
+    required this.livenessStepActions,
     required this.livenessStepLabels,
     required this.livenessStepDone,
     required this.currentLivenessStep,
@@ -25,6 +26,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
   final CameraController? cameraController;
   final bool isCameraReady;
   final bool isCaptureLocked;
+  final List<String> livenessStepActions;
   final List<String> livenessStepLabels;
   final List<bool> livenessStepDone;
   final int currentLivenessStep;
@@ -37,7 +39,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     final title = isLiveness ? 'Kiểm tra sống' : 'Ảnh chân dung';
     final subtitle =
         isLiveness
-            ? 'Nhìn thẳng và quay đầu theo thứ tự hướng dẫn'
+            ? 'Nhìn thẳng, chớp mắt và quay đầu theo thứ tự hướng dẫn'
             : 'Đặt khuôn mặt vào khung và nhìn thẳng';
 
     return Stack(
@@ -189,7 +191,14 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: AppTheme.primaryColor.withValues(alpha: 0.15),
                 ),
-                child: Icon(_stepIcon(active), color: AppTheme.primaryColor),
+                child: Icon(
+                  _stepIcon(
+                    active < livenessStepActions.length
+                        ? livenessStepActions[active]
+                        : '',
+                  ),
+                  color: AppTheme.primaryColor,
+                ),
               ),
 
               const SizedBox(width: 12),
@@ -251,19 +260,14 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     );
   }
 
-  IconData _stepIcon(int stepIndex) {
-    switch (stepIndex) {
-      case 0:
-        return Icons.center_focus_strong_rounded;
-      case 1:
-        return Icons.remove_red_eye_outlined;
-      case 2:
-        return Icons.turn_left_rounded;
-      case 3:
-        return Icons.turn_right_rounded;
-      default:
-        return Icons.face_retouching_natural;
-    }
+  IconData _stepIcon(String action) {
+    return switch (action) {
+      'center' => Icons.center_focus_strong_rounded,
+      'blink' => Icons.remove_red_eye_outlined,
+      'turn_left' => Icons.turn_left_rounded,
+      'turn_right' => Icons.turn_right_rounded,
+      _ => Icons.face_retouching_natural,
+    };
   }
 
   Widget _buildSelfieCaptureControls(BuildContext context) {

@@ -63,6 +63,9 @@ class FaceVerificationService implements FaceVerificationRepository {
             body: {
               'purpose': purpose,
               'device_id': await DeviceService.getDeviceId(),
+              // v2 adds the blink action. Older app versions omit this field
+              // and continue receiving the legacy three-step challenge.
+              'liveness_version': '2',
             },
           )
           .timeout(_requestTimeout);

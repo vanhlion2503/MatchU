@@ -203,6 +203,7 @@ def _evidence_matches_face(
 async def issue_liveness_challenge(
     purpose: str = Form("face_reauth"),
     device_id: str = Form(...),
+    liveness_version: int = Form(1),
     current_user: FirebaseUser = Depends(require_firebase_user),
 ) -> dict:
     try:
@@ -210,6 +211,7 @@ async def issue_liveness_challenge(
             uid=current_user.uid,
             device_id=device_id,
             purpose=purpose,
+            liveness_version=liveness_version,
         )
     except LivenessChallengeError as exc:
         status_code = (

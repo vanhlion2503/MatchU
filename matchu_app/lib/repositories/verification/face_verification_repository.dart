@@ -57,7 +57,10 @@ class FaceLivenessChallenge {
 
   bool get isValid =>
       id.isNotEmpty &&
-      actions.length == 3 &&
+      actions.length == 4 &&
+      actions.first == 'center' &&
+      actions[1] == 'blink' &&
+      actions.sublist(2).toSet().containsAll({'turn_left', 'turn_right'}) &&
       expiresAt.isAfter(DateTime.now().toUtc());
 }
 
