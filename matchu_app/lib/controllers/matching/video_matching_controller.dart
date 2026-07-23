@@ -8,6 +8,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
+import 'package:matchu_app/controllers/matching/video_matching_admission_controller.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -32,6 +33,8 @@ class VideoMatchingController extends GetxController {
   VideoMatchingController({
     required this.targetGender,
     required this.anonymousAvatar,
+    required this.faceProofId,
+    required this.deviceId,
     required VideoMatchingRepository repository,
     WebRTCService? webRTCService,
     IceServerService? iceServerService,
@@ -41,6 +44,8 @@ class VideoMatchingController extends GetxController {
 
   final String targetGender;
   final String anonymousAvatar;
+  final String faceProofId;
+  final String deviceId;
   final VideoMatchingRepository _repository;
   final WebRTCService _webRTC;
   final IceServerService _iceServerService;
@@ -172,6 +177,8 @@ class VideoMatchingController extends GetxController {
         sessionId: sessionId,
         targetGender: targetGender,
         anonymousAvatar: anonymousAvatar,
+        faceProofId: faceProofId,
+        deviceId: deviceId,
       );
       if (_disposed || _sessionId != sessionId) {
         // Cancellation may race the callable before it writes the queue. A
@@ -281,6 +288,8 @@ class VideoMatchingController extends GetxController {
         arguments: {
           'targetGender': targetGender,
           'anonymousAvatar': anonymousAvatar,
+          'faceProofId': faceProofId,
+          'deviceId': deviceId,
         },
       );
     });
@@ -1004,6 +1013,8 @@ class VideoMatchingController extends GetxController {
           'nextRouteArguments': {
             'targetGender': targetGender,
             'anonymousAvatar': anonymousAvatar,
+            'faceProofId': faceProofId,
+            'deviceId': deviceId,
           },
       },
     );
@@ -1035,12 +1046,12 @@ class VideoMatchingController extends GetxController {
     _restoreRouteIfMinimized();
     _sessionCoordinator?.finish();
     debugPrint('Anonymous video matching error: $error');
-    final reputationErrorMessage = _matchingReputationErrorMessage(error);
+    final admissionErrorMessage = _matchingAdmissionErrorMessage(error);
     errorMessage.value = videoMatchingTr(
       'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.',
     );
-    if (reputationErrorMessage != null) {
-      errorMessage.value = reputationErrorMessage;
+    if (admissionErrorMessage != null) {
+      errorMessage.value = admissionErrorMessage;
     }
     phase.value = VideoMatchingPhase.error;
     final sessionId = _sessionId;
@@ -1072,13 +1083,35 @@ class VideoMatchingController extends GetxController {
     await _webRTC.resetConnection();
   }
 
-  String? _matchingReputationErrorMessage(Object error) {
-    if (error is! FirebaseFunctionsException ||
-        error.code != 'failed-precondition') {
+  String? _matchingAdmissionErrorMessage(Object error) {
+    if (error is! FirebaseFunctionsException) {
       return null;
     }
     final details = error.details;
-    if (details is! Map || details['reason'] != 'insufficient-reputation') {
+    if (details is! Map) {
+      return null;
+    }
+    if (details['reason'] == 'insufficient-gem') {
+      return videoMatchingTr(
+        'Bạn cần ít nhất 1 gem để bắt đầu video matching.',
+      );
+    }
+    if (details['reason'] == 'face-enrollment-required') {
+      return videoMatchingTr(
+        'Bạn cần xác thực tài khoản bằng khuôn mặt trước khi video matching.',
+      );
+    }
+    if (details['reason'] == 'face-reauth-required' ||
+        details['reason'] == 'face-proof-device-mismatch') {
+      if (Get.isRegistered<VideoMatchingAdmissionController>()) {
+        Get.find<VideoMatchingAdmissionController>().clearProof();
+      }
+      return videoMatchingTr(
+        'Phiên xác thực khuôn mặt đã hết hạn. Vui lòng quay lại và quét lại khuôn mặt.',
+      );
+    }
+    if (error.code != 'failed-precondition' ||
+        details['reason'] != 'insufficient-reputation') {
       return null;
     }
     return MatchingChatTranslationKeys.videoReputationRequired.trParams({

@@ -9,7 +9,9 @@ class VideoMatchingBinding extends Bindings {
     final arguments = Get.arguments;
     if (arguments is! Map ||
         arguments['targetGender'] is! String ||
-        arguments['anonymousAvatar'] is! String) {
+        arguments['anonymousAvatar'] is! String ||
+        arguments['faceProofId'] is! String ||
+        arguments['deviceId'] is! String) {
       throw ArgumentError(
         'Video matching requires targetGender and anonymousAvatar.',
       );
@@ -26,6 +28,8 @@ class VideoMatchingBinding extends Bindings {
       VideoMatchingController(
         targetGender: arguments['targetGender'] as String,
         anonymousAvatar: arguments['anonymousAvatar'] as String,
+        faceProofId: arguments['faceProofId'] as String,
+        deviceId: arguments['deviceId'] as String,
         repository: Get.find<VideoMatchingRepository>(),
       ),
       permanent: true,

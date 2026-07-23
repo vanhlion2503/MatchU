@@ -33,6 +33,10 @@ class ReauthResult:
     expires_at: datetime | None = None
 
 
+VIDEO_MATCHING_PURPOSE = "video_matching"
+DEFAULT_REAUTH_PURPOSE = "face_reauth"
+
+
 def _db() -> firestore.Client:
     ensure_firebase_app()
     return firestore.client()
@@ -111,6 +115,8 @@ def reauthenticate_face(
     *,
     uid: str,
     live_embedding: np.ndarray,
+    purpose: str = DEFAULT_REAUTH_PURPOSE,
+    device_id: str | None = None,
 ) -> ReauthResult:
     settings = get_settings()
     db = _db()
@@ -147,25 +153,14 @@ def reauthenticate_face(
             threshold=threshold,
         )
 
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.reauth_session_ttl_minutes
+    result = issue_face_session(
+        uid=uid,
+        similarity=score,
+        threshold=threshold,
+        purpose=purpose,
+        device_id=device_id,
     )
-    session_id = secrets.token_urlsafe(24)
-    session_ref = db.collection("faceReauthSessions").document(session_id)
-
     batch = db.batch()
-    batch.set(
-        session_ref,
-        {
-            "uid": uid,
-            "status": "valid",
-            "purpose": "face_reauth",
-            "similarity": float(score),
-            "threshold": float(threshold),
-            "createdAt": firestore.SERVER_TIMESTAMP,
-            "expiresAt": expires_at,
-        },
-    )
     batch.set(
         enrollment_ref,
         {
@@ -180,6 +175,56 @@ def reauthenticate_face(
         success=True,
         similarity=score,
         threshold=threshold,
+        session_id=result.session_id,
+        expires_at=result.expires_at,
+    )
+
+
+def issue_face_session(
+    *,
+    uid: str,
+    similarity: float,
+    threshold: float,
+    purpose: str = DEFAULT_REAUTH_PURPOSE,
+    device_id: str | None = None,
+) -> ReauthResult:
+    settings = get_settings()
+    normalized_purpose = (
+        VIDEO_MATCHING_PURPOSE
+        if purpose == VIDEO_MATCHING_PURPOSE
+        else DEFAULT_REAUTH_PURPOSE
+    )
+    ttl_minutes = (
+        settings.video_matching_session_ttl_minutes
+        if normalized_purpose == VIDEO_MATCHING_PURPOSE
+        else settings.reauth_session_ttl_minutes
+    )
+    max_uses = (
+        settings.video_matching_session_max_uses
+        if normalized_purpose == VIDEO_MATCHING_PURPOSE
+        else 1
+    )
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)
+    session_id = secrets.token_urlsafe(24)
+    session_ref = _db().collection("faceReauthSessions").document(session_id)
+    session_ref.set(
+        {
+            "uid": uid,
+            "status": "valid",
+            "purpose": normalized_purpose,
+            "deviceId": (device_id or "").strip() or None,
+            "similarity": float(similarity),
+            "threshold": float(threshold),
+            "maxUses": max_uses,
+            "useCount": 0,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "expiresAt": expires_at,
+        }
+    )
+    return ReauthResult(
+        success=True,
+        similarity=similarity,
+        threshold=threshold,
         session_id=session_id,
         expires_at=expires_at,
     )
@@ -191,4 +236,7 @@ __all__ = [
     "ReauthResult",
     "store_face_enrollment",
     "reauthenticate_face",
+    "issue_face_session",
+    "VIDEO_MATCHING_PURPOSE",
+    "DEFAULT_REAUTH_PURPOSE",
 ]

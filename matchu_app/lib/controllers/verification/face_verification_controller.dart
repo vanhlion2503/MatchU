@@ -21,12 +21,14 @@ class FaceVerificationController extends GetxController
     with WidgetsBindingObserver {
   FaceVerificationController({FaceVerificationService? verificationService})
     : _verificationService = verificationService ?? FaceVerificationService(),
-      mode = _readMode(Get.arguments);
+      mode = _readMode(Get.arguments),
+      purpose = _readPurpose(Get.arguments);
 
   final FaceVerificationService _verificationService;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FaceVerificationMode mode;
+  final String purpose;
 
   final Rx<VerificationState> state = VerificationState.idle.obs;
   final RxBool blinkDetected = false.obs;
@@ -36,8 +38,8 @@ class FaceVerificationController extends GetxController
   final RxBool isAlreadyVerified = false.obs;
   final RxBool wasAlreadyVerifiedAtEntry = false.obs;
   final RxInt currentLivenessStep = 0.obs;
-  final RxList<bool> livenessStepDone =
-      List<bool>.filled(_livenessStepLabels.length, false).obs;
+  final RxList<bool> livenessStepDone = <bool>[].obs;
+  final RxList<String> _challengeStepLabels = <String>[].obs;
   final RxString instructionText = "Đặt khuôn mặt vào khung và chụp ảnh".obs;
 
   final RxBool isCameraReady = false.obs;
@@ -47,6 +49,8 @@ class FaceVerificationController extends GetxController
 
   File? selfieFile;
   File? liveFrameFile;
+  final List<File> _livenessEvidenceFiles = <File>[];
+  FaceLivenessChallenge? _livenessChallenge;
   FaceVerificationResult? _successfulResult;
 
   CameraController? cameraController;
@@ -58,6 +62,7 @@ class FaceVerificationController extends GetxController
   bool _isInitializingCamera = false;
   bool _isShuttingDownCamera = false;
   bool _livenessPassed = false;
+  bool _stepEvidenceCaptureInProgress = false;
   bool _shouldResumeCamera = false;
   bool _isDisposed = false;
   int _activeStreamSession = 0;
@@ -65,7 +70,6 @@ class FaceVerificationController extends GetxController
   Uint8List? _nv21ReusableBuffer;
   double? _straightYawBaseline;
   int _straightStableFrames = 0;
-  bool _blinkPrimed = false;
   DateTime _lastLivenessStepAt = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastFrameProcessedAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _frameProcessInterval = Duration(milliseconds: 120);
@@ -73,21 +77,19 @@ class FaceVerificationController extends GetxController
   static const int _straightStableRequiredFrames = 3;
   static const double _straightYawTolerance = 8;
   static const double _straightRollTolerance = 10;
-  static const double _blinkOpenThreshold = 0.65;
-  static const double _blinkClosedThreshold = 0.3;
   static const double _turnYawThreshold = 14;
-  static const List<String> _livenessStepLabels = <String>[
-    "Nhìn thẳng",
-    "Chớp mắt",
-    "Quay trái",
-    "Quay phải",
-  ];
-
   static FaceVerificationMode _readMode(dynamic arguments) {
     if (arguments is Map && arguments["mode"] == "reauth") {
       return FaceVerificationMode.reauthentication;
     }
     return FaceVerificationMode.enrollment;
+  }
+
+  static String _readPurpose(dynamic arguments) {
+    if (arguments is Map && arguments["purpose"] == "video_matching") {
+      return "video_matching";
+    }
+    return "face_reauth";
   }
 
   bool get isReauthentication => mode == FaceVerificationMode.reauthentication;
@@ -119,7 +121,7 @@ class FaceVerificationController extends GetxController
     super.onClose();
   }
 
-  List<String> get livenessStepLabels => _livenessStepLabels;
+  List<String> get livenessStepLabels => _challengeStepLabels.toList();
 
   bool isLivenessStepDone(int index) {
     if (index < 0 || index >= livenessStepDone.length) {
@@ -249,7 +251,11 @@ class FaceVerificationController extends GetxController
             (cameraController == null && !isCameraReady.value);
         _shouldResumeCamera = false;
         if (shouldInitCamera) {
-          unawaited(initCamera());
+          if (this.state.value == VerificationState.liveness) {
+            unawaited(_restartLivenessAfterPause());
+          } else {
+            unawaited(initCamera());
+          }
         }
         break;
       case AppLifecycleState.detached:
@@ -295,7 +301,7 @@ class FaceVerificationController extends GetxController
       await _initFrontCamera();
 
       _resetLivenessSequence(updateInstruction: false);
-      if (isReauthentication) {
+      if (isReauthentication || state.value == VerificationState.liveness) {
         state.value = VerificationState.liveness;
         instructionText.value = "Bắt đầu kiểm tra liveness...";
         await startLiveness();
@@ -374,18 +380,23 @@ class FaceVerificationController extends GetxController
     }
 
     try {
+      _livenessChallenge ??= await _verificationService.createLivenessChallenge(
+        purpose: purpose,
+      );
+      final challenge = _livenessChallenge;
+      if (challenge == null || !challenge.isValid) {
+        throw StateError("Unable to create a liveness challenge.");
+      }
+      _challengeStepLabels.assignAll(
+        challenge.actions.map(_labelForLivenessAction),
+      );
       await _initFaceDetector();
       await _stopImageStream();
 
       _resetLivenessSequence();
       _isProcessingFrame = false;
       _lastFrameProcessedAt = DateTime.fromMillisecondsSinceEpoch(0);
-
-      final streamSession = ++_activeStreamSession;
-      await camera.startImageStream((image) {
-        unawaited(_onCameraImage(image, streamSession));
-      });
-      _isStreaming = true;
+      await _startLivenessImageStream();
     } catch (e, stackTrace) {
       if (e is CameraException) {
         debugPrint("startLiveness camera error: ${e.code} ${e.description}");
@@ -399,13 +410,6 @@ class FaceVerificationController extends GetxController
     }
   }
 
-  void onBlinkDetected() {
-    if (blinkDetected.value) {
-      return;
-    }
-    blinkDetected.value = true;
-  }
-
   void onHeadTurnDetected() {
     if (headTurnDetected.value) {
       return;
@@ -417,13 +421,13 @@ class FaceVerificationController extends GetxController
     blinkDetected.value = false;
     headTurnDetected.value = false;
     _livenessPassed = false;
+    _stepEvidenceCaptureInProgress = false;
     currentLivenessStep.value = 0;
     livenessStepDone.assignAll(
-      List<bool>.filled(_livenessStepLabels.length, false),
+      List<bool>.filled(_challengeStepLabels.length, false),
     );
     _straightYawBaseline = null;
     _straightStableFrames = 0;
-    _blinkPrimed = false;
     _lastLivenessStepAt = DateTime.fromMillisecondsSinceEpoch(0);
     if (updateInstruction) {
       _updateInstructionForCurrentStep();
@@ -431,60 +435,71 @@ class FaceVerificationController extends GetxController
   }
 
   void _updateInstructionForCurrentStep() {
-    switch (currentLivenessStep.value) {
-      case 0:
-        instructionText.value = "Bước 1/4: Nhìn thẳng vào camera";
-        break;
-      case 1:
-        instructionText.value = "Bước 2/4: Chớp mắt";
-        break;
-      case 2:
-        instructionText.value = "Bước 3/4: Quay đầu sang trái";
-        break;
-      case 3:
-        instructionText.value = "Bước 4/4: Quay đầu sang phải";
-        break;
-      default:
-        instructionText.value = "Bạn đã hoàn thành xác thực khuôn mặt";
-        break;
-    }
-  }
-
-  void _completeCurrentLivenessStep() {
-    final step = currentLivenessStep.value;
-    if (step < 0 || step >= _livenessStepLabels.length) {
+    final index = currentLivenessStep.value;
+    if (index < 0 || index >= _challengeStepLabels.length) {
+      instructionText.value = "Bạn đã hoàn thành xác thực khuôn mặt";
       return;
     }
+    instructionText.value =
+        "Bước ${index + 1}/${_challengeStepLabels.length}: "
+        "${_challengeStepLabels[index]}";
+  }
 
+  String _labelForLivenessAction(String action) {
+    return switch (action) {
+      "center" => "Nhìn thẳng vào camera",
+      "turn_left" => "Quay đầu sang trái và giữ nguyên",
+      "turn_right" => "Quay đầu sang phải và giữ nguyên",
+      _ => "Làm theo hướng dẫn",
+    };
+  }
+
+  Future<void> _startLivenessImageStream() async {
+    final camera = cameraController;
+    if (camera == null || !camera.value.isInitialized || _isStreaming) return;
+    final streamSession = ++_activeStreamSession;
+    await camera.startImageStream((image) {
+      unawaited(_onCameraImage(image, streamSession));
+    });
+    _isStreaming = true;
+  }
+
+  void _scheduleCurrentStepEvidenceCapture() {
+    final step = currentLivenessStep.value;
+    if (step < 0 ||
+        step >= _challengeStepLabels.length ||
+        _stepEvidenceCaptureInProgress) {
+      return;
+    }
     final now = DateTime.now();
     if (now.difference(_lastLivenessStepAt) < _livenessStepGap) {
       return;
     }
     _lastLivenessStepAt = now;
-
-    livenessStepDone[step] = true;
-    if (step == 1) {
-      onBlinkDetected();
-    }
-
-    if (step >= _livenessStepLabels.length - 1) {
-      onHeadTurnDetected();
-      _livenessPassed = true;
-      instructionText.value = "Đang chụp ảnh xác thực...";
-      return;
-    }
-
-    currentLivenessStep.value = step + 1;
-    _updateInstructionForCurrentStep();
+    _stepEvidenceCaptureInProgress = true;
+    instructionText.value = "Giữ nguyên tư thế...";
+    // Let the current ML Kit frame callback finish before stopping its stream.
+    Future<void>.delayed(
+      const Duration(milliseconds: 40),
+      () => _captureCurrentStepEvidence(step),
+    );
   }
 
   void _processLivenessStep(Face face) {
     final step = currentLivenessStep.value;
+    final challenge = _livenessChallenge;
+    if (challenge == null ||
+        step < 0 ||
+        step >= challenge.actions.length ||
+        _stepEvidenceCaptureInProgress) {
+      return;
+    }
     final yaw = face.headEulerAngleY ?? 0;
     final roll = face.headEulerAngleZ ?? 0;
+    final action = challenge.actions[step];
 
-    switch (step) {
-      case 0:
+    switch (action) {
+      case "center":
         final left = face.leftEyeOpenProbability;
         final right = face.rightEyeOpenProbability;
         final eyesAreOpen =
@@ -501,42 +516,67 @@ class FaceVerificationController extends GetxController
         _straightStableFrames++;
         if (_straightStableFrames >= _straightStableRequiredFrames) {
           _straightYawBaseline = yaw;
-          _completeCurrentLivenessStep();
+          _scheduleCurrentStepEvidenceCapture();
         }
         return;
-      case 1:
-        final left = face.leftEyeOpenProbability;
-        final right = face.rightEyeOpenProbability;
-        if (left == null || right == null) {
-          return;
-        }
-        if (!_blinkPrimed &&
-            left > _blinkOpenThreshold &&
-            right > _blinkOpenThreshold) {
-          _blinkPrimed = true;
-        }
-        final blinkClosed =
-            left < _blinkClosedThreshold && right < _blinkClosedThreshold;
-        if (_blinkPrimed && blinkClosed) {
-          _completeCurrentLivenessStep();
-        }
-        return;
-      case 2:
+      case "turn_left":
         final baseline = _straightYawBaseline ?? 0;
         final deltaYaw = yaw - baseline;
         if (deltaYaw <= -_turnYawThreshold) {
-          _completeCurrentLivenessStep();
+          _scheduleCurrentStepEvidenceCapture();
         }
         return;
-      case 3:
+      case "turn_right":
         final baseline = _straightYawBaseline ?? 0;
         final deltaYaw = yaw - baseline;
         if (deltaYaw >= _turnYawThreshold) {
-          _completeCurrentLivenessStep();
+          _scheduleCurrentStepEvidenceCapture();
         }
         return;
       default:
         return;
+    }
+  }
+
+  Future<void> _captureCurrentStepEvidence(int step) async {
+    try {
+      await _stopImageStream();
+      final camera = cameraController;
+      if (camera == null || !camera.value.isInitialized) {
+        throw StateError("Camera is unavailable for liveness evidence.");
+      }
+      final captured = await _safeTakePicture(camera);
+      final directory = await getTemporaryDirectory();
+      final file = File(
+        "${directory.path}${Platform.pathSeparator}"
+        "liveness_evidence_$step.jpg",
+      );
+      await file.writeAsBytes(await captured.readAsBytes(), flush: true);
+      _livenessEvidenceFiles.add(file);
+      livenessStepDone[step] = true;
+
+      if (step >= _challengeStepLabels.length - 1) {
+        onHeadTurnDetected();
+        _livenessPassed = true;
+        instructionText.value = "Đang chụp ảnh xác thực...";
+        _stepEvidenceCaptureInProgress = false;
+        await onLivenessPassed();
+        return;
+      }
+
+      currentLivenessStep.value = step + 1;
+      _straightStableFrames = 0;
+      _updateInstructionForCurrentStep();
+      _stepEvidenceCaptureInProgress = false;
+      await _startLivenessImageStream();
+    } catch (error, stackTrace) {
+      debugPrint("capture liveness evidence error: $error");
+      debugPrintStack(stackTrace: stackTrace);
+      _stepEvidenceCaptureInProgress = false;
+      await _shutdownCameraForPreviewExit();
+      state.value = VerificationState.failed;
+      errorText.value = "Không thể ghi nhận bước xác thực. Vui lòng thử lại.";
+      instructionText.value = errorText.value;
     }
   }
 
@@ -574,15 +614,26 @@ class FaceVerificationController extends GetxController
       state.value = VerificationState.processing;
       instructionText.value = "Đang xử lý dữ liệu khuôn mặt ...";
 
+      final challenge = _livenessChallenge;
+      if (challenge == null ||
+          _livenessEvidenceFiles.length != challenge.actions.length) {
+        throw StateError("Liveness evidence is incomplete.");
+      }
       final verificationResult =
           isReauthentication
               ? await _verificationService.reauthenticate(
                 liveFrameFile: savedFrame,
+                challenge: challenge,
+                evidenceFrames: List<File>.unmodifiable(_livenessEvidenceFiles),
+                purpose: purpose,
               )
               : await _verificationService.enrollVerification(
                 selfieFile:
                     selfieFile ?? (throw Exception("Selfie file is missing.")),
                 liveFrameFile: savedFrame,
+                challenge: challenge,
+                evidenceFrames: List<File>.unmodifiable(_livenessEvidenceFiles),
+                purpose: purpose,
               );
 
       final hasRequiredReauthSession =
@@ -627,11 +678,20 @@ class FaceVerificationController extends GetxController
   Future<void> retryVerification() async {
     await _deleteTemporaryFaceFiles();
     _successfulResult = null;
+    _livenessChallenge = null;
+    _challengeStepLabels.clear();
     hasStartedVerificationFlow.value = true;
     _resetLivenessSequence(updateInstruction: false);
     state.value = VerificationState.idle;
     instructionText.value = "Đặt khuôn mặt vào khung và chụp ảnh";
     errorText.value = "";
+    await initCamera();
+  }
+
+  Future<void> _restartLivenessAfterPause() async {
+    await _deleteLivenessEvidenceFiles();
+    _livenessChallenge = null;
+    _challengeStepLabels.clear();
     await initCamera();
   }
 
@@ -1095,6 +1155,21 @@ class FaceVerificationController extends GetxController
         }
       } catch (e) {
         debugPrint("delete temporary face file error: $e");
+      }
+    }
+    await _deleteLivenessEvidenceFiles();
+  }
+
+  Future<void> _deleteLivenessEvidenceFiles() async {
+    final files = List<File>.from(_livenessEvidenceFiles);
+    _livenessEvidenceFiles.clear();
+    for (final file in files) {
+      try {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e) {
+        debugPrint("delete liveness evidence error: $e");
       }
     }
   }

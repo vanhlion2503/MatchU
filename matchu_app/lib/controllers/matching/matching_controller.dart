@@ -237,6 +237,7 @@ class MatchingController extends GetxController {
         remaining: -1,
         limit: _dailyMatchingLimit,
         reputationScore: reputationScore,
+        gem: _parseInt(data['gem'], fallback: 15).clamp(0, 1 << 31).toInt(),
       );
     }
 
@@ -255,6 +256,7 @@ class MatchingController extends GetxController {
       remaining: remaining,
       limit: _dailyMatchingLimit,
       reputationScore: reputationScore,
+      gem: _parseInt(data['gem'], fallback: 15).clamp(0, 1 << 31).toInt(),
     );
   }
 
@@ -530,6 +532,7 @@ class MatchingQuotaPreview {
   final int remaining;
   final int limit;
   final int reputationScore;
+  final int gem;
 
   const MatchingQuotaPreview({
     required this.isUnlimited,
@@ -537,6 +540,7 @@ class MatchingQuotaPreview {
     required this.remaining,
     required this.limit,
     required this.reputationScore,
+    required this.gem,
   });
 
   bool canUse(MatchingMode mode) {

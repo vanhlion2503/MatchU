@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:matchu_app/services/security/device_service.dart';
 
 class FaceVerificationResult {
   const FaceVerificationResult({
@@ -52,6 +52,23 @@ class FaceVerificationResult {
   static const failed = FaceVerificationResult(success: false);
 }
 
+class FaceLivenessChallenge {
+  const FaceLivenessChallenge({
+    required this.id,
+    required this.actions,
+    required this.expiresAt,
+  });
+
+  final String id;
+  final List<String> actions;
+  final DateTime expiresAt;
+
+  bool get isValid =>
+      id.isNotEmpty &&
+      actions.length == 3 &&
+      expiresAt.isAfter(DateTime.now().toUtc());
+}
+
 class FaceVerificationService {
   FaceVerificationService({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
@@ -82,14 +99,64 @@ class FaceVerificationService {
 
   Uri _enrollUri() => Uri.parse('$_baseUrl/v1/face/enroll');
   Uri _reauthUri() => Uri.parse('$_baseUrl/v1/face/reauth');
+  Uri _challengeUri() => Uri.parse('$_baseUrl/v1/face/challenge');
+
+  Future<FaceLivenessChallenge?> createLivenessChallenge({
+    required String purpose,
+  }) async {
+    final headers = await _buildAuthenticatedHeaders();
+    if (headers == null) return null;
+    try {
+      final response = await _client
+          .post(
+            _challengeUri(),
+            headers: headers,
+            body: {
+              'purpose': purpose,
+              'device_id': await DeviceService.getDeviceId(),
+            },
+          )
+          .timeout(_requestTimeout);
+      if (response.statusCode != 200) {
+        debugPrint(
+          'createLivenessChallenge failed: status=${response.statusCode}',
+        );
+        return null;
+      }
+      final payload = jsonDecode(utf8.decode(response.bodyBytes));
+      if (payload is! Map) return null;
+      final actions =
+          (payload['actions'] as List?)
+              ?.map((value) => value.toString())
+              .toList(growable: false) ??
+          const <String>[];
+      final challenge = FaceLivenessChallenge(
+        id: payload['challengeId']?.toString() ?? '',
+        actions: actions,
+        expiresAt:
+            DateTime.tryParse(
+              payload['expiresAt']?.toString() ?? '',
+            )?.toUtc() ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
+      return challenge.isValid ? challenge : null;
+    } catch (error) {
+      debugPrint('createLivenessChallenge error: $error');
+      return null;
+    }
+  }
 
   Future<bool> uploadVerification({
     required File selfieFile,
     required File liveFrameFile,
+    required FaceLivenessChallenge challenge,
+    required List<File> evidenceFrames,
   }) async {
     final result = await enrollVerification(
       selfieFile: selfieFile,
       liveFrameFile: liveFrameFile,
+      challenge: challenge,
+      evidenceFrames: evidenceFrames,
     );
     return result.success;
   }
@@ -97,6 +164,9 @@ class FaceVerificationService {
   Future<FaceVerificationResult> enrollVerification({
     required File selfieFile,
     required File liveFrameFile,
+    required FaceLivenessChallenge challenge,
+    required List<File> evidenceFrames,
+    String purpose = 'face_reauth',
   }) async {
     if (!await selfieFile.exists() || !await liveFrameFile.exists()) {
       debugPrint('uploadVerification: selfie/live frame file does not exist.');
@@ -111,14 +181,22 @@ class FaceVerificationService {
     final request =
         http.MultipartRequest('POST', _enrollUri())
           ..headers.addAll(headers)
+          ..fields['purpose'] = purpose
+          ..fields['device_id'] = await DeviceService.getDeviceId()
+          ..fields['challenge_id'] = challenge.id
+          ..fields['challenge_response'] = jsonEncode(challenge.actions)
           ..files.add(await _buildImagePart('selfie', selfieFile))
           ..files.add(await _buildImagePart('live_frame', liveFrameFile));
+    await _addEvidenceParts(request, evidenceFrames);
 
     return _sendMultipart(request, operation: 'enrollVerification');
   }
 
   Future<FaceVerificationResult> reauthenticate({
     required File liveFrameFile,
+    required FaceLivenessChallenge challenge,
+    required List<File> evidenceFrames,
+    String purpose = 'face_reauth',
   }) async {
     if (!await liveFrameFile.exists()) {
       debugPrint('reauthenticate: live frame file does not exist.');
@@ -133,7 +211,12 @@ class FaceVerificationService {
     final request =
         http.MultipartRequest('POST', _reauthUri())
           ..headers.addAll(headers)
+          ..fields['purpose'] = purpose
+          ..fields['device_id'] = await DeviceService.getDeviceId()
+          ..fields['challenge_id'] = challenge.id
+          ..fields['challenge_response'] = jsonEncode(challenge.actions)
           ..files.add(await _buildImagePart('live_frame', liveFrameFile));
+    await _addEvidenceParts(request, evidenceFrames);
 
     return _sendMultipart(request, operation: 'reauthenticate');
   }
@@ -195,15 +278,6 @@ class FaceVerificationService {
       'Authorization': 'Bearer $idToken',
     };
 
-    try {
-      final appCheckToken = await FirebaseAppCheck.instance.getToken();
-      if (appCheckToken != null && appCheckToken.isNotEmpty) {
-        headers['X-Firebase-AppCheck'] = appCheckToken;
-      }
-    } catch (e) {
-      debugPrint('Firebase App Check token unavailable: $e');
-    }
-
     return headers;
   }
 
@@ -213,6 +287,15 @@ class FaceVerificationService {
       file.path,
       contentType: MediaType('image', 'jpeg'),
     );
+  }
+
+  Future<void> _addEvidenceParts(
+    http.MultipartRequest request,
+    List<File> evidenceFrames,
+  ) async {
+    for (final frame in evidenceFrames) {
+      request.files.add(await _buildImagePart('evidence_frames', frame));
+    }
   }
 
   void dispose() {

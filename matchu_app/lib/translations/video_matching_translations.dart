@@ -59,6 +59,12 @@ const videoMatchingVietnameseTranslations = <String, String>{
   'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.':
       'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.',
   'Thử lại': 'Thử lại',
+  'Bạn cần ít nhất 1 gem để bắt đầu video matching.':
+      'Bạn cần ít nhất 1 gem để bắt đầu video matching.',
+  'Bạn cần xác thực tài khoản bằng khuôn mặt trước khi video matching.':
+      'Bạn cần xác thực tài khoản bằng khuôn mặt trước khi video matching.',
+  'Phiên xác thực khuôn mặt đã hết hạn. Vui lòng quay lại và quét lại khuôn mặt.':
+      'Phiên xác thực khuôn mặt đã hết hạn. Vui lòng quay lại và quét lại khuôn mặt.',
 };
 
 const videoMatchingEnglishTranslations = <String, String>{
@@ -121,6 +127,12 @@ const videoMatchingEnglishTranslations = <String, String>{
   'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.':
       'The connection could not be maintained. Check your camera, microphone, and network, then try again.',
   'Thử lại': 'Try again',
+  'Bạn cần ít nhất 1 gem để bắt đầu video matching.':
+      'You need at least 1 gem to start video matching.',
+  'Bạn cần xác thực tài khoản bằng khuôn mặt trước khi video matching.':
+      'Verify your account with your face before starting video matching.',
+  'Phiên xác thực khuôn mặt đã hết hạn. Vui lòng quay lại và quét lại khuôn mặt.':
+      'Your face verification session expired. Go back and scan your face again.',
 };
 
 String videoMatchingTr(String source) {

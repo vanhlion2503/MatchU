@@ -870,6 +870,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /faceLivenessChallenges/{challengeId} {
+      allow read, write: if false;
+    }
+
+    match /faceLivenessRateLimits/{rateLimitId} {
+      allow read, write: if false;
+    }
+
+    // Wallet mutations and their audit trail are Cloud Functions-only.
+    match /gemTransactions/{transactionId} {
+      allow read, write: if false;
+    }
+
     // Recommendation retrieval/index documents are maintained by Admin SDK
     // Cloud Functions and are never exposed directly to clients.
     match /postRecommendationIndex/{postId} {

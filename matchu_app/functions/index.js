@@ -99,12 +99,14 @@ const {
 const {
   startTempChatMatching,
   cancelTempChatMatching,
+  revokeVideoMatchingFaceProof,
   convertTempChat,
   expireTempChatSessions,
   cleanupExpiredMatchingSessions,
   cleanupExpiredTempChatPresence,
   convertMutualTempChat,
   releaseEndedTempChatParticipants,
+  refundFailedVideoMatch,
 } = require("./src/callables/tempChatSession");
 const {
   ensureUserReputationDailyDefaults,
@@ -196,9 +198,11 @@ exports.progressLike5PostsComment5TimesOnComment =
 exports.moderateTempChatMessage = moderateTempChatMessage;
 exports.startTempChatMatching = startTempChatMatching;
 exports.cancelTempChatMatching = cancelTempChatMatching;
+exports.revokeVideoMatchingFaceProof = revokeVideoMatchingFaceProof;
 exports.convertTempChat = convertTempChat;
 exports.expireTempChatSessions = expireTempChatSessions;
 exports.cleanupExpiredMatchingSessions = cleanupExpiredMatchingSessions;
 exports.cleanupExpiredTempChatPresence = cleanupExpiredTempChatPresence;
 exports.convertMutualTempChat = convertMutualTempChat;
 exports.releaseEndedTempChatParticipants = releaseEndedTempChatParticipants;
+exports.refundFailedVideoMatch = refundFailedVideoMatch;

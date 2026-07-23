@@ -6,6 +6,7 @@ from threading import Lock
 from typing import Any
 
 import numpy as np
+from dataclasses import dataclass
 
 from app.core.config import get_settings
 
@@ -31,6 +32,12 @@ _face_app_lock = Lock()
 _face_app_error: str | None = None
 _face_app_last_attempt_mono: float = 0.0
 _init_retry_interval_seconds = 15.0
+
+
+@dataclass(frozen=True)
+class FaceObservation:
+    embedding: np.ndarray
+    yaw: float
 
 
 def _set_face_app_error(error: str | None) -> None:
@@ -117,7 +124,9 @@ def _face_area(face: Any) -> float:
     return width * height
 
 
-def extract_embedding(image_bytes: bytes) -> tuple[np.ndarray | None, str | None]:
+def extract_face_observation(
+    image_bytes: bytes,
+) -> tuple[FaceObservation | None, str | None]:
     """
     Returns:
     - (embedding, None) on success
@@ -157,4 +166,14 @@ def extract_embedding(image_bytes: bytes) -> tuple[np.ndarray | None, str | None
     if embedding is None:
         return None, "face_not_detected"
 
-    return np.asarray(embedding, dtype=np.float32), None
+    pose = getattr(primary_face, "pose", None)
+    yaw = float(pose[1]) if pose is not None and len(pose) >= 2 else 0.0
+    return FaceObservation(
+        embedding=np.asarray(embedding, dtype=np.float32),
+        yaw=yaw,
+    ), None
+
+
+def extract_embedding(image_bytes: bytes) -> tuple[np.ndarray | None, str | None]:
+    observation, error = extract_face_observation(image_bytes)
+    return (observation.embedding if observation is not None else None), error

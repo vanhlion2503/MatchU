@@ -9,6 +9,7 @@ import 'package:matchu_app/bindings/profile/profile_privacy_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
 import 'package:matchu_app/bindings/chat/temp_chat_binding.dart';
 import 'package:matchu_app/bindings/matching/video_matching_binding.dart';
+import 'package:matchu_app/bindings/matching/video_matching_admission_binding.dart';
 import 'package:matchu_app/controllers/auth/avatar_controller.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
 import 'package:matchu_app/controllers/chat/rating_controller.dart';
@@ -145,6 +146,7 @@ class AppPages {
       page: () => MainView(),
       binding: BindingsBuilder(() {
         Get.put(MainController());
+        VideoMatchingAdmissionBinding().dependencies();
 
         // 🔹 User-related (CHỈ INIT SAU LOGIN)
         Get.put(UserController());

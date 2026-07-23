@@ -44,6 +44,8 @@ class Settings:
     similarity_threshold: float
     reauth_similarity_threshold: float
     reauth_session_ttl_minutes: int
+    video_matching_session_ttl_minutes: int
+    video_matching_session_max_uses: int
     max_upload_size_mb: int
     face_model_version: str
     insightface_model_name: str
@@ -65,6 +67,16 @@ def get_settings() -> Settings:
         similarity_threshold=_env_float("SIMILARITY_THRESHOLD", 0.65, min_value=0.0, max_value=1.0),
         reauth_similarity_threshold=_env_float("REAUTH_SIMILARITY_THRESHOLD", 0.65, min_value=0.0, max_value=1.0),
         reauth_session_ttl_minutes=_env_int("REAUTH_SESSION_TTL_MINUTES", 5, min_value=1),
+        video_matching_session_ttl_minutes=_env_int(
+            "VIDEO_MATCHING_SESSION_TTL_MINUTES",
+            15,
+            min_value=1,
+        ),
+        video_matching_session_max_uses=_env_int(
+            "VIDEO_MATCHING_SESSION_MAX_USES",
+            3,
+            min_value=1,
+        ),
         max_upload_size_mb=_env_int("MAX_UPLOAD_SIZE_MB", 10, min_value=1),
         face_model_version=os.getenv("FACE_MODEL_VERSION", "insightface-buffalo_l-v1"),
         insightface_model_name=os.getenv("INSIGHTFACE_MODEL_NAME", "buffalo_l"),

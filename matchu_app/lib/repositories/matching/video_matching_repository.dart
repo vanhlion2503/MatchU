@@ -8,6 +8,8 @@ abstract class VideoMatchingRepository {
     required String sessionId,
     required String targetGender,
     required String anonymousAvatar,
+    required String faceProofId,
+    required String deviceId,
   });
 
   Future<void> cancelMatching({required String sessionId});

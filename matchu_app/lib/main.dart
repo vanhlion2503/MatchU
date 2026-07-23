@@ -26,7 +26,6 @@ import 'package:matchu_app/controllers/system/theme_controller.dart';
 import 'package:matchu_app/controllers/system/language_controller.dart';
 import 'package:matchu_app/translations/app_translations.dart';
 import 'package:matchu_app/widgets/global_matching_bubble.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 
 Future<void> _cleanupAbandonedRegisterFlow() async {
   final box = GetStorage();
@@ -90,13 +89,7 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
 
-  // ✅ 2. ACTIVATE APP CHECK (SAU FIREBASE)
-  await FirebaseAppCheck.instance.activate(
-    providerAndroid: const AndroidDebugProvider(),
-    providerApple: const AppleDebugProvider(),
-  );
-
-  // ✅ 3. LOAD WORD CHAIN SEED WORDS (🔥 THÊM DÒNG NÀY)
+  // ✅ 2. LOAD WORD CHAIN SEED WORDS (🔥 THÊM DÒNG NÀY)
   await WordChainService.loadSeedWords();
 
   // ✅ 4. LOCAL STORAGE

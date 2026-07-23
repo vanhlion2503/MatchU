@@ -32,8 +32,10 @@ const randomChatEnglishTranslations = <String, String>{
       'These matching rules help keep conversations fair and safe.',
   'Chỉ tính lượt khi ghép cặp thành công (không trừ lượt khi chỉ bấm tìm).':
       'A turn is used only after a successful match, not when you simply start searching.',
-  'Tài khoản chưa xác thực: tối đa 10 lượt ghép thành công/ngày, reset lúc 00:00.':
-      'Unverified accounts get up to 10 successful matches per day, resetting at midnight.',
+  'Tài khoản chưa xác thực: tối đa 10 lượt chat matching thành công/ngày, reset lúc 00:00.':
+      'Unverified accounts get up to 10 successful chat matches per day, resetting at midnight.',
+  'Video matching yêu cầu tài khoản đã xác thực khuôn mặt và tốn 1 gem khi ghép thành công.':
+      'Video matching requires a face-verified account and costs 1 gem after a successful match.',
   'Chat tạm yêu cầu tối thiểu 80 điểm uy tín; video call yêu cầu tối thiểu 90 điểm uy tín.':
       'Temporary chat requires at least 80 reputation points; video matching requires at least 90.',
   'Nếu cả hai cùng thích nhau, hệ thống chuyển sang phòng chat lâu dài.':
@@ -47,6 +49,11 @@ const randomChatEnglishTranslations = <String, String>{
   'Đang bắt đầu...': 'Starting...',
   'Đang tải lượt...': 'Loading turns...',
   'Bắt đầu tìm kiếm': 'Start searching',
+  'Không đủ gem': 'Not enough gems',
+  'Mỗi lần ghép đôi video thành công cần 1 gem. Gem chỉ bị trừ sau khi hệ thống tạo phòng thành công.':
+      'Each successful video match costs 1 gem. Gems are charged only after a room is created successfully.',
+  'Bạn phải hoàn tất xác thực khuôn mặt trước khi video matching.':
+      'Complete face verification before starting video matching.',
   'Loại hình...': 'Experience...',
   'Vui lòng chọn avatar trước khi bắt đầu':
       'Choose an avatar before you start.',
@@ -72,6 +79,19 @@ String randomChatTr(String source) {
 
   final start = RegExp(r'^Bắt đầu tìm kiếm • (\d+)/(\d+)$').firstMatch(source);
   if (start != null) return 'Start searching • ${start[1]}/${start[2]}';
+
+  if (source == 'Không đủ gem • Cần 1 gem') {
+    return 'Not enough gems • 1 gem required';
+  }
+  if (source == 'Bắt đầu tìm kiếm • 1 gem') {
+    return 'Start searching • 1 gem';
+  }
+  final videoStart = RegExp(
+    r'^Bắt đầu tìm kiếm • (\d+)/(\d+) • 1 gem$',
+  ).firstMatch(source);
+  if (videoStart != null) {
+    return 'Start searching • ${videoStart[1]}/${videoStart[2]} • 1 gem';
+  }
 
   return source;
 }

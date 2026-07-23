@@ -40,7 +40,9 @@ def _extract_bearer_token(authorization: str | None) -> str:
 
 
 def _requires_app_check() -> bool:
-    return os.getenv("REQUIRE_FIREBASE_APP_CHECK", "").strip().lower() in {
+    # App Check is currently optional. It can be re-enabled later through the
+    # Cloud Run environment without changing the verification endpoints.
+    return os.getenv("REQUIRE_FIREBASE_APP_CHECK", "false").strip().lower() in {
         "1",
         "true",
         "yes",

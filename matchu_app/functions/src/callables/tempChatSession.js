@@ -13,6 +13,9 @@ const DAILY_MATCH_LIMIT = 10;
 const MATCH_SCAN_LIMIT = 50;
 const MIN_TEMP_CHAT_REPUTATION = 80;
 const MIN_VIDEO_REPUTATION = 90;
+const VIDEO_MATCH_GEM_COST = 1;
+const INITIAL_GEM_BALANCE = 15;
+const VIDEO_MATCHING_FACE_PURPOSE = "video_matching";
 const VERIFIED_STATUSES = new Set([
   "verified",
   "approved",
@@ -80,6 +83,126 @@ function assertMatchingReputation(userData, matchingMode, participant) {
       participant,
     }
   );
+}
+
+function gemBalanceFrom(userData) {
+  const rawValue = userData?.gem;
+  // Existing profiles created before the wallet field was introduced receive
+  // the same opening balance as new profiles on their first server-side use.
+  if (rawValue == null || rawValue === "") return INITIAL_GEM_BALANCE;
+  const value = Number(rawValue);
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function assertSufficientVideoGem(userData, matchingMode, participant) {
+  if (normalizeMatchingMode(matchingMode) !== "video") return;
+
+  const currentGem = gemBalanceFrom(userData);
+  if (currentGem >= VIDEO_MATCH_GEM_COST) return;
+
+  throw new HttpsError(
+    "resource-exhausted",
+    "Insufficient gem balance for video matching.",
+    {
+      reason: "insufficient-gem",
+      matchingMode: "video",
+      requiredGem: VIDEO_MATCH_GEM_COST,
+      currentGem,
+      participant,
+    }
+  );
+}
+
+function videoMatchChargeId(roomId, uid) {
+  return `video_match_${roomId}_${uid}`;
+}
+
+function videoMatchRefundId(roomId, uid) {
+  return `video_match_refund_${roomId}_${uid}`;
+}
+
+function faceProofFailureReason({
+  userData,
+  enrollmentData,
+  proofData,
+  uid,
+  deviceId,
+  nowMillis,
+}) {
+  if (userData?.isFaceVerified !== true) {
+    return "face-enrollment-required";
+  }
+  if (!enrollmentData || enrollmentData.isActive === false) {
+    return "face-enrollment-required";
+  }
+  if (!proofData) return "face-reauth-required";
+
+  const expiresAt = proofData.expiresAt;
+  const expiresAtMillis =
+    expiresAt && typeof expiresAt.toMillis === "function"
+      ? expiresAt.toMillis()
+      : 0;
+  const maxUses = Math.max(1, Number(proofData.maxUses) || 1);
+  const useCount = Math.max(0, Number(proofData.useCount) || 0);
+  if (
+    proofData.uid !== uid ||
+    proofData.status !== "valid" ||
+    proofData.purpose !== VIDEO_MATCHING_FACE_PURPOSE ||
+    expiresAtMillis <= nowMillis ||
+    useCount >= maxUses
+  ) {
+    return "face-reauth-required";
+  }
+  if (!deviceId || proofData.deviceId !== deviceId) {
+    return "face-proof-device-mismatch";
+  }
+  return null;
+}
+
+async function readVideoFaceAdmission(tx, {
+  userSnap,
+  uid,
+  proofId,
+  deviceId,
+  matchingMode,
+  participant,
+  nowMillis,
+}) {
+  if (normalizeMatchingMode(matchingMode) !== "video") return null;
+
+  const enrollmentRef = db.collection("faceEnrollments").doc(uid);
+  const proofRef = proofId
+    ? db.collection("faceReauthSessions").doc(proofId)
+    : null;
+  const refs = proofRef ? [enrollmentRef, proofRef] : [enrollmentRef];
+  const snapshots = await tx.getAll(...refs);
+  const enrollmentSnap = snapshots[0];
+  const proofSnap = proofRef ? snapshots[1] : null;
+  const reason = faceProofFailureReason({
+    userData: userSnap.data() || {},
+    enrollmentData: enrollmentSnap.exists ? enrollmentSnap.data() : null,
+    proofData: proofSnap?.exists ? proofSnap.data() : null,
+    uid,
+    deviceId,
+    nowMillis,
+  });
+  if (reason) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Fresh face verification is required for video matching.",
+      {
+        reason,
+        matchingMode: "video",
+        participant,
+      }
+    );
+  }
+
+  const proofData = proofSnap.data() || {};
+  return {
+    proofRef,
+    useCount: Math.max(0, Number(proofData.useCount) || 0),
+  };
 }
 
 function isActiveTempRoomForUser(room, uid) {
@@ -163,14 +286,21 @@ function bangkokDateKey(now = new Date()) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function quotaPatch(userData, now) {
+function quotaPatch(userData, now, participant = null) {
   if (isVerifiedAccount(userData)) return {};
   const today = bangkokDateKey(now);
   const used = userData?.dailyMatchingDate === today
     ? Math.max(0, Number(userData?.dailyMatchingCount) || 0)
     : 0;
   if (used >= DAILY_MATCH_LIMIT) {
-    throw new HttpsError("resource-exhausted", "Daily matching limit reached.");
+    throw new HttpsError(
+      "resource-exhausted",
+      "Daily matching limit reached.",
+      {
+        reason: "daily-matching-limit",
+        participant,
+      }
+    );
   }
   return {
     dailyMatchingCount: used + 1,
@@ -195,6 +325,8 @@ async function enqueueSeeker({
   targetGender,
   avatar,
   matchingMode,
+  faceProofId,
+  deviceId,
 }) {
   const userRef = db.collection("users").doc(uid);
   const queueRef = db.collection(QUEUE_COLLECTION).doc(uid);
@@ -206,6 +338,7 @@ async function enqueueSeeker({
       throw new HttpsError("not-found", "User profile not found.");
     }
     const activeRoomId = cleanString(userSnap.get("activeTempRoomId"));
+    let shouldClearStaleRoom = false;
     if (activeRoomId) {
       const activeRoom = await tx.get(db.collection("tempChats").doc(activeRoomId));
       if (activeRoom.exists && isActiveTempRoomForUser(activeRoom.data(), uid)) {
@@ -218,19 +351,35 @@ async function enqueueSeeker({
         return activeRoomId;
       }
       // Recover from a stale lock left by an interrupted cleanup trigger.
-      tx.set(userRef, { activeTempRoomId: null }, { merge: true });
+      shouldClearStaleRoom = true;
     }
     assertMatchingReputation(userSnap.data() || {}, matchingMode, "seeker");
+    assertSufficientVideoGem(userSnap.data() || {}, matchingMode, "seeker");
     // Validate quota now, but consume it only after a room is created.
     quotaPatch(userSnap.data() || {}, now);
+    await readVideoFaceAdmission(tx, {
+      userSnap,
+      uid,
+      proofId: faceProofId,
+      deviceId,
+      matchingMode,
+      participant: "seeker",
+      nowMillis: now.getTime(),
+    });
 
     const gender = normalizeGender(userSnap.get("gender"));
+    if (shouldClearStaleRoom) {
+      tx.set(userRef, { activeTempRoomId: null }, { merge: true });
+    }
     tx.set(queueRef, {
       uid,
       sessionId,
       gender,
       targetGender,
       matchingMode,
+      ...(matchingMode === "video"
+        ? { faceProofId, deviceId }
+        : {}),
       anonymousAvatar: avatar,
       status: "waiting",
       createdAt: admin.firestore.Timestamp.fromDate(now),
@@ -292,15 +441,53 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
           matchingMode,
           "candidate"
         );
+        assertSufficientVideoGem(
+          seekerUser.data() || {},
+          matchingMode,
+          "seeker"
+        );
+        assertSufficientVideoGem(
+          candidateUser.data() || {},
+          matchingMode,
+          "candidate"
+        );
+        const seekerFaceAdmission = await readVideoFaceAdmission(tx, {
+          userSnap: seekerUser,
+          uid,
+          proofId: cleanString(seeker.faceProofId, 256),
+          deviceId: cleanString(seeker.deviceId, 128),
+          matchingMode,
+          participant: "seeker",
+          nowMillis: Date.now(),
+        });
+        const candidateFaceAdmission = await readVideoFaceAdmission(tx, {
+          userSnap: candidateUser,
+          uid: candidateUid,
+          proofId: cleanString(candidate.faceProofId, 256),
+          deviceId: cleanString(candidate.deviceId, 128),
+          matchingMode,
+          participant: "candidate",
+          nowMillis: Date.now(),
+        });
         if (await hasBlockInTransaction(tx, uid, candidateUid)) return null;
 
         const now = new Date();
-        const matchingMode = normalizeMatchingMode(seeker.matchingMode);
-        const durationMs = matchingMode === "video"
+        const roomMatchingMode = normalizeMatchingMode(seeker.matchingMode);
+        const durationMs = roomMatchingMode === "video"
           ? VIDEO_CHAT_DURATION_MS
           : TEMP_CHAT_DURATION_MS;
-        const seekerQuota = quotaPatch(seekerUser.data() || {}, now);
-        const candidateQuota = quotaPatch(candidateUser.data() || {}, now);
+        const seekerQuota = quotaPatch(
+          seekerUser.data() || {},
+          now,
+          "seeker"
+        );
+        const candidateQuota = quotaPatch(
+          candidateUser.data() || {},
+          now,
+          "candidate"
+        );
+        const seekerGemBefore = gemBalanceFrom(seekerUser.data() || {});
+        const candidateGemBefore = gemBalanceFrom(candidateUser.data() || {});
         const createdAt = admin.firestore.Timestamp.fromDate(now);
         const expiresAt = admin.firestore.Timestamp.fromMillis(
           now.getTime() + durationMs
@@ -317,7 +504,7 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
           createdAt,
           expiresAt,
           durationSeconds: durationMs / 1000,
-          matchingMode,
+          matchingMode: roomMatchingMode,
           sessionA: seeker.sessionId,
           sessionB: candidate.sessionId,
           sessionIds: [seeker.sessionId, candidate.sessionId],
@@ -331,7 +518,7 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
             [uid]: seeker.anonymousAvatar,
             [candidateUid]: candidate.anonymousAvatar,
           },
-          ...(matchingMode === "video" ? {
+          ...(roomMatchingMode === "video" ? {
             cameraUnlockAt,
             callSessionId: callRef.id,
             videoCameraStates: {
@@ -344,7 +531,7 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
             },
           } : {}),
         });
-        if (matchingMode === "video") {
+        if (roomMatchingMode === "video") {
           // The session starts as active so the normal incoming-call listener,
           // which only watches "ringing", never exposes either anonymous user.
           tx.create(callRef, {
@@ -360,6 +547,14 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
             createdAt,
             updatedAt: createdAt,
           });
+          tx.update(seekerFaceAdmission.proofRef, {
+            useCount: seekerFaceAdmission.useCount + 1,
+            lastUsedAt: createdAt,
+          });
+          tx.update(candidateFaceAdmission.proofRef, {
+            useCount: candidateFaceAdmission.useCount + 1,
+            lastUsedAt: createdAt,
+          });
         }
         tx.update(seekerRef, {
           status: "matched",
@@ -373,16 +568,54 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
         });
         tx.set(seekerUser.ref, {
           ...seekerQuota,
+          ...(roomMatchingMode === "video"
+            ? { gem: seekerGemBefore - VIDEO_MATCH_GEM_COST }
+            : {}),
           isMatching: false,
           activeMatchingSessionId: null,
           activeTempRoomId: roomRef.id,
         }, { merge: true });
         tx.set(candidateUser.ref, {
           ...candidateQuota,
+          ...(roomMatchingMode === "video"
+            ? { gem: candidateGemBefore - VIDEO_MATCH_GEM_COST }
+            : {}),
           isMatching: false,
           activeMatchingSessionId: null,
           activeTempRoomId: roomRef.id,
         }, { merge: true });
+        if (roomMatchingMode === "video") {
+          for (const charge of [
+            {
+              uid,
+              sessionId: seeker.sessionId,
+              balanceBefore: seekerGemBefore,
+            },
+            {
+              uid: candidateUid,
+              sessionId: candidate.sessionId,
+              balanceBefore: candidateGemBefore,
+            },
+          ]) {
+            tx.create(
+              db.collection("gemTransactions")
+                .doc(videoMatchChargeId(roomRef.id, charge.uid)),
+              {
+                uid: charge.uid,
+                roomId: roomRef.id,
+                matchingSessionId: charge.sessionId,
+                amount: -VIDEO_MATCH_GEM_COST,
+                reason: "video_matching",
+                status: "charged",
+                balanceBefore: charge.balanceBefore,
+                balanceAfter: charge.balanceBefore - VIDEO_MATCH_GEM_COST,
+                createdAt,
+                refundedAt: null,
+                refundReason: null,
+              }
+            );
+          }
+        }
         return roomRef.id;
       });
       if (roomId) return roomId;
@@ -390,7 +623,12 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
       if (
         error instanceof HttpsError &&
         error.code === "failed-precondition" &&
-        error.details?.reason === "insufficient-reputation" &&
+        [
+          "insufficient-reputation",
+          "face-enrollment-required",
+          "face-reauth-required",
+          "face-proof-device-mismatch",
+        ].includes(error.details?.reason) &&
         error.details?.participant === "candidate"
       ) {
         // Reputation can change while a user waits in the queue. Remove an
@@ -404,8 +642,13 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
         await batch.commit();
         continue;
       }
-      if (error instanceof HttpsError && error.code === "resource-exhausted") {
-        // A stale candidate with no quota must not block the rest of the queue.
+      if (
+        error instanceof HttpsError &&
+        error.code === "resource-exhausted" &&
+        error.details?.participant === "candidate"
+      ) {
+        // A stale candidate with no quota/gem must not block the rest of the
+        // queue. Seeker errors are returned to their own client.
         const batch = db.batch();
         batch.set(candidateRef, { status: "expired" }, { merge: true });
         batch.set(db.collection("users").doc(candidateUid), {
@@ -421,12 +664,102 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
   return null;
 }
 
+async function refundVideoMatch(roomId, reason) {
+  const roomRef = db.collection("tempChats").doc(roomId);
+
+  return db.runTransaction(async (tx) => {
+    const roomSnap = await tx.get(roomRef);
+    if (!roomSnap.exists) return false;
+
+    const room = roomSnap.data() || {};
+    const participants = Array.isArray(room.participants)
+      ? room.participants
+      : [];
+    if (
+      room.matchingMode !== "video" ||
+      room.status !== "ended" ||
+      room.endedBy !== "system" ||
+      !["system_error", "matching_setup_failed"].includes(room.endedReason) ||
+      participants.length !== 2
+    ) {
+      return false;
+    }
+
+    const chargeRefs = participants.map((participant) =>
+      db.collection("gemTransactions")
+        .doc(videoMatchChargeId(roomId, participant))
+    );
+    const userRefs = participants.map((participant) =>
+      db.collection("users").doc(participant)
+    );
+    const snapshots = await tx.getAll(...chargeRefs, ...userRefs);
+    const chargeSnapshots = snapshots.slice(0, participants.length);
+    const userSnapshots = snapshots.slice(participants.length);
+    const canRefundEveryone = participants.every((_, index) =>
+      chargeSnapshots[index].exists &&
+      chargeSnapshots[index].get("status") === "charged" &&
+      userSnapshots[index].exists
+    );
+    if (!canRefundEveryone) return false;
+
+    const refundedAt = admin.firestore.Timestamp.now();
+
+    participants.forEach((participant, index) => {
+      const userSnap = userSnapshots[index];
+      const balanceBeforeRefund = gemBalanceFrom(userSnap.data() || {});
+      const balanceAfterRefund = balanceBeforeRefund + VIDEO_MATCH_GEM_COST;
+      tx.set(userRefs[index], { gem: balanceAfterRefund }, { merge: true });
+      tx.update(chargeRefs[index], {
+        status: "refunded",
+        refundedAt,
+        refundReason: reason,
+      });
+      tx.create(
+        db.collection("gemTransactions")
+          .doc(videoMatchRefundId(roomId, participant)),
+        {
+          uid: participant,
+          roomId,
+          amount: VIDEO_MATCH_GEM_COST,
+          reason: "video_matching_refund",
+          status: "completed",
+          balanceBefore: balanceBeforeRefund,
+          balanceAfter: balanceAfterRefund,
+          relatedTransactionId: chargeRefs[index].id,
+          refundReason: reason,
+          createdAt: refundedAt,
+        }
+      );
+    });
+    return true;
+  });
+}
+
+const refundFailedVideoMatch = onDocumentUpdated(
+  "tempChats/{roomId}",
+  async (event) => {
+    const before = event.data.before.data() || {};
+    const after = event.data.after.data() || {};
+    if (
+      before.status === "ended" ||
+      after.status !== "ended" ||
+      after.endedBy !== "system" ||
+      !["system_error", "matching_setup_failed"].includes(after.endedReason)
+    ) {
+      return;
+    }
+    await refundVideoMatch(event.params.roomId, after.endedReason);
+  }
+);
+
 const startTempChatMatching = onCall(async (request) => {
   const uid = requireUid(request);
   const sessionId = cleanString(request.data?.sessionId);
   const targetGender = normalizeGender(request.data?.targetGender);
   const matchingMode = normalizeMatchingMode(request.data?.matchingMode);
   const avatar = cleanString(request.data?.anonymousAvatar, 32);
+  const faceProofId = cleanString(request.data?.faceProofId, 256);
+  const deviceId = cleanString(request.data?.deviceId, 128);
   if (!sessionId) {
     throw new HttpsError("invalid-argument", "sessionId is required.");
   }
@@ -440,6 +773,8 @@ const startTempChatMatching = onCall(async (request) => {
     targetGender,
     avatar,
     matchingMode,
+    faceProofId,
+    deviceId,
   });
   if (activeRoomId) {
     return { status: "matched", roomId: activeRoomId, resumed: true };
@@ -471,6 +806,38 @@ const cancelTempChatMatching = onCall(async (request) => {
     }, { merge: true });
   });
   return { cancelled: true };
+});
+
+const revokeVideoMatchingFaceProof = onCall(async (request) => {
+  const uid = requireUid(request);
+  const proofId = cleanString(request.data?.faceProofId, 256);
+  const deviceId = cleanString(request.data?.deviceId, 128);
+  if (!proofId || !deviceId) {
+    throw new HttpsError(
+      "invalid-argument",
+      "faceProofId and deviceId are required."
+    );
+  }
+  const proofRef = db.collection("faceReauthSessions").doc(proofId);
+  await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(proofRef);
+    if (!snapshot.exists) return;
+    const data = snapshot.data() || {};
+    if (
+      data.uid !== uid ||
+      data.deviceId !== deviceId ||
+      data.purpose !== VIDEO_MATCHING_FACE_PURPOSE
+    ) {
+      throw new HttpsError("permission-denied", "Face proof is not owned.");
+    }
+    if (data.status !== "valid") return;
+    tx.update(proofRef, {
+      status: "revoked",
+      revokedAt: admin.firestore.FieldValue.serverTimestamp(),
+      revokedReason: "app_background_timeout",
+    });
+  });
+  return { revoked: true };
 });
 
 async function convertTempRoom(tempRoomId, requesterUid = null) {
@@ -661,12 +1028,14 @@ const cleanupExpiredTempChatPresence = onSchedule(
 module.exports = {
   startTempChatMatching,
   cancelTempChatMatching,
+  revokeVideoMatchingFaceProof,
   convertTempChat,
   expireTempChatSessions,
   cleanupExpiredMatchingSessions,
   cleanupExpiredTempChatPresence,
   convertMutualTempChat,
   releaseEndedTempChatParticipants,
+  refundFailedVideoMatch,
   __test: {
     normalizeGender,
     normalizeMatchingMode,
@@ -676,6 +1045,11 @@ module.exports = {
     minimumReputationForMode,
     hasSufficientMatchingReputation,
     assertMatchingReputation,
+    gemBalanceFrom,
+    assertSufficientVideoGem,
+    videoMatchChargeId,
+    videoMatchRefundId,
+    faceProofFailureReason,
     isVerifiedAccount,
     bangkokDateKey,
     quotaPatch,

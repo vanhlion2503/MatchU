@@ -30,6 +30,8 @@ class VideoMatchingService implements VideoMatchingRepository {
     required String sessionId,
     required String targetGender,
     required String anonymousAvatar,
+    required String faceProofId,
+    required String deviceId,
   }) async {
     final result = await _functions
         .httpsCallable('startTempChatMatching')
@@ -38,6 +40,8 @@ class VideoMatchingService implements VideoMatchingRepository {
           'targetGender': targetGender,
           'anonymousAvatar': anonymousAvatar,
           'matchingMode': 'video',
+          'faceProofId': faceProofId,
+          'deviceId': deviceId,
         });
     final data = Map<String, dynamic>.from(result.data as Map);
     return data['roomId']?.toString();

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/models/matching/matching_mode.dart';
+import 'package:matchu_app/models/matching/video_matching_access_proof.dart';
 import 'package:matchu_app/models/queue_user_model.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
 import 'package:matchu_app/views/matching/video_matching_view.dart';
@@ -68,5 +69,20 @@ void main() {
 
   test('video matching screen can be constructed', () {
     expect(const VideoMatchingView(), isA<VideoMatchingView>());
+  });
+
+  test('video face proof keeps an expiry safety margin', () {
+    final now = DateTime.utc(2026, 7, 23, 10);
+    final proof = VideoMatchingAccessProof(
+      id: 'proof-a',
+      deviceId: 'device-a',
+      expiresAt: now.add(const Duration(minutes: 15)),
+    );
+
+    expect(proof.isUsableAt(now), isTrue);
+    expect(
+      proof.isUsableAt(now.add(const Duration(minutes: 14, seconds: 50))),
+      isFalse,
+    );
   });
 }

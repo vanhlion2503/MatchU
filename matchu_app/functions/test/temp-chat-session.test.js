@@ -60,6 +60,75 @@ test("video matching requires at least 90 reputation points", () => {
   );
 });
 
+test("video matching requires one gem while chat matching does not", () => {
+  assert.equal(__test.gemBalanceFrom({ gem: 3 }), 3);
+  assert.equal(__test.gemBalanceFrom({}), 15);
+  assert.doesNotThrow(() =>
+    __test.assertSufficientVideoGem({ gem: 0 }, "chat", "seeker")
+  );
+  assert.throws(
+    () => __test.assertSufficientVideoGem({ gem: 0 }, "video", "seeker"),
+    (error) => error.code === "resource-exhausted" &&
+      error.details.reason === "insufficient-gem" &&
+      error.details.requiredGem === 1 &&
+      error.details.currentGem === 0
+  );
+});
+
+test("video gem transaction ids are deterministic per room and user", () => {
+  assert.equal(
+    __test.videoMatchChargeId("room-a", "user-a"),
+    "video_match_room-a_user-a"
+  );
+  assert.equal(
+    __test.videoMatchRefundId("room-a", "user-a"),
+    "video_match_refund_room-a_user-a"
+  );
+});
+
+test("video face admission requires enrollment and a fresh device-bound proof", () => {
+  const nowMillis = Date.parse("2026-07-23T00:00:00.000Z");
+  const validInput = {
+    userData: { isFaceVerified: true },
+    enrollmentData: { isActive: true },
+    proofData: {
+      uid: "user-a",
+      status: "valid",
+      purpose: "video_matching",
+      deviceId: "device-a",
+      useCount: 1,
+      maxUses: 3,
+      expiresAt: { toMillis: () => nowMillis + 60_000 },
+    },
+    uid: "user-a",
+    deviceId: "device-a",
+    nowMillis,
+  };
+
+  assert.equal(__test.faceProofFailureReason(validInput), null);
+  assert.equal(
+    __test.faceProofFailureReason({
+      ...validInput,
+      userData: { isFaceVerified: false },
+    }),
+    "face-enrollment-required"
+  );
+  assert.equal(
+    __test.faceProofFailureReason({
+      ...validInput,
+      proofData: { ...validInput.proofData, useCount: 3 },
+    }),
+    "face-reauth-required"
+  );
+  assert.equal(
+    __test.faceProofFailureReason({
+      ...validInput,
+      deviceId: "another-device",
+    }),
+    "face-proof-device-mismatch"
+  );
+});
+
 test("legacy profiles without reputation retain the default score", () => {
   assert.equal(__test.reputationScoreFrom({}), 100);
   assert.equal(__test.hasSufficientMatchingReputation({}, "video"), true);

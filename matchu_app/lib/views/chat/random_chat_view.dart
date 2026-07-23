@@ -9,8 +9,10 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
+import 'package:matchu_app/controllers/matching/video_matching_admission_controller.dart';
 import 'package:matchu_app/models/matching/matching_mode.dart';
 import 'package:matchu_app/models/matching/matching_reputation_policy.dart';
+import 'package:matchu_app/models/matching/video_matching_access_proof.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
@@ -66,7 +68,8 @@ class _RandomChatViewState extends State<RandomChatView>
       icon: Iconsax.shield_tick,
       bullets: [
         'Chỉ tính lượt khi ghép cặp thành công (không trừ lượt khi chỉ bấm tìm).',
-        'Tài khoản chưa xác thực: tối đa 10 lượt ghép thành công/ngày, reset lúc 00:00.',
+        'Tài khoản chưa xác thực: tối đa 10 lượt chat matching thành công/ngày, reset lúc 00:00.',
+        'Video matching yêu cầu tài khoản đã xác thực khuôn mặt và tốn 1 gem khi ghép thành công.',
         'Chat tạm yêu cầu tối thiểu 80 điểm uy tín; video call yêu cầu tối thiểu 90 điểm uy tín.',
         'Nếu cả hai cùng thích nhau, hệ thống chuyển sang phòng chat lâu dài.',
         'Phòng video kéo dài tối đa 8 phút; camera chỉ mở được sau 1 phút 30 giây.',
@@ -83,6 +86,7 @@ class _RandomChatViewState extends State<RandomChatView>
 
   final controller = Get.find<MatchingController>();
   final videoMatchingSession = Get.find<VideoMatchingSessionCoordinator>();
+  final videoAdmission = Get.find<VideoMatchingAdmissionController>();
   final anonAvatarC = Get.find<AnonymousAvatarController>();
   final _matchingService = MatchingService();
   final _box = GetStorage();
@@ -151,11 +155,22 @@ class _RandomChatViewState extends State<RandomChatView>
   }
 
   bool get _isOutOfQuota {
+    // Video matching is gated by face verification and gems. The daily quota
+    // applies to anonymous chat only.
+    if (_selectedExperience == _MatchingExperience.video) {
+      return false;
+    }
     final quota = _quotaPreview;
     if (_isLoadingQuota || quota == null || quota.isUnlimited) {
       return false;
     }
     return quota.remaining <= 0;
+  }
+
+  bool get _isOutOfVideoGem {
+    return _selectedExperience == _MatchingExperience.video &&
+        !_isLoadingQuota &&
+        (_quotaPreview?.gem ?? 0) < 1;
   }
 
   MatchingMode get _selectedMatchingMode {
@@ -206,24 +221,54 @@ class _RandomChatViewState extends State<RandomChatView>
 
   String _startButtonLabel() {
     if (_isStarting) {
-      return 'Đang bắt đầu...';
+      return randomChatTr('Đang bắt đầu...');
     }
     if (_isLoadingQuota) {
-      return 'Đang tải lượt...';
+      return randomChatTr('Đang tải lượt...');
     }
 
     final quota = _quotaPreview;
     if (quota == null) {
-      return 'Bắt đầu tìm kiếm';
+      return randomChatTr('Bắt đầu tìm kiếm');
+    }
+    if (_selectedExperience == _MatchingExperience.video && quota.gem < 1) {
+      return randomChatTr('Không đủ gem • Cần 1 gem');
+    }
+    if (_selectedExperience == _MatchingExperience.video) {
+      return randomChatTr('Bắt đầu tìm kiếm • 1 gem');
     }
     if (quota.isUnlimited) {
-      return 'Bắt đầu tìm kiếm';
+      return randomChatTr('Bắt đầu tìm kiếm');
     }
     if (quota.remaining <= 0) {
-      return 'Hết lượt hôm nay • 0/${quota.limit}';
+      return randomChatTr('Hết lượt hôm nay • 0/${quota.limit}');
     }
 
-    return 'Bắt đầu tìm kiếm • ${quota.remaining}/${quota.limit}';
+    final quotaLabel = 'Bắt đầu tìm kiếm • ${quota.remaining}/${quota.limit}';
+    return randomChatTr(quotaLabel);
+  }
+
+  Future<void> _showInsufficientGemDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(randomChatTr('Không đủ gem')),
+          content: Text(
+            randomChatTr(
+              'Mỗi lần ghép đôi video thành công cần 1 gem. Gem chỉ bị trừ sau khi hệ thống tạo phòng thành công.',
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showOutOfQuotaDialog() async {
@@ -410,12 +455,33 @@ class _RandomChatViewState extends State<RandomChatView>
       return;
     }
 
+    if (_isOutOfVideoGem) {
+      await _showInsufficientGemDialog();
+      return;
+    }
+
     if (!anonAvatarC.isSelected) {
       Get.snackbar(
         matchingChatTr('Thiếu avatar ẩn danh'),
         randomChatTr('Vui lòng chọn avatar trước khi bắt đầu'),
       );
       return;
+    }
+
+    VideoMatchingAccessProof? videoProof;
+    if (_selectedExperience == _MatchingExperience.video) {
+      videoProof = await videoAdmission.ensureProof();
+      if (!mounted) return;
+      if (videoProof == null) {
+        Get.snackbar(
+          matchingChatTr('Lỗi'),
+          randomChatTr(
+            'Bạn phải hoàn tất xác thực khuôn mặt trước khi video matching.',
+          ),
+          snackPosition: SnackPosition.TOP,
+        );
+        return;
+      }
     }
 
     final passcodeReady = await ensurePasscodeReady(
@@ -446,10 +512,16 @@ class _RandomChatViewState extends State<RandomChatView>
         return;
       }
 
-      if (latestQuota != null &&
+      if (_selectedExperience == _MatchingExperience.chat &&
+          latestQuota != null &&
           !latestQuota.isUnlimited &&
           latestQuota.remaining <= 0) {
         await _showOutOfQuotaDialog();
+        return;
+      }
+      if (_selectedExperience == _MatchingExperience.video &&
+          (latestQuota?.gem ?? 0) < 1) {
+        await _showInsufficientGemDialog();
         return;
       }
 
@@ -463,6 +535,8 @@ class _RandomChatViewState extends State<RandomChatView>
         arguments: {
           'targetGender': selectedTarget,
           'anonymousAvatar': anonAvatarC.selectedAvatar.value,
+          if (videoProof != null) 'faceProofId': videoProof.id,
+          if (videoProof != null) 'deviceId': videoProof.deviceId,
         },
       );
 
