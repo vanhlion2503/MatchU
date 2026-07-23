@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import hashlib
 import time
 from threading import Lock
 from typing import Any
@@ -42,7 +41,6 @@ class FaceObservation:
     yaw: float
     roll: float
     face_area_ratio: float
-    perceptual_fingerprint: str
 
 
 def _set_face_app_error(error: str | None) -> None:
@@ -129,15 +127,6 @@ def _face_area(face: Any) -> float:
     return width * height
 
 
-def _perceptual_fingerprint(image: np.ndarray) -> str:
-    """Small dHash used to reject exact/near-identical evidence replays."""
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    resized = cv2.resize(gray, (9, 8), interpolation=cv2.INTER_AREA)
-    bits = resized[:, 1:] > resized[:, :-1]
-    packed = np.packbits(bits.reshape(-1).astype(np.uint8)).tobytes()
-    return hashlib.sha256(packed).hexdigest()
-
-
 def extract_face_observation(
     image_bytes: bytes,
 ) -> tuple[FaceObservation | None, str | None]:
@@ -213,7 +202,6 @@ def extract_face_observation(
         yaw=yaw,
         roll=roll,
         face_area_ratio=face_area_ratio,
-        perceptual_fingerprint=_perceptual_fingerprint(img),
     ), None
 
 

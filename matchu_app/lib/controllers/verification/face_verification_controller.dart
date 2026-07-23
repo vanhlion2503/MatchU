@@ -849,8 +849,6 @@ class FaceVerificationController extends GetxController
         "Khuôn mặt không khớp với dữ liệu đã xác thực.",
       "challenge_invalid" ||
       "challenge_not_found" => "Phiên kiểm tra đã hết hạn. Vui lòng thử lại.",
-      "challenge_replay_detected" =>
-        "Ảnh xác thực đã được sử dụng trước đó. Vui lòng quét lại.",
       "challenge_pose_invalid" || "challenge_turn_pose_invalid" =>
         "Tư thế khuôn mặt chưa đúng hướng dẫn. Vui lòng thử lại.",
       "template_update_authorization_required" ||

@@ -6,7 +6,6 @@ const BATCH_LIMIT = 400;
 const EXPIRING_COLLECTIONS = [
   "faceReauthSessions",
   "faceLivenessChallenges",
-  "faceLivenessEvidenceFingerprints",
   "faceTemplateUpdateAuthorizations",
 ];
 

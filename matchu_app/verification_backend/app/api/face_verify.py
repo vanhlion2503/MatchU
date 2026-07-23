@@ -27,7 +27,6 @@ from app.services.liveness_challenge import (
     consume_liveness_challenge,
     create_liveness_challenge,
     record_liveness_failure,
-    reserve_evidence_fingerprints,
     reset_liveness_failures,
     validate_pose_evidence,
 )
@@ -170,13 +169,6 @@ async def _verify_liveness_evidence(
         validate_pose_evidence(actions, [item.yaw for item in observations])
         if any(abs(item.pitch) > 25.0 or abs(item.roll) > 25.0 for item in observations):
             raise LivenessChallengeError("challenge_pose_invalid")
-        reserve_evidence_fingerprints(
-            uid=current_user.uid,
-            challenge_id=challenge_id,
-            fingerprints=[
-                item.perceptual_fingerprint for item in observations
-            ],
-        )
         return observations
     except (json.JSONDecodeError, LivenessChallengeError) as exc:
         reason = (

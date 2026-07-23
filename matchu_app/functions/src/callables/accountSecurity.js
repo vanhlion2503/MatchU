@@ -146,7 +146,6 @@ async function deleteBiometricData(uid) {
     "faceReauthSessions",
     "faceLivenessChallenges",
     "faceLivenessRateLimits",
-    "faceLivenessEvidenceFingerprints",
     "faceTemplateUpdateAuthorizations",
   ];
   const snapshots = await Promise.all(
