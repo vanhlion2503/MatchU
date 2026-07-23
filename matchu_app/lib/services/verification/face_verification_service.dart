@@ -3,76 +3,23 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:matchu_app/repositories/verification/face_verification_repository.dart';
 import 'package:matchu_app/services/security/device_service.dart';
 
-class FaceVerificationResult {
-  const FaceVerificationResult({
-    required this.success,
-    this.reason,
-    this.similarity,
-    this.threshold,
-    this.sessionId,
-    this.expiresAt,
-  });
+export 'package:matchu_app/repositories/verification/face_verification_repository.dart';
 
-  final bool success;
-  final String? reason;
-  final double? similarity;
-  final double? threshold;
-  final String? sessionId;
-  final DateTime? expiresAt;
-
-  factory FaceVerificationResult.fromPayload(Map<String, dynamic>? payload) {
-    DateTime? parseDate(dynamic value) {
-      if (value is String && value.trim().isNotEmpty) {
-        return DateTime.tryParse(value.trim());
-      }
-      return null;
-    }
-
-    double? parseDouble(dynamic value) {
-      if (value is num) return value.toDouble();
-      if (value is String) return double.tryParse(value);
-      return null;
-    }
-
-    return FaceVerificationResult(
-      success: payload?['success'] == true,
-      reason: payload?['reason']?.toString(),
-      similarity: parseDouble(payload?['similarity']),
-      threshold: parseDouble(payload?['threshold']),
-      sessionId: payload?['sessionId']?.toString(),
-      expiresAt: parseDate(payload?['expiresAt']),
-    );
-  }
-
-  static const failed = FaceVerificationResult(success: false);
-}
-
-class FaceLivenessChallenge {
-  const FaceLivenessChallenge({
-    required this.id,
-    required this.actions,
-    required this.expiresAt,
-  });
-
-  final String id;
-  final List<String> actions;
-  final DateTime expiresAt;
-
-  bool get isValid =>
-      id.isNotEmpty &&
-      actions.length == 3 &&
-      expiresAt.isAfter(DateTime.now().toUtc());
-}
-
-class FaceVerificationService {
-  FaceVerificationService({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
-      _baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBaseUrl);
+class FaceVerificationService implements FaceVerificationRepository {
+  FaceVerificationService({
+    http.Client? client,
+    String? baseUrl,
+    FirebaseFunctions? functions,
+  }) : _client = client ?? http.Client(),
+       _baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBaseUrl),
+       _functions = functions ?? FirebaseFunctions.instance;
 
   static const String _cloudRunBaseUrl =
       'https://face-verification-40953934947.asia-southeast1.run.app';
@@ -84,6 +31,7 @@ class FaceVerificationService {
 
   final http.Client _client;
   final String _baseUrl;
+  final FirebaseFunctions _functions;
 
   static String _normalizeBaseUrl(String baseUrl) {
     final raw = baseUrl.trim();
@@ -101,6 +49,7 @@ class FaceVerificationService {
   Uri _reauthUri() => Uri.parse('$_baseUrl/v1/face/reauth');
   Uri _challengeUri() => Uri.parse('$_baseUrl/v1/face/challenge');
 
+  @override
   Future<FaceLivenessChallenge?> createLivenessChallenge({
     required String purpose,
   }) async {
@@ -146,6 +95,34 @@ class FaceVerificationService {
     }
   }
 
+  @override
+  Future<FaceTemplateUpdateAuthorization> authorizeTemplateUpdateWithPin({
+    required String passcode,
+  }) async {
+    final deviceId = await DeviceService.getDeviceId();
+    final callable = _functions.httpsCallable(
+      'authorizeFaceTemplateUpdateWithPin',
+    );
+    final response = await callable.call(<String, dynamic>{
+      'passcode': passcode.trim(),
+      'deviceId': deviceId,
+    });
+    final data = response.data;
+    if (data is! Map) {
+      throw const FormatException('Invalid update authorization response.');
+    }
+    final authorization = FaceTemplateUpdateAuthorization(
+      id: data['authorizationId']?.toString() ?? '',
+      expiresAt:
+          DateTime.tryParse(data['expiresAt']?.toString() ?? '')?.toUtc() ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+    );
+    if (!authorization.isValid) {
+      throw const FormatException('Invalid update authorization response.');
+    }
+    return authorization;
+  }
+
   Future<bool> uploadVerification({
     required File selfieFile,
     required File liveFrameFile,
@@ -161,12 +138,14 @@ class FaceVerificationService {
     return result.success;
   }
 
+  @override
   Future<FaceVerificationResult> enrollVerification({
     required File selfieFile,
     required File liveFrameFile,
     required FaceLivenessChallenge challenge,
     required List<File> evidenceFrames,
     String purpose = 'face_reauth',
+    String? templateUpdateAuthorizationId,
   }) async {
     if (!await selfieFile.exists() || !await liveFrameFile.exists()) {
       debugPrint('uploadVerification: selfie/live frame file does not exist.');
@@ -187,11 +166,16 @@ class FaceVerificationService {
           ..fields['challenge_response'] = jsonEncode(challenge.actions)
           ..files.add(await _buildImagePart('selfie', selfieFile))
           ..files.add(await _buildImagePart('live_frame', liveFrameFile));
+    final updateAuthorization = templateUpdateAuthorizationId?.trim() ?? '';
+    if (updateAuthorization.isNotEmpty) {
+      request.fields['template_update_authorization'] = updateAuthorization;
+    }
     await _addEvidenceParts(request, evidenceFrames);
 
     return _sendMultipart(request, operation: 'enrollVerification');
   }
 
+  @override
   Future<FaceVerificationResult> reauthenticate({
     required File liveFrameFile,
     required FaceLivenessChallenge challenge,
@@ -298,6 +282,7 @@ class FaceVerificationService {
     }
   }
 
+  @override
   void dispose() {
     _client.close();
   }

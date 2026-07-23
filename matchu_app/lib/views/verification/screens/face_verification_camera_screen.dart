@@ -18,7 +18,6 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     required this.currentLivenessStep,
     required this.instructionText,
     required this.onClose,
-    required this.onFlashTap,
     required this.onCaptureSelfie,
   });
 
@@ -31,7 +30,6 @@ class FaceVerificationCameraScreen extends StatelessWidget {
   final int currentLivenessStep;
   final String instructionText;
   final VoidCallback onClose;
-  final VoidCallback onFlashTap;
   final VoidCallback onCaptureSelfie;
 
   @override
@@ -39,7 +37,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
     final title = isLiveness ? 'Kiểm tra sống' : 'Ảnh chân dung';
     final subtitle =
         isLiveness
-            ? 'Nhìn thẳng, chớp mắt, quay trái, quay phải'
+            ? 'Nhìn thẳng và quay đầu theo thứ tự hướng dẫn'
             : 'Đặt khuôn mặt vào khung và nhìn thẳng';
 
     return Stack(
@@ -96,10 +94,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                     icon: Icons.close_rounded,
                     onTap: onClose,
                   ),
-                  FaceVerificationGlassIconButton(
-                    icon: Icons.flash_on_outlined,
-                    onTap: onFlashTap,
-                  ),
+                  const SizedBox(width: 44, height: 44),
                 ],
               ),
               const SizedBox(height: 18),
@@ -167,18 +162,18 @@ class FaceVerificationCameraScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color:
                 isDark
-                    ? AppTheme.darkSurface.withOpacity(0.92)
-                    : AppTheme.lightSurface.withOpacity(0.95),
+                    ? AppTheme.darkSurface.withValues(alpha: 0.92)
+                    : AppTheme.lightSurface.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color:
                   isDark
-                      ? AppTheme.darkBorder.withOpacity(0.8)
+                      ? AppTheme.darkBorder.withValues(alpha: 0.8)
                       : AppTheme.lightBorder,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.18),
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.18),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -192,7 +187,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.primaryColor.withOpacity(0.15),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.15),
                 ),
                 child: Icon(_stepIcon(active), color: AppTheme.primaryColor),
               ),
@@ -220,7 +215,7 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                       style: textTheme.bodySmall?.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurface.withOpacity(0.65),
+                        color: colorScheme.onSurface.withValues(alpha: 0.65),
                       ),
                     ),
                   ],
@@ -237,14 +232,14 @@ class FaceVerificationCameraScreen extends StatelessWidget {
                     style: textTheme.bodySmall?.copyWith(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface.withOpacity(0.55),
+                      color: colorScheme.onSurface.withValues(alpha: 0.55),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Icon(
                     Icons.arrow_forward_rounded,
                     size: 16,
-                    color: colorScheme.onSurface.withOpacity(0.4),
+                    color: colorScheme.onSurface.withValues(alpha: 0.4),
                   ),
                 ],
               ),
@@ -283,9 +278,9 @@ class FaceVerificationCameraScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.45), // overlay OK
+            color: Colors.black.withValues(alpha: 0.45), // overlay OK
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

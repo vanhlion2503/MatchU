@@ -55,9 +55,18 @@ class LivenessChallengeValidationTest(unittest.TestCase):
         validate_pose_evidence(actions, [2.0, -18.0, 19.0])
         with self.assertRaisesRegex(
             LivenessChallengeError,
-            "challenge_turn_sequence_invalid",
+            "challenge_turn_pose_invalid",
         ):
             validate_pose_evidence(actions, [2.0, 18.0, 20.0])
+
+    def test_pose_evidence_must_follow_requested_turn_order(self) -> None:
+        actions = ("center", "turn_right", "turn_left")
+        validate_pose_evidence(actions, [1.0, 17.0, -18.0])
+        with self.assertRaisesRegex(
+            LivenessChallengeError,
+            "challenge_turn_pose_invalid",
+        ):
+            validate_pose_evidence(actions, [1.0, -18.0, 17.0])
 
 
 if __name__ == "__main__":

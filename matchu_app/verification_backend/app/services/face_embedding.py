@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import hashlib
 import time
 from threading import Lock
 from typing import Any
@@ -37,7 +38,11 @@ _init_retry_interval_seconds = 15.0
 @dataclass(frozen=True)
 class FaceObservation:
     embedding: np.ndarray
+    pitch: float
     yaw: float
+    roll: float
+    face_area_ratio: float
+    perceptual_fingerprint: str
 
 
 def _set_face_app_error(error: str | None) -> None:
@@ -124,6 +129,15 @@ def _face_area(face: Any) -> float:
     return width * height
 
 
+def _perceptual_fingerprint(image: np.ndarray) -> str:
+    """Small dHash used to reject exact/near-identical evidence replays."""
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    resized = cv2.resize(gray, (9, 8), interpolation=cv2.INTER_AREA)
+    bits = resized[:, 1:] > resized[:, :-1]
+    packed = np.packbits(bits.reshape(-1).astype(np.uint8)).tobytes()
+    return hashlib.sha256(packed).hexdigest()
+
+
 def extract_face_observation(
     image_bytes: bytes,
 ) -> tuple[FaceObservation | None, str | None]:
@@ -136,6 +150,11 @@ def extract_face_observation(
     - engine_unavailable
     - invalid_image
     - face_not_detected
+    - multiple_faces_detected
+    - image_too_dark
+    - image_too_bright
+    - image_too_blurry
+    - face_too_small
     """
     if cv2 is None:
         return None, "engine_unavailable"
@@ -151,6 +170,19 @@ def extract_face_observation(
     if img is None:
         return None, "invalid_image"
 
+    height, width = img.shape[:2]
+    if height < 160 or width < 160 or height * width > 24_000_000:
+        return None, "invalid_image"
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    brightness = float(np.mean(gray))
+    if brightness < 20.0:
+        return None, "image_too_dark"
+    if brightness > 240.0:
+        return None, "image_too_bright"
+    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    if sharpness < 20.0:
+        return None, "image_too_blurry"
+
     try:
         faces = face_app.get(img)
     except Exception as exc:  # pragma: no cover - depends on runtime env
@@ -160,17 +192,28 @@ def extract_face_observation(
 
     if not faces:
         return None, "face_not_detected"
+    if len(faces) != 1:
+        return None, "multiple_faces_detected"
 
-    primary_face = max(faces, key=_face_area)
+    primary_face = faces[0]
+    face_area_ratio = _face_area(primary_face) / float(width * height)
+    if face_area_ratio < 0.03:
+        return None, "face_too_small"
     embedding = getattr(primary_face, "embedding", None)
     if embedding is None:
         return None, "face_not_detected"
 
     pose = getattr(primary_face, "pose", None)
+    pitch = float(pose[0]) if pose is not None and len(pose) >= 3 else 0.0
     yaw = float(pose[1]) if pose is not None and len(pose) >= 2 else 0.0
+    roll = float(pose[2]) if pose is not None and len(pose) >= 3 else 0.0
     return FaceObservation(
         embedding=np.asarray(embedding, dtype=np.float32),
+        pitch=pitch,
         yaw=yaw,
+        roll=roll,
+        face_area_ratio=face_area_ratio,
+        perceptual_fingerprint=_perceptual_fingerprint(img),
     ), None
 
 

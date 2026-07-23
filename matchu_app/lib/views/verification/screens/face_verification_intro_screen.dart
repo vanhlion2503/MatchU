@@ -118,7 +118,7 @@ class FaceVerificationIntroScreen extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 description ??
-                    'Giúp cộng đồng an toàn và đáng tin cậy hơn. Quá trình này hoàn toàn riêng tư.',
+                    'Ảnh được xử lý để tạo mẫu khuôn mặt mã hóa trên máy chủ. MatchU không lưu video xác thực.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
               ),
@@ -213,7 +213,7 @@ class _IntroStepTile extends StatelessWidget {
                       ? null
                       : [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),

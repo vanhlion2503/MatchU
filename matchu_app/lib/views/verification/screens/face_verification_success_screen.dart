@@ -113,7 +113,7 @@ class FaceVerificationSuccessScreen extends StatelessWidget {
                 description ??
                     (wasAlreadyVerifiedAtEntry
                         ? 'Tài khoản của bạn đã xác thực. Bạn có thể cập nhật dữ liệu khuôn mặt bảo mật để dùng cho các bước xác thực lại sau này.'
-                        : 'Hồ sơ của bạn đã được xác minh danh tính an toàn.'),
+                        : 'Khuôn mặt của bạn đã được đăng ký an toàn để sử dụng cho các lần xác thực sau.'),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,
               ),

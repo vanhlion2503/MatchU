@@ -127,6 +127,37 @@ async function deleteOwnedStorage(uid) {
   }
 }
 
+async function deleteDocuments(documents) {
+  for (let offset = 0; offset < documents.length; offset += WRITE_BATCH_LIMIT) {
+    const batch = db.batch();
+    for (const document of documents.slice(
+      offset,
+      offset + WRITE_BATCH_LIMIT
+    )) {
+      batch.delete(document.ref);
+    }
+    await batch.commit();
+  }
+}
+
+async function deleteBiometricData(uid) {
+  const enrollmentRef = db.collection("faceEnrollments").doc(uid);
+  const collections = [
+    "faceReauthSessions",
+    "faceLivenessChallenges",
+    "faceLivenessRateLimits",
+    "faceLivenessEvidenceFingerprints",
+    "faceTemplateUpdateAuthorizations",
+  ];
+  const snapshots = await Promise.all(
+    collections.map((name) =>
+      db.collection(name).where("uid", "==", uid).get()
+    )
+  );
+  await enrollmentRef.delete();
+  await deleteDocuments(snapshots.flatMap((snapshot) => snapshot.docs));
+}
+
 async function removePrivateUserData(uid) {
   const userRef = db.collection("users").doc(uid);
   await db.recursiveDelete(userRef);
@@ -181,6 +212,7 @@ const deleteAccount = onCall(
       removeSocialReferences(uid),
       hidePublicContent(uid),
       deleteOwnedStorage(uid),
+      deleteBiometricData(uid),
     ]);
 
     await admin.auth().revokeRefreshTokens(uid);

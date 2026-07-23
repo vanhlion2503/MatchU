@@ -180,6 +180,44 @@ def reset_liveness_failures(uid: str, device_id: str) -> None:
     )
 
 
+def reserve_evidence_fingerprints(
+    *,
+    uid: str,
+    challenge_id: str,
+    fingerprints: list[str],
+) -> None:
+    if len(fingerprints) != 3 or len(set(fingerprints)) != 3:
+        raise LivenessChallengeError("challenge_replay_detected")
+
+    db = _db()
+    refs = [
+        db.collection("faceLivenessEvidenceFingerprints").document(
+            hashlib.sha256(f"{uid}:{fingerprint}".encode("utf-8")).hexdigest()
+        )
+        for fingerprint in fingerprints
+    ]
+    transaction = db.transaction()
+
+    @transactional
+    def reserve(tx: firestore.Transaction) -> None:
+        snapshots = [ref.get(transaction=tx) for ref in refs]
+        if any(snapshot.exists for snapshot in snapshots):
+            raise LivenessChallengeError("challenge_replay_detected")
+        for ref, fingerprint in zip(refs, fingerprints):
+            tx.set(
+                ref,
+                {
+                    "uid": uid,
+                    "challengeId": challenge_id,
+                    "fingerprint": fingerprint,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                    "expiresAt": datetime.now(timezone.utc) + timedelta(days=30),
+                },
+            )
+
+    reserve(transaction)
+
+
 __all__ = [
     "LivenessChallenge",
     "LivenessChallengeError",
@@ -187,6 +225,7 @@ __all__ = [
     "create_liveness_challenge",
     "normalize_purpose",
     "record_liveness_failure",
+    "reserve_evidence_fingerprints",
     "reset_liveness_failures",
     "validate_challenge_payload",
     "validate_pose_evidence",

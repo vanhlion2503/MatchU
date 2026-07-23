@@ -54,11 +54,15 @@ def validate_pose_evidence(actions: tuple[str, ...], yaws: list[float]) -> None:
         raise LivenessChallengeError("challenge_evidence_incomplete")
 
     center_yaw = yaws[0]
-    first_turn = yaws[1]
-    second_turn = yaws[2]
     if abs(center_yaw) > 14.0:
         raise LivenessChallengeError("challenge_center_pose_invalid")
-    if abs(first_turn) < 10.0 or abs(second_turn) < 10.0:
-        raise LivenessChallengeError("challenge_turn_pose_invalid")
-    if first_turn * second_turn >= 0 or abs(first_turn - second_turn) < 22.0:
+
+    for action, yaw in zip(actions[1:], yaws[1:]):
+        if action == "turn_left" and yaw > -10.0:
+            raise LivenessChallengeError("challenge_turn_pose_invalid")
+        if action == "turn_right" and yaw < 10.0:
+            raise LivenessChallengeError("challenge_turn_pose_invalid")
+
+    first_turn, second_turn = yaws[1], yaws[2]
+    if abs(first_turn - second_turn) < 22.0:
         raise LivenessChallengeError("challenge_turn_sequence_invalid")

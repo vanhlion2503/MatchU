@@ -878,6 +878,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /faceLivenessEvidenceFingerprints/{fingerprintId} {
+      allow read, write: if false;
+    }
+
+    match /faceTemplateUpdateAuthorizations/{authorizationId} {
+      allow read, write: if false;
+    }
+
     // Wallet mutations and their audit trail are Cloud Functions-only.
     match /gemTransactions/{transactionId} {
       allow read, write: if false;

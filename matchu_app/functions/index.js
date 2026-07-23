@@ -31,6 +31,12 @@ const {
   deleteFaceRecoveryBackup,
 } = require("./src/callables/faceRecoveryBackup");
 const {
+  authorizeFaceTemplateUpdateWithPin,
+} = require("./src/callables/faceTemplateUpdatePin");
+const {
+  maintainBiometricDocuments,
+} = require("./src/triggers/biometricMaintenance");
+const {
   touchReputationDailyOnAppOpen,
   getReputationDailyState,
   claimReputationTask,
@@ -133,6 +139,9 @@ exports.storeFaceRecoveryBackup = storeFaceRecoveryBackup;
 exports.getFaceRecoveryBackupStatus = getFaceRecoveryBackupStatus;
 exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;
 exports.deleteFaceRecoveryBackup = deleteFaceRecoveryBackup;
+exports.authorizeFaceTemplateUpdateWithPin =
+  authorizeFaceTemplateUpdateWithPin;
+exports.maintainBiometricDocuments = maintainBiometricDocuments;
 exports.touchReputationDailyOnAppOpen = touchReputationDailyOnAppOpen;
 exports.getReputationDailyState = getReputationDailyState;
 exports.claimReputationTask = claimReputationTask;

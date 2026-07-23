@@ -32,7 +32,7 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
           left: -80,
           child: FaceVerificationSoftCircle(
             size: 260,
-            color: AppTheme.primaryColor.withOpacity(0.14),
+            color: AppTheme.primaryColor.withValues(alpha: 0.14),
           ),
         ),
         Positioned(
@@ -40,7 +40,7 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
           right: -80,
           child: FaceVerificationSoftCircle(
             size: 240,
-            color: AppTheme.secondaryColor.withOpacity(0.14),
+            color: AppTheme.secondaryColor.withValues(alpha: 0.14),
           ),
         ),
 
@@ -84,7 +84,9 @@ class FaceVerificationProcessingScreen extends StatelessWidget {
                     width: 220,
                     child: LinearProgressIndicator(
                       minHeight: 5,
-                      backgroundColor: colorScheme.onSurface.withOpacity(0.16),
+                      backgroundColor: colorScheme.onSurface.withValues(
+                        alpha: 0.16,
+                      ),
                       valueColor: const AlwaysStoppedAnimation<Color>(
                         AppTheme.primaryColor,
                       ),

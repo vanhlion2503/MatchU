@@ -27,10 +27,16 @@ from app.services.liveness_challenge import (
     consume_liveness_challenge,
     create_liveness_challenge,
     record_liveness_failure,
+    reserve_evidence_fingerprints,
     reset_liveness_failures,
     validate_pose_evidence,
 )
 from app.services.similarity import cosine_similarity
+from app.services.template_update_authorization import (
+    TemplateUpdateAuthorizationError,
+    consume_template_update_authorization,
+    face_enrollment_exists,
+)
 
 router = APIRouter(tags=["Face Verification"])
 
@@ -90,13 +96,17 @@ async def _read_bytes(upload: UploadFile, field_name: str) -> bytes:
 
 
 def _raise_engine_unavailable() -> None:
-    detail = "Face recognition engine is unavailable."
     engine_error = get_face_engine_error()
     if engine_error:
-        detail = f"{detail} {engine_error}"
+        # Keep runtime/model details in server logs rather than API responses.
+        import logging
+
+        logging.getLogger(__name__).error(
+            "Face recognition engine is unavailable: %s", engine_error
+        )
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=detail,
+        detail="Face recognition engine is unavailable.",
     )
 
 
@@ -107,6 +117,14 @@ def _embedding_error_response(error: str | None) -> dict | None:
         return {"success": False, "reason": "invalid_image"}
     if error == "face_not_detected":
         return {"success": False, "reason": "face_not_detected"}
+    if error in {
+        "multiple_faces_detected",
+        "image_too_dark",
+        "image_too_bright",
+        "image_too_blurry",
+        "face_too_small",
+    }:
+        return {"success": False, "reason": error}
     return None
 
 
@@ -150,6 +168,15 @@ async def _verify_liveness_evidence(
             observations.append(observation)
 
         validate_pose_evidence(actions, [item.yaw for item in observations])
+        if any(abs(item.pitch) > 25.0 or abs(item.roll) > 25.0 for item in observations):
+            raise LivenessChallengeError("challenge_pose_invalid")
+        reserve_evidence_fingerprints(
+            uid=current_user.uid,
+            challenge_id=challenge_id,
+            fingerprints=[
+                item.perceptual_fingerprint for item in observations
+            ],
+        )
         return observations
     except (json.JSONDecodeError, LivenessChallengeError) as exc:
         reason = (
@@ -256,6 +283,7 @@ async def verify_face(
     selfie: UploadFile = File(...),
     live: UploadFile | None = File(None),
     live_frame: UploadFile | None = File(None),
+    _current_user: FirebaseUser = Depends(require_firebase_user),
 ) -> dict:
     live_file = _pick_live_file(live=live, live_frame=live_frame)
 
@@ -286,6 +314,7 @@ async def enroll_face(
     device_id: str | None = Form(None),
     challenge_id: str = Form(...),
     challenge_response: str = Form(...),
+    template_update_authorization: str | None = Form(None),
     evidence_frames: list[UploadFile] = File(...),
     current_user: FirebaseUser = Depends(require_firebase_user),
 ) -> dict:
@@ -324,6 +353,12 @@ async def enroll_face(
             return {"success": False, "reason": "challenge_identity_mismatch"}
 
         try:
+            if face_enrollment_exists(current_user.uid):
+                consume_template_update_authorization(
+                    authorization_id=template_update_authorization or "",
+                    uid=current_user.uid,
+                    device_id=(device_id or "").strip(),
+                )
             enrollment = store_face_enrollment(
                 uid=current_user.uid,
                 selfie_embedding=result.selfie_embedding,
@@ -331,6 +366,8 @@ async def enroll_face(
                 pair_similarity=result.similarity,
                 pair_threshold=result.threshold,
             )
+        except TemplateUpdateAuthorizationError as exc:
+            return {"success": False, "reason": exc.reason}
         except FaceTemplateCryptoError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

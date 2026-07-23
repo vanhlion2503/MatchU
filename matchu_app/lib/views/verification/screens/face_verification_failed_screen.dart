@@ -155,7 +155,11 @@ class _ReasonTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 19, color: colorScheme.onSurface.withOpacity(0.45)),
+          Icon(
+            icon,
+            size: 19,
+            color: colorScheme.onSurface.withValues(alpha: 0.45),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

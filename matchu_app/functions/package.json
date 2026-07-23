@@ -19,7 +19,8 @@
     "test:notifications": "node --test test/chat-message-notifications.test.js",
     "test:chat-messages": "node --test test/chat-messages.test.js",
     "test:post-notifications": "node --test test/post-engagement-notifications.test.js",
-    "test:account-security": "node --test test/account-security.test.js"
+    "test:account-security": "node --test test/account-security.test.js",
+    "test:face-template-pin": "node --test test/face-template-update-pin.test.js"
   },
   "engines": {
     "node": "22"

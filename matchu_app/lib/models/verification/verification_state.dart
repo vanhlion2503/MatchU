@@ -3,6 +3,7 @@ enum VerificationState {
   capturingSelfie,
   liveness,
   processing,
+  authorizingUpdate,
   success,
   failed,
 }

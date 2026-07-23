@@ -8,6 +8,7 @@ import 'package:matchu_app/views/verification/screens/face_verification_intro_sc
 import 'package:matchu_app/views/verification/screens/face_verification_permission_screen.dart';
 import 'package:matchu_app/views/verification/screens/face_verification_processing_screen.dart';
 import 'package:matchu_app/views/verification/screens/face_verification_success_screen.dart';
+import 'package:matchu_app/views/verification/screens/face_template_update_pin_screen.dart';
 
 class FaceVerificationView extends GetView<FaceVerificationController> {
   const FaceVerificationView({super.key});
@@ -65,6 +66,8 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
             VerificationState.liveness => _buildLivenessStage(),
             VerificationState.processing =>
               const FaceVerificationProcessingScreen(),
+            VerificationState.authorizingUpdate =>
+              _buildTemplateUpdatePinStage(),
             VerificationState.success => _buildSuccessStage(),
             VerificationState.failed => _buildFailedStage(),
           },
@@ -107,7 +110,6 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
       currentLivenessStep: controller.currentLivenessStep.value,
       instructionText: controller.instructionText.value,
       onClose: Get.back,
-      onFlashTap: () {},
       onCaptureSelfie: controller.captureSelfie,
     );
   }
@@ -132,7 +134,6 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
       currentLivenessStep: controller.currentLivenessStep.value,
       instructionText: controller.instructionText.value,
       onClose: Get.back,
-      onFlashTap: () {},
       onCaptureSelfie: controller.captureSelfie,
     );
   }
@@ -147,13 +148,21 @@ class FaceVerificationView extends GetView<FaceVerificationController> {
               : null,
       primaryButtonLabel:
           controller.isReauthentication ? 'Tiếp tục mở khóa' : null,
-      showRetryAction: !controller.isReauthentication,
+      showRetryAction:
+          !controller.isReauthentication &&
+          controller.wasAlreadyVerifiedAtEntry.value,
       showBenefits: !controller.isReauthentication,
       onContinue: () => Get.back(result: controller.successResultPayload),
-      onRetry: () {
-        controller.hasStartedVerificationFlow.value = true;
-        controller.retryVerification();
-      },
+      onRetry: controller.startTemplateUpdatePinAuthorization,
+    );
+  }
+
+  Widget _buildTemplateUpdatePinStage() {
+    return FaceTemplateUpdatePinScreen(
+      errorText: controller.errorText.value,
+      isSubmitting: controller.isPinActionRunning.value,
+      onConfirm: controller.confirmTemplateUpdatePin,
+      onCancel: controller.cancelTemplateUpdatePin,
     );
   }
 

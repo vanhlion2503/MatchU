@@ -10,8 +10,8 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:matchu_app/models/verification/verification_state.dart';
+import 'package:matchu_app/repositories/verification/face_verification_repository.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
-import 'package:matchu_app/services/verification/face_verification_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -19,19 +19,21 @@ enum FaceVerificationMode { enrollment, reauthentication }
 
 class FaceVerificationController extends GetxController
     with WidgetsBindingObserver {
-  FaceVerificationController({FaceVerificationService? verificationService})
-    : _verificationService = verificationService ?? FaceVerificationService(),
-      mode = _readMode(Get.arguments),
-      purpose = _readPurpose(Get.arguments);
+  FaceVerificationController({
+    FaceVerificationRepository? verificationRepository,
+  }) : _verificationRepository =
+           verificationRepository ??
+           (throw ArgumentError.notNull('verificationRepository')),
+       mode = _readMode(Get.arguments),
+       purpose = _readPurpose(Get.arguments);
 
-  final FaceVerificationService _verificationService;
+  final FaceVerificationRepository _verificationRepository;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FaceVerificationMode mode;
   final String purpose;
 
   final Rx<VerificationState> state = VerificationState.idle.obs;
-  final RxBool blinkDetected = false.obs;
   final RxBool headTurnDetected = false.obs;
   final RxBool hasStartedVerificationFlow = false.obs;
   final RxBool isCheckingVerificationStatus = true.obs;
@@ -46,11 +48,13 @@ class FaceVerificationController extends GetxController
   final RxBool hasCameraPermission = false.obs;
   final RxBool isCaptureLocked = false.obs;
   final RxString errorText = "".obs;
+  final RxBool isPinActionRunning = false.obs;
 
   File? selfieFile;
   File? liveFrameFile;
   final List<File> _livenessEvidenceFiles = <File>[];
   FaceLivenessChallenge? _livenessChallenge;
+  FaceTemplateUpdateAuthorization? _templateUpdateAuthorization;
   FaceVerificationResult? _successfulResult;
 
   CameraController? cameraController;
@@ -65,8 +69,10 @@ class FaceVerificationController extends GetxController
   bool _stepEvidenceCaptureInProgress = false;
   bool _shouldResumeCamera = false;
   bool _isDisposed = false;
+  bool _serverRequiresTemplateUpdatePin = false;
   int _activeStreamSession = 0;
   Completer<void>? _pendingFrameProcessing;
+  Timer? _evidenceCaptureTimer;
   Uint8List? _nv21ReusableBuffer;
   double? _straightYawBaseline;
   int _straightStableFrames = 0;
@@ -117,7 +123,7 @@ class FaceVerificationController extends GetxController
     _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
     unawaited(disposeResources());
-    _verificationService.dispose();
+    _verificationRepository.dispose();
     super.onClose();
   }
 
@@ -380,9 +386,8 @@ class FaceVerificationController extends GetxController
     }
 
     try {
-      _livenessChallenge ??= await _verificationService.createLivenessChallenge(
-        purpose: purpose,
-      );
+      _livenessChallenge ??= await _verificationRepository
+          .createLivenessChallenge(purpose: purpose);
       final challenge = _livenessChallenge;
       if (challenge == null || !challenge.isValid) {
         throw StateError("Unable to create a liveness challenge.");
@@ -418,7 +423,6 @@ class FaceVerificationController extends GetxController
   }
 
   void _resetLivenessSequence({bool updateInstruction = true}) {
-    blinkDetected.value = false;
     headTurnDetected.value = false;
     _livenessPassed = false;
     _stepEvidenceCaptureInProgress = false;
@@ -479,10 +483,16 @@ class FaceVerificationController extends GetxController
     _stepEvidenceCaptureInProgress = true;
     instructionText.value = "Giữ nguyên tư thế...";
     // Let the current ML Kit frame callback finish before stopping its stream.
-    Future<void>.delayed(
-      const Duration(milliseconds: 40),
-      () => _captureCurrentStepEvidence(step),
-    );
+    _evidenceCaptureTimer?.cancel();
+    _evidenceCaptureTimer = Timer(const Duration(milliseconds: 40), () {
+      if (_isDisposed ||
+          state.value != VerificationState.liveness ||
+          step != currentLivenessStep.value) {
+        _stepEvidenceCaptureInProgress = false;
+        return;
+      }
+      unawaited(_captureCurrentStepEvidence(step));
+    });
   }
 
   void _processLivenessStep(Face face) {
@@ -621,19 +631,20 @@ class FaceVerificationController extends GetxController
       }
       final verificationResult =
           isReauthentication
-              ? await _verificationService.reauthenticate(
+              ? await _verificationRepository.reauthenticate(
                 liveFrameFile: savedFrame,
                 challenge: challenge,
                 evidenceFrames: List<File>.unmodifiable(_livenessEvidenceFiles),
                 purpose: purpose,
               )
-              : await _verificationService.enrollVerification(
+              : await _verificationRepository.enrollVerification(
                 selfieFile:
                     selfieFile ?? (throw Exception("Selfie file is missing.")),
                 liveFrameFile: savedFrame,
                 challenge: challenge,
                 evidenceFrames: List<File>.unmodifiable(_livenessEvidenceFiles),
                 purpose: purpose,
+                templateUpdateAuthorizationId: _templateUpdateAuthorization?.id,
               );
 
       final hasRequiredReauthSession =
@@ -645,12 +656,23 @@ class FaceVerificationController extends GetxController
         if (!isReauthentication) {
           await _syncCurrentUserVerifiedState();
           await PasscodeBackupService.syncFaceRecoveryBackupIfEligible();
+          _templateUpdateAuthorization = null;
+          _serverRequiresTemplateUpdatePin = false;
         }
         state.value = VerificationState.success;
         instructionText.value = "Xác thực thành công";
       } else {
+        if (verificationResult.reason ==
+                "template_update_authorization_required" ||
+            verificationResult.reason ==
+                "template_update_authorization_invalid") {
+          _templateUpdateAuthorization = null;
+          _serverRequiresTemplateUpdatePin = true;
+        }
         state.value = VerificationState.failed;
-        errorText.value = "Xác thực thất bại. Vui lòng thử lại.";
+        errorText.value = _messageForVerificationReason(
+          verificationResult.reason,
+        );
         instructionText.value = errorText.value;
       }
     } catch (e, stackTrace) {
@@ -669,6 +691,8 @@ class FaceVerificationController extends GetxController
   }
 
   Future<void> disposeResources() async {
+    _evidenceCaptureTimer?.cancel();
+    _evidenceCaptureTimer = null;
     await _stopImageStream();
     await _disposeCameraOnly();
     await _disposeDetectorOnly();
@@ -676,6 +700,12 @@ class FaceVerificationController extends GetxController
   }
 
   Future<void> retryVerification() async {
+    if (!isReauthentication &&
+        (wasAlreadyVerifiedAtEntry.value || _serverRequiresTemplateUpdatePin) &&
+        _templateUpdateAuthorization?.isValid != true) {
+      startTemplateUpdatePinAuthorization();
+      return;
+    }
     await _deleteTemporaryFaceFiles();
     _successfulResult = null;
     _livenessChallenge = null;
@@ -686,6 +716,94 @@ class FaceVerificationController extends GetxController
     instructionText.value = "Đặt khuôn mặt vào khung và chụp ảnh";
     errorText.value = "";
     await initCamera();
+  }
+
+  void startTemplateUpdatePinAuthorization() {
+    if (isReauthentication ||
+        (!wasAlreadyVerifiedAtEntry.value &&
+            !_serverRequiresTemplateUpdatePin) ||
+        isPinActionRunning.value) {
+      return;
+    }
+    errorText.value = "";
+    state.value = VerificationState.authorizingUpdate;
+  }
+
+  Future<bool> confirmTemplateUpdatePin(String passcode) async {
+    if (isPinActionRunning.value) {
+      return false;
+    }
+    final normalizedPasscode = passcode.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(normalizedPasscode)) {
+      errorText.value = "Mã PIN phải gồm đúng 6 chữ số.";
+      return false;
+    }
+
+    isPinActionRunning.value = true;
+    errorText.value = "";
+    try {
+      final authorization = await _verificationRepository
+          .authorizeTemplateUpdateWithPin(passcode: normalizedPasscode);
+      _templateUpdateAuthorization = authorization;
+      await retryVerification();
+      return true;
+    } catch (error) {
+      errorText.value = _messageForPinError(error);
+      return false;
+    } finally {
+      isPinActionRunning.value = false;
+    }
+  }
+
+  void cancelTemplateUpdatePin() {
+    if (wasAlreadyVerifiedAtEntry.value) {
+      errorText.value = "";
+      state.value = VerificationState.success;
+    } else {
+      errorText.value =
+          "Cần nhập đúng mã PIN chat để cập nhật dữ liệu khuôn mặt hiện có.";
+      state.value = VerificationState.failed;
+    }
+  }
+
+  String _messageForVerificationReason(String? reason) {
+    return switch (reason) {
+      "face_not_detected" => "Không tìm thấy khuôn mặt rõ ràng trong ảnh.",
+      "multiple_faces_detected" =>
+        "Chỉ được có một khuôn mặt trong khung hình.",
+      "image_too_dark" => "Ảnh quá tối. Hãy chuyển đến nơi đủ sáng.",
+      "image_too_bright" => "Ảnh quá sáng. Hãy tránh nguồn sáng trực tiếp.",
+      "image_too_blurry" => "Ảnh bị mờ. Hãy giữ thiết bị ổn định.",
+      "face_too_small" => "Hãy đưa khuôn mặt gần khung hướng dẫn hơn.",
+      "face_mismatch" || "challenge_identity_mismatch" =>
+        "Khuôn mặt không khớp với dữ liệu đã xác thực.",
+      "challenge_invalid" ||
+      "challenge_not_found" => "Phiên kiểm tra đã hết hạn. Vui lòng thử lại.",
+      "challenge_replay_detected" =>
+        "Ảnh xác thực đã được sử dụng trước đó. Vui lòng quét lại.",
+      "challenge_pose_invalid" || "challenge_turn_pose_invalid" =>
+        "Tư thế khuôn mặt chưa đúng hướng dẫn. Vui lòng thử lại.",
+      "template_update_authorization_required" ||
+      "template_update_authorization_invalid" =>
+        "Quyền cập nhật khuôn mặt đã hết hạn. Vui lòng nhập lại mã PIN.",
+      "liveness_rate_limited" =>
+        "Bạn đã thử quá nhiều lần. Vui lòng quay lại sau.",
+      _ => "Xác thực thất bại. Vui lòng thử lại.",
+    };
+  }
+
+  String _messageForPinError(Object error) {
+    final raw = error.toString().toLowerCase();
+    if (raw.contains("incorrect") || raw.contains("permission-denied")) {
+      return "Mã PIN không đúng. Vui lòng thử lại.";
+    }
+    if (raw.contains("resource-exhausted") || raw.contains("too many")) {
+      return "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau.";
+    }
+    if (raw.contains("failed-precondition")) {
+      return "Bạn cần thiết lập mã PIN bảo vệ chat trước khi cập nhật khuôn mặt.";
+    }
+    return "Không thể kiểm tra mã PIN. Vui lòng thử lại.";
   }
 
   Future<void> _restartLivenessAfterPause() async {
@@ -739,10 +857,19 @@ class FaceVerificationController extends GetxController
         if (currentLivenessStep.value == 0) {
           _straightStableFrames = 0;
         }
+        instructionText.value = "Đưa khuôn mặt vào giữa khung hình";
+        return;
+      }
+      if (faces.length != 1) {
+        _straightStableFrames = 0;
+        instructionText.value = "Chỉ để một khuôn mặt trong khung hình";
         return;
       }
 
-      final targetFace = _pickPrimaryFace(faces);
+      if (!_stepEvidenceCaptureInProgress) {
+        _updateInstructionForCurrentStep();
+      }
+      final targetFace = faces.single;
       _processLivenessStep(targetFace);
 
       if (_livenessPassed) {
@@ -763,25 +890,6 @@ class FaceVerificationController extends GetxController
       }
       _pendingFrameProcessing = null;
     }
-  }
-
-  Face _pickPrimaryFace(List<Face> faces) {
-    if (faces.length == 1) {
-      return faces.first;
-    }
-
-    Face largestFace = faces.first;
-    double largestArea =
-        largestFace.boundingBox.width * largestFace.boundingBox.height;
-    for (int i = 1; i < faces.length; i++) {
-      final candidate = faces[i];
-      final area = candidate.boundingBox.width * candidate.boundingBox.height;
-      if (area > largestArea) {
-        largestArea = area;
-        largestFace = candidate;
-      }
-    }
-    return largestFace;
   }
 
   Future<void> _initFrontCamera() async {
@@ -1113,6 +1221,8 @@ class FaceVerificationController extends GetxController
     }
     _isShuttingDownCamera = true;
     try {
+      _evidenceCaptureTimer?.cancel();
+      _evidenceCaptureTimer = null;
       await _stopImageStream();
       await _disposeCameraOnly();
       await _disposeDetectorOnly();

@@ -29,18 +29,50 @@ def _decode_key(raw: str) -> bytes:
     return key
 
 
-@lru_cache(maxsize=1)
-def _encryption_key() -> bytes:
-    raw = os.getenv("FACE_TEMPLATE_ENCRYPTION_KEY_B64", "")
-    if not raw.strip():
-        raise FaceTemplateCryptoError(
-            "FACE_TEMPLATE_ENCRYPTION_KEY_B64 is required for biometric storage."
-        )
-    return _decode_key(raw)
-
-
 def _key_version() -> str:
     return os.getenv("FACE_TEMPLATE_KEY_VERSION", "v1").strip() or "v1"
+
+
+@lru_cache(maxsize=1)
+def _encryption_keys() -> dict[str, bytes]:
+    """Loads a versioned keyring while remaining compatible with the v1 secret."""
+    raw_keyring = os.getenv("FACE_TEMPLATE_ENCRYPTION_KEYS_B64", "").strip()
+    keys: dict[str, bytes] = {}
+    if raw_keyring:
+        try:
+            payload = json.loads(raw_keyring)
+        except json.JSONDecodeError as exc:
+            raise FaceTemplateCryptoError(
+                "FACE_TEMPLATE_ENCRYPTION_KEYS_B64 must be a JSON object."
+            ) from exc
+        if not isinstance(payload, dict):
+            raise FaceTemplateCryptoError(
+                "FACE_TEMPLATE_ENCRYPTION_KEYS_B64 must be a JSON object."
+            )
+        for version, raw_key in payload.items():
+            clean_version = str(version).strip()
+            if clean_version:
+                keys[clean_version] = _decode_key(str(raw_key))
+
+    legacy = os.getenv("FACE_TEMPLATE_ENCRYPTION_KEY_B64", "").strip()
+    if legacy:
+        legacy_key = _decode_key(legacy)
+        keys.setdefault("v1", legacy_key)
+        keys.setdefault(_key_version(), legacy_key)
+    if not keys:
+        raise FaceTemplateCryptoError(
+            "A face template encryption key is required."
+        )
+    return keys
+
+
+def _encryption_key(key_version: str) -> bytes:
+    key = _encryption_keys().get(key_version)
+    if key is None:
+        raise FaceTemplateCryptoError(
+            f"Face template key version is unavailable: {key_version}."
+        )
+    return key
 
 
 def _aad(uid: str, model_version: str, key_version: str) -> bytes:
@@ -70,7 +102,7 @@ def encrypt_embedding(
         separators=(",", ":"),
     ).encode("utf-8")
 
-    ciphertext = AESGCM(_encryption_key()).encrypt(
+    ciphertext = AESGCM(_encryption_key(key_version)).encrypt(
         nonce,
         payload,
         _aad(uid, model_version, key_version),
@@ -103,7 +135,7 @@ def decrypt_embedding(
         raise FaceTemplateCryptoError("Encrypted face template is malformed.") from exc
 
     try:
-        plaintext = AESGCM(_encryption_key()).decrypt(
+        plaintext = AESGCM(_encryption_key(key_version)).decrypt(
             nonce,
             ciphertext,
             _aad(uid, model_version, key_version),
