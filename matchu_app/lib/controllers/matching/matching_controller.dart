@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
+import 'package:matchu_app/models/matching/matching_mode.dart';
+import 'package:matchu_app/models/matching/matching_reputation_policy.dart';
 import 'package:matchu_app/translations/matching_chat_translations.dart';
 
 import '../../models/queue_user_model.dart';
@@ -224,12 +227,16 @@ class MatchingController extends GetxController {
   }
 
   MatchingQuotaPreview _buildQuotaPreviewFromData(Map<String, dynamic> data) {
+    final reputationScore = MatchingReputationPolicy.scoreFrom(
+      data['reputationScore'],
+    );
     if (_isAccountVerified(data)) {
-      return const MatchingQuotaPreview(
+      return MatchingQuotaPreview(
         isUnlimited: true,
         used: 0,
         remaining: -1,
         limit: _dailyMatchingLimit,
+        reputationScore: reputationScore,
       );
     }
 
@@ -247,6 +254,7 @@ class MatchingController extends GetxController {
       used: used,
       remaining: remaining,
       limit: _dailyMatchingLimit,
+      reputationScore: reputationScore,
     );
   }
 
@@ -307,6 +315,32 @@ class MatchingController extends GetxController {
       }
 
       final data = profileSnap.data()!;
+      final reputationScore = MatchingReputationPolicy.scoreFrom(
+        data['reputationScore'],
+      );
+      if (!MatchingReputationPolicy.canUse(
+        MatchingMode.chat,
+        reputationScore,
+      )) {
+        Get.snackbar(
+          MatchingChatTranslationKeys.insufficientReputationTitle.tr,
+          MatchingChatTranslationKeys.tempChatReputationRequired.trParams({
+            'required':
+                MatchingReputationPolicy.minimumTempChatScore.toString(),
+            'score': reputationScore.toString(),
+          }),
+          snackPosition: SnackPosition.TOP,
+        );
+        if (Get.currentRoute == _matchingRoute) {
+          Future.microtask(() {
+            if (Get.currentRoute == _matchingRoute) {
+              Get.back();
+            }
+          });
+        }
+        return;
+      }
+
       final quota = _buildQuotaPreviewFromData(data);
       if (!quota.isUnlimited && quota.remaining <= 0) {
         if (Get.currentRoute == _matchingRoute) {
@@ -364,7 +398,7 @@ class MatchingController extends GetxController {
           _go(queue['roomId'] as String);
         }
       });
-    } catch (_) {
+    } catch (error) {
       await _roomSub?.cancel();
       _roomSub = null;
       _resetMatchingState();
@@ -378,6 +412,8 @@ class MatchingController extends GetxController {
         }
       }
 
+      if (_showReputationError(error, MatchingMode.chat)) return;
+
       Get.snackbar(
         matchingChatTr('Không thể bắt đầu matching'),
         matchingChatTr('Vui lòng thử lại sau ít phút.'),
@@ -386,6 +422,34 @@ class MatchingController extends GetxController {
     } finally {
       _isStartInProgress = false;
     }
+  }
+
+  bool _showReputationError(Object error, MatchingMode mode) {
+    if (error is! FirebaseFunctionsException ||
+        error.code != 'failed-precondition') {
+      return false;
+    }
+    final details = error.details;
+    if (details is! Map || details['reason'] != 'insufficient-reputation') {
+      return false;
+    }
+
+    final score = MatchingReputationPolicy.scoreFrom(
+      details['currentReputation'],
+    );
+    final messageKey =
+        mode == MatchingMode.video
+            ? MatchingChatTranslationKeys.videoReputationRequired
+            : MatchingChatTranslationKeys.tempChatReputationRequired;
+    Get.snackbar(
+      MatchingChatTranslationKeys.insufficientReputationTitle.tr,
+      messageKey.trParams({
+        'required': MatchingReputationPolicy.minimumScoreFor(mode).toString(),
+        'score': score.toString(),
+      }),
+      snackPosition: SnackPosition.TOP,
+    );
+    return true;
   }
 
   // =========================================================
@@ -465,11 +529,17 @@ class MatchingQuotaPreview {
   final int used;
   final int remaining;
   final int limit;
+  final int reputationScore;
 
   const MatchingQuotaPreview({
     required this.isUnlimited,
     required this.used,
     required this.remaining,
     required this.limit,
+    required this.reputationScore,
   });
+
+  bool canUse(MatchingMode mode) {
+    return MatchingReputationPolicy.canUse(mode, reputationScore);
+  }
 }

@@ -38,6 +38,47 @@ test("matching mode must be mutual", () => {
   );
 });
 
+test("temp chat matching requires at least 80 reputation points", () => {
+  assert.equal(
+    __test.hasSufficientMatchingReputation({ reputationScore: 79 }, "chat"),
+    false
+  );
+  assert.equal(
+    __test.hasSufficientMatchingReputation({ reputationScore: 80 }, "chat"),
+    true
+  );
+});
+
+test("video matching requires at least 90 reputation points", () => {
+  assert.equal(
+    __test.hasSufficientMatchingReputation({ reputationScore: 89 }, "video"),
+    false
+  );
+  assert.equal(
+    __test.hasSufficientMatchingReputation({ reputationScore: 90 }, "video"),
+    true
+  );
+});
+
+test("legacy profiles without reputation retain the default score", () => {
+  assert.equal(__test.reputationScoreFrom({}), 100);
+  assert.equal(__test.hasSufficientMatchingReputation({}, "video"), true);
+});
+
+test("insufficient reputation returns machine-readable error details", () => {
+  assert.throws(
+    () => __test.assertMatchingReputation(
+      { reputationScore: 70 },
+      "video",
+      "seeker"
+    ),
+    (error) => error.code === "failed-precondition" &&
+      error.details.reason === "insufficient-reputation" &&
+      error.details.requiredReputation === 90 &&
+      error.details.currentReputation === 70
+  );
+});
+
 test("verified users do not consume daily quota", () => {
   const patch = __test.quotaPatch(
     { isFaceVerified: true, dailyMatchingCount: 10 },

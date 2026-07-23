@@ -11,6 +11,8 @@ const VIDEO_CAMERA_LOCK_MS = 90 * 1000;
 const QUEUE_TTL_MS = 90 * 1000;
 const DAILY_MATCH_LIMIT = 10;
 const MATCH_SCAN_LIMIT = 50;
+const MIN_TEMP_CHAT_REPUTATION = 80;
+const MIN_VIDEO_REPUTATION = 90;
 const VERIFIED_STATUSES = new Set([
   "verified",
   "approved",
@@ -44,6 +46,40 @@ function normalizeGender(value) {
 
 function normalizeMatchingMode(value) {
   return cleanString(value, 16).toLowerCase() === "video" ? "video" : "chat";
+}
+
+function reputationScoreFrom(userData) {
+  const rawValue = userData?.reputationScore;
+  if (rawValue == null || rawValue === "") return 100;
+  const value = Number(rawValue);
+  return Number.isFinite(value) ? Math.trunc(value) : 100;
+}
+
+function minimumReputationForMode(matchingMode) {
+  return normalizeMatchingMode(matchingMode) === "video"
+    ? MIN_VIDEO_REPUTATION
+    : MIN_TEMP_CHAT_REPUTATION;
+}
+
+function hasSufficientMatchingReputation(userData, matchingMode) {
+  return reputationScoreFrom(userData) >=
+    minimumReputationForMode(matchingMode);
+}
+
+function assertMatchingReputation(userData, matchingMode, participant) {
+  if (hasSufficientMatchingReputation(userData, matchingMode)) return;
+
+  throw new HttpsError(
+    "failed-precondition",
+    "Insufficient reputation for the selected matching mode.",
+    {
+      reason: "insufficient-reputation",
+      matchingMode: normalizeMatchingMode(matchingMode),
+      requiredReputation: minimumReputationForMode(matchingMode),
+      currentReputation: reputationScoreFrom(userData),
+      participant,
+    }
+  );
 }
 
 function isActiveTempRoomForUser(room, uid) {
@@ -184,6 +220,7 @@ async function enqueueSeeker({
       // Recover from a stale lock left by an interrupted cleanup trigger.
       tx.set(userRef, { activeTempRoomId: null }, { merge: true });
     }
+    assertMatchingReputation(userSnap.data() || {}, matchingMode, "seeker");
     // Validate quota now, but consume it only after a room is created.
     quotaPatch(userSnap.data() || {}, now);
 
@@ -245,6 +282,16 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
           db.collection("users").doc(candidateUid)
         );
         if (!seekerUser.exists || !candidateUser.exists) return null;
+        assertMatchingReputation(
+          seekerUser.data() || {},
+          matchingMode,
+          "seeker"
+        );
+        assertMatchingReputation(
+          candidateUser.data() || {},
+          matchingMode,
+          "candidate"
+        );
         if (await hasBlockInTransaction(tx, uid, candidateUid)) return null;
 
         const now = new Date();
@@ -340,6 +387,23 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
       });
       if (roomId) return roomId;
     } catch (error) {
+      if (
+        error instanceof HttpsError &&
+        error.code === "failed-precondition" &&
+        error.details?.reason === "insufficient-reputation" &&
+        error.details?.participant === "candidate"
+      ) {
+        // Reputation can change while a user waits in the queue. Remove an
+        // ineligible candidate and continue scanning without blocking others.
+        const batch = db.batch();
+        batch.set(candidateRef, { status: "expired" }, { merge: true });
+        batch.set(db.collection("users").doc(candidateUid), {
+          isMatching: false,
+          activeMatchingSessionId: null,
+        }, { merge: true });
+        await batch.commit();
+        continue;
+      }
       if (error instanceof HttpsError && error.code === "resource-exhausted") {
         // A stale candidate with no quota must not block the rest of the queue.
         const batch = db.batch();
@@ -608,6 +672,10 @@ module.exports = {
     normalizeMatchingMode,
     isActiveTempRoomForUser,
     isMutualMatch,
+    reputationScoreFrom,
+    minimumReputationForMode,
+    hasSufficientMatchingReputation,
+    assertMatchingReputation,
     isVerifiedAccount,
     bangkokDateKey,
     quotaPatch,

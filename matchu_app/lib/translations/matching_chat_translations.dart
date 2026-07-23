@@ -3,9 +3,23 @@ import 'package:get/get.dart';
 abstract final class MatchingChatTranslationKeys {
   static const notice = 'matching_chat.notice';
   static const error = 'matching_chat.error';
+  static const insufficientReputationTitle =
+      'matching_chat.insufficient_reputation_title';
+  static const tempChatReputationRequired =
+      'matching_chat.temp_chat_reputation_required';
+  static const videoReputationRequired =
+      'matching_chat.video_reputation_required';
+  static const understood = 'matching_chat.understood';
 }
 
 const matchingChatVietnameseTranslations = <String, String>{
+  MatchingChatTranslationKeys.insufficientReputationTitle:
+      'Điểm uy tín chưa đủ',
+  MatchingChatTranslationKeys.tempChatReputationRequired:
+      'Bạn cần ít nhất @required điểm uy tín để ghép đôi chat tạm. Điểm hiện tại: @score.',
+  MatchingChatTranslationKeys.videoReputationRequired:
+      'Bạn cần ít nhất @required điểm uy tín để ghép đôi video. Điểm hiện tại: @score.',
+  MatchingChatTranslationKeys.understood: 'Đã hiểu',
   MatchingChatTranslationKeys.notice: 'Thông báo',
   MatchingChatTranslationKeys.error: 'Lỗi',
   'Mất kết nối': 'Mất kết nối',
@@ -117,6 +131,13 @@ const matchingChatVietnameseTranslations = <String, String>{
 };
 
 const matchingChatEnglishTranslations = <String, String>{
+  MatchingChatTranslationKeys.insufficientReputationTitle:
+      'Insufficient reputation',
+  MatchingChatTranslationKeys.tempChatReputationRequired:
+      'You need at least @required reputation points to use temporary chat matching. Current score: @score.',
+  MatchingChatTranslationKeys.videoReputationRequired:
+      'You need at least @required reputation points to use video matching. Current score: @score.',
+  MatchingChatTranslationKeys.understood: 'Got it',
   MatchingChatTranslationKeys.notice: 'Notice',
   MatchingChatTranslationKeys.error: 'Error',
   'Mất kết nối': 'Connection lost',

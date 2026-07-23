@@ -34,6 +34,8 @@ const randomChatEnglishTranslations = <String, String>{
       'A turn is used only after a successful match, not when you simply start searching.',
   'Tài khoản chưa xác thực: tối đa 10 lượt ghép thành công/ngày, reset lúc 00:00.':
       'Unverified accounts get up to 10 successful matches per day, resetting at midnight.',
+  'Chat tạm yêu cầu tối thiểu 80 điểm uy tín; video call yêu cầu tối thiểu 90 điểm uy tín.':
+      'Temporary chat requires at least 80 reputation points; video matching requires at least 90.',
   'Nếu cả hai cùng thích nhau, hệ thống chuyển sang phòng chat lâu dài.':
       'If you both like each other, the conversation becomes a permanent chat.',
   'Phòng video kéo dài tối đa 8 phút; camera chỉ mở được sau 1 phút 30 giây.':

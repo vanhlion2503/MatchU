@@ -9,6 +9,8 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
+import 'package:matchu_app/models/matching/matching_mode.dart';
+import 'package:matchu_app/models/matching/matching_reputation_policy.dart';
 import 'package:matchu_app/services/chat/matching_service.dart';
 import 'package:matchu_app/views/chat/chat_widget/avatar_overlay_service.dart';
 import 'package:matchu_app/views/chat/list_chat/passcode_prompt_dialog.dart';
@@ -65,6 +67,7 @@ class _RandomChatViewState extends State<RandomChatView>
       bullets: [
         'Chỉ tính lượt khi ghép cặp thành công (không trừ lượt khi chỉ bấm tìm).',
         'Tài khoản chưa xác thực: tối đa 10 lượt ghép thành công/ngày, reset lúc 00:00.',
+        'Chat tạm yêu cầu tối thiểu 80 điểm uy tín; video call yêu cầu tối thiểu 90 điểm uy tín.',
         'Nếu cả hai cùng thích nhau, hệ thống chuyển sang phòng chat lâu dài.',
         'Phòng video kéo dài tối đa 8 phút; camera chỉ mở được sau 1 phút 30 giây.',
         'Không spam, xúc phạm, quấy rối hoặc chia sẻ nội dung nhạy cảm.',
@@ -153,6 +156,52 @@ class _RandomChatViewState extends State<RandomChatView>
       return false;
     }
     return quota.remaining <= 0;
+  }
+
+  MatchingMode get _selectedMatchingMode {
+    return _selectedExperience == _MatchingExperience.video
+        ? MatchingMode.video
+        : MatchingMode.chat;
+  }
+
+  bool _isReputationBlocked(MatchingQuotaPreview? preview) {
+    return preview != null && !preview.canUse(_selectedMatchingMode);
+  }
+
+  Future<void> _showInsufficientReputationDialog(
+    MatchingQuotaPreview preview,
+  ) async {
+    if (!mounted) return;
+
+    final mode = _selectedMatchingMode;
+    final messageKey =
+        mode == MatchingMode.video
+            ? MatchingChatTranslationKeys.videoReputationRequired
+            : MatchingChatTranslationKeys.tempChatReputationRequired;
+    final requiredScore = MatchingReputationPolicy.minimumScoreFor(mode);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            MatchingChatTranslationKeys.insufficientReputationTitle.tr,
+          ),
+          content: Text(
+            messageKey.trParams({
+              'required': requiredScore.toString(),
+              'score': preview.reputationScore.toString(),
+            }),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(MatchingChatTranslationKeys.understood.tr),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _startButtonLabel() {
@@ -351,6 +400,11 @@ class _RandomChatViewState extends State<RandomChatView>
       return;
     }
 
+    if (_isReputationBlocked(_quotaPreview)) {
+      await _showInsufficientReputationDialog(_quotaPreview!);
+      return;
+    }
+
     if (_isOutOfQuota) {
       await _showOutOfQuotaDialog();
       return;
@@ -386,6 +440,11 @@ class _RandomChatViewState extends State<RandomChatView>
         _quotaPreview = latestQuota;
         _isLoadingQuota = false;
       });
+
+      if (_isReputationBlocked(latestQuota)) {
+        await _showInsufficientReputationDialog(latestQuota!);
+        return;
+      }
 
       if (latestQuota != null &&
           !latestQuota.isUnlimited &&

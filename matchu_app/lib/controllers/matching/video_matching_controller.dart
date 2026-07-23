@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -12,6 +13,7 @@ import 'package:matchu_app/repositories/matching/video_matching_repository.dart'
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
 import 'package:matchu_app/services/chat/webrtc_service.dart';
+import 'package:matchu_app/translations/matching_chat_translations.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
 import 'package:matchu_app/views/matching/match_transition_view.dart';
 
@@ -1033,9 +1035,13 @@ class VideoMatchingController extends GetxController {
     _restoreRouteIfMinimized();
     _sessionCoordinator?.finish();
     debugPrint('Anonymous video matching error: $error');
+    final reputationErrorMessage = _matchingReputationErrorMessage(error);
     errorMessage.value = videoMatchingTr(
       'Không thể duy trì kết nối. Hãy kiểm tra camera, micro và đường truyền rồi thử lại.',
     );
+    if (reputationErrorMessage != null) {
+      errorMessage.value = reputationErrorMessage;
+    }
     phase.value = VideoMatchingPhase.error;
     final sessionId = _sessionId;
     final roomId = _roomId;
@@ -1064,6 +1070,21 @@ class VideoMatchingController extends GetxController {
     }
     await _cancelAllSubscriptions();
     await _webRTC.resetConnection();
+  }
+
+  String? _matchingReputationErrorMessage(Object error) {
+    if (error is! FirebaseFunctionsException ||
+        error.code != 'failed-precondition') {
+      return null;
+    }
+    final details = error.details;
+    if (details is! Map || details['reason'] != 'insufficient-reputation') {
+      return null;
+    }
+    return MatchingChatTranslationKeys.videoReputationRequired.trParams({
+      'required': (details['requiredReputation'] ?? 90).toString(),
+      'score': (details['currentReputation'] ?? 0).toString(),
+    });
   }
 
   void _resetForSearch() {
