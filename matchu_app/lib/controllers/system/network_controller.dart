@@ -15,7 +15,11 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
   final Connectivity _connectivity;
 
   final isOffline = false.obs;
+  // Once shown, this overlay is dismissed only by a successful manual retry.
+  final shouldShowOfflineOverlay = false.obs;
   final isChecking = false.obs;
+  final isRetrying = false.obs;
+  final lastRetryFailed = false.obs;
   final isReady = false.obs;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -42,21 +46,48 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
       final transports = await _connectivity.checkConnectivity();
       if (transports.contains(ConnectivityResult.none)) {
         isOffline.value = true;
+        shouldShowOfflineOverlay.value = true;
         return false;
       }
 
       final hasInternet = await _canReachInternet();
       isOffline.value = !hasInternet;
+      if (!hasInternet) shouldShowOfflineOverlay.value = true;
       return hasInternet;
     } catch (_) {
       // A failed probe is treated as offline. The next transport event, the
       // periodic probe, or a manual retry can immediately recover the app.
       isOffline.value = true;
+      shouldShowOfflineOverlay.value = true;
       return false;
     } finally {
       isChecking.value = false;
       isReady.value = true;
     }
+  }
+
+  /// Shows the explicit reconnect state requested by the offline dialog.
+  /// A short minimum duration prevents the loading dialog from flashing.
+  Future<void> retryConnection() async {
+    if (isRetrying.value) return;
+
+    isRetrying.value = true;
+    lastRetryFailed.value = false;
+    final startedAt = DateTime.now();
+    final connected = await checkConnection();
+    final elapsed = DateTime.now().difference(startedAt);
+    const minimumLoadingTime = Duration(milliseconds: 650);
+    if (elapsed < minimumLoadingTime) {
+      await Future<void>.delayed(minimumLoadingTime - elapsed);
+    }
+
+    if (connected) {
+      lastRetryFailed.value = false;
+      shouldShowOfflineOverlay.value = false;
+    } else {
+      lastRetryFailed.value = true;
+    }
+    isRetrying.value = false;
   }
 
   Future<bool> _canReachInternet() async {
