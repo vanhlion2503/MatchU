@@ -1,0 +1,63 @@
+# MatchU Web Admin
+
+Nền tảng quản trị MatchU dùng Node.js, Express, EJS và Firebase Admin SDK. Mật khẩu được Firebase Authentication kiểm tra ở trình duyệt; server chỉ nhận Firebase ID Token một lần để tạo session cookie HttpOnly.
+
+## Yêu cầu và chạy dự án
+
+- Node.js 18+ (khuyến nghị Node.js LTS).
+- Một Firebase project có Authentication (Email/Password) và Firestore.
+
+```bash
+cd matchu_web_admin
+npm install
+copy .env.example .env
+npm run dev
+```
+
+Production dùng `npm start`. Mở `http://localhost:3000`.
+
+## Cấu hình `.env`
+
+Điền các biến Firebase Admin cho môi trường local: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, và `FIREBASE_PRIVATE_KEY`. Private key phải là một dòng có ký tự `\\n`, ví dụ `-----BEGIN PRIVATE KEY-----\\n...`.
+
+Điền thêm `FIREBASE_WEB_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_APP_ID` cho Firebase Client SDK ở trang login. Các giá trị này là cấu hình public của Firebase Web App; tuyệt đối không truyền private key Admin xuống trình duyệt. Trong production, có thể bỏ ba biến Admin và dùng Application Default Credentials do môi trường deploy cung cấp.
+
+Không commit `.env` hoặc JSON service account.
+
+## Tạo admin đầu tiên
+
+1. Trong Firebase Console, bật **Email/Password** và tạo tài khoản admin.
+2. Lấy UID tại Firebase Authentication → Users (hoặc qua Firebase CLI/Admin SDK).
+3. Trong Firestore, tạo document `adminProfiles/{UID}` với nội dung sau. Trường timestamp có thể để Firestore tạo hoặc bổ sung sau.
+
+```json
+{
+  "uid": "FIREBASE_UID",
+  "email": "admin@example.com",
+  "displayName": "Super Admin",
+  "avatarUrl": null,
+  "role": "super_admin",
+  "permissions": [],
+  "status": "active"
+}
+```
+
+`super_admin` có toàn quyền dù mảng `permissions` rỗng. Những role hợp lệ khác: `moderator`, `support`, `analyst`; chúng chỉ được cấp các màn hình có permission tương ứng. Tài khoản chỉ tồn tại trong Firebase Authentication sẽ không thể đăng nhập nếu không có profile active.
+
+## Routes
+
+| Method | Route | Mục đích |
+| --- | --- | --- |
+| GET | `/` | Điều hướng login/dashboard |
+| GET | `/login` | Trang đăng nhập khách |
+| POST | `/auth/session` | Xác minh token và tạo cookie |
+| POST | `/auth/logout` | Xóa cookie và ghi audit log |
+| GET | `/dashboard` | Tổng quan, cần `dashboard.read` |
+
+## Cấu trúc
+
+`routes → middlewares → controllers → services → Firebase/Firestore`. `views/layouts` chứa hai layout tái sử dụng; header/sidebar/footer là partial. Các số liệu dashboard, biểu đồ, hoạt động gần đây và menu chưa có route là placeholder có chủ đích để bổ sung module sau.
+
+## Bảo mật
+
+Project dùng Helmet, rate limit toàn cục và nghiêm ngặt cho login, body limit, cookie HttpOnly/SameSite (Secure ở production), kiểm tra Firebase session cookie bị revoke, và kiểm tra role/permission ở server. Không lưu ID token tại Local Storage. TODO: khi thêm form thay đổi dữ liệu, tích hợp CSRF token (ví dụ `csurf` hoặc double-submit cookie) trước khi mở các route đó.

@@ -1,0 +1,2 @@
+const { APP_VERSION } = require('../config/constants');
+module.exports = (req, res, next) => { res.locals.currentAdmin = req.admin || null; res.locals.currentPath = req.path; res.locals.pageTitle = 'MatchU Admin'; res.locals.successMessage = null; res.locals.errorMessage = null; res.locals.currentYear = new Date().getFullYear(); res.locals.appVersion = APP_VERSION; res.locals.hasPermission = (permission) => req.admin?.role === 'super_admin' || Boolean(req.admin?.permissions?.includes(permission)); next(); };

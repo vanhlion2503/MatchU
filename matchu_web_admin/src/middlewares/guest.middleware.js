@@ -1,0 +1,2 @@
+const { auth } = require('../config/firebase-admin'); const { sessionCookieName } = require('../config/env');
+module.exports = async (req, res, next) => { const cookie = req.cookies[sessionCookieName]; if (!cookie) return next(); try { await auth.verifySessionCookie(cookie, true); return res.redirect('/dashboard'); } catch (_) { res.clearCookie(sessionCookieName, { path: '/' }); return next(); } };
