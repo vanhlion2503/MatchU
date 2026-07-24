@@ -124,6 +124,20 @@ class NotificationController extends GetxController {
     _authSub = _auth.authStateChanges().listen(_handleAuthChanged);
   }
 
+  /// Re-sync services that have no auth-state event when the network returns.
+  /// Firestore listeners reconnect by themselves; FCM token registration and
+  /// presence need an explicit write retry.
+  Future<void> resumeAfterNetworkRecovery() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    if (supportsNotifications) {
+      final settings = await _messaging.getNotificationSettings();
+      await _syncCurrentToken(userId: user.uid, settings: settings);
+    }
+    await _syncDeviceContext();
+  }
+
   Future<void> _handleAuthChanged(User? user) async {
     final generation = ++_authGeneration;
     await _tokenRefreshSub?.cancel();

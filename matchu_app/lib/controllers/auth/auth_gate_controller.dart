@@ -107,7 +107,15 @@ class AuthGateController extends GetxController {
       _box.remove('isRegistering');
     }
 
-    await user.getIdToken(true);
+    try {
+      await user.getIdToken(true);
+    } catch (error, stackTrace) {
+      // The global offline overlay will offer an explicit retry. Do not mark
+      // this auth event as navigated when its network work did not complete.
+      debugPrint('Auth token refresh deferred: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return;
+    }
     await Future.delayed(const Duration(milliseconds: 300));
 
     if (eventToken != _authEventToken ||
@@ -135,7 +143,17 @@ class AuthGateController extends GetxController {
     // ============================
     // 4️⃣ LOAD USER DOCUMENT
     // ============================
-    final snap = await _loadUserDoc(user.uid);
+    DocumentSnapshot<Map<String, dynamic>> snap;
+    try {
+      snap = await _loadUserDoc(user.uid);
+    } catch (error, stackTrace) {
+      // Keep _navigated false so NetworkController can safely restart this
+      // exact startup flow after connectivity is restored.
+      _navigated = false;
+      debugPrint('User profile load deferred: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return;
+    }
 
     if (eventToken != _authEventToken ||
         _isLoggingOut ||
@@ -251,6 +269,14 @@ class AuthGateController extends GetxController {
 
   Future<void> refreshCurrentUser() async {
     _navigated = false;
+    await _handleAuth(FirebaseAuth.instance.currentUser);
+  }
+
+  /// Continue a startup/onboarding auth flow that was interrupted by a lost
+  /// network connection. Once the user is already inside the app, the active
+  /// route must be preserved; Firestore listeners will reconnect on their own.
+  Future<void> recoverAfterNetworkRestored() async {
+    if (_navigated) return;
     await _handleAuth(FirebaseAuth.instance.currentUser);
   }
 

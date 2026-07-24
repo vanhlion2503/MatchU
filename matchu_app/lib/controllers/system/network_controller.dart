@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
+import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
+import 'package:matchu_app/controllers/system/notification_controller.dart';
 
 /// Keeps a single, app-wide view of whether MatchU can actually reach the
 /// internet. Connectivity alone is not enough: a device may be connected to a
@@ -66,8 +70,14 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
     }
   }
 
-  /// Shows the explicit reconnect state requested by the offline dialog.
-  /// A short minimum duration prevents the loading dialog from flashing.
+  /// Restores the application services after the user explicitly confirms that
+  /// their connection is back. A successful HTTP probe alone is not enough:
+  /// Firestore may have been disabled during logout and startup work may have
+  /// failed while the device was offline.
+  ///
+  /// The overlay is dismissed only after the essential Firebase/Auth recovery
+  /// succeeds. Firestore listeners owned by feature controllers automatically
+  /// reconnect once Firestore networking is enabled again.
   Future<void> retryConnection() async {
     if (isRetrying.value) return;
 
@@ -81,13 +91,50 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
       await Future<void>.delayed(minimumLoadingTime - elapsed);
     }
 
-    if (connected) {
+    final recovered = connected && await _restoreApplicationServices();
+    if (!recovered) {
+      lastRetryFailed.value = true;
+    } else {
       lastRetryFailed.value = false;
       shouldShowOfflineOverlay.value = false;
-    } else {
-      lastRetryFailed.value = true;
     }
     isRetrying.value = false;
+  }
+
+  Future<bool> _restoreApplicationServices() async {
+    try {
+      // This is idempotent. It also recovers the explicit disableNetwork call
+      // used by the logout flow without recreating any controllers or streams.
+      await FirebaseFirestore.instance.enableNetwork().timeout(
+        const Duration(seconds: 10),
+      );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Force an authenticated server request before proceeding. This avoids
+        // hiding the dialog while an expired token or Firestore session is
+        // still unusable.
+        await user.getIdToken(true).timeout(const Duration(seconds: 10));
+      }
+
+      if (Get.isRegistered<AuthGateController>()) {
+        await Get.find<AuthGateController>().recoverAfterNetworkRestored();
+      }
+
+      // Push registration and presence are non-critical for opening the app;
+      // retry them here but never keep the user behind the offline overlay when
+      // the core Auth/Firestore recovery has already succeeded.
+      if (Get.isRegistered<NotificationController>()) {
+        unawaited(
+          Get.find<NotificationController>()
+              .resumeAfterNetworkRecovery()
+              .catchError((_) {}),
+        );
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> _canReachInternet() async {
