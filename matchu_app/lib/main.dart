@@ -24,8 +24,10 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/system/theme_controller.dart';
 import 'package:matchu_app/controllers/system/language_controller.dart';
+import 'package:matchu_app/controllers/system/network_controller.dart';
 import 'package:matchu_app/translations/app_translations.dart';
 import 'package:matchu_app/widgets/global_matching_bubble.dart';
+import 'package:matchu_app/widgets/network_offline_overlay.dart';
 
 Future<void> _cleanupAbandonedRegisterFlow() async {
   final box = GetStorage();
@@ -105,6 +107,7 @@ void main() async {
   // Register before runApp so cold-start links are not missed.
   Get.put(PostDeepLinkController(), permanent: true);
   Get.put(AppLifecycleController(), permanent: true);
+  Get.put(NetworkController(), permanent: true);
   final notificationController = Get.put(
     NotificationController(),
     permanent: true,
@@ -149,7 +152,13 @@ class MyApp extends StatelessWidget {
 
         // ⭐ QUAN TRỌNG NHẤT
         builder: (context, child) {
-          return Stack(children: [child!, GlobalMatchingBubble()]);
+          return Stack(
+            children: [
+              child!,
+              GlobalMatchingBubble(),
+              const NetworkOfflineOverlay(),
+            ],
+          );
         },
       ),
     );
