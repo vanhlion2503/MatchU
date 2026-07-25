@@ -11,6 +11,7 @@ import 'package:matchu_app/translations/chat_safety_translations.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
 import 'package:matchu_app/widgets/chat_rating_safety_notice.dart';
+import 'package:matchu_app/widgets/temp_room_extension_prompt.dart';
 
 enum _ExitChoice { stay, leave }
 
@@ -102,6 +103,7 @@ class VideoCallStage extends StatelessWidget {
             controller: controller,
             onExit: () => _showExitChoices(context),
           ),
+          _VideoExtensionPrompt(controller: controller),
           _ConnectionStatus(controller: controller, lockText: _cameraLockText),
           _CallBottomControls(controller: controller),
           Obx(
@@ -125,6 +127,36 @@ class VideoCallStage extends StatelessWidget {
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
     final remainder = (seconds % 60).toString().padLeft(2, '0');
     return videoMatchingTr('Có thể mở camera sau $minutes:$remainder');
+  }
+}
+
+class _VideoExtensionPrompt extends StatelessWidget {
+  const _VideoExtensionPrompt({required this.controller});
+
+  final VideoMatchingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 82, 14, 0),
+          child: Obx(() {
+            if (!controller.canExtendRoom) return const SizedBox.shrink();
+            return ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: TempRoomExtensionPrompt(
+                extensionCount: controller.extensionCount.value,
+                isLoading: controller.isExtendingRoom.value,
+                onExtend: controller.extendRoom,
+                onDarkSurface: true,
+              ),
+            );
+          }),
+        ),
+      ),
+    );
   }
 }
 
@@ -388,7 +420,7 @@ class _CallTopBar extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Phòng video ẩn danh • tối đa 8 phút'.tr,
+                        'Phòng video ẩn danh • tối đa 2 lượt gia hạn'.tr,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.68),
                           fontSize: 10,

@@ -10,6 +10,7 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/controllers/matching/video_matching_admission_controller.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
+import 'package:matchu_app/models/temp_room_extension.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
@@ -56,6 +57,8 @@ class VideoMatchingController extends GetxController {
   final canCancel = false.obs;
   final searchElapsedSeconds = 0.obs;
   final roomRemainingSeconds = (8 * 60).obs;
+  final extensionCount = 0.obs;
+  final isExtendingRoom = false.obs;
   final cameraUnlockRemainingSeconds = 90.obs;
   final cameraUnlocked = false.obs;
   final isMuted = false.obs;
@@ -79,6 +82,11 @@ class VideoMatchingController extends GetxController {
 
   String get formattedSearchTime => _formatDuration(searchElapsedSeconds.value);
   String get formattedRoomTime => _formatDuration(roomRemainingSeconds.value);
+  bool get canExtendRoom => TempRoomExtensionPolicy.isAvailable(
+    remainingSeconds: roomRemainingSeconds.value,
+    extensionCount: extensionCount.value,
+    isActive: phase.value == VideoMatchingPhase.active,
+  );
 
   VideoMatchingSessionCoordinator? get _sessionCoordinator {
     if (!Get.isRegistered<VideoMatchingSessionCoordinator>()) return null;
@@ -122,6 +130,7 @@ class VideoMatchingController extends GetxController {
   String? _lastAnswerSdp;
   String? _videoOfferSignature;
   String _negotiatedVideoSignature = '';
+  int? _observedExtensionCount;
 
   @override
   void onInit() {
@@ -399,6 +408,7 @@ class VideoMatchingController extends GetxController {
     otherLiked.value = peerLiked;
 
     _expiresAt = _timestampDate(data['expiresAt']);
+    _syncExtensionState(data);
     _cameraUnlockAt = _timestampDate(data['cameraUnlockAt']);
     _syncRoomClock();
     _startClock();
@@ -812,6 +822,46 @@ class VideoMatchingController extends GetxController {
     }
   }
 
+  Future<void> extendRoom() async {
+    final roomId = _roomId;
+    if (roomId == null || !canExtendRoom || isExtendingRoom.value) return;
+    isExtendingRoom.value = true;
+    try {
+      await _repository.extendRoom(roomId);
+    } on TempRoomExtensionException catch (error) {
+      _showExtensionError(error.failure);
+    } catch (error) {
+      debugPrint('Video room extension failed for room $roomId: $error');
+      _showExtensionError(TempRoomExtensionFailure.unknown);
+    } finally {
+      isExtendingRoom.value = false;
+    }
+  }
+
+  void _showExtensionError(TempRoomExtensionFailure failure) {
+    final message = switch (failure) {
+      TempRoomExtensionFailure.insufficientGem =>
+        'Bạn không đủ gem để gia hạn phòng.',
+      TempRoomExtensionFailure.tooEarly =>
+        'Gia hạn chỉ khả dụng khi phòng còn tối đa 1 phút.',
+      TempRoomExtensionFailure.expired =>
+        'Phòng đã hết thời gian nên không thể gia hạn.',
+      TempRoomExtensionFailure.limitReached =>
+        'Phòng đã dùng hết 2 lượt gia hạn.',
+      TempRoomExtensionFailure.roomUnavailable => 'Phòng không còn khả dụng.',
+      TempRoomExtensionFailure.unknown =>
+        'Chưa thể gia hạn lúc này. Vui lòng thử lại.',
+    };
+    Get.snackbar(
+      'Không thể gia hạn'.tr,
+      message.tr,
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(12),
+      maxWidth: 420,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
   Future<void> leaveRoom({required bool findNext}) async {
     await _finishWithoutMatch(reason: 'left', findNext: findNext);
   }
@@ -1126,6 +1176,9 @@ class VideoMatchingController extends GetxController {
     canCancel.value = false;
     searchElapsedSeconds.value = 0;
     roomRemainingSeconds.value = 8 * 60;
+    extensionCount.value = 0;
+    isExtendingRoom.value = false;
+    _observedExtensionCount = null;
     cameraUnlockRemainingSeconds.value = 90;
     cameraUnlocked.value = false;
     isMuted.value = false;
@@ -1202,6 +1255,29 @@ class VideoMatchingController extends GetxController {
           milliseconds <= 0 ? 0 : ((milliseconds + 999) ~/ 1000);
       cameraUnlocked.value = milliseconds <= 0;
     }
+  }
+
+  void _syncExtensionState(Map<String, dynamic> room) {
+    final rawCount = room['extensionCount'];
+    final count = rawCount is num ? rawCount.toInt() : 0;
+    final previousCount = _observedExtensionCount;
+    _observedExtensionCount = count;
+    extensionCount.value = count;
+
+    if (previousCount == null || count <= previousCount) return;
+
+    final extendedByMe = room['lastExtendedBy'] == uid;
+    Get.snackbar(
+      extendedByMe ? 'Gia hạn thành công'.tr : 'Phòng đã được gia hạn'.tr,
+      (extendedByMe
+              ? 'Bạn đã thêm 5 phút cho phòng.'
+              : 'Đối phương đã thêm 5 phút cho phòng.')
+          .tr,
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(12),
+      maxWidth: 420,
+      duration: const Duration(seconds: 3),
+    );
   }
 
   Future<void> _cancelRoomSubscriptions() async {

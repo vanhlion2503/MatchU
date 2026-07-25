@@ -169,6 +169,11 @@ class VideoMatchingService implements VideoMatchingRepository {
   }
 
   @override
+  Future<void> extendRoom(String roomId) {
+    return _tempChatService.extendRoom(roomId);
+  }
+
+  @override
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenCallSession(
     String callId,
   ) {

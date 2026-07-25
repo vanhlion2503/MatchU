@@ -105,6 +105,7 @@ const {
 const {
   startTempChatMatching,
   cancelTempChatMatching,
+  extendTempChatRoom,
   revokeVideoMatchingFaceProof,
   convertTempChat,
   expireTempChatSessions,
@@ -207,6 +208,7 @@ exports.progressLike5PostsComment5TimesOnComment =
 exports.moderateTempChatMessage = moderateTempChatMessage;
 exports.startTempChatMatching = startTempChatMatching;
 exports.cancelTempChatMatching = cancelTempChatMatching;
+exports.extendTempChatRoom = extendTempChatRoom;
 exports.revokeVideoMatchingFaceProof = revokeVideoMatchingFaceProof;
 exports.convertTempChat = convertTempChat;
 exports.expireTempChatSessions = expireTempChatSessions;

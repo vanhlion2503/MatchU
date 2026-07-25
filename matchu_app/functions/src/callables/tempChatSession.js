@@ -14,6 +14,10 @@ const MATCH_SCAN_LIMIT = 50;
 const MIN_TEMP_CHAT_REPUTATION = 80;
 const MIN_VIDEO_REPUTATION = 90;
 const VIDEO_MATCH_GEM_COST = 1;
+const ROOM_EXTENSION_GEM_COST = 1;
+const ROOM_EXTENSION_DURATION_MS = 5 * 60 * 1000;
+const ROOM_EXTENSION_WINDOW_MS = 60 * 1000;
+const MAX_ROOM_EXTENSIONS = 2;
 const INITIAL_GEM_BALANCE = 15;
 const VIDEO_MATCHING_FACE_PURPOSE = "video_matching";
 const VERIFIED_STATUSES = new Set([
@@ -119,6 +123,35 @@ function videoMatchChargeId(roomId, uid) {
 
 function videoMatchRefundId(roomId, uid) {
   return `video_match_refund_${roomId}_${uid}`;
+}
+
+function roomExtensionChargeId(roomId, extensionNumber) {
+  return `room_extension_${roomId}_${extensionNumber}`;
+}
+
+function roomExtensionFailureReason(roomData, uid, nowMillis) {
+  if (!roomData || roomData.status !== "active") return "room-not-active";
+  if (!Array.isArray(roomData.participants) ||
+      !roomData.participants.includes(uid)) {
+    return "not-participant";
+  }
+  if (roomData.userALiked === true && roomData.userBLiked === true) {
+    return "mutual-consent-complete";
+  }
+
+  const expiresAtMillis = roomData.expiresAt?.toMillis?.();
+  if (!Number.isFinite(expiresAtMillis)) return "invalid-expiry";
+
+  const remainingMs = expiresAtMillis - nowMillis;
+  if (remainingMs <= 0) return "room-expired";
+  if (remainingMs > ROOM_EXTENSION_WINDOW_MS) return "too-early";
+
+  const extensionCount = Number(roomData.extensionCount || 0);
+  if (!Number.isInteger(extensionCount) || extensionCount < 0 ||
+      extensionCount >= MAX_ROOM_EXTENSIONS) {
+    return "extension-limit-reached";
+  }
+  return null;
 }
 
 function faceProofFailureReason({
@@ -509,6 +542,7 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
           sessionB: candidate.sessionId,
           sessionIds: [seeker.sessionId, candidate.sessionId],
           status: "active",
+          extensionCount: 0,
           userALiked: null,
           userBLiked: null,
           permanentRoomId: null,
@@ -808,6 +842,100 @@ const cancelTempChatMatching = onCall(async (request) => {
   return { cancelled: true };
 });
 
+const extendTempChatRoom = onCall(async (request) => {
+  const uid = requireUid(request);
+  const roomId = cleanString(request.data?.roomId, 128);
+  if (!roomId) {
+    throw new HttpsError("invalid-argument", "roomId is required.");
+  }
+
+  const roomRef = db.collection("tempChats").doc(roomId);
+  const userRef = db.collection("users").doc(uid);
+
+  return db.runTransaction(async (tx) => {
+    const [roomSnap, userSnap] = await tx.getAll(roomRef, userRef);
+    if (!roomSnap.exists) {
+      throw new HttpsError("not-found", "Temp room not found.");
+    }
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found.");
+    }
+
+    const roomData = roomSnap.data() || {};
+    const nowMillis = Date.now();
+    const failureReason = roomExtensionFailureReason(
+      roomData,
+      uid,
+      nowMillis
+    );
+    if (failureReason) {
+      const code = failureReason === "not-participant"
+        ? "permission-denied"
+        : "failed-precondition";
+      throw new HttpsError(code, "Room cannot be extended.", {
+        reason: failureReason,
+        extensionCount: Number(roomData.extensionCount || 0),
+        maxExtensions: MAX_ROOM_EXTENSIONS,
+      });
+    }
+
+    const userData = userSnap.data() || {};
+    const balanceBefore = gemBalanceFrom(userData);
+    if (balanceBefore < ROOM_EXTENSION_GEM_COST) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Insufficient gem balance for room extension.",
+        {
+          reason: "insufficient-gem",
+          requiredGem: ROOM_EXTENSION_GEM_COST,
+          currentGem: balanceBefore,
+        }
+      );
+    }
+
+    const currentCount = Number(roomData.extensionCount || 0);
+    const extensionNumber = currentCount + 1;
+    const previousExpiresAtMillis = roomData.expiresAt.toMillis();
+    const nextExpiresAt = admin.firestore.Timestamp.fromMillis(
+      previousExpiresAtMillis + ROOM_EXTENSION_DURATION_MS
+    );
+    const extendedAt = admin.firestore.Timestamp.fromMillis(nowMillis);
+    const transactionRef = db.collection("gemTransactions")
+      .doc(roomExtensionChargeId(roomId, extensionNumber));
+
+    tx.update(roomRef, {
+      expiresAt: nextExpiresAt,
+      extensionCount: extensionNumber,
+      lastExtendedAt: extendedAt,
+      lastExtendedBy: uid,
+    });
+    tx.update(userRef, {
+      gem: balanceBefore - ROOM_EXTENSION_GEM_COST,
+    });
+    tx.create(transactionRef, {
+      uid,
+      roomId,
+      matchingMode: normalizeMatchingMode(roomData.matchingMode),
+      extensionNumber,
+      amount: -ROOM_EXTENSION_GEM_COST,
+      reason: "temp_room_extension",
+      status: "charged",
+      balanceBefore,
+      balanceAfter: balanceBefore - ROOM_EXTENSION_GEM_COST,
+      createdAt: extendedAt,
+    });
+
+    return {
+      success: true,
+      extensionCount: extensionNumber,
+      maxExtensions: MAX_ROOM_EXTENSIONS,
+      addedSeconds: ROOM_EXTENSION_DURATION_MS / 1000,
+      expiresAt: nextExpiresAt.toDate().toISOString(),
+      gemBalance: balanceBefore - ROOM_EXTENSION_GEM_COST,
+    };
+  });
+});
+
 const revokeVideoMatchingFaceProof = onCall(async (request) => {
   const uid = requireUid(request);
   const proofId = cleanString(request.data?.faceProofId, 256);
@@ -1028,6 +1156,7 @@ const cleanupExpiredTempChatPresence = onSchedule(
 module.exports = {
   startTempChatMatching,
   cancelTempChatMatching,
+  extendTempChatRoom,
   revokeVideoMatchingFaceProof,
   convertTempChat,
   expireTempChatSessions,
@@ -1049,6 +1178,8 @@ module.exports = {
     assertSufficientVideoGem,
     videoMatchChargeId,
     videoMatchRefundId,
+    roomExtensionChargeId,
+    roomExtensionFailureReason,
     faceProofFailureReason,
     isVerifiedAccount,
     bangkokDateKey,

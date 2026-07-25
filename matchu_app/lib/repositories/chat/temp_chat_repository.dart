@@ -23,6 +23,9 @@ abstract class TempChatRepository {
     required String reason,
   });
 
+  /// Charges one gem and adds five minutes when the room is in its last minute.
+  Future<void> extendRoom(String roomId);
+
   Future<String> convertToPermanent(String tempRoomId);
 
   Future<void> sendSystemMessage({

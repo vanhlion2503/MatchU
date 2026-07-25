@@ -48,6 +48,8 @@ abstract class VideoMatchingRepository {
     required String reason,
   });
 
+  Future<void> extendRoom(String roomId);
+
   Stream<DocumentSnapshot<Map<String, dynamic>>> listenCallSession(
     String callId,
   );

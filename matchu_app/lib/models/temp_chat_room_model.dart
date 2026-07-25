@@ -11,6 +11,8 @@ class TempChatRoomModel {
     this.userALiked,
     this.userBLiked,
     this.status = 'active',
+    this.extensionCount = 0,
+    this.lastExtendedBy,
     this.anonymousAvatars = const {},
     this.permanentRoomId,
   });
@@ -25,6 +27,8 @@ class TempChatRoomModel {
   final bool? userBLiked;
   final Map<String, String> anonymousAvatars;
   final String status;
+  final int extensionCount;
+  final String? lastExtendedBy;
   final String? permanentRoomId;
 
   Map<String, dynamic> toJson() => {
@@ -38,6 +42,8 @@ class TempChatRoomModel {
     'userBLiked': userBLiked,
     'anonymousAvatars': anonymousAvatars,
     'status': status,
+    'extensionCount': extensionCount,
+    'lastExtendedBy': lastExtendedBy,
     'permanentRoomId': permanentRoomId,
   };
 
@@ -59,6 +65,8 @@ class TempChatRoomModel {
       userALiked: json['userALiked'] as bool?,
       userBLiked: json['userBLiked'] as bool?,
       status: json['status']?.toString() ?? 'active',
+      extensionCount: (json['extensionCount'] as num?)?.toInt() ?? 0,
+      lastExtendedBy: json['lastExtendedBy']?.toString(),
       anonymousAvatars: Map<String, String>.from(
         json['anonymousAvatars'] ?? const {},
       ),

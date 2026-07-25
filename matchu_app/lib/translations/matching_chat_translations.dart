@@ -22,6 +22,31 @@ const matchingChatVietnameseTranslations = <String, String>{
   MatchingChatTranslationKeys.understood: 'Đã hiểu',
   MatchingChatTranslationKeys.notice: 'Thông báo',
   MatchingChatTranslationKeys.error: 'Lỗi',
+  'Thêm 5 phút?': 'Thêm 5 phút?',
+  'Chỉ cần một người gia hạn. Phòng sẽ có thêm 5 phút và người gia hạn trả 1 gem.':
+      'Chỉ cần một người gia hạn. Phòng sẽ có thêm 5 phút và người gia hạn trả 1 gem.',
+  'Để sau': 'Để sau',
+  'Dùng 1 gem': 'Dùng 1 gem',
+  'Lượt': 'Lượt',
+  'Sắp hết thời gian': 'Sắp hết thời gian',
+  'Gia hạn thêm 5 phút': 'Gia hạn thêm 5 phút',
+  'Gia hạn thành công': 'Gia hạn thành công',
+  'Phòng đã được gia hạn': 'Phòng đã được gia hạn',
+  'Bạn đã thêm 5 phút cho phòng.': 'Bạn đã thêm 5 phút cho phòng.',
+  'Đối phương đã thêm 5 phút cho phòng.':
+      'Đối phương đã thêm 5 phút cho phòng.',
+  'Không thể gia hạn': 'Không thể gia hạn',
+  'Bạn không đủ gem để gia hạn phòng.': 'Bạn không đủ gem để gia hạn phòng.',
+  'Gia hạn chỉ khả dụng khi phòng còn tối đa 1 phút.':
+      'Gia hạn chỉ khả dụng khi phòng còn tối đa 1 phút.',
+  'Phòng đã hết thời gian nên không thể gia hạn.':
+      'Phòng đã hết thời gian nên không thể gia hạn.',
+  'Phòng đã dùng hết 2 lượt gia hạn.': 'Phòng đã dùng hết 2 lượt gia hạn.',
+  'Phòng không còn khả dụng.': 'Phòng không còn khả dụng.',
+  'Chưa thể gia hạn lúc này. Vui lòng thử lại.':
+      'Chưa thể gia hạn lúc này. Vui lòng thử lại.',
+  'Phòng video ẩn danh • tối đa 2 lượt gia hạn':
+      'Phòng video ẩn danh • tối đa 2 lượt gia hạn',
   'Mất kết nối': 'Mất kết nối',
   'Đã mất mạng, quay về trang tìm chat': 'Đã mất mạng, quay về trang tìm chat',
   'Thiếu avatar ẩn danh': 'Thiếu avatar ẩn danh',
@@ -140,6 +165,32 @@ const matchingChatEnglishTranslations = <String, String>{
   MatchingChatTranslationKeys.understood: 'Got it',
   MatchingChatTranslationKeys.notice: 'Notice',
   MatchingChatTranslationKeys.error: 'Error',
+  'Thêm 5 phút?': 'Add 5 minutes?',
+  'Chỉ cần một người gia hạn. Phòng sẽ có thêm 5 phút và người gia hạn trả 1 gem.':
+      'Only one person needs to extend. The room gets 5 more minutes and that person pays 1 gem.',
+  'Để sau': 'Not now',
+  'Dùng 1 gem': 'Use 1 gem',
+  'Lượt': 'Extension',
+  'Sắp hết thời gian': 'Time is almost up',
+  'Gia hạn thêm 5 phút': 'Extend by 5 minutes',
+  'Gia hạn thành công': 'Extension successful',
+  'Phòng đã được gia hạn': 'Room extended',
+  'Bạn đã thêm 5 phút cho phòng.': 'You added 5 minutes to the room.',
+  'Đối phương đã thêm 5 phút cho phòng.':
+      'The other person added 5 minutes to the room.',
+  'Không thể gia hạn': 'Unable to extend',
+  'Bạn không đủ gem để gia hạn phòng.':
+      'You do not have enough gems to extend the room.',
+  'Gia hạn chỉ khả dụng khi phòng còn tối đa 1 phút.':
+      'Extension is available only in the final minute.',
+  'Phòng đã hết thời gian nên không thể gia hạn.':
+      'The room has expired and cannot be extended.',
+  'Phòng đã dùng hết 2 lượt gia hạn.': 'This room has used both extensions.',
+  'Phòng không còn khả dụng.': 'The room is no longer available.',
+  'Chưa thể gia hạn lúc này. Vui lòng thử lại.':
+      'Unable to extend right now. Please try again.',
+  'Phòng video ẩn danh • tối đa 2 lượt gia hạn':
+      'Anonymous video room • up to 2 extensions',
   'Mất kết nối': 'Connection lost',
   'Đã mất mạng, quay về trang tìm chat':
       'You are offline. Returning to chat matching.',

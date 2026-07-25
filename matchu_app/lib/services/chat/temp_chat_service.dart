@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
+import 'package:matchu_app/models/temp_room_extension.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/repositories/chat/temp_chat_repository.dart';
 
@@ -122,6 +123,16 @@ class TempChatService implements TempChatRepository {
       final participants = List<String>.from(room['participants'] ?? const []);
       if (!participants.contains(uid)) return;
 
+      // A timeout raced with a successful extension. Re-reading expiresAt in
+      // this transaction prevents the stale client clock from ending the room.
+      if (reason == 'timeout') {
+        final expiresAt = room['expiresAt'];
+        if (expiresAt is Timestamp &&
+            expiresAt.toDate().isAfter(DateTime.now())) {
+          return;
+        }
+      }
+
       final userA = room['userA'];
       final userB = room['userB'];
       if (userA is! String || userB is! String) return;
@@ -151,6 +162,36 @@ class TempChatService implements TempChatRepository {
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  @override
+  Future<void> extendRoom(String roomId) async {
+    try {
+      await _functions.httpsCallable('extendTempChatRoom').call({
+        'roomId': roomId,
+      });
+    } on FirebaseFunctionsException catch (error) {
+      final details =
+          error.details is Map
+              ? Map<String, dynamic>.from(error.details as Map)
+              : const <String, dynamic>{};
+      final reason = details['reason']?.toString();
+      final failure = switch (reason) {
+        'insufficient-gem' => TempRoomExtensionFailure.insufficientGem,
+        'too-early' => TempRoomExtensionFailure.tooEarly,
+        'room-expired' => TempRoomExtensionFailure.expired,
+        'extension-limit-reached' => TempRoomExtensionFailure.limitReached,
+        'room-not-active' ||
+        'not-participant' ||
+        'mutual-consent-complete' => TempRoomExtensionFailure.roomUnavailable,
+        _ => TempRoomExtensionFailure.unknown,
+      };
+      final rawGem = details['currentGem'];
+      throw TempRoomExtensionException(
+        failure,
+        currentGem: rawGem is num ? rawGem.toInt() : null,
+      );
+    }
   }
 
   @override

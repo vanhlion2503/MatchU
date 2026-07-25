@@ -8,6 +8,7 @@ import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/quick_message.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
+import 'package:matchu_app/models/temp_room_extension.dart';
 import 'package:matchu_app/models/word_chain.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
@@ -42,6 +43,8 @@ class TempChatController extends GetxController {
   final WordChainController? _wordChainController;
   final uid = Get.find<AuthController>().user!.uid;
   final remainingSeconds = 420.obs;
+  final extensionCount = 0.obs;
+  final isExtendingRoom = false.obs;
   final lifecycle = TempChatLifecycle.joining.obs;
   final userLiked = RxnBool();
   final otherLiked = RxnBool();
@@ -78,6 +81,7 @@ class TempChatController extends GetxController {
   bool _isNearMessageBottom = true;
   int? _lastHapticSecond;
   int _lastTimerSecond = 421;
+  int? _observedExtensionCount;
   bool _hasNavigatedToMatch = false;
   String? _otherUid;
 
@@ -90,6 +94,14 @@ class TempChatController extends GetxController {
   DateTime? _expiresAt;
   VoidCallback? onOtherLiked;
   final currentQuickMessages = <QuickMessage>[].obs;
+
+  bool get canExtendRoom => TempRoomExtensionPolicy.isAvailable(
+    remainingSeconds: remainingSeconds.value,
+    extensionCount: extensionCount.value,
+    isActive:
+        lifecycle.value == TempChatLifecycle.joining ||
+        lifecycle.value == TempChatLifecycle.active,
+  );
 
   final _introMessages = [
     QuickMessage(id: "vanTay", text: "👋", type: "emoji"),
@@ -434,6 +446,7 @@ class TempChatController extends GetxController {
       telepathy.syncRoomState(data);
       wordChain.syncRoomState(data);
       _syncServerExpiry(data);
+      _syncExtensionState(data);
       _roomStatusKnown = true;
       _roomIsActive = data["status"] == "active";
       lifecycle.value = switch (data["status"]?.toString()) {
@@ -730,6 +743,43 @@ class TempChatController extends GetxController {
     userLiked.value = value;
   }
 
+  Future<void> extendRoom() async {
+    if (!canExtendRoom || isExtendingRoom.value) return;
+    isExtendingRoom.value = true;
+    try {
+      await service.extendRoom(roomId);
+    } on TempRoomExtensionException catch (error) {
+      _showExtensionError(error.failure);
+    } catch (error) {
+      debugPrint('Temp chat extension failed for room $roomId: $error');
+      _showExtensionError(TempRoomExtensionFailure.unknown);
+    } finally {
+      isExtendingRoom.value = false;
+    }
+  }
+
+  void _showExtensionError(TempRoomExtensionFailure failure) {
+    final message = switch (failure) {
+      TempRoomExtensionFailure.insufficientGem =>
+        'Bạn không đủ gem để gia hạn phòng.',
+      TempRoomExtensionFailure.tooEarly =>
+        'Gia hạn chỉ khả dụng khi phòng còn tối đa 1 phút.',
+      TempRoomExtensionFailure.expired =>
+        'Phòng đã hết thời gian nên không thể gia hạn.',
+      TempRoomExtensionFailure.limitReached =>
+        'Phòng đã dùng hết 2 lượt gia hạn.',
+      TempRoomExtensionFailure.roomUnavailable => 'Phòng không còn khả dụng.',
+      TempRoomExtensionFailure.unknown =>
+        'Chưa thể gia hạn lúc này. Vui lòng thử lại.',
+    };
+    Get.snackbar(
+      MatchingChatTranslationKeys.notice.tr,
+      message.tr,
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
   Future<void> leaveByDislike() async {
     if (hasLeft.value) return;
     hasLeft.value = true;
@@ -888,6 +938,29 @@ class TempChatController extends GetxController {
     if (createdAt is Timestamp) {
       _expiresAt = createdAt.toDate().add(const Duration(minutes: 7));
     }
+  }
+
+  void _syncExtensionState(Map<String, dynamic> room) {
+    final rawCount = room['extensionCount'];
+    final count = rawCount is num ? rawCount.toInt() : 0;
+    final previousCount = _observedExtensionCount;
+    _observedExtensionCount = count;
+    extensionCount.value = count;
+
+    if (previousCount == null || count <= previousCount) return;
+
+    // Each extension creates a new final-minute warning window.
+    hasSent30sWarning.value = false;
+    final extendedByMe = room['lastExtendedBy'] == uid;
+    Get.snackbar(
+      extendedByMe ? 'Gia hạn thành công'.tr : 'Phòng đã được gia hạn'.tr,
+      (extendedByMe
+              ? 'Bạn đã thêm 5 phút cho phòng.'
+              : 'Đối phương đã thêm 5 phút cho phòng.')
+          .tr,
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
+    );
   }
 
   void markTelepathyAccepted() {

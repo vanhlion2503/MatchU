@@ -15,6 +15,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 import 'package:matchu_app/widgets/chat_rating_safety_notice.dart';
+import 'package:matchu_app/widgets/temp_room_extension_prompt.dart';
 import 'package:matchu_app/translations/chat_safety_translations.dart';
 
 class TempChatView extends StatefulWidget {
@@ -95,7 +96,7 @@ class _TempChatViewState extends State<TempChatView> {
           preferredSize: const Size.fromHeight(4), // chiều cao progress bar
           child: Obx(() {
             final sec = controller.remainingSeconds.value;
-            final total = 420.0;
+            final total = 420.0 + (controller.extensionCount.value * 5 * 60);
             final progress = (sec / total).clamp(0.0, 1.0);
             final isDanger = sec <= 30;
 
@@ -323,6 +324,19 @@ class _TempChatViewState extends State<TempChatView> {
                       );
                     }),
                     TelepathyPinnedBanner(controller: controller),
+                    Obx(() {
+                      if (!controller.canExtendRoom) {
+                        return const SizedBox.shrink();
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: TempRoomExtensionPrompt(
+                          extensionCount: controller.extensionCount.value,
+                          isLoading: controller.isExtendingRoom.value,
+                          onExtend: controller.extendRoom,
+                        ),
+                      );
+                    }),
                     Expanded(child: MessagesList(roomId, controller)),
                     BottomActionBar(controller),
                   ],

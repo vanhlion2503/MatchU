@@ -86,6 +86,58 @@ test("video gem transaction ids are deterministic per room and user", () => {
   );
 });
 
+test("room extension is available only in the last minute", () => {
+  const now = 1_000_000;
+  const room = {
+    status: "active",
+    participants: ["user-a", "user-b"],
+    extensionCount: 0,
+    expiresAt: { toMillis: () => now + 60_000 },
+  };
+
+  assert.equal(
+    __test.roomExtensionFailureReason(room, "user-a", now),
+    null
+  );
+  assert.equal(
+    __test.roomExtensionFailureReason({
+      ...room,
+      expiresAt: { toMillis: () => now + 60_001 },
+    }, "user-a", now),
+    "too-early"
+  );
+  assert.equal(
+    __test.roomExtensionFailureReason({
+      ...room,
+      expiresAt: { toMillis: () => now },
+    }, "user-a", now),
+    "room-expired"
+  );
+});
+
+test("room extension enforces participant and two-use limits", () => {
+  const now = 1_000_000;
+  const room = {
+    status: "active",
+    participants: ["user-a", "user-b"],
+    extensionCount: 2,
+    expiresAt: { toMillis: () => now + 30_000 },
+  };
+
+  assert.equal(
+    __test.roomExtensionFailureReason(room, "user-c", now),
+    "not-participant"
+  );
+  assert.equal(
+    __test.roomExtensionFailureReason(room, "user-a", now),
+    "extension-limit-reached"
+  );
+  assert.equal(
+    __test.roomExtensionChargeId("room-a", 2),
+    "room_extension_room-a_2"
+  );
+});
+
 test("video face admission requires enrollment and a fresh device-bound proof", () => {
   const nowMillis = Date.parse("2026-07-23T00:00:00.000Z");
   const validInput = {
