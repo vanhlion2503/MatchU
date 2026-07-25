@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/security/chat_passcode_security_controller.dart';
 import 'package:matchu_app/views/setting/chat_passcode/widgets/chat_pin_input.dart';
@@ -69,13 +68,39 @@ class _NewChatPasscodeViewState extends State<NewChatPasscodeView> {
               'có thể không khôi phục được trên thiết bị mới.',
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Hủy'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Tôi hiểu, tiếp tục'),
+              SizedBox(
+                width: double.infinity,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(dialogContext, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: const Text('Hủy', maxLines: 1, softWrap: false),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(dialogContext, true),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Tôi hiểu, tiếp tục',
+                            maxLines: 1,
+                            softWrap: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -93,16 +118,118 @@ class _NewChatPasscodeViewState extends State<NewChatPasscodeView> {
         title: 'Đã đặt lại mã PIN',
         message: 'Khóa khôi phục mới đã được tạo.',
       );
+    } else if (result == DestructiveResetResult.needsMfa) {
+      await _showMfaDialog();
     }
   }
 
-  Future<void> _completeMfa() async {
-    final completed = await controller.completeMfaReset(_otpController.text);
-    if (!completed || !mounted) return;
-    _finish(
-      title: 'Đã đặt lại mã PIN',
-      message: 'Khóa khôi phục mới đã được tạo.',
+  Future<void> _showMfaDialog() async {
+    _otpController.clear();
+    final completed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => Obx(
+            () => AlertDialog(
+              icon: const Icon(Icons.sms_outlined),
+              title: const Text('Xác nhận OTP'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Nhập mã đã gửi đến ${controller.mfaPhoneNumber}.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ChatPinInput(
+                    controller: _otpController,
+                    autofocus: true,
+                    enabled: !controller.isActionRunning.value,
+                    obscureText: false,
+                  ),
+                  if (controller.errorMessage.value.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      controller.errorMessage.value,
+                      style: TextStyle(
+                        color: Theme.of(dialogContext).colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed:
+                              controller.isActionRunning.value
+                                  ? null
+                                  : () => Navigator.pop(dialogContext, false),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: const Text(
+                            'Hủy',
+                            maxLines: 1,
+                            softWrap: false,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed:
+                              controller.isActionRunning.value
+                                  ? null
+                                  : () => _confirmMfaDialog(dialogContext),
+                          child:
+                              controller.isActionRunning.value
+                                  ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Xác nhận',
+                                      maxLines: 1,
+                                      softWrap: false,
+                                    ),
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
     );
+    if (!mounted) return;
+
+    if (completed == true) {
+      _finish(
+        title: 'Đã đặt lại mã PIN',
+        message: 'Khóa khôi phục mới đã được tạo.',
+      );
+    } else {
+      controller.cancelPendingMfa();
+    }
+  }
+
+  Future<void> _confirmMfaDialog(BuildContext dialogContext) async {
+    final completed = await controller.completeMfaReset(_otpController.text);
+    if (completed && dialogContext.mounted) {
+      Navigator.pop(dialogContext, true);
+    }
   }
 
   void _finish({required String title, required String message}) {
@@ -250,16 +377,6 @@ class _NewChatPasscodeViewState extends State<NewChatPasscodeView> {
                     : 'Xác thực và đặt lại PIN',
               ),
             ),
-            if (!isFaceRecovery && controller.isMfaPending.value) ...[
-              const SizedBox(height: 20),
-              _MfaCard(
-                phoneNumber: controller.mfaPhoneNumber,
-                otpController: _otpController,
-                isRunning: controller.isActionRunning.value,
-                onConfirm: _completeMfa,
-                onCancel: controller.cancelPendingMfa,
-              ),
-            ],
           ],
         ),
       ),
@@ -332,64 +449,6 @@ class _FieldLabel extends StatelessWidget {
       style: Theme.of(
         context,
       ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-    );
-  }
-}
-
-class _MfaCard extends StatelessWidget {
-  const _MfaCard({
-    required this.phoneNumber,
-    required this.otpController,
-    required this.isRunning,
-    required this.onConfirm,
-    required this.onCancel,
-  });
-
-  final String phoneNumber;
-  final TextEditingController otpController;
-  final bool isRunning;
-  final VoidCallback onConfirm;
-  final VoidCallback onCancel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Xác nhận OTP',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text('Nhập mã đã gửi đến $phoneNumber.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: otpController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Mã OTP',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: isRunning ? null : onConfirm,
-              child: const Text('Xác nhận và đặt lại'),
-            ),
-            TextButton(
-              onPressed: isRunning ? null : onCancel,
-              child: const Text('Hủy xác thực OTP'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
