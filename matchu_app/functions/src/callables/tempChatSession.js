@@ -3,6 +3,9 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 
 const { admin, db } = require("../shared/firebase");
+const {
+  isVideoMatchingFaceVerificationEnabled,
+} = require("../config/featureFlags");
 
 const QUEUE_COLLECTION = "tempChatMatchingQueue";
 const TEMP_CHAT_DURATION_MS = 7 * 60 * 1000;
@@ -202,6 +205,7 @@ async function readVideoFaceAdmission(tx, {
   nowMillis,
 }) {
   if (normalizeMatchingMode(matchingMode) !== "video") return null;
+  if (!isVideoMatchingFaceVerificationEnabled()) return null;
 
   const enrollmentRef = db.collection("faceEnrollments").doc(uid);
   const proofRef = proofId
@@ -581,14 +585,16 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
             createdAt,
             updatedAt: createdAt,
           });
-          tx.update(seekerFaceAdmission.proofRef, {
-            useCount: seekerFaceAdmission.useCount + 1,
-            lastUsedAt: createdAt,
-          });
-          tx.update(candidateFaceAdmission.proofRef, {
-            useCount: candidateFaceAdmission.useCount + 1,
-            lastUsedAt: createdAt,
-          });
+          if (seekerFaceAdmission && candidateFaceAdmission) {
+            tx.update(seekerFaceAdmission.proofRef, {
+              useCount: seekerFaceAdmission.useCount + 1,
+              lastUsedAt: createdAt,
+            });
+            tx.update(candidateFaceAdmission.proofRef, {
+              useCount: candidateFaceAdmission.useCount + 1,
+              lastUsedAt: createdAt,
+            });
+          }
         }
         tx.update(seekerRef, {
           status: "matched",
@@ -1181,6 +1187,7 @@ module.exports = {
     roomExtensionChargeId,
     roomExtensionFailureReason,
     faceProofFailureReason,
+    isVideoMatchingFaceVerificationEnabled,
     isVerifiedAccount,
     bangkokDateKey,
     quotaPatch,

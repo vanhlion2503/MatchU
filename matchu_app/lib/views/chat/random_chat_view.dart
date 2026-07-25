@@ -5,6 +5,7 @@ import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/config/app_feature_flags.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
@@ -469,7 +470,8 @@ class _RandomChatViewState extends State<RandomChatView>
     }
 
     VideoMatchingAccessProof? videoProof;
-    if (_selectedExperience == _MatchingExperience.video) {
+    if (_selectedExperience == _MatchingExperience.video &&
+        AppFeatureFlags.videoMatchingFaceVerificationEnabled) {
       videoProof = await videoAdmission.ensureProof();
       if (!mounted) return;
       if (videoProof == null) {
@@ -535,8 +537,10 @@ class _RandomChatViewState extends State<RandomChatView>
         arguments: {
           'targetGender': selectedTarget,
           'anonymousAvatar': anonAvatarC.selectedAvatar.value,
-          if (videoProof != null) 'faceProofId': videoProof.id,
-          if (videoProof != null) 'deviceId': videoProof.deviceId,
+          if (_selectedExperience == _MatchingExperience.video)
+            'faceProofId': videoProof?.id ?? '',
+          if (_selectedExperience == _MatchingExperience.video)
+            'deviceId': videoProof?.deviceId ?? '',
         },
       );
 

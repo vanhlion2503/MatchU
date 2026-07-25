@@ -181,6 +181,21 @@ test("video face admission requires enrollment and a fresh device-bound proof", 
   );
 });
 
+test("video face admission feature flag is secure by default", () => {
+  assert.equal(
+    __test.isVideoMatchingFaceVerificationEnabled(undefined),
+    true
+  );
+  assert.equal(
+    __test.isVideoMatchingFaceVerificationEnabled("true"),
+    true
+  );
+  assert.equal(
+    __test.isVideoMatchingFaceVerificationEnabled("false"),
+    false
+  );
+});
+
 test("legacy profiles without reputation retain the default score", () => {
   assert.equal(__test.reputationScoreFrom({}), 100);
   assert.equal(__test.hasSufficientMatchingReputation({}, "video"), true);
