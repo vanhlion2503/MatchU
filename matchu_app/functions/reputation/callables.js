@@ -8,6 +8,7 @@ const {
 const {
   DEFAULT_REPUTATION_TIMEZONE,
   REPUTATION_MAX_SCORE,
+  INITIAL_GEM_BALANCE,
   APP_USAGE_REWARD_INTERVAL_MINUTES,
   getTaskConfig,
 } = require("./taskConfig");
@@ -17,6 +18,7 @@ const {
   toMillis,
   clamp,
   getCurrentReputationScore,
+  allocateReputationReward,
   normalizeDailyDoc,
   buildDailyStatePayload,
   resolveTaskProgressCap,
@@ -41,6 +43,16 @@ const SESSION_END_SOURCES = new Set([
   "detached",
   "logout",
 ]);
+
+function getCurrentGemBalance(userData) {
+  const rawGem = userData?.gem;
+  if (rawGem == null || rawGem === "") return INITIAL_GEM_BALANCE;
+  return Math.max(0, toInt(rawGem, 0));
+}
+
+function buildReputationGemTransactionId({ uid, dateKey, claimId }) {
+  return `reputation_reward_${uid}_${dateKey}_${claimId}`;
+}
 
 function assertAuthenticated(request) {
   if (!request.auth?.uid) {
@@ -117,16 +129,21 @@ function taskHistoryTitle(taskId) {
 function buildEarnHistoryItem({ doc, dailyDoc }) {
   const data = doc.data() || {};
   const awarded = Math.max(0, toInt(data.awarded, 0));
-  if (awarded <= 0) return null;
+  const gemAwarded = Math.max(0, toInt(data.gemAwarded, 0));
+  if (awarded <= 0 && gemAwarded <= 0) return null;
 
   const taskId = typeof data.taskId === "string" ? data.taskId : "";
   return {
     id: `claim_${dailyDoc.id}_${doc.id}`,
-    type: "earn",
+    type: gemAwarded > 0 ? "gemConversion" : "earn",
     source: "reputationTask",
     title: taskHistoryTitle(taskId),
-    description: "Nhan diem tu nhiem vu uy tin",
+    description:
+      gemAwarded > 0
+        ? "Quy doi thuong uy tin sang gem"
+        : "Nhan diem tu nhiem vu uy tin",
     points: awarded,
+    gemAwarded,
     reason: typeof data.reason === "string" ? data.reason : null,
     taskId,
     reputationBefore: toInt(data.reputationBefore, 0),
@@ -668,6 +685,7 @@ const claimReputationTask = onCall(
     taskId,
     requested: 0,
     awarded: 0,
+    gemAwarded: 0,
     reason: "unknown",
     reputationBefore: REPUTATION_MAX_SCORE,
     reputationAfter: REPUTATION_MAX_SCORE,
@@ -718,6 +736,7 @@ const claimReputationTask = onCall(
       taskId,
       requested: requestedReward,
       awarded: 0,
+      gemAwarded: 0,
       reason: "unknown",
       reputationBefore,
       reputationAfter: reputationBefore,
@@ -744,6 +763,7 @@ const claimReputationTask = onCall(
         taskId,
         requested: Math.max(0, toInt(claimLog.requested, requestedReward)),
         awarded: Math.max(0, toInt(claimLog.awarded, 0)),
+        gemAwarded: Math.max(0, toInt(claimLog.gemAwarded, 0)),
         reason:
           typeof claimLog.reason === "string" && claimLog.reason.trim()
             ? claimLog.reason
@@ -818,42 +838,40 @@ const claimReputationTask = onCall(
       return;
     }
 
-    const remainingDaily = Math.max(0, daily.cap - daily.claimedPoints);
-    const remainingScore = Math.max(0, REPUTATION_MAX_SCORE - reputationBefore);
-    const awarded = Math.max(
-      0,
-      Math.min(requestedReward, remainingDaily, remainingScore)
-    );
-    const nextReputation = clamp(
-      reputationBefore + awarded,
-      0,
-      REPUTATION_MAX_SCORE
-    );
-    const nextTodayClaimed = daily.claimedPoints + awarded;
-
-    let reason = "claimed";
-    if (remainingScore <= 0) {
-      reason = "reputation_max_reached";
-    } else if (remainingDaily <= 0) {
-      reason = "daily_cap_reached";
-    }
+    const allocation = allocateReputationReward({
+      requestedReward,
+      reputationBefore,
+      todayClaimed: daily.claimedPoints,
+      dailyCap: daily.cap,
+    });
+    const awarded = allocation.reputationAwarded;
+    const gemAwarded = allocation.gemAwarded;
+    const nextReputation = allocation.reputationAfter;
+    const nextTodayClaimed = allocation.todayClaimedAfter;
+    const currentGem = getCurrentGemBalance(userData);
+    const nextGem = currentGem + gemAwarded;
+    const reason = allocation.reason;
 
     let nextTaskState;
     if (isRepeatableTask) {
-      const nextClaimedReward = Math.max(0, alreadyClaimedReward + awarded);
+      const nextClaimedReward = Math.max(
+        0,
+        alreadyClaimedReward + allocation.consumedReward
+      );
 
       nextTaskState = {
         ...task,
         progress: task.progress,
         claimed: false,
         claimedReward: nextClaimedReward,
-        claimedAt: awarded > 0 ? new Date() : task.claimedAt,
+        claimedAt:
+          allocation.consumedReward > 0 ? new Date() : task.claimedAt,
       };
     } else {
       nextTaskState = {
         ...task,
         claimed: true,
-        claimedReward: awarded,
+        claimedReward: allocation.consumedReward,
         claimedAt: new Date(),
       };
     }
@@ -887,6 +905,7 @@ const claimReputationTask = onCall(
         reputationTodayClaimed: nextTodayClaimed,
         reputationTodayCap: daily.cap,
         reputationLastClaimAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(gemAwarded > 0 ? { gem: nextGem } : {}),
       },
       { merge: true }
     );
@@ -896,6 +915,7 @@ const claimReputationTask = onCall(
       taskId,
       requested: requestedReward,
       awarded,
+      gemAwarded,
       reputationBefore,
       reputationAfter: nextReputation,
       todayClaimedBefore: claimResult.todayClaimedBefore,
@@ -904,10 +924,32 @@ const claimReputationTask = onCall(
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    if (gemAwarded > 0) {
+      const gemTransactionRef = db.collection("gemTransactions").doc(
+        buildReputationGemTransactionId({ uid, dateKey, claimId })
+      );
+      // create() makes the wallet audit idempotent even if a claim log is
+      // accidentally removed later; an existing transaction cannot be replaced.
+      tx.create(gemTransactionRef, {
+        uid,
+        amount: gemAwarded,
+        reason: "reputation_reward_conversion",
+        status: "completed",
+        taskId,
+        dateKey,
+        claimId,
+        reputationPointsConverted: gemAwarded,
+        balanceBefore: currentGem,
+        balanceAfter: nextGem,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
     claimResult = {
       taskId,
       requested: requestedReward,
       awarded,
+      gemAwarded,
       reason,
       reputationBefore,
       reputationAfter: nextReputation,

@@ -25,21 +25,16 @@ Widget buildPostEngagementTaskCard({
   final commentProgress = (commentItem?.progress ?? 0).clamp(0, commentTarget);
   final rewardTextValue =
       task == null ? 3 : (task.claimed ? task.claimedReward : task.reward);
+  final rewardUnit = hasReachedMax ? "Gem" : "Uy tín";
 
   final bool canClaim =
-      task != null &&
-      task.isCompleted &&
-      !task.claimed &&
-      !hasReachedMax &&
-      !isClaiming;
+      task != null && task.isCompleted && !task.claimed && !isClaiming;
 
   String buttonLabel;
   if (task == null) {
     buttonLabel = "Đang tải...";
   } else if (isClaiming) {
     buttonLabel = "Đang nhận...";
-  } else if (hasReachedMax) {
-    buttonLabel = "Đã đủ uy tín";
   } else if (task.claimed) {
     buttonLabel = "Đã nhận";
   } else if (!task.isCompleted) {
@@ -123,7 +118,7 @@ Widget buildPostEngagementTaskCard({
             ),
             const SizedBox(width: 12),
             Text(
-              "+$rewardTextValue Uy tín",
+              "+$rewardTextValue $rewardUnit",
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF0284C7),

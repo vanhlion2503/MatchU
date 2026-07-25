@@ -29,11 +29,8 @@ Widget buildReceivedFiveStarTaskCard({
     999,
   );
   final bool canClaim =
-      task != null &&
-      pendingReward > 0 &&
-      !hasReachedMax &&
-      canEarnMore &&
-      !isClaiming;
+      task != null && pendingReward > 0 && canEarnMore && !isClaiming;
+  final rewardUnit = hasReachedMax ? "Gem" : "Uy tín";
   final double progress = (safeProgress / 5).clamp(0.0, 1.0);
 
   final String subtitle =
@@ -46,8 +43,6 @@ Widget buildReceivedFiveStarTaskCard({
     buttonLabel = "Đang tải...";
   } else if (isClaiming) {
     buttonLabel = "Đang nhận...";
-  } else if (hasReachedMax) {
-    buttonLabel = "Đã đủ uy tín";
   } else if (!canEarnMore) {
     buttonLabel = "Đã hết";
   } else if (safeProgress > 0 && pendingReward <= 0) {
@@ -133,7 +128,9 @@ Widget buildReceivedFiveStarTaskCard({
             ),
             const SizedBox(width: 12),
             Text(
-              pendingReward > 0 ? "+$pendingReward Uy tín" : "+0 Uy tín",
+              pendingReward > 0
+                  ? "+$pendingReward $rewardUnit"
+                  : "+0 $rewardUnit",
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFFF97316),

@@ -150,6 +150,7 @@ class ReputationClaimResult {
   final String taskId;
   final int requested;
   final int awarded;
+  final int gemAwarded;
   final String reason;
   final int reputationBefore;
   final int reputationAfter;
@@ -160,6 +161,7 @@ class ReputationClaimResult {
     required this.taskId,
     required this.requested,
     required this.awarded,
+    required this.gemAwarded,
     required this.reason,
     required this.reputationBefore,
     required this.reputationAfter,
@@ -172,6 +174,7 @@ class ReputationClaimResult {
       taskId: (data["taskId"] ?? "").toString(),
       requested: _asInt(data["requested"], min: 0),
       awarded: _asInt(data["awarded"], min: 0),
+      gemAwarded: _asInt(data["gemAwarded"], min: 0),
       reason: (data["reason"] ?? "unknown").toString(),
       reputationBefore: _asInt(data["reputationBefore"], min: 0, max: 100),
       reputationAfter: _asInt(data["reputationAfter"], min: 0, max: 100),
@@ -195,6 +198,7 @@ class ReputationHistoryItem {
   final String title;
   final String description;
   final int points;
+  final int gemAwarded;
   final String? reason;
   final String? severity;
   final String? taskId;
@@ -209,6 +213,7 @@ class ReputationHistoryItem {
     required this.title,
     required this.description,
     required this.points,
+    required this.gemAwarded,
     required this.reason,
     required this.severity,
     required this.taskId,
@@ -225,6 +230,7 @@ class ReputationHistoryItem {
       title: (data["title"] ?? "Cập nhật uy tín").toString(),
       description: (data["description"] ?? "").toString(),
       points: _asInt(data["points"]),
+      gemAwarded: _asInt(data["gemAwarded"], min: 0),
       reason: _asNullableString(data["reason"]),
       severity: _asNullableString(data["severity"]),
       taskId: _asNullableString(data["taskId"]),

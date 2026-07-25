@@ -18,24 +18,19 @@ Widget buildQualifiedDailyPostTaskCard({
   );
 
   final bool canClaim =
-      task != null &&
-      task.isCompleted &&
-      !task.claimed &&
-      !hasReachedMax &&
-      !isClaiming;
+      task != null && task.isCompleted && !task.claimed && !isClaiming;
   final int safeTarget = (task?.target ?? 1) <= 0 ? 1 : (task?.target ?? 1);
   final int safeProgress = (task?.progress ?? 0).clamp(0, safeTarget);
   final double progress = (safeProgress / safeTarget).clamp(0.0, 1.0);
   final int rewardTextValue =
       task == null ? 1 : (task.claimed ? task.claimedReward : task.reward);
+  final rewardUnit = hasReachedMax ? "Gem" : "Uy tín";
 
   String buttonLabel;
   if (task == null) {
     buttonLabel = "Đang tải...";
   } else if (isClaiming) {
     buttonLabel = "Đang nhận...";
-  } else if (hasReachedMax) {
-    buttonLabel = "Đã đủ uy tín";
   } else if (task.claimed) {
     buttonLabel = "Đã nhận";
   } else if (!task.isCompleted) {
@@ -119,7 +114,7 @@ Widget buildQualifiedDailyPostTaskCard({
             ),
             const SizedBox(width: 12),
             Text(
-              "+$rewardTextValue Uy tín",
+              "+$rewardTextValue $rewardUnit",
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF8B5CF6),

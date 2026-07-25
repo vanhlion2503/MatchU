@@ -52,8 +52,12 @@ class ReputationController extends GetxController {
 
       final reason = response.claim.reason;
       final awarded = response.claim.awarded;
-      final title = awarded > 0 ? "Nhận điểm thành công" : "Đã xử lý claim";
-      final message = _reasonMessage(reason, awarded);
+      final gemAwarded = response.claim.gemAwarded;
+      final title =
+          awarded > 0 || gemAwarded > 0
+              ? "Nhận thưởng thành công"
+              : "Đã xử lý claim";
+      final message = _reasonMessage(reason, awarded, gemAwarded);
       Get.snackbar(title, message, snackPosition: SnackPosition.TOP);
     } catch (error) {
       final message = _toDisplayError(error);
@@ -85,10 +89,14 @@ class ReputationController extends GetxController {
     }
   }
 
-  String _reasonMessage(String reason, int awarded) {
+  String _reasonMessage(String reason, int awarded, int gemAwarded) {
     switch (reason) {
       case "claimed":
         return "Bạn vừa nhận +$awarded điểm uy tín.";
+      case "claimed_as_gem":
+        return "Uy tín đã đạt 100. Bạn vừa nhận +$gemAwarded gem.";
+      case "claimed_with_gem_conversion":
+        return "Bạn vừa nhận +$awarded uy tín và +$gemAwarded gem.";
       case "daily_cap_reached":
         return "Hôm nay đã hết giới hạn nhận điểm.";
       case "reputation_max_reached":

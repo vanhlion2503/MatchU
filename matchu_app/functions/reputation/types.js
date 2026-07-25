@@ -1,6 +1,7 @@
 const {
   REPUTATION_DAILY_CAP,
   REPUTATION_MAX_SCORE,
+  REPUTATION_POINTS_PER_GEM,
   REPUTATION_DAILY_TASK_CONFIG,
   buildDefaultTasksState,
 } = require("./taskConfig");
@@ -64,6 +65,60 @@ function getCurrentReputationScore(userData) {
 
   const score = Math.trunc(Math.min(...candidates));
   return clamp(score, 0, REPUTATION_MAX_SCORE);
+}
+
+function allocateReputationReward({
+  requestedReward,
+  reputationBefore,
+  todayClaimed,
+  dailyCap,
+}) {
+  const requested = Math.max(0, toInt(requestedReward, 0));
+  const safeReputation = clamp(
+    toInt(reputationBefore, REPUTATION_MAX_SCORE),
+    0,
+    REPUTATION_MAX_SCORE
+  );
+  const safeTodayClaimed = Math.max(0, toInt(todayClaimed, 0));
+  const safeDailyCap = Math.max(1, toInt(dailyCap, REPUTATION_DAILY_CAP));
+  const remainingDaily = Math.max(0, safeDailyCap - safeTodayClaimed);
+  const remainingScore = Math.max(0, REPUTATION_MAX_SCORE - safeReputation);
+
+  const reputationAwarded = Math.min(
+    requested,
+    remainingDaily,
+    remainingScore
+  );
+  const reputationAfter = safeReputation + reputationAwarded;
+
+  // Once the account reaches 100 reputation, every unconsumed reward point is
+  // converted 1:1 to gem. Gem conversion deliberately ignores the daily cap.
+  const convertiblePoints =
+    reputationAfter >= REPUTATION_MAX_SCORE
+      ? requested - reputationAwarded
+      : 0;
+  const gemAwarded = Math.floor(
+    convertiblePoints / REPUTATION_POINTS_PER_GEM
+  );
+
+  let reason = "claimed";
+  if (gemAwarded > 0 && reputationAwarded > 0) {
+    reason = "claimed_with_gem_conversion";
+  } else if (gemAwarded > 0) {
+    reason = "claimed_as_gem";
+  } else if (reputationAwarded <= 0 && remainingDaily <= 0) {
+    reason = "daily_cap_reached";
+  }
+
+  return {
+    requested,
+    reputationAwarded,
+    gemAwarded,
+    reputationAfter,
+    todayClaimedAfter: safeTodayClaimed + reputationAwarded,
+    consumedReward: reputationAwarded + convertiblePoints,
+    reason,
+  };
 }
 
 function resolveTaskProgressCap(taskConfig, target) {
@@ -203,7 +258,8 @@ function buildDailyStatePayload({ reputationScore, daily }) {
     reputationScore,
     reputationMax: REPUTATION_MAX_SCORE,
     canEarnMore:
-      reputationScore < REPUTATION_MAX_SCORE && daily.claimedPoints < daily.cap,
+      reputationScore >= REPUTATION_MAX_SCORE ||
+      daily.claimedPoints < daily.cap,
     tasks,
   };
 }
@@ -215,6 +271,7 @@ module.exports = {
   toBool,
   toMillis,
   getCurrentReputationScore,
+  allocateReputationReward,
   normalizeTaskState,
   normalizeTasks,
   normalizeRuntime,

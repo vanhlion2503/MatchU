@@ -94,7 +94,14 @@ class _HistoryTile extends StatelessWidget {
     final color =
         item.isPenalty ? theme.colorScheme.error : const Color(0xFF1E9E55);
     final bgColor = color.withValues(alpha: 0.1);
-    final pointsText = item.points > 0 ? "+${item.points}" : "${item.points}";
+    final pointsText =
+        item.gemAwarded > 0
+            ? item.points > 0
+                ? "+${item.points} uy tín, +${item.gemAwarded} gem"
+                : "+${item.gemAwarded} gem"
+            : item.points > 0
+            ? "+${item.points}"
+            : "${item.points}";
     final title = _displayTitle(item);
     final description = _displayDescription(item);
 
@@ -294,6 +301,10 @@ String _displayTitle(ReputationHistoryItem item) {
     }
   }
 
+  if (item.gemAwarded > 0) {
+    return "Thưởng nhiệm vụ uy tín";
+  }
+
   switch (item.taskId) {
     case "loginDaily":
       return "Đăng nhập hằng ngày";
@@ -329,6 +340,11 @@ String _displayDescription(ReputationHistoryItem item) {
   }
 
   if (!item.isPenalty) {
+    if (item.gemAwarded > 0) {
+      return item.points > 0
+          ? "Nhận ${item.points} uy tín và ${item.gemAwarded} gem."
+          : "Uy tín đã đạt 100, nhận ${item.gemAwarded} gem.";
+    }
     return "Nhận điểm từ nhiệm vụ uy tín.";
   }
 

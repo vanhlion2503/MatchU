@@ -18,11 +18,8 @@ Widget buildAppUsageTaskCard({
   );
 
   final bool canClaim =
-      task != null &&
-      task.isCompleted &&
-      !task.claimed &&
-      !hasReachedMax &&
-      !isClaiming;
+      task != null && task.isCompleted && !task.claimed && !isClaiming;
+  final rewardUnit = hasReachedMax ? "Gem" : "Uy tín";
   final int safeTarget = (task?.target ?? 15) <= 0 ? 15 : (task?.target ?? 15);
   final int safeProgress = (task?.progress ?? 0).clamp(0, safeTarget);
   final double progress = (safeProgress / safeTarget).clamp(0.0, 1.0);
@@ -36,8 +33,6 @@ Widget buildAppUsageTaskCard({
     buttonLabel = "Đang tải...";
   } else if (isClaiming) {
     buttonLabel = "Đang nhận...";
-  } else if (hasReachedMax) {
-    buttonLabel = "Đã đủ uy tín";
   } else if (task.claimed) {
     buttonLabel = "Đã nhận";
   } else if (!task.isCompleted) {
@@ -121,7 +116,7 @@ Widget buildAppUsageTaskCard({
             ),
             const SizedBox(width: 12),
             Text(
-              "+1 Uy tín",
+              "+1 $rewardUnit",
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF22C55E),

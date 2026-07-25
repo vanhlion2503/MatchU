@@ -18,11 +18,8 @@ Widget buildMutualLikeLongChatTaskCard({
   );
 
   final bool canClaim =
-      task != null &&
-      task.isCompleted &&
-      !task.claimed &&
-      !hasReachedMax &&
-      !isClaiming;
+      task != null && task.isCompleted && !task.claimed && !isClaiming;
+  final rewardUnit = hasReachedMax ? "Gem" : "Uy tín";
   final int safeTarget = (task?.target ?? 5) <= 0 ? 5 : (task?.target ?? 5);
   final int safeProgress = (task?.progress ?? 0).clamp(0, safeTarget);
   final double progress = (safeProgress / safeTarget).clamp(0.0, 1.0);
@@ -36,8 +33,6 @@ Widget buildMutualLikeLongChatTaskCard({
     buttonLabel = "Đang tải...";
   } else if (isClaiming) {
     buttonLabel = "Đang nhận...";
-  } else if (hasReachedMax) {
-    buttonLabel = "Đã đủ uy tín";
   } else if (task.claimed) {
     buttonLabel = "Đã nhận";
   } else if (!task.isCompleted) {
@@ -121,7 +116,7 @@ Widget buildMutualLikeLongChatTaskCard({
             ),
             const SizedBox(width: 12),
             Text(
-              "+3 Uy tín",
+              "+3 $rewardUnit",
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFFEF4444),

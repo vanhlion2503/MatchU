@@ -96,8 +96,7 @@ class ReputationView extends StatelessWidget {
         final hasReachedMax =
             dailyState?.hasReachedMax ?? (reputationScore >= 100);
         final canEarnMore =
-            dailyState?.canEarnMore ??
-            (!hasReachedMax && safeClaimed < safeCap);
+            dailyState?.canEarnMore ?? (hasReachedMax || safeClaimed < safeCap);
         final remainingToday = (safeCap - safeClaimed).clamp(0, safeCap);
 
         return SingleChildScrollView(
@@ -137,7 +136,9 @@ class ReputationView extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      "$remainingToday điểm còn lại",
+                      hasReachedMax
+                          ? "Thưởng nhiệm vụ được đổi sang gem"
+                          : "$remainingToday điểm còn lại",
                       style: textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
                         fontWeight: FontWeight.w700,
