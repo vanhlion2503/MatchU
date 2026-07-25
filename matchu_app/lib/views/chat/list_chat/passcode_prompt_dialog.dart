@@ -569,7 +569,7 @@ Future<bool> ensurePasscodeReady(
     if (result.action == PasscodePromptAction.reset) {
       if (!context.mounted) return false;
       if (shouldContinue != null && !shouldContinue()) return false;
-      final resetCompleted = await Get.toNamed<bool>(AppRouter.forgotChatPin);
+      final resetCompleted = await Get.toNamed(AppRouter.forgotChatPin);
       if (resetCompleted == true) {
         await onPasscodeReset?.call();
         return true;

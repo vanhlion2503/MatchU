@@ -33,6 +33,10 @@ class AppRouter {
   static const String chatPinSecurity = '/account-security/chat-pin';
   static const String changeChatPin = '/account-security/chat-pin/change';
   static const String forgotChatPin = '/account-security/chat-pin/recovery';
+  static const String recoverChatPin =
+      '/account-security/chat-pin/recovery/face';
+  static const String resetChatPin =
+      '/account-security/chat-pin/recovery/reset';
   static const String restrictionList = '/restriction-list';
   static const String followingListPrivacy = '/following-list-privacy';
   static const String privateAccount = '/private-account';

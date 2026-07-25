@@ -31,11 +31,6 @@ class ChatPasscodeSecurityView extends GetView<ChatPasscodeSecurityController> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
             children: [
-              _StatusCard(
-                configured: status.isConfigured,
-                unlockedOnDevice: status.isUnlockedOnDevice,
-              ),
-              const SizedBox(height: 20),
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: Column(
@@ -57,10 +52,8 @@ class ChatPasscodeSecurityView extends GetView<ChatPasscodeSecurityController> {
                       minTileHeight: 72,
                       leading: const Icon(Icons.lock_reset_outlined),
                       title: const Text('Quên hoặc đặt lại mã PIN'),
-                      subtitle: Text(
-                        status.canRecoverWithFace
-                            ? 'Có thể khôi phục lịch sử bằng khuôn mặt.'
-                            : 'Đặt lại có thể làm mất khả năng khôi phục lịch sử cũ.',
+                      subtitle: const Text(
+                        'Chọn khôi phục lịch sử hoặc tạo khóa khôi phục mới.',
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Get.toNamed(AppRouter.forgotChatPin),
@@ -73,65 +66,14 @@ class ChatPasscodeSecurityView extends GetView<ChatPasscodeSecurityController> {
                 const _InfoCard(
                   icon: Icons.info_outline,
                   text:
-                      'PIN sẽ được yêu cầu khi tính năng chat mã hóa tạo khóa khôi phục lần đầu.',
+                      'PIN sẽ được yêu cầu khi tính năng chat mã hóa tạo '
+                      'khóa khôi phục lần đầu.',
                 ),
               ],
             ],
           ),
         );
       }),
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.configured, required this.unlockedOnDevice});
-
-  final bool configured;
-  final bool unlockedOnDevice;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final active = configured && unlockedOnDevice;
-    return Card(
-      color: active ? colors.primaryContainer : colors.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: colors.surface.withValues(alpha: 0.75),
-              child: Icon(
-                active ? Icons.verified_user_outlined : Icons.shield_outlined,
-                color: active ? colors.primary : colors.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    configured ? 'PIN đã được thiết lập' : 'Chưa thiết lập PIN',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    active
-                        ? 'Khóa khôi phục đang sẵn sàng trên thiết bị này.'
-                        : configured
-                        ? 'Thiết bị này cần mở khóa PIN để truy cập lịch sử.'
-                        : 'PIN bảo vệ khóa dùng để khôi phục tin nhắn mã hóa.',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

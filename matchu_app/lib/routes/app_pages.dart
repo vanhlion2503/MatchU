@@ -52,6 +52,7 @@ import 'package:matchu_app/views/setting/account_security_hub_view.dart';
 import 'package:matchu_app/views/setting/chat_passcode/chat_passcode_security_view.dart';
 import 'package:matchu_app/views/setting/chat_passcode/change_chat_passcode_view.dart';
 import 'package:matchu_app/views/setting/chat_passcode/forgot_chat_passcode_view.dart';
+import 'package:matchu_app/views/setting/chat_passcode/new_chat_passcode_view.dart';
 import 'package:matchu_app/views/setting/restriction_list_view.dart';
 import 'package:matchu_app/views/setting/following_list_privacy_view.dart';
 import 'package:matchu_app/views/setting/private_account_view.dart';
@@ -252,6 +253,24 @@ class AppPages {
     GetPage(
       name: AppRouter.forgotChatPin,
       page: () => const ForgotChatPasscodeView(),
+      binding: ChatPasscodeSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.recoverChatPin,
+      page:
+          () => const NewChatPasscodeView(
+            mode: ChatPasscodeRecoveryMode.faceRecovery,
+          ),
+      binding: ChatPasscodeSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.resetChatPin,
+      page:
+          () => const NewChatPasscodeView(
+            mode: ChatPasscodeRecoveryMode.destructiveReset,
+          ),
       binding: ChatPasscodeSecurityBinding(),
       transition: Transition.cupertino,
     ),
