@@ -14,7 +14,8 @@ class TelepathyPinnedBanner extends StatelessWidget {
     final telepathy = controller.telepathy;
 
     return Obx(() {
-      if (telepathy.status.value != TelepathyStatus.finished) {
+      if (telepathy.status.value != TelepathyStatus.finished ||
+          !telepathy.showPinnedResult.value) {
         return const SizedBox.shrink();
       }
 
@@ -33,8 +34,8 @@ class TelepathyPinnedBanner extends StatelessWidget {
             BoxShadow(
               color:
                   theme.brightness == Brightness.dark
-                      ? Colors.black.withOpacity(0.30)
-                      : Colors.black.withOpacity(0.06),
+                      ? Colors.black.withValues(alpha: 0.30)
+                      : Colors.black.withValues(alpha: 0.06),
               blurRadius: 14,
               offset: const Offset(0, -6),
             ),
@@ -43,8 +44,8 @@ class TelepathyPinnedBanner extends StatelessWidget {
             BoxShadow(
               color:
                   theme.brightness == Brightness.dark
-                      ? Colors.black.withOpacity(0.35)
-                      : Colors.black.withOpacity(0.10),
+                      ? Colors.black.withValues(alpha: 0.35)
+                      : Colors.black.withValues(alpha: 0.10),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -56,7 +57,7 @@ class TelepathyPinnedBanner extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.12),
+                color: theme.colorScheme.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -89,6 +90,16 @@ class TelepathyPinnedBanner extends StatelessWidget {
             TextButton(
               onPressed: () => telepathy.showResultOverlay.value = true,
               child: const Text("Xem chi tiết"),
+            ),
+            IconButton(
+              tooltip: 'Ẩn kết quả',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => telepathy.showPinnedResult.value = false,
+              icon: Icon(
+                Icons.close_rounded,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

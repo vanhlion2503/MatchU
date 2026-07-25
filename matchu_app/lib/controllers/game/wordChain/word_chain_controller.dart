@@ -46,6 +46,7 @@ class WordChainController extends GetxController {
   final invitedAt = Rxn<DateTime>();
   final submittingAction = Rxn<WordChainSubmitAction>();
   final opponentJustAccepted = false.obs;
+  final suggestionsDisabled = false.obs;
 
   // ===== REWARD PHASE =====
   final rewardPhase = WordChainRewardPhase.idle.obs;
@@ -127,6 +128,7 @@ class WordChainController extends GetxController {
     final game = Map<String, dynamic>.from(rawGame);
     final nextStatus = _parseStatus(game["status"]);
     status.value = nextStatus;
+    suggestionsDisabled.value = game["suggestionsDisabled"] == true;
 
     if (nextStatus != WordChainStatus.inviting) {
       submittingAction.value = null;
@@ -317,14 +319,27 @@ class WordChainController extends GetxController {
     await service.invite(roomId);
   }
 
-  Future<void> respond(bool accept) async {
+  Future<void> respond(
+    bool accept, {
+    bool disableFutureSuggestions = false,
+  }) async {
     final action =
         accept ? WordChainSubmitAction.accept : WordChainSubmitAction.decline;
 
     if (submittingAction.value != null) return;
     submittingAction.value = action;
 
-    await service.respond(roomId: roomId, uid: uid, accept: accept);
+    try {
+      await service.respond(
+        roomId: roomId,
+        uid: uid,
+        accept: accept,
+        disableFutureSuggestions: !accept && disableFutureSuggestions,
+      );
+    } catch (_) {
+      submittingAction.value = null;
+      rethrow;
+    }
   }
 
   Future<void> exitGame() async {
@@ -594,6 +609,7 @@ class WordChainController extends GetxController {
     invitedAt.value = null;
     submittingAction.value = null;
     opponentJustAccepted.value = false;
+    suggestionsDisabled.value = false;
     rewardPhase.value = WordChainRewardPhase.idle;
     rewardQuestion.value = '';
     rewardQuestionPresetId.value = null;

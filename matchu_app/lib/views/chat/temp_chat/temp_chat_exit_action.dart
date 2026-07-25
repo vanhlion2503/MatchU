@@ -35,9 +35,18 @@ Future<void> confirmTempChatExit(
 
 /// Exit affordance displayed above a full-screen temp-chat game.
 class TempChatGameExitButton extends StatefulWidget {
-  const TempChatGameExitButton({super.key, required this.onExit});
+  const TempChatGameExitButton({
+    super.key,
+    required this.onExit,
+    this.backgroundColor,
+    this.dimension = 44,
+    this.iconSize = 23,
+  });
 
   final Future<void> Function() onExit;
+  final Color? backgroundColor;
+  final double dimension;
+  final double iconSize;
 
   @override
   State<TempChatGameExitButton> createState() => _TempChatGameExitButtonState();
@@ -96,19 +105,29 @@ class _TempChatGameExitButtonState extends State<TempChatGameExitButton> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final backgroundColor = widget.backgroundColor;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.surface.withValues(alpha: 0.96),
-            scheme.surfaceContainerHighest.withValues(alpha: 0.88),
-          ],
+        color: backgroundColor,
+        gradient:
+            backgroundColor == null
+                ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.surface.withValues(alpha: 0.96),
+                    scheme.surfaceContainerHighest.withValues(alpha: 0.88),
+                  ],
+                )
+                : null,
+        border: Border.all(
+          color:
+              backgroundColor == null
+                  ? scheme.error.withValues(alpha: 0.28)
+                  : Colors.white.withValues(alpha: 0.14),
         ),
-        border: Border.all(color: scheme.error.withValues(alpha: 0.28)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -122,7 +141,7 @@ class _TempChatGameExitButtonState extends State<TempChatGameExitButton> {
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: SizedBox.square(
-          dimension: 44,
+          dimension: widget.dimension,
           child: IconButton(
             tooltip: 'Thoát trò chơi'.tr,
             onPressed: _showingConfirmation ? null : _onPressed,
@@ -135,7 +154,12 @@ class _TempChatGameExitButtonState extends State<TempChatGameExitButton> {
                         color: scheme.error,
                       ),
                     )
-                    : Icon(Icons.close_rounded, size: 23, color: scheme.error),
+                    : Icon(
+                      Icons.close_rounded,
+                      size: widget.iconSize,
+                      color:
+                          backgroundColor == null ? scheme.error : Colors.white,
+                    ),
           ),
         ),
       ),

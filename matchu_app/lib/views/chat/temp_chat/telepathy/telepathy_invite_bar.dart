@@ -10,15 +10,42 @@ const _brandGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-class TelepathyInviteBar extends StatelessWidget {
+class TelepathyInviteBar extends StatefulWidget {
   final TempChatController controller;
 
   const TelepathyInviteBar({super.key, required this.controller});
 
   @override
+  State<TelepathyInviteBar> createState() => _TelepathyInviteBarState();
+}
+
+class _TelepathyInviteBarState extends State<TelepathyInviteBar> {
+  bool _disableFutureSuggestions = false;
+  Worker? _invitationWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    _invitationWorker = ever<TelepathyStatus>(
+      widget.controller.telepathy.status,
+      (status) {
+        if (status == TelepathyStatus.inviting && mounted) {
+          setState(() => _disableFutureSuggestions = false);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _invitationWorker?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final telepathy = controller.telepathy;
+    final telepathy = widget.controller.telepathy;
 
     return Obx(() {
       final submitting = telepathy.submittingAction.value;
@@ -42,7 +69,7 @@ class TelepathyInviteBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.14),
+              color: Colors.black.withValues(alpha: 0.14),
               blurRadius: 22,
               offset: const Offset(0, 10),
             ),
@@ -92,6 +119,22 @@ class TelepathyInviteBar extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
+            CheckboxListTile(
+              value: _disableFutureSuggestions,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Không hiện lại nữa'),
+              onChanged:
+                  submitting == null
+                      ? (value) {
+                        setState(
+                          () => _disableFutureSuggestions = value ?? false,
+                        );
+                      }
+                      : null,
+            ),
+            const SizedBox(height: 8),
 
             // 🔥 USER B: ĐỐI PHƯƠNG ĐÃ ĐỒNG Ý
             if (!waiting && otherAccepted)
@@ -105,7 +148,7 @@ class TelepathyInviteBar extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.08),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -163,7 +206,11 @@ class TelepathyInviteBar extends StatelessWidget {
                     loading: loadingDecline,
                     onTap:
                         submitting == null
-                            ? () => telepathy.respond(false)
+                            ? () => telepathy.respond(
+                              false,
+                              disableFutureSuggestions:
+                                  _disableFutureSuggestions,
+                            )
                             : null,
                   ),
                 ],
@@ -178,7 +225,11 @@ class TelepathyInviteBar extends StatelessWidget {
                       loading: loadingDecline,
                       onTap:
                           submitting == null
-                              ? () => telepathy.respond(false)
+                              ? () => telepathy.respond(
+                                false,
+                                disableFutureSuggestions:
+                                    _disableFutureSuggestions,
+                              )
                               : null,
                     ),
                   ),

@@ -47,6 +47,8 @@ class TelepathyController extends GetxController {
   final cancelledBy = RxnString();
   final result = Rxn<TelepathyResult>();
   final showResultOverlay = false.obs;
+  final showPinnedResult = false.obs;
+  final suggestionsDisabled = false.obs;
   final submittingAction = Rxn<TelepathySubmitAction>();
   final opponentJustAccepted = false.obs;
   final aiInsightText = RxnString();
@@ -123,6 +125,7 @@ class TelepathyController extends GetxController {
   void _syncGameState(Map<String, dynamic> game) {
     final nextStatus = _parseStatus(game["status"]);
     status.value = nextStatus;
+    suggestionsDisabled.value = game["suggestionsDisabled"] == true;
 
     if (nextStatus != TelepathyStatus.inviting) {
       submittingAction.value = null;
@@ -222,6 +225,7 @@ class TelepathyController extends GetxController {
     final finishedAt = _parseTimestamp(game["finishedAt"]);
     if (finishedAt != null && finishedAt != _lastFinishedAt) {
       showResultOverlay.value = true;
+      showPinnedResult.value = true;
       _lastFinishedAt = finishedAt;
     }
 
@@ -262,6 +266,8 @@ class TelepathyController extends GetxController {
     cancelledBy.value = null;
     result.value = null;
     showResultOverlay.value = false;
+    showPinnedResult.value = false;
+    suggestionsDisabled.value = false;
     submittingAction.value = null;
     opponentJustAccepted.value = false;
     aiInsightText.value = null;
@@ -406,7 +412,10 @@ class TelepathyController extends GetxController {
     await _service.invite(roomId);
   }
 
-  Future<void> respond(bool accept) async {
+  Future<void> respond(
+    bool accept, {
+    bool disableFutureSuggestions = false,
+  }) async {
     final action =
         accept ? TelepathySubmitAction.accept : TelepathySubmitAction.decline;
 
@@ -415,9 +424,14 @@ class TelepathyController extends GetxController {
     submittingAction.value = action;
 
     try {
-      await _service.respond(roomId: roomId, uid: uid, accept: accept);
+      await _service.respond(
+        roomId: roomId,
+        uid: uid,
+        accept: accept,
+        disableFutureSuggestions: !accept && disableFutureSuggestions,
+      );
 
-      if (!accept) {
+      if (!accept && !disableFutureSuggestions) {
         await _sendDeclineMessage();
       }
     } catch (_) {

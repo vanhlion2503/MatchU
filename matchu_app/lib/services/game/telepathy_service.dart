@@ -97,9 +97,12 @@ class TelepathyService {
       final data = snap.data() ?? const <String, dynamic>{};
       final game = data['minigame'];
       final status = game is Map ? game['status'] : null;
+      final suggestionsDisabled =
+          game is Map && game['suggestionsDisabled'] == true;
 
       if (status == 'inviting') return;
       if (status == 'playing' || status == 'countdown') return;
+      if (suggestionsDisabled) return;
 
       tx.update(ref, {
         'minigame.type': 'telepathy',
@@ -125,6 +128,7 @@ class TelepathyService {
     required String roomId,
     required String uid,
     required bool accept,
+    bool disableFutureSuggestions = false,
   }) async {
     final ref = _roomRef(roomId);
 
@@ -138,11 +142,36 @@ class TelepathyService {
       if (status != 'inviting') return;
 
       if (!accept) {
-        tx.update(ref, {
+        final updates = <String, dynamic>{
           'minigame.status': 'cancelled',
           'minigame.cancelledBy': uid,
           'minigame.cancelledAt': FieldValue.serverTimestamp(),
-        });
+        };
+
+        if (disableFutureSuggestions) {
+          final otherUid =
+              _participants(data).where((id) => id != uid).firstOrNull;
+          updates.addAll({
+            'minigame.suggestionsDisabled': true,
+            'minigame.suggestionsDisabledBy': uid,
+            'minigame.suggestionsDisabledAt': FieldValue.serverTimestamp(),
+          });
+
+          if (otherUid != null) {
+            tx.set(ref.collection('messages').doc(), {
+              'type': 'system',
+              'systemCode': 'telepathy_suggestions_disabled',
+              'text':
+                  'Đối phương đã chọn không nhận thêm đề xuất Thần giao cách cảm trong cuộc trò chuyện này.',
+              'senderId': uid,
+              'targetUid': otherUid,
+              ..._approvedSystemFields,
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        tx.update(ref, updates);
         return;
       }
 

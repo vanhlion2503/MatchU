@@ -250,6 +250,12 @@ class _MessagesListState extends State<MessagesList> {
                 return const SizedBox();
               }
 
+              if ((code == "telepathy_suggestions_disabled" ||
+                      code == "word_chain_suggestions_disabled") &&
+                  targetUid != uid) {
+                return const SizedBox();
+              }
+
               if (code == "ended" && senderId == uid) {
                 return const SizedBox();
               }
@@ -259,6 +265,11 @@ class _MessagesListState extends State<MessagesList> {
               }
 
               if (code == "telepathy_game_exit") {
+                _showSystemSnackbarOnce(doc.id, data["text"] ?? "");
+              }
+
+              if (code == "telepathy_suggestions_disabled" ||
+                  code == "word_chain_suggestions_disabled") {
                 _showSystemSnackbarOnce(doc.id, data["text"] ?? "");
               }
 
@@ -275,7 +286,9 @@ class _MessagesListState extends State<MessagesList> {
               Color? textColor;
 
               if (code == "telepathy_cancelled" ||
-                  code == "telepathy_game_exit") {
+                  code == "telepathy_game_exit" ||
+                  code == "telepathy_suggestions_disabled" ||
+                  code == "word_chain_suggestions_disabled") {
                 backgroundColor = theme.colorScheme.surfaceContainerHighest;
                 textColor = theme.colorScheme.onSurfaceVariant;
               } else if (code == "telepathy_hook") {

@@ -11,15 +11,42 @@ const _chainGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-class WordChainInviteBar extends StatelessWidget {
+class WordChainInviteBar extends StatefulWidget {
   final TempChatController controller;
 
   const WordChainInviteBar({super.key, required this.controller});
 
   @override
+  State<WordChainInviteBar> createState() => _WordChainInviteBarState();
+}
+
+class _WordChainInviteBarState extends State<WordChainInviteBar> {
+  bool _disableFutureSuggestions = false;
+  Worker? _invitationWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    _invitationWorker = ever<WordChainStatus>(
+      widget.controller.wordChain.status,
+      (status) {
+        if (status == WordChainStatus.inviting && mounted) {
+          setState(() => _disableFutureSuggestions = false);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _invitationWorker?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final wordChain = controller.wordChain;
+    final wordChain = widget.controller.wordChain;
 
     return Obx(() {
       final submitting = wordChain.submittingAction.value;
@@ -42,7 +69,7 @@ class WordChainInviteBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.14),
+              color: Colors.black.withValues(alpha: 0.14),
               blurRadius: 22,
               offset: const Offset(0, 10),
             ),
@@ -88,6 +115,22 @@ class WordChainInviteBar extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
+            CheckboxListTile(
+              value: _disableFutureSuggestions,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Không hiện lại nữa'),
+              onChanged:
+                  submitting == null
+                      ? (value) {
+                        setState(
+                          () => _disableFutureSuggestions = value ?? false,
+                        );
+                      }
+                      : null,
+            ),
+            const SizedBox(height: 8),
 
             if (!waiting && otherAccepted)
               Obx(() {
@@ -100,7 +143,7 @@ class WordChainInviteBar extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.08),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
@@ -159,7 +202,11 @@ class WordChainInviteBar extends StatelessWidget {
                     loading: loadingDecline,
                     onTap:
                         submitting == null
-                            ? () => wordChain.respond(false)
+                            ? () => wordChain.respond(
+                              false,
+                              disableFutureSuggestions:
+                                  _disableFutureSuggestions,
+                            )
                             : null,
                   ),
                 ],
@@ -174,7 +221,11 @@ class WordChainInviteBar extends StatelessWidget {
                       loading: loadingDecline,
                       onTap:
                           submitting == null
-                              ? () => wordChain.respond(false)
+                              ? () => wordChain.respond(
+                                false,
+                                disableFutureSuggestions:
+                                    _disableFutureSuggestions,
+                              )
                               : null,
                     ),
                   ),

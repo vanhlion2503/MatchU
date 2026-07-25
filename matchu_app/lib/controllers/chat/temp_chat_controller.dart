@@ -322,7 +322,7 @@ class TempChatController extends GetxController {
     if (_processingTimerEvents || !_roomIsActive) return;
     _processingTimerEvents = true;
     try {
-      if (!_telepathyAccepted) {
+      if (!_telepathyAccepted && !telepathy.suggestionsDisabled.value) {
         final crossedMoments =
             _telepathyInviteMoments
                 .where(
@@ -376,6 +376,8 @@ class TempChatController extends GetxController {
   }
 
   bool get canInviteWordChain {
+    if (wordChain.suggestionsDisabled.value) return false;
+
     final chainStatus = wordChain.status.value;
     if (chainStatus == WordChainStatus.inviting ||
         chainStatus == WordChainStatus.countdown ||

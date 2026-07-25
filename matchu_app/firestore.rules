@@ -1284,6 +1284,21 @@ service cloud.firestore {
           && request.auth.uid in resource.data.participants;
       }
 
+      function hasValidSuggestionPreference(game) {
+        return (
+            !game.keys().hasAny(["suggestionsDisabled"])
+            || game.suggestionsDisabled is bool
+          )
+          && (
+            !game.keys().hasAny(["suggestionsDisabledBy"])
+            || game.suggestionsDisabledBy is string
+          )
+          && (
+            !game.keys().hasAny(["suggestionsDisabledAt"])
+            || game.suggestionsDisabledAt is timestamp
+          );
+      }
+
       function isValidMinigame() {
         return request.resource.data.minigame is map
           && request.resource.data.minigame.type == "telepathy"
@@ -1303,8 +1318,12 @@ service cloud.firestore {
             "currentQuestionIndex",
             "questionStartedAt",
             "startedAt",
-            "countdownStartedAt"
-          ]);
+            "countdownStartedAt",
+            "suggestionsDisabled",
+            "suggestionsDisabledBy",
+            "suggestionsDisabledAt"
+          ])
+          && hasValidSuggestionPreference(request.resource.data.minigame);
       }
 
       function isValidWordChainReward() {
@@ -1419,7 +1438,10 @@ service cloud.firestore {
             "reward",
             "updatedAt",
             "pendingWord",
-            "invalidReason"
+            "invalidReason",
+            "suggestionsDisabled",
+            "suggestionsDisabledBy",
+            "suggestionsDisabledAt"
           ])
           && request.resource.data.minigames.wordChain.status is string
           && request.resource.data.minigames.wordChain.currentWord is string
@@ -1435,7 +1457,10 @@ service cloud.firestore {
           )
           && isValidWordChainReward()
           && isValidWordChainPendingWord()
-          && isValidWordChainInvalidReason();
+          && isValidWordChainInvalidReason()
+          && hasValidSuggestionPreference(
+            request.resource.data.minigames.wordChain
+          );
       }
 
       function onlyUpdateMyAvatar() {

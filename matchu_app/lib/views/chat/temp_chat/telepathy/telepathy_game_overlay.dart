@@ -210,6 +210,9 @@ class _TelepathyGameOverlayState extends State<TelepathyGameOverlay>
                   padding: const EdgeInsets.all(12),
                   child: TempChatGameExitButton(
                     onExit: widget.controller.telepathy.exitGame,
+                    backgroundColor: const Color(0xFF131220),
+                    dimension: 38,
+                    iconSize: 20,
                   ),
                 ),
               ),

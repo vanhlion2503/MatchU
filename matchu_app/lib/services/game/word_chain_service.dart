@@ -97,10 +97,13 @@ class WordChainService {
       final data = snap.data();
       final game = data?["minigames"]?["wordChain"];
       final status = game is Map ? game["status"] : null;
+      final suggestionsDisabled =
+          game is Map && game["suggestionsDisabled"] == true;
 
       if (status == "inviting" || status == "playing" || status == "reward") {
         return;
       }
+      if (suggestionsDisabled) return;
 
       final participants = List<String>.from(data?["participants"] ?? []);
       if (participants.length < 2) return;
@@ -132,6 +135,7 @@ class WordChainService {
     required String roomId,
     required String uid,
     required bool accept,
+    bool disableFutureSuggestions = false,
   }) async {
     final ref = _roomRef(roomId);
 
@@ -145,14 +149,46 @@ class WordChainService {
       if (status != "inviting") return;
 
       if (!accept) {
-        tx.update(ref, {
+        final updates = <String, dynamic>{
           "minigames.wordChain.status": "idle",
           "minigames.wordChain.consent": {},
           "minigames.wordChain.countdownStartedAt": FieldValue.delete(),
           "minigames.wordChain.reward": FieldValue.delete(),
           "minigames.wordChain.cancelledBy": uid,
           "minigames.wordChain.cancelledAt": FieldValue.serverTimestamp(),
-        });
+        };
+
+        if (disableFutureSuggestions) {
+          final participants = List<String>.from(
+            data?["participants"] ?? const [],
+          );
+          final otherUid = participants.where((id) => id != uid).firstOrNull;
+          updates.addAll({
+            "minigames.wordChain.suggestionsDisabled": true,
+            "minigames.wordChain.suggestionsDisabledBy": uid,
+            "minigames.wordChain.suggestionsDisabledAt":
+                FieldValue.serverTimestamp(),
+          });
+
+          if (otherUid != null) {
+            tx.set(ref.collection("messages").doc(), {
+              "type": "system",
+              "systemCode": "word_chain_suggestions_disabled",
+              "text":
+                  "Đối phương đã chọn không nhận thêm đề xuất Nối từ trong cuộc trò chuyện này.",
+              "senderId": uid,
+              "targetUid": otherUid,
+              "status": "approved",
+              "blockedBy": null,
+              "reason": null,
+              "warning": false,
+              "aiScore": null,
+              "createdAt": FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        tx.update(ref, updates);
         return;
       }
 
