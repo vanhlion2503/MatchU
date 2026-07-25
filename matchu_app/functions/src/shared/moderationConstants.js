@@ -1,7 +1,4 @@
 const MODERATION_THRESHOLD = 0.8;
-const MODERATION_ENDPOINT =
-  "https://ai-moderation-376071505252.asia-southeast1.run.app/moderate";
-const AI_MODERATION_TIMEOUT_MS = 1000;
 const AI_MODERATION_CACHE_TTL_MS = 5 * 60 * 1000;
 const AI_MODERATION_CACHE_MAX_ENTRIES = 512;
 const LINK_PATTERN = /(?:https?:\/\/|www\.)\S+/i;
@@ -65,6 +62,18 @@ const DANGEROUS_KEYWORDS = {
     "quan he",
     "gạ tình",
     "ga tinh",
+    "có đi khách không",
+    "co di khach khong",
+    "em đi khách không",
+    "em di khach khong",
+    "đi khách bao nhiêu",
+    "di khach bao nhieu",
+    "giá bao nhiêu một đêm",
+    "gia bao nhieu mot dem",
+    "mại dâm",
+    "mai dam",
+    "bán dâm",
+    "ban dam",
     "nude",
     "ảnh nóng",
     "anh nong",
@@ -87,6 +96,10 @@ const DANGEROUS_KEYWORDS = {
     "dcm",
     "vãi lồn",
     "vai lon",
+    "vãi cả lồn",
+    "vai ca lon",
+    "vcl",
+    "v c l",
     "cút",
     "cut",
     "cút mẹ",
@@ -231,8 +244,6 @@ const DANGEROUS_KEYWORDS = {
 
 module.exports = {
   MODERATION_THRESHOLD,
-  MODERATION_ENDPOINT,
-  AI_MODERATION_TIMEOUT_MS,
   AI_MODERATION_CACHE_TTL_MS,
   AI_MODERATION_CACHE_MAX_ENTRIES,
   LINK_PATTERN,
