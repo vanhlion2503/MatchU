@@ -11,7 +11,7 @@ import 'package:matchu_app/translations/chat_safety_translations.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:matchu_app/translations/video_matching_translations.dart';
 import 'package:matchu_app/widgets/chat_rating_safety_notice.dart';
-import 'package:matchu_app/widgets/temp_room_extension_prompt.dart';
+import 'package:matchu_app/widgets/temp_room_extension_overlay.dart';
 
 enum _ExitChoice { stay, leave }
 
@@ -137,24 +137,14 @@ class _VideoExtensionPrompt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 82, 14, 0),
-          child: Obx(() {
-            if (!controller.canExtendRoom) return const SizedBox.shrink();
-            return ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: TempRoomExtensionPrompt(
-                extensionCount: controller.extensionCount.value,
-                isLoading: controller.isExtendingRoom.value,
-                onExtend: controller.extendRoom,
-                onDarkSurface: true,
-              ),
-            );
-          }),
-        ),
+    return Obx(
+      () => TempRoomExtensionOverlay(
+        isVisible: controller.canExtendRoom,
+        remainingSeconds: controller.roomRemainingSeconds.value,
+        extensionCount: controller.extensionCount.value,
+        isLoading: controller.isExtendingRoom.value,
+        onExtend: controller.extendRoom,
+        topInset: MediaQuery.paddingOf(context).top + 82,
       ),
     );
   }
@@ -401,32 +391,20 @@ class _CallTopBar extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
-                    vertical: 9,
+                    vertical: 11,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.48),
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: Colors.white24),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        controller.formattedRoomTime,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      Text(
-                        'Phòng video ẩn danh • tối đa 2 lượt gia hạn'.tr,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.68),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    controller.formattedRoomTime,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ),
                 const Spacer(),

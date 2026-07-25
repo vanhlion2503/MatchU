@@ -249,6 +249,41 @@ class _RandomChatViewState extends State<RandomChatView>
     return randomChatTr(quotaLabel);
   }
 
+  Widget _buildStartButtonChild() {
+    final quota = _quotaPreview;
+    final showsVideoGemCost =
+        !_isStarting &&
+        !_isLoadingQuota &&
+        _selectedExperience == _MatchingExperience.video &&
+        quota != null &&
+        quota.gem >= 1;
+
+    if (!showsVideoGemCost) {
+      return Text(_startButtonLabel());
+    }
+
+    final semanticLabel = randomChatTr('Bắt đầu tìm kiếm • 1 gem');
+    return Semantics(
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('${randomChatTr('Bắt đầu tìm kiếm')} • 1'),
+            const SizedBox(width: 6),
+            Image.asset(
+              'assets/icon/gem.png',
+              width: 20,
+              height: 20,
+              filterQuality: FilterQuality.medium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showInsufficientGemDialog() async {
     if (!mounted) return;
     await showDialog<void>(
@@ -714,7 +749,7 @@ class _RandomChatViewState extends State<RandomChatView>
                               (_isLoadingQuota || _isStarting)
                                   ? null
                                   : _onStartPressed,
-                          child: Text(_startButtonLabel()),
+                          child: _buildStartButtonChild(),
                         ),
                       ),
                       const SizedBox(height: 12),
