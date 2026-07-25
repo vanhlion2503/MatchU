@@ -129,25 +129,63 @@ const storeFaceRecoveryBackup = onCall(
     await assertUserFaceVerified(uid);
 
     const backupKey = readBackupKey(request.data?.backupKey);
+    const requestedGeneration = Number(request.data?.generation || 0);
+    if (
+      !Number.isSafeInteger(requestedGeneration) ||
+      requestedGeneration < 0
+    ) {
+      throw new HttpsError("invalid-argument", "generation is invalid.");
+    }
     const encrypted = encryptBackupKey({ uid, backupKey });
     const faceBackupRef = db
       .collection("users")
       .doc(uid)
       .collection("security")
       .doc("faceBackup");
-    const existing = await faceBackupRef.get();
+    const pinBackupRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("security")
+      .doc("backup");
+    const stateRef = db
+      .collection("users")
+      .doc(uid)
+      .collection("security")
+      .doc("passcodeState");
 
-    const payload = {
-      ...encrypted,
-      uid,
-      version: 1,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-    if (!existing.exists) {
-      payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
-    }
+    await db.runTransaction(async (tx) => {
+      const [existing, pinBackup, state] = await Promise.all([
+        tx.get(faceBackupRef),
+        tx.get(pinBackupRef),
+        tx.get(stateRef),
+      ]);
+      const pinGeneration = Number(pinBackup.data()?.generation || 0);
+      const stateGeneration = Number(state.data()?.generation || 0);
+      if (
+        !pinBackup.exists ||
+        requestedGeneration !== pinGeneration ||
+        (state.exists &&
+          (state.data()?.status !== "active" ||
+            stateGeneration !== requestedGeneration))
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Recovery-key generation is no longer current."
+        );
+      }
 
-    await faceBackupRef.set(payload, { merge: true });
+      const payload = {
+        ...encrypted,
+        uid,
+        version: 1,
+        generation: requestedGeneration,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (!existing.exists) {
+        payload.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+      tx.set(faceBackupRef, payload, { merge: true });
+    });
 
     return { ok: true };
   }
@@ -163,15 +201,25 @@ const getFaceRecoveryBackupStatus = onCall(async (request) => {
     return { available: false, faceVerified: false };
   }
 
-  const backupSnap = await db
-    .collection("users")
-    .doc(uid)
-    .collection("security")
-    .doc("faceBackup")
-    .get();
+  const securityRef = db.collection("users").doc(uid).collection("security");
+  const [backupSnap, pinBackupSnap, stateSnap] = await Promise.all([
+    securityRef.doc("faceBackup").get(),
+    securityRef.doc("backup").get(),
+    securityRef.doc("passcodeState").get(),
+  ]);
+  const faceGeneration = Number(backupSnap.data()?.generation || 0);
+  const pinGeneration = Number(pinBackupSnap.data()?.generation || 0);
+  const stateGeneration = Number(stateSnap.data()?.generation || 0);
+  const generationIsCurrent =
+    backupSnap.exists &&
+    pinBackupSnap.exists &&
+    faceGeneration === pinGeneration &&
+    (!stateSnap.exists ||
+      (stateSnap.data()?.status === "active" &&
+        stateGeneration === faceGeneration));
 
   return {
-    available: backupSnap.exists,
+    available: generationIsCurrent,
     faceVerified: true,
   };
 });
@@ -187,7 +235,7 @@ const recoverBackupKeyWithFace = onCall(
       throw new HttpsError("invalid-argument", "sessionId is required.");
     }
 
-    const backupKey = await db.runTransaction(async (tx) => {
+    const recovered = await db.runTransaction(async (tx) => {
       const sessionRef = db.collection("faceReauthSessions").doc(sessionId);
       const sessionSnap = await tx.get(sessionRef);
       if (!sessionSnap.exists) {
@@ -222,6 +270,20 @@ const recoverBackupKeyWithFace = onCall(
           "No face recovery backup is available."
         );
       }
+      const pinBackupRef = db
+        .collection("users")
+        .doc(uid)
+        .collection("security")
+        .doc("backup");
+      const pinBackupSnap = await tx.get(pinBackupRef);
+      const faceGeneration = Number(backupSnap.data()?.generation || 0);
+      const pinGeneration = Number(pinBackupSnap.data()?.generation || 0);
+      if (!pinBackupSnap.exists || faceGeneration !== pinGeneration) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Face recovery backup is no longer current."
+        );
+      }
 
       const decrypted = decryptBackupKey({
         uid,
@@ -235,11 +297,12 @@ const recoverBackupKeyWithFace = onCall(
         },
         { merge: true }
       );
-      return decrypted;
+      return { backupKey: decrypted, generation: pinGeneration };
     });
 
     return {
-      backupKey: backupKey.toString("base64"),
+      backupKey: recovered.backupKey.toString("base64"),
+      generation: recovered.generation,
     };
   }
 );

@@ -325,6 +325,7 @@ const _extendedVietnamese = <String, String>{
   'Đặt lại': 'Đặt lại',
   'Mở khóa': 'Mở khóa',
   'Đặt lại mã PIN': 'Đặt lại mã PIN',
+  'Mã PIN bảo vệ tin nhắn': 'Mã PIN bảo vệ tin nhắn',
   'Việc nãy sẽ xóa toàn bộ tin nhắn đã mã hóa cũ trên thiết bị này':
       'Việc này sẽ xóa toàn bộ tin nhắn cũ đã mã hóa trên thiết bị này.',
   'Đang sửa': 'Đang chỉnh sửa',
@@ -564,6 +565,7 @@ const _extendedEnglish = <String, String>{
   'Đặt lại': 'Reset',
   'Mở khóa': 'Unlock',
   'Đặt lại mã PIN': 'Reset PIN',
+  'Mã PIN bảo vệ tin nhắn': 'Message protection PIN',
   'Việc nãy sẽ xóa toàn bộ tin nhắn đã mã hóa cũ trên thiết bị này':
       'This will delete all previously encrypted messages on this device.',
   'Đang sửa': 'Editing',

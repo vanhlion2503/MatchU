@@ -39,6 +39,12 @@ class AccountSecurityView extends GetView<AccountSecurityController> {
                   title: 'Đổi mật khẩu'.tr,
                   onTap: () => Get.toNamed(AppRouter.passwordSecurity),
                 ),
+                const Divider(height: 1),
+                _HubTile(
+                  icon: Icons.pin_outlined,
+                  title: 'Mã PIN bảo vệ tin nhắn'.tr,
+                  onTap: () => Get.toNamed(AppRouter.chatPinSecurity),
+                ),
               ],
             ),
             const SizedBox(height: 20),

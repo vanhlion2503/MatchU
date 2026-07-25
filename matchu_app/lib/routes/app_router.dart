@@ -30,6 +30,9 @@ class AppRouter {
   static const String passwordSecurity = '/account-security/password';
   static const String deviceSessions = '/account-security/devices';
   static const String deleteAccount = '/account-security/delete-account';
+  static const String chatPinSecurity = '/account-security/chat-pin';
+  static const String changeChatPin = '/account-security/chat-pin/change';
+  static const String forgotChatPin = '/account-security/chat-pin/recovery';
   static const String restrictionList = '/restriction-list';
   static const String followingListPrivacy = '/following-list-privacy';
   static const String privateAccount = '/private-account';

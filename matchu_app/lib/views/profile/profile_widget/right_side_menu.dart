@@ -71,6 +71,14 @@ class RightSideMenu {
                                   },
                                 ),
                                 menuItem(
+                                  icon: Icons.pin_outlined,
+                                  text: 'Mã PIN bảo vệ tin nhắn'.tr,
+                                  onTap: () {
+                                    Get.back();
+                                    Get.toNamed(AppRouter.chatPinSecurity);
+                                  },
+                                ),
+                                menuItem(
                                   icon: Iconsax.scan,
                                   text: TranslationKeys.myCode.tr,
                                   onTap: () {

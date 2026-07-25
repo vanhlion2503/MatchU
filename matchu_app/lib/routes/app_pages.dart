@@ -5,6 +5,7 @@ import 'package:matchu_app/bindings/feed/post_search_binding.dart';
 import 'package:matchu_app/bindings/feed/post_search_results_binding.dart';
 import 'package:matchu_app/bindings/notification/notification_inbox_binding.dart';
 import 'package:matchu_app/bindings/user/account_security_binding.dart';
+import 'package:matchu_app/bindings/security/chat_passcode_security_binding.dart';
 import 'package:matchu_app/bindings/profile/profile_privacy_binding.dart';
 import 'package:matchu_app/bindings/verification/face_verification_binding.dart';
 import 'package:matchu_app/bindings/chat/temp_chat_binding.dart';
@@ -48,6 +49,9 @@ import 'package:matchu_app/views/setting/language_view.dart';
 import 'package:matchu_app/views/setting/edit_profile_view.dart';
 import 'package:matchu_app/views/setting/account_security_view.dart';
 import 'package:matchu_app/views/setting/account_security_hub_view.dart';
+import 'package:matchu_app/views/setting/chat_passcode/chat_passcode_security_view.dart';
+import 'package:matchu_app/views/setting/chat_passcode/change_chat_passcode_view.dart';
+import 'package:matchu_app/views/setting/chat_passcode/forgot_chat_passcode_view.dart';
 import 'package:matchu_app/views/setting/restriction_list_view.dart';
 import 'package:matchu_app/views/setting/following_list_privacy_view.dart';
 import 'package:matchu_app/views/setting/private_account_view.dart';
@@ -231,6 +235,24 @@ class AppPages {
             section: AccountSecurityDetailSection.deleteAccount,
           ),
       binding: AccountSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.chatPinSecurity,
+      page: () => const ChatPasscodeSecurityView(),
+      binding: ChatPasscodeSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.changeChatPin,
+      page: () => const ChangeChatPasscodeView(),
+      binding: ChatPasscodeSecurityBinding(),
+      transition: Transition.cupertino,
+    ),
+    GetPage(
+      name: AppRouter.forgotChatPin,
+      page: () => const ForgotChatPasscodeView(),
+      binding: ChatPasscodeSecurityBinding(),
       transition: Transition.cupertino,
     ),
 

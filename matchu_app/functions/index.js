@@ -34,6 +34,9 @@ const {
   authorizeFaceTemplateUpdateWithPin,
 } = require("./src/callables/faceTemplateUpdatePin");
 const {
+  resetChatPasscode,
+} = require("./src/callables/chatPasscodeSecurity");
+const {
   maintainBiometricDocuments,
 } = require("./src/triggers/biometricMaintenance");
 const {
@@ -142,6 +145,7 @@ exports.recoverBackupKeyWithFace = recoverBackupKeyWithFace;
 exports.deleteFaceRecoveryBackup = deleteFaceRecoveryBackup;
 exports.authorizeFaceTemplateUpdateWithPin =
   authorizeFaceTemplateUpdateWithPin;
+exports.resetChatPasscode = resetChatPasscode;
 exports.maintainBiometricDocuments = maintainBiometricDocuments;
 exports.touchReputationDailyOnAppOpen = touchReputationDailyOnAppOpen;
 exports.getReputationDailyState = getReputationDailyState;

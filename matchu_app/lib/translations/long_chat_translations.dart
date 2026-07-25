@@ -132,6 +132,7 @@ const longChatEnglishTranslations = <String, String>{
       'Enter your PIN to restore old messages on this device.',
   'Nếu quên mã PIN, bạn có thể đặt lại để bắt đầu khóa khôi phục mới.':
       'If you forgot your PIN, reset it to create a new recovery key.',
+  'Quên mã PIN?': 'Forgot PIN?',
   'Việc này sẽ xóa toàn bộ tin nhắn đã mã hóa cũ trên thiết bị này':
       'This will delete all previously encrypted messages on this device.',
 };

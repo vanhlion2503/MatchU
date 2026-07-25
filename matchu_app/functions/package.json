@@ -23,6 +23,7 @@
     "test:post-notifications": "node --test test/post-engagement-notifications.test.js",
     "test:account-security": "node --test test/account-security.test.js",
     "test:face-template-pin": "node --test test/face-template-update-pin.test.js",
+    "test:chat-passcode": "node --test test/chat-passcode-security.test.js",
     "test:reputation": "node --test test/reputation-reward.test.js"
   },
   "engines": {

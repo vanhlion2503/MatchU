@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -97,6 +98,7 @@ Widget _buildPasscodeInput({
         forceErrorState: hasError,
         errorPinTheme: buildPinTheme(effectiveErrorColor),
         keyboardType: TextInputType.number,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         separatorBuilder: (_) => const SizedBox(width: _pinSeparatorWidth),
         defaultPinTheme: buildPinTheme(primaryColor.withValues(alpha: 0.4)),
         focusedPinTheme: buildPinTheme(primaryColor),
@@ -201,7 +203,7 @@ Future<String?> showPasscodeSetupDialog(
                 ElevatedButton(
                   onPressed: () {
                     final pin = controller.text.trim();
-                    if (pin.length != 6) {
+                    if (!PasscodeBackupService.isValidPasscode(pin)) {
                       setState(() {
                         errorText = 'Mã PIN phải đủ 6 số';
                       });
@@ -267,7 +269,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
             if (isSubmitting) return;
 
             final pin = controller.text.trim();
-            if (pin.length != 6) {
+            if (!PasscodeBackupService.isValidPasscode(pin)) {
               setState(() {
                 shakeTrigger++;
                 localError = 'Mã PIN phải đủ 6 chữ số';
@@ -439,7 +441,7 @@ Future<PasscodePromptResult?> showPasscodeUnlockDialog(
                                           ),
                                         );
                                       },
-                              child: const Text('Đặt lại'),
+                              child: const Text('Quên mã PIN?'),
                             ),
                           ),
                         ),
@@ -567,22 +569,13 @@ Future<bool> ensurePasscodeReady(
     if (result.action == PasscodePromptAction.reset) {
       if (!context.mounted) return false;
       if (shouldContinue != null && !shouldContinue()) return false;
-      final confirm = await showPasscodeResetConfirmDialog(context);
-      if (!confirm) continue;
-
-      await PasscodeBackupService.resetPasscode();
-      await onPasscodeReset?.call();
-
-      if (!context.mounted) return false;
+      final resetCompleted = await Get.toNamed<bool>(AppRouter.forgotChatPin);
+      if (resetCompleted == true) {
+        await onPasscodeReset?.call();
+        return true;
+      }
       if (!canContinue()) return false;
-      final newPasscode = await showPasscodeSetupDialog(
-        context,
-        title: setupTitle,
-        description: setupDescription,
-      );
-      if (newPasscode == null || newPasscode.isEmpty) return false;
-      await PasscodeBackupService.setPasscode(newPasscode, lockHistory: true);
-      return true;
+      continue;
     }
 
     if (result.action == PasscodePromptAction.faceUnlocked) {
