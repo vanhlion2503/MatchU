@@ -1,27 +1,19 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:matchu_app/models/user_model.dart';
+import 'package:matchu_app/services/auth/google_auth_credential_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 import 'package:matchu_app/translations/auth_translations.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  bool _googleSignInInitialized = false;
 
   FirebaseAuth get auth => _auth;
   FirebaseFirestore get db => _db;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
-
-  Future<void> _ensureGoogleSignInInitialized() async {
-    if (_googleSignInInitialized || kIsWeb) return;
-
-    await GoogleSignIn.instance.initialize();
-    _googleSignInInitialized = true;
-  }
 
   /* ======================= REGISTER ======================= */
 
@@ -191,13 +183,7 @@ class AuthService {
       return _auth.signInWithPopup(provider);
     }
 
-    await _ensureGoogleSignInInitialized();
-    final googleUser = await GoogleSignIn.instance.authenticate();
-    final googleAuth = googleUser.authentication;
-    final credential = GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-    );
-
+    final credential = await GoogleAuthCredentialService.requestCredential();
     return _auth.signInWithCredential(credential);
   }
 

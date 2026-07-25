@@ -5,6 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:matchu_app/models/account_security/account_security_model.dart';
+import 'package:matchu_app/services/auth/google_auth_credential_service.dart';
 import 'package:matchu_app/services/security/device_service.dart';
 
 class MfaReauthenticationChallenge {
@@ -166,17 +167,22 @@ class AccountSecurityRepository {
         );
         await user.reauthenticateWithCredential(credential);
       } else {
-        final provider =
-            GoogleAuthProvider()
-              ..addScope('email')
-              ..addScope('profile');
         if (kIsWeb) {
+          final provider =
+              GoogleAuthProvider()
+                ..addScope('email')
+                ..addScope('profile');
           await user.reauthenticateWithPopup(provider);
         } else {
-          await user.reauthenticateWithProvider(provider);
+          // Use the same ID-token flow as the app's working Google login.
+          // reauthenticateWithProvider is not reliable with the current
+          // google_sign_in mobile integration.
+          final credential =
+              await GoogleAuthCredentialService.requestCredential();
+          await user.reauthenticateWithCredential(credential);
         }
       }
-      await user.getIdToken(true);
+      await _currentUser.getIdToken(true);
       return null;
     } on FirebaseAuthMultiFactorException catch (error) {
       return _startMfaReauthentication(error);

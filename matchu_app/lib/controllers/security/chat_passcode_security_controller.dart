@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:matchu_app/models/security/chat_passcode_status.dart';
 import 'package:matchu_app/repositories/account_security/account_security_repository.dart';
 import 'package:matchu_app/repositories/security/chat_passcode_security_repository.dart';
@@ -221,6 +222,22 @@ class ChatPasscodeSecurityController extends GetxController {
           return 'Phiên đăng nhập không còn hiệu lực.';
         default:
           return error.message ?? 'Không thể hoàn tất thao tác mã PIN.';
+      }
+    }
+    if (error is GoogleSignInException) {
+      switch (error.code) {
+        case GoogleSignInExceptionCode.canceled:
+          return 'Bạn đã hủy xác thực tài khoản Google.';
+        case GoogleSignInExceptionCode.userMismatch:
+          return 'Vui lòng chọn đúng tài khoản Google đang đăng nhập.';
+        case GoogleSignInExceptionCode.clientConfigurationError:
+        case GoogleSignInExceptionCode.providerConfigurationError:
+          return 'Cấu hình đăng nhập Google chưa hợp lệ. Vui lòng thử lại sau.';
+        case GoogleSignInExceptionCode.uiUnavailable:
+        case GoogleSignInExceptionCode.interrupted:
+          return 'Không thể mở xác thực Google lúc này. Vui lòng thử lại.';
+        case GoogleSignInExceptionCode.unknownError:
+          return error.description ?? 'Không thể xác thực tài khoản Google.';
       }
     }
     final message =
