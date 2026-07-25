@@ -47,6 +47,12 @@ const matchingChatVietnameseTranslations = <String, String>{
       'Chưa thể gia hạn lúc này. Vui lòng thử lại.',
   'Phòng video ẩn danh • tối đa 2 lượt gia hạn':
       'Phòng video ẩn danh • tối đa 2 lượt gia hạn',
+  'Mở đề xuất gia hạn': 'Mở đề xuất gia hạn',
+  'Muốn trò chuyện thêm 5 phút?': 'Muốn trò chuyện thêm 5 phút?',
+  'Chỉ cần một người dùng 1 gem. Phòng còn @remaining lượt gia hạn.':
+      'Chỉ cần một người dùng 1 gem. Phòng còn @remaining lượt gia hạn.',
+  'Tạm ẩn': 'Tạm ẩn',
+  'Gia hạn • 1 gem': 'Gia hạn',
   'Mất kết nối': 'Mất kết nối',
   'Đã mất mạng, quay về trang tìm chat': 'Đã mất mạng, quay về trang tìm chat',
   'Thiếu avatar ẩn danh': 'Thiếu avatar ẩn danh',
@@ -191,6 +197,12 @@ const matchingChatEnglishTranslations = <String, String>{
       'Unable to extend right now. Please try again.',
   'Phòng video ẩn danh • tối đa 2 lượt gia hạn':
       'Anonymous video room • up to 2 extensions',
+  'Mở đề xuất gia hạn': 'Open extension prompt',
+  'Muốn trò chuyện thêm 5 phút?': 'Want 5 more minutes?',
+  'Chỉ cần một người dùng 1 gem. Phòng còn @remaining lượt gia hạn.':
+      'Only one person needs to use 1 gem. The room has @remaining extensions left.',
+  'Tạm ẩn': 'Minimize',
+  'Gia hạn • 1 gem': 'Extend',
   'Mất kết nối': 'Connection lost',
   'Đã mất mạng, quay về trang tìm chat':
       'You are offline. Returning to chat matching.',

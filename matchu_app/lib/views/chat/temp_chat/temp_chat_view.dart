@@ -13,9 +13,9 @@ import 'package:matchu_app/views/chat/temp_chat/word_chain/word_chain_playing_ba
 import '../../../controllers/chat/temp_chat_controller.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/views/chat/temp_chat/messages_list.dart';
+import 'package:matchu_app/views/chat/temp_chat/temp_chat_extension_overlay.dart';
 import 'package:matchu_app/widgets/verified_name_row.dart';
 import 'package:matchu_app/widgets/chat_rating_safety_notice.dart';
-import 'package:matchu_app/widgets/temp_room_extension_prompt.dart';
 import 'package:matchu_app/translations/chat_safety_translations.dart';
 
 class TempChatView extends StatefulWidget {
@@ -324,19 +324,6 @@ class _TempChatViewState extends State<TempChatView> {
                       );
                     }),
                     TelepathyPinnedBanner(controller: controller),
-                    Obx(() {
-                      if (!controller.canExtendRoom) {
-                        return const SizedBox.shrink();
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: TempRoomExtensionPrompt(
-                          extensionCount: controller.extensionCount.value,
-                          isLoading: controller.isExtendingRoom.value,
-                          onExtend: controller.extendRoom,
-                        ),
-                      );
-                    }),
                     Expanded(child: MessagesList(roomId, controller)),
                     BottomActionBar(controller),
                   ],
@@ -345,6 +332,7 @@ class _TempChatViewState extends State<TempChatView> {
               WordChainPlayingBar(controller: controller),
               TelepathyGameOverlay(controller: controller),
               TelepathyResultOverlay(controller: controller),
+              TempChatExtensionOverlay(controller: controller),
             ],
           ),
         ),
