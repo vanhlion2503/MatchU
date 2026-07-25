@@ -14,6 +14,7 @@
     "test:recommendation": "node --test test/recommendation-core.test.js",
     "test:post-search": "node --test test/post-search.test.js",
     "test:post-share": "node --test test/post-external-share.test.js",
+    "test:post-text-moderation": "node --test test/post-text-moderation.test.js",
     "test:temp-chat": "node --test test/temp-chat-session.test.js",
     "test:temp-chat-moderation": "node --test test/temp-chat-moderation.test.js",
     "test:telepathy-insight": "node --test test/telepathy-insight.test.js",
