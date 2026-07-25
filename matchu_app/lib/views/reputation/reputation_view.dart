@@ -121,11 +121,14 @@ class ReputationView extends StatelessWidget {
                   Expanded(
                     child: Text(
                       "Nhiệm vụ hôm nay",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -137,7 +140,7 @@ class ReputationView extends StatelessWidget {
                     ),
                     child: Text(
                       hasReachedMax
-                          ? "Thưởng nhiệm vụ được đổi sang gem"
+                          ? "Thưởng nhiệm vụ"
                           : "$remainingToday điểm còn lại",
                       style: textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.primary,
