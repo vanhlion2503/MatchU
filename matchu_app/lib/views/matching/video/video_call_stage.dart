@@ -873,12 +873,12 @@ class _CallControlDock extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 350),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: const Color(0xFF111827).withValues(alpha: 0.9),
+          color: const Color(0xFF111827).withValues(alpha: 0.48),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
           boxShadow: const [
             BoxShadow(
-              color: Colors.black38,
+              color: Colors.black26,
               blurRadius: 20,
               offset: Offset(0, 8),
             ),
@@ -954,8 +954,8 @@ class _DockButton extends StatelessWidget {
         child: Material(
           color:
               enabled
-                  ? const Color(0xFF2A3342)
-                  : const Color(0xFF2A3342).withValues(alpha: 0.45),
+                  ? const Color(0xFF2A3342).withValues(alpha: 0.46)
+                  : const Color(0xFF2A3342).withValues(alpha: 0.22),
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -997,7 +997,7 @@ class _GlassIconButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.black.withValues(alpha: 0.48),
+        color: Colors.black.withValues(alpha: 0.28),
         shape: const CircleBorder(),
         child: IconButton(
           onPressed: onTap == null ? null : () => onTap!(),
@@ -1030,7 +1030,7 @@ class _CompactAction extends StatelessWidget {
     return FilledButton.tonalIcon(
       onPressed: onTap == null ? null : () => onTap!(),
       style: FilledButton.styleFrom(
-        backgroundColor: Colors.black.withValues(alpha: 0.58),
+        backgroundColor: Colors.black.withValues(alpha: 0.32),
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       ),

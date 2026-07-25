@@ -49,6 +49,9 @@ const randomChatEnglishTranslations = <String, String>{
   'Đang bắt đầu...': 'Starting...',
   'Đang tải lượt...': 'Loading turns...',
   'Bắt đầu tìm kiếm': 'Start searching',
+  'Bắt đầu tìm kiếm video?': 'Start searching for a video match?',
+  'Khi ghép đôi video thành công, hệ thống sẽ trừ 1 gem. Bạn có muốn tiếp tục?':
+      'A successful video match will cost 1 gem. Do you want to continue?',
   'Không đủ gem': 'Not enough gems',
   'Mỗi lần ghép đôi video thành công cần 1 gem. Gem chỉ bị trừ sau khi hệ thống tạo phòng thành công.':
       'Each successful video match costs 1 gem. Gems are charged only after a room is created successfully.',

@@ -227,16 +227,13 @@ class _RandomChatViewState extends State<RandomChatView>
     if (_isLoadingQuota) {
       return randomChatTr('Đang tải lượt...');
     }
+    if (_selectedExperience == _MatchingExperience.video) {
+      return randomChatTr('Bắt đầu tìm kiếm');
+    }
 
     final quota = _quotaPreview;
     if (quota == null) {
       return randomChatTr('Bắt đầu tìm kiếm');
-    }
-    if (_selectedExperience == _MatchingExperience.video && quota.gem < 1) {
-      return randomChatTr('Không đủ gem • Cần 1 gem');
-    }
-    if (_selectedExperience == _MatchingExperience.video) {
-      return randomChatTr('Bắt đầu tìm kiếm • 1 gem');
     }
     if (quota.isUnlimited) {
       return randomChatTr('Bắt đầu tìm kiếm');
@@ -247,41 +244,6 @@ class _RandomChatViewState extends State<RandomChatView>
 
     final quotaLabel = 'Bắt đầu tìm kiếm • ${quota.remaining}/${quota.limit}';
     return randomChatTr(quotaLabel);
-  }
-
-  Widget _buildStartButtonChild() {
-    final quota = _quotaPreview;
-    final showsVideoGemCost =
-        !_isStarting &&
-        !_isLoadingQuota &&
-        _selectedExperience == _MatchingExperience.video &&
-        quota != null &&
-        quota.gem >= 1;
-
-    if (!showsVideoGemCost) {
-      return Text(_startButtonLabel());
-    }
-
-    final semanticLabel = randomChatTr('Bắt đầu tìm kiếm • 1 gem');
-    return Semantics(
-      label: semanticLabel,
-      child: ExcludeSemantics(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('${randomChatTr('Bắt đầu tìm kiếm')} • 1'),
-            const SizedBox(width: 6),
-            Image.asset(
-              'assets/icon/gem.png',
-              width: 20,
-              height: 20,
-              filterQuality: FilterQuality.medium,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _showInsufficientGemDialog() async {
@@ -305,6 +267,41 @@ class _RandomChatViewState extends State<RandomChatView>
         );
       },
     );
+  }
+
+  Future<bool> _confirmVideoGemCharge() async {
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              icon: Image.asset(
+                'assets/icon/gem.png',
+                width: 42,
+                height: 42,
+                filterQuality: FilterQuality.medium,
+              ),
+              title: Text(randomChatTr('Bắt đầu tìm kiếm video?')),
+              content: Text(
+                randomChatTr(
+                  'Khi ghép đôi video thành công, hệ thống sẽ trừ 1 gem. Bạn có muốn tiếp tục?',
+                ),
+                textAlign: TextAlign.center,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text('Hủy'.tr),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text('Đồng ý'.tr),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   Future<void> _showOutOfQuotaDialog() async {
@@ -494,6 +491,11 @@ class _RandomChatViewState extends State<RandomChatView>
     if (_isOutOfVideoGem) {
       await _showInsufficientGemDialog();
       return;
+    }
+
+    if (_selectedExperience == _MatchingExperience.video) {
+      final confirmed = await _confirmVideoGemCharge();
+      if (!confirmed || !mounted) return;
     }
 
     if (!anonAvatarC.isSelected) {
@@ -749,7 +751,7 @@ class _RandomChatViewState extends State<RandomChatView>
                               (_isLoadingQuota || _isStarting)
                                   ? null
                                   : _onStartPressed,
-                          child: _buildStartButtonChild(),
+                          child: Text(_startButtonLabel()),
                         ),
                       ),
                       const SizedBox(height: 12),
