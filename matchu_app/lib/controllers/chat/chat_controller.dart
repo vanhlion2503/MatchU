@@ -1615,13 +1615,6 @@ class ChatController extends GetxController {
               roomId,
               _currentKeyId,
             );
-    final hasKeyForCurrentDevice =
-        hasAnyKeys
-            ? await SessionKeyService.hasSessionKeyForCurrentDevice(
-              roomId,
-              keyId: _currentKeyId,
-            )
-            : false;
 
     final historyLocked = await PasscodeBackupService.isHistoryLocked();
     if (!historyLocked) {
@@ -1670,7 +1663,7 @@ class ChatController extends GetxController {
         debugPrint('Unable to publish room key request: $e');
       }
 
-      if (allowRotateIfUnrecoverable && !hasKeyForCurrentDevice) {
+      if (allowRotateIfUnrecoverable) {
         final receivedOnDemand = await SessionKeyService.waitForLocalSessionKey(
           roomId,
           keyId: _currentKeyId,
@@ -1678,7 +1671,14 @@ class ChatController extends GetxController {
         );
         if (receivedOnDemand) return;
 
-        debugPrint("Room $roomId key request timed out; rotating to a new key");
+        // An existing envelope is not proof that this device can decrypt it.
+        // This happens after local key loss or an identity-key replacement.
+        // Existing envelope documents are immutable in the distribution flow,
+        // so waiting longer cannot repair them; rotate only after both the
+        // immediate decrypt and the on-demand recovery attempt have failed.
+        debugPrint(
+          "Room $roomId key recovery timed out; rotating to a new key",
+        );
         final previousKeyId = _currentKeyId;
         final newKeyId = await SessionKeyService.rotateSessionKey(
           roomId: roomId,

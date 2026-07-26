@@ -100,7 +100,7 @@ class IdentityKeyService {
       );
     } on FirebaseException catch (e) {
       if (e.code != 'permission-denied') rethrow;
-      await _ensureLegacyDeviceDoc(
+      await _repairDeviceDoc(
         uid: uid,
         deviceId: deviceId,
         publicPem: publicPem,
@@ -131,6 +131,12 @@ class IdentityKeyService {
         'e2eeUpdatedAt': FieldValue.serverTimestamp(),
         'signedOutAt': FieldValue.delete(),
         'revokedAt': FieldValue.delete(),
+        'fcmToken': FieldValue.delete(),
+        'fcmTokenUpdatedAt': FieldValue.delete(),
+        'pushEnabled': FieldValue.delete(),
+        'notificationPermission': FieldValue.delete(),
+        'notificationUpdatedAt': FieldValue.delete(),
+        'lastNotificationOpenedAt': FieldValue.delete(),
       }, SetOptions(merge: true));
       return;
     }
@@ -147,7 +153,15 @@ class IdentityKeyService {
     }, SetOptions(merge: true));
   }
 
-  static Future<void> _ensureLegacyDeviceDoc({
+  /// Replaces a legacy/malformed public device document with the canonical
+  /// E2EE schema.
+  ///
+  /// Firestore Rules validate the complete post-merge document. Consequently,
+  /// another merge cannot repair a document that already contains an unknown
+  /// field or a field with a legacy type; the invalid value remains present and
+  /// every subsequent write is denied. A full owner-only replacement removes
+  /// that stale data while keeping the same device ID and RSA identity.
+  static Future<void> _repairDeviceDoc({
     required String uid,
     required String deviceId,
     required String publicPem,
@@ -158,24 +172,21 @@ class IdentityKeyService {
         .collection('devices')
         .doc(deviceId);
     final snap = await docRef.get();
-
-    if (snap.exists) {
-      await docRef.set({
-        'publicKey': publicPem,
-        'algorithm': 'RSA-2048',
-        'platform': _platformName(),
-        'lastActiveAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      return;
-    }
+    final existingCreatedAt = snap.data()?['createdAt'];
 
     await docRef.set({
       'publicKey': publicPem,
       'algorithm': 'RSA-2048',
       'platform': _platformName(),
-      'createdAt': FieldValue.serverTimestamp(),
+      'e2eeStatus': _activeE2eeStatus,
+      'createdAt':
+          existingCreatedAt is Timestamp
+              ? existingCreatedAt
+              : FieldValue.serverTimestamp(),
       'lastActiveAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+      'lastE2eeActiveAt': FieldValue.serverTimestamp(),
+      'e2eeUpdatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   static String _platformName() {
