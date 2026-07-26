@@ -129,6 +129,36 @@ service cloud.firestore {
         && !isBlockedBetween(data.participants[0], data.participants[1]);
     }
 
+    function canUseAccountFeature(feature) {
+      let signedIn = request.auth != null;
+      let userExists = signedIn
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      let user = userExists
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : {};
+      let status = userExists && user.accountStatus is string
+        ? user.accountStatus
+        : "active";
+      let hasRestriction = userExists
+        && user.restriction is map
+        && user.restriction.features is list;
+      let restrictionExpired = hasRestriction
+        && user.restriction.expiresAt is timestamp
+        && request.time >= user.restriction.expiresAt;
+      return userExists
+        && (
+          status == "active"
+          || (
+            status == "restricted"
+            && hasRestriction
+            && (
+              restrictionExpired
+              || !(feature in user.restriction.features)
+            )
+          )
+        );
+    }
+
     // ================= USERS =================
     match /users/{userId} {
       function isSignedIn() {
@@ -1149,6 +1179,7 @@ service cloud.firestore {
 
       allow read: if canReadPost();
       allow create: if isAuthorCreate()
+        && canUseAccountFeature("posts")
         && canCreatePostByReputation()
         && hasValidPostVisibilityForWrite(request.resource.data)
         && hasValidPostModerationForCreate(request.resource.data)
@@ -1204,6 +1235,7 @@ service cloud.firestore {
         allow read: if canAccessParentPost();
 
         allow create: if request.auth != null
+          && canUseAccountFeature("comments")
           && canAccessParentPost()
           && request.resource.data.userId == request.auth.uid;
 
@@ -1749,6 +1781,7 @@ service cloud.firestore {
           && (
             (
               isPendingUserMessageCreate()
+              && canUseAccountFeature("chat")
               && participantsHaveNoBlock(
                 get(/databases/$(database)/documents/tempChats/$(roomId)).data
               )
@@ -1779,6 +1812,7 @@ service cloud.firestore {
 
       // ➕ tạo room (khi convert)
       allow create: if request.auth != null
+        && canUseAccountFeature("chat")
         && request.resource.data.participants is list
         && request.auth.uid in request.resource.data.participants
         && participantsHaveNoBlock(request.resource.data);
@@ -1907,6 +1941,7 @@ service cloud.firestore {
 
         // ➕ gửi / copy tin nhắn
         allow create: if isRoomParticipant()
+          && canUseAccountFeature("chat")
           && participantsHaveNoBlock(
             get(/databases/$(database)/documents/chatRooms/$(roomId)).data
           )
@@ -2032,6 +2067,7 @@ service cloud.firestore {
 
       // Caller creates the session with initial SDP offer.
       allow create: if isSignedIn()
+        && canUseAccountFeature("calls")
         && request.resource.data.keys().hasOnly([
           "callId",
           "roomChatId",
@@ -2068,6 +2104,10 @@ service cloud.firestore {
 
       // Participants can only update signaling fields.
       allow update: if isCallParticipant()
+        && (
+          !changedKeys().hasAny(["answer"])
+          || canUseAccountFeature("calls")
+        )
         && changedKeys().hasOnly([
           "offer",
           "answer",

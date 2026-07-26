@@ -1,0 +1,215 @@
+<%- include('../partials/page-title') %>
+
+<section class="row g-3 mb-4">
+  <% const cards = [
+    { label: 'Tổng tài khoản', value: statistics.total, icon: 'people', tone: 'primary' },
+    { label: 'Đang hoạt động', value: statistics.active, icon: 'person-check', tone: 'success' },
+    { label: 'Đang hạn chế', value: statistics.restricted + statistics.suspended, icon: 'person-lock', tone: 'warning' },
+    { label: 'Đã cấm', value: statistics.banned, icon: 'person-x', tone: 'danger' },
+    { label: 'Đã xác minh khuôn mặt', value: statistics.verified, icon: 'patch-check', tone: 'info' }
+  ]; %>
+  <% cards.forEach((card) => { %>
+    <div class="col-6 col-xl">
+      <article class="stat-card h-100">
+        <div class="stat-icon bg-<%= card.tone %>-subtle text-<%= card.tone %>">
+          <i class="bi bi-<%= card.icon %>"></i>
+        </div>
+        <div>
+          <span><%= card.label %></span>
+          <strong><%= card.value.toLocaleString('vi-VN') %></strong>
+        </div>
+      </article>
+    </div>
+  <% }) %>
+</section>
+
+<section class="panel mb-4">
+  <div class="panel-heading mb-3">
+    <div>
+      <h3>Tìm kiếm và lọc tài khoản</h3>
+      <p class="panel-subtitle">Tra cứu theo UID, họ tên, nickname, email hoặc số điện thoại.</p>
+    </div>
+    <% if (filters.q || filters.status || filters.verification || filters.activity || filters.risk) { %>
+      <a href="/users" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-x-circle me-1"></i>Xóa bộ lọc
+      </a>
+    <% } %>
+  </div>
+  <form action="/users" method="get" class="user-filter-form">
+    <div class="filter-search">
+      <label class="form-label" for="userSearch">Từ khóa</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input id="userSearch" class="form-control" type="search" name="q"
+          value="<%= filters.q %>" maxlength="120"
+          placeholder="UID, tên, nickname, email, số điện thoại">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="statusFilter">Trạng thái</label>
+      <select id="statusFilter" class="form-select" name="status">
+        <option value="">Tất cả trạng thái</option>
+        <% Object.entries(statusLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.status === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="verificationFilter">Xác minh</label>
+      <select id="verificationFilter" class="form-select" name="verification">
+        <option value="">Tất cả xác minh</option>
+        <option value="face_verified" <%= filters.verification === 'face_verified' ? 'selected' : '' %>>Đã xác minh khuôn mặt</option>
+        <option value="face_unverified" <%= filters.verification === 'face_unverified' ? 'selected' : '' %>>Chưa xác minh khuôn mặt</option>
+        <option value="profile_completed" <%= filters.verification === 'profile_completed' ? 'selected' : '' %>>Đã hoàn thiện hồ sơ</option>
+        <option value="profile_incomplete" <%= filters.verification === 'profile_incomplete' ? 'selected' : '' %>>Chưa hoàn thiện hồ sơ</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="activityFilter">Hoạt động</label>
+      <select id="activityFilter" class="form-select" name="activity">
+        <option value="">Mọi hoạt động</option>
+        <option value="online" <%= filters.activity === 'online' ? 'selected' : '' %>>Đang online</option>
+        <option value="offline" <%= filters.activity === 'offline' ? 'selected' : '' %>>Đang offline</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="riskFilter">Rủi ro</label>
+      <select id="riskFilter" class="form-select" name="risk">
+        <option value="">Mọi mức rủi ro</option>
+        <option value="reported" <%= filters.risk === 'reported' ? 'selected' : '' %>>Đã bị báo cáo</option>
+        <option value="warned" <%= filters.risk === 'warned' ? 'selected' : '' %>>Đã bị cảnh báo</option>
+        <option value="low_reputation" <%= filters.risk === 'low_reputation' ? 'selected' : '' %>>Uy tín dưới 50</option>
+      </select>
+    </div>
+    <input type="hidden" name="limit" value="<%= filters.limit %>">
+    <button class="btn btn-primary filter-submit" type="submit">
+      <i class="bi bi-funnel me-1"></i>Áp dụng
+    </button>
+  </form>
+</section>
+
+<section class="panel user-list-panel">
+  <div class="panel-heading mb-3">
+    <div>
+      <h3>Danh sách tài khoản</h3>
+      <p class="panel-subtitle">
+        Hiển thị <strong><%= users.length %></strong> tài khoản phù hợp
+      </p>
+    </div>
+    <span class="badge rounded-pill text-bg-light border">
+      Đã quét <%= scanned.toLocaleString('vi-VN') %> bản ghi
+    </span>
+  </div>
+
+  <% if (scanLimitReached) { %>
+    <div class="alert alert-warning py-2">
+      Kết quả tìm kiếm đã đạt giới hạn quét an toàn. Hãy nhập thêm thông tin để thu hẹp kết quả.
+    </div>
+  <% } %>
+
+  <% if (users.length === 0) { %>
+    <div class="empty-state user-empty-state">
+      <div>
+        <i class="bi bi-person-exclamation"></i>
+        <h4>Không tìm thấy tài khoản</h4>
+        <p>Thử thay đổi từ khóa hoặc bộ lọc đang sử dụng.</p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table align-middle user-table">
+        <thead>
+          <tr>
+            <th>Tài khoản</th>
+            <th>Liên hệ</th>
+            <th>Trạng thái</th>
+            <th>Xác minh</th>
+            <th>Uy tín</th>
+            <th>Báo cáo</th>
+            <th>Hoạt động gần nhất</th>
+            <th class="text-end">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach((user) => { %>
+            <tr>
+              <td>
+                <div class="user-identity">
+                  <% if (user.avatarUrl) { %>
+                    <img class="user-avatar" src="<%= user.avatarUrl %>"
+                      alt="Avatar của <%= user.fullname || user.nickname || 'người dùng' %>"
+                      loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                      data-avatar-image
+                      data-avatar-initial="<%= (user.fullname || user.nickname || 'U').charAt(0).toUpperCase() %>">
+                  <% } else { %>
+                    <span class="user-avatar user-avatar-fallback"><%= (user.fullname || user.nickname || 'U').charAt(0).toUpperCase() %></span>
+                  <% } %>
+                  <div>
+                    <a class="user-name" href="/users/<%= encodeURIComponent(user.uid) %>"><%= user.fullname || 'Chưa cập nhật tên' %></a>
+                    <div class="user-meta">@<%= user.nickname || 'chưa-có-nickname' %></div>
+                    <code class="uid-code" title="<%= user.uid %>"><%= user.uid %></code>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="contact-line"><i class="bi bi-envelope"></i><%= maskEmail(user.email) %></div>
+                <div class="contact-line"><i class="bi bi-telephone"></i><%= maskPhone(user.phonenumber) %></div>
+              </td>
+              <td>
+                <span class="account-status status-<%= user.accountStatus %>">
+                  <span></span><%= statusLabels[user.accountStatus] || user.accountStatus %>
+                </span>
+                <div class="user-meta mt-1"><%= user.activeStatus === 'online' ? 'Đang online' : 'Offline' %></div>
+              </td>
+              <td>
+                <div class="verification-stack">
+                  <span class="<%= user.isFaceVerified ? 'text-success' : 'text-muted' %>">
+                    <i class="bi bi-<%= user.isFaceVerified ? 'patch-check-fill' : 'patch-minus' %>"></i>
+                    Khuôn mặt
+                  </span>
+                  <span class="<%= user.isProfileCompleted ? 'text-success' : 'text-muted' %>">
+                    <i class="bi bi-<%= user.isProfileCompleted ? 'check-circle-fill' : 'circle' %>"></i>
+                    Hồ sơ
+                  </span>
+                </div>
+              </td>
+              <td>
+                <strong><%= user.reputationScore.toLocaleString('vi-VN') %></strong>
+                <% if (user.trustWarnings > 0) { %>
+                  <div class="small text-warning"><%= user.trustWarnings %> cảnh báo</div>
+                <% } %>
+              </td>
+              <td>
+                <span class="<%= user.totalReports > 0 ? 'text-danger fw-semibold' : 'text-muted' %>">
+                  <%= user.totalReports.toLocaleString('vi-VN') %>
+                </span>
+              </td>
+              <td><%= formatDate(user.lastActiveAt) %></td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary" href="/users/<%= encodeURIComponent(user.uid) %>">
+                  Xem chi tiết
+                </a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="user-pagination">
+    <div class="text-muted small">Mỗi trang tối đa <%= filters.limit %> tài khoản phù hợp.</div>
+    <div class="d-flex gap-2">
+      <% if (hasPreviousPage) { %>
+        <a class="btn btn-outline-secondary" href="/users">
+          <i class="bi bi-chevron-bar-left me-1"></i>Trang đầu
+        </a>
+      <% } %>
+      <% if (nextPageUrl) { %>
+        <a class="btn btn-primary" href="<%= nextPageUrl %>">
+          Trang tiếp<i class="bi bi-chevron-right ms-1"></i>
+        </a>
+      <% } %>
+    </div>
+  </div>
+</section>

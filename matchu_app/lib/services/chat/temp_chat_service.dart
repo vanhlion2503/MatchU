@@ -1,21 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/models/temp_room_extension.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/repositories/chat/temp_chat_repository.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 
 /// Repository for temp-room state and message operations.
 ///
 /// Matching and permanent-room conversion are server-authoritative. Frequent
 /// room operations stay on Firestore so snapshots retain offline/optimistic UI.
 class TempChatService implements TempChatRepository {
-  TempChatService({FirebaseFirestore? db, FirebaseFunctions? functions})
-    : _db = db ?? FirebaseFirestore.instance,
-      _functions = functions ?? FirebaseFunctions.instance;
+  TempChatService({
+    FirebaseFirestore? db,
+    FirebaseFunctions? functions,
+    AccountAccessService? accountAccessService,
+  }) : _db = db ?? FirebaseFirestore.instance,
+       _functions = functions ?? FirebaseFunctions.instance,
+       _accountAccessService =
+           accountAccessService ?? AccountAccessService(firestore: db);
 
   final FirebaseFirestore _db;
   final FirebaseFunctions _functions;
+  final AccountAccessService _accountAccessService;
 
   static const Map<String, dynamic> _approvedSystemFields = {
     'status': 'approved',
@@ -67,6 +75,7 @@ class TempChatService implements TempChatRepository {
 
   @override
   Future<String> sendMessages(String roomId, TempMessageModel message) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.chat);
     final messageRef = _messagesRef(roomId).doc(message.id);
     await messageRef.set(message.toJson());
     return messageRef.id;

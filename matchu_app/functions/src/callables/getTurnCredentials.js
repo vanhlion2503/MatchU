@@ -1,5 +1,8 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const axios = require("axios");
+const {
+  assertAccountFeatureAllowed,
+} = require("../shared/accountAccess");
 
 const {
   TWILIO_ACCOUNT_SID,
@@ -14,6 +17,7 @@ const getTurnCredentials = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication is required.");
     }
+    await assertAccountFeatureAllowed(request.auth.uid, "calls");
 
     const accountSid = (TWILIO_ACCOUNT_SID.value() || "").trim();
     const authToken = (TWILIO_AUTH_TOKEN.value() || "").trim();

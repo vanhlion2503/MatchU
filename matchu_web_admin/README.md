@@ -53,6 +53,38 @@ Không commit `.env` hoặc JSON service account.
 | POST | `/auth/session` | Xác minh token và tạo cookie |
 | POST | `/auth/logout` | Xóa cookie và ghi audit log |
 | GET | `/dashboard` | Tổng quan, cần `dashboard.read` |
+| GET | `/users` | Danh sách, tìm kiếm và lọc tài khoản, cần `users.read` |
+| GET | `/users/:uid` | Hồ sơ quản trị 360° của người dùng, cần `users.read` |
+| POST | `/users/:uid/actions` | Thực hiện thao tác quản trị theo permission của từng hành động |
+
+## Quản lý tài khoản người dùng
+
+Module người dùng gồm danh sách có tìm kiếm/lọc/phân trang, thống kê trạng thái,
+chi tiết hồ sơ, Firebase Authentication, thiết bị, hoạt động, báo cáo, vi phạm
+kiểm duyệt và lịch sử quản trị.
+
+Các permission hành động:
+
+- `users.warn`
+- `users.restrict`
+- `users.suspend`
+- `users.ban`
+- `users.restore`
+- `users.sessions.revoke`
+- `users.security.manage`
+- `users.verification.manage`
+- `users.gems.adjust`
+- `users.reputation.adjust`
+
+`super_admin` luôn có toàn quyền. Hành động thay đổi dữ liệu được bảo vệ CSRF,
+kiểm tra permission ở server, tạo lịch sử tại
+`users/{uid}/adminActions` và ghi `adminAuditLogs`.
+
+Chạy kiểm tra trước khi phát hành:
+
+```bash
+npm run check
+```
 
 ## Cấu trúc
 

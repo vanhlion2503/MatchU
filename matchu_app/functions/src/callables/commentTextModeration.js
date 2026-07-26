@@ -2,6 +2,9 @@ const { GoogleGenAI, Type } = require("@google/genai");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
 const { admin, db } = require("../shared/firebase");
+const {
+  assertAccountFeatureAllowed,
+} = require("../shared/accountAccess");
 const { GEMINI_API_KEY } = require("../shared/secrets");
 const {
   AI_MODERATION_CACHE_MAX_ENTRIES,
@@ -429,6 +432,7 @@ const moderateCommentText = onCall(
     }
 
     const uid = request.auth.uid;
+    await assertAccountFeatureAllowed(uid, "comments");
 
     if (shouldFastApprove(normalizedContent)) {
       return allowedResult();

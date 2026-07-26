@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/models/profile_privacy_settings.dart';
 
 class UserModel {
@@ -53,6 +54,7 @@ class UserModel {
 
   final String activeStatus;
   final String accountStatus;
+  final AccountRestriction? restriction;
 
   final String role;
   final bool isProfileCompleted;
@@ -113,6 +115,7 @@ class UserModel {
 
     this.activeStatus = "offline",
     this.accountStatus = "active",
+    this.restriction,
 
     this.role = "user",
     this.isProfileCompleted = false,
@@ -272,6 +275,12 @@ class UserModel {
 
       activeStatus: json["activeStatus"] ?? "offline",
       accountStatus: json["accountStatus"] ?? "active",
+      restriction:
+          json["restriction"] is Map
+              ? AccountRestriction.fromJson(
+                Map<String, dynamic>.from(json["restriction"] as Map),
+              )
+              : null,
 
       role: json["role"] ?? "user",
       isProfileCompleted: json["isProfileCompleted"] ?? false,
@@ -336,6 +345,7 @@ class UserModel {
 
     String? activeStatus,
     String? accountStatus,
+    AccountRestriction? restriction,
 
     String? role,
     bool? isProfileCompleted,
@@ -400,6 +410,7 @@ class UserModel {
 
       activeStatus: activeStatus ?? this.activeStatus,
       accountStatus: accountStatus ?? this.accountStatus,
+      restriction: restriction ?? this.restriction,
 
       role: role ?? this.role,
       isProfileCompleted: isProfileCompleted ?? this.isProfileCompleted,

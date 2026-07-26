@@ -10,6 +10,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
@@ -1575,6 +1576,9 @@ class PostCommentsController extends GetxController {
   }
 
   String _mapError(Object error) {
+    if (error is AccountAccessException) {
+      return error.message;
+    }
     if (error is FirebaseException) {
       return firebaseErrorToVietnamese(error.code);
     }

@@ -9,6 +9,7 @@ import 'package:matchu_app/translations/long_chat_translations.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/models/message_status.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
 import 'package:matchu_app/services/security/passcode_backup_service.dart';
@@ -796,7 +797,11 @@ class ChatController extends GetxController {
       Get.snackbar(
         LongChatTranslationKeys.error.tr,
         longChatTr(
-          error is StateError ? error.message : "Không thể gửi tin nhắn.",
+          error is AccountAccessException
+              ? error.message
+              : error is StateError
+              ? error.message
+              : "Không thể gửi tin nhắn.",
         ),
       );
     }
@@ -846,7 +851,9 @@ class ChatController extends GetxController {
       pending.failed.value = true;
       Get.snackbar(
         LongChatTranslationKeys.error.tr,
-        longChatTr("Không thể gửi ảnh."),
+        longChatTr(
+          e is AccountAccessException ? e.message : "Không thể gửi ảnh.",
+        ),
       );
       Future.delayed(const Duration(seconds: 2), () {
         pendingImageMessages.remove(pending);
@@ -978,7 +985,11 @@ class ChatController extends GetxController {
       Get.snackbar(
         LongChatTranslationKeys.error.tr,
         longChatTr(
-          error is StateError ? error.message : "Không thể gửi ghi âm.",
+          error is AccountAccessException
+              ? error.message
+              : error is StateError
+              ? error.message
+              : "Không thể gửi ghi âm.",
         ),
       );
       Future.delayed(const Duration(seconds: 2), () {

@@ -6,8 +6,10 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:matchu_app/models/chat_room_model.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/security/message_crypto_service.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 
 class ChatService {
   ChatService({
@@ -16,17 +18,22 @@ class ChatService {
     FirebaseStorage? storage,
     FirebaseFunctions? functions,
     PostRestrictionService? restrictionService,
+    AccountAccessService? accountAccessService,
   }) : _db = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
        _functions = functions ?? FirebaseFunctions.instance,
-       _restrictionService = restrictionService ?? PostRestrictionService();
+       _restrictionService = restrictionService ?? PostRestrictionService(),
+       _accountAccessService =
+           accountAccessService ??
+           AccountAccessService(firestore: firestore, auth: auth);
 
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
   final FirebaseFunctions _functions;
   final PostRestrictionService _restrictionService;
+  final AccountAccessService _accountAccessService;
 
   String get uid => _auth.currentUser!.uid;
 
@@ -124,6 +131,7 @@ class ChatService {
     String? clientMessageId,
     int keyId = 0,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.chat);
     final roomRef = _db.collection("chatRooms").doc(roomId);
     final msgRef = roomRef.collection("messages").doc();
 
@@ -226,6 +234,7 @@ class ChatService {
     String? replyText,
     void Function(double progress)? onUploadProgress,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.chat);
     final roomRef = _db.collection("chatRooms").doc(roomId);
     final msgRef = roomRef.collection("messages").doc();
 
@@ -298,6 +307,7 @@ class ChatService {
     String? replyText,
     void Function(double progress)? onUploadProgress,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.chat);
     final roomRef = _db.collection("chatRooms").doc(roomId);
     final msgRef = roomRef.collection("messages").doc();
 

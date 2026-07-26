@@ -6,12 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/chat_user_cache_controller.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/chat/call_signaling_service.dart';
 import 'package:matchu_app/services/chat/ice_server_service.dart';
 import 'package:matchu_app/services/chat/webrtc_service.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 import 'package:matchu_app/translations/long_chat_translations.dart';
 
 enum CallUiState { idle, creating, ringing, connecting, active, ended, error }
@@ -44,6 +46,7 @@ class CallController extends GetxController {
   final IceServerService _iceServerService = IceServerService();
   final UserService _userService = UserService();
   final PostRestrictionService _restrictionService = PostRestrictionService();
+  final AccountAccessService _accountAccessService = AccountAccessService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final RxnString currentUserId = RxnString();
@@ -214,6 +217,12 @@ class CallController extends GetxController {
       _setError('A call is already in progress.');
       return;
     }
+    try {
+      await _accountAccessService.ensureAllowed(AccountFeature.calls);
+    } on AccountAccessException catch (error) {
+      _setError(error.message);
+      return;
+    }
     if (await _restrictionService.hasBlockRelationship(receiverId)) {
       _setError(
         'Kh\u00F4ng th\u1EC3 g\u1ECDi v\u00EC m\u1ED9t trong hai ng\u01B0\u1EDDi \u0111\u00E3 ch\u1EB7n ng\u01B0\u1EDDi c\u00F2n l\u1EA1i.',
@@ -267,7 +276,11 @@ class CallController extends GetxController {
       await _subscribeToRemoteIceCandidates(callId, callerSide: true);
     } catch (error) {
       debugPrint('startCall error: $error');
-      _setError('Unable to start call.');
+      _setError(
+        error is AccountAccessException
+            ? error.message
+            : 'Unable to start call.',
+      );
       await _clearLocalSession(popScreens: true);
     }
   }
@@ -287,6 +300,7 @@ class CallController extends GetxController {
     isIncomingActionBusy.value = true;
 
     try {
+      await _accountAccessService.ensureAllowed(AccountFeature.calls);
       final cachedData = _getCachedCallData(callId);
       if (cachedData == null) {
         // Give immediate feedback while waiting for first call document read.
@@ -372,7 +386,11 @@ class CallController extends GetxController {
       await _subscribeToRemoteIceCandidates(callId, callerSide: false);
     } catch (error) {
       debugPrint('acceptCall error: $error');
-      _setError('Unable to accept call.');
+      _setError(
+        error is AccountAccessException
+            ? error.message
+            : 'Unable to accept call.',
+      );
       await _clearLocalSession(popScreens: true);
     } finally {
       isIncomingActionBusy.value = false;

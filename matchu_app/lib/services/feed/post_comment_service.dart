@@ -8,9 +8,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/services/feed/comment_text_moderation_service.dart';
 import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 import 'package:path_provider/path_provider.dart';
 
 class PostCommentPageResult {
@@ -33,6 +35,7 @@ class PostCommentService {
     UserService? userService,
     CommentTextModerationService? textModerationService,
     ImageModerationService? imageModerationService,
+    AccountAccessService? accountAccessService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
@@ -40,7 +43,10 @@ class PostCommentService {
        _textModerationService =
            textModerationService ?? CommentTextModerationService(),
        _imageModerationService =
-           imageModerationService ?? ImageModerationService();
+           imageModerationService ?? ImageModerationService(),
+       _accountAccessService =
+           accountAccessService ??
+           AccountAccessService(firestore: firestore, auth: auth);
 
   static const int maxCommentLength = 300;
   static const int defaultTopLevelPageSize = 5;
@@ -52,6 +58,7 @@ class PostCommentService {
   final UserService _userService;
   final CommentTextModerationService _textModerationService;
   final ImageModerationService _imageModerationService;
+  final AccountAccessService _accountAccessService;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -143,6 +150,7 @@ class PostCommentService {
     String? voiceFileName,
     int? voiceDurationMs,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.comments);
     if (uid.isEmpty) {
       throw StateError('Bạn cần đăng nhập để bình luận.');
     }

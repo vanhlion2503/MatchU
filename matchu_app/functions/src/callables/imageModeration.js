@@ -2,6 +2,9 @@ const vision = require("@google-cloud/vision");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
 const { admin, db } = require("../shared/firebase");
+const {
+  assertAccountFeatureAllowed,
+} = require("../shared/accountAccess");
 const { REPUTATION_MAX_SCORE } = require("../../reputation/taskConfig");
 const {
   clamp,
@@ -338,6 +341,14 @@ const moderateImageContent = onCall(
       throw new HttpsError("unauthenticated", "Authentication is required.");
     }
 
+    const moderationContext = moderationPenaltyContext(request);
+    if (moderationContext === "post" || moderationContext === "comment") {
+      await assertAccountFeatureAllowed(
+        request.auth.uid,
+        moderationContext === "post" ? "posts" : "comments"
+      );
+    }
+
     const base64Image =
       typeof request.data?.base64Image === "string"
         ? request.data.base64Image.trim()
@@ -352,7 +363,7 @@ const moderateImageContent = onCall(
     }
 
     const applyPostPenalty = shouldApplyPostPenalty(request);
-    const penaltyContext = moderationPenaltyContext(request);
+    const penaltyContext = moderationContext;
     if (applyPostPenalty) {
       await assertCanPostImage(request.auth.uid);
     }

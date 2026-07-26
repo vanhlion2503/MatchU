@@ -10,6 +10,13 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://www.gstatic.com'],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
       fontSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+      imgSrc: [
+        "'self'",
+        'data:',
+        'https://firebasestorage.googleapis.com',
+        'https://storage.googleapis.com',
+        'https://*.googleusercontent.com'
+      ],
       connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com']
     }
   }

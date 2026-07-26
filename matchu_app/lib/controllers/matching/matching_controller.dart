@@ -7,6 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/anonymous_avatar_controller.dart';
 import 'package:matchu_app/models/matching/matching_mode.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/models/matching/matching_reputation_policy.dart';
 import 'package:matchu_app/translations/matching_chat_translations.dart';
 
@@ -418,7 +419,11 @@ class MatchingController extends GetxController {
 
       Get.snackbar(
         matchingChatTr('Không thể bắt đầu matching'),
-        matchingChatTr('Vui lòng thử lại sau ít phút.'),
+        matchingChatTr(
+          error is AccountAccessException
+              ? error.message
+              : 'Vui lòng thử lại sau ít phút.',
+        ),
         snackPosition: SnackPosition.TOP,
       );
     } finally {

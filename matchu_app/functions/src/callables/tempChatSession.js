@@ -4,6 +4,9 @@ const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 
 const { admin, db } = require("../shared/firebase");
 const {
+  assertAccountFeatureAllowed,
+} = require("../shared/accountAccess");
+const {
   isVideoMatchingFaceVerificationEnabled,
 } = require("../config/featureFlags");
 
@@ -794,6 +797,7 @@ const refundFailedVideoMatch = onDocumentUpdated(
 
 const startTempChatMatching = onCall(async (request) => {
   const uid = requireUid(request);
+  await assertAccountFeatureAllowed(uid, "matching");
   const sessionId = cleanString(request.data?.sessionId);
   const targetGender = normalizeGender(request.data?.targetGender);
   const matchingMode = normalizeMatchingMode(request.data?.matchingMode);

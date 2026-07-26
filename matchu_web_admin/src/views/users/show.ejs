@@ -1,0 +1,341 @@
+<div class="user-detail-heading">
+  <div>
+    <a class="back-link" href="/users"><i class="bi bi-arrow-left"></i>Quay lại danh sách</a>
+    <h1>Chi tiết tài khoản</h1>
+  </div>
+  <span class="account-status status-<%= user.accountStatus %>">
+    <span></span><%= statusLabels[user.accountStatus] || user.accountStatus %>
+  </span>
+</div>
+
+<% if (successMessage) { %><div class="alert alert-success"><i class="bi bi-check-circle me-2"></i><%= successMessage %></div><% } %>
+<% if (errorMessage) { %><div class="alert alert-danger"><i class="bi bi-exclamation-circle me-2"></i><%= errorMessage %></div><% } %>
+
+<section class="panel user-profile-hero mb-4">
+  <div class="user-profile-primary">
+    <% if (user.avatarUrl) { %>
+      <img class="user-profile-avatar" src="<%= user.avatarUrl %>"
+        alt="Avatar của <%= user.fullname || user.nickname || 'người dùng' %>"
+        decoding="async" referrerpolicy="no-referrer"
+        data-avatar-image
+        data-avatar-initial="<%= (user.fullname || user.nickname || 'U').charAt(0).toUpperCase() %>">
+    <% } else { %>
+      <span class="user-profile-avatar user-avatar-fallback"><%= (user.fullname || user.nickname || 'U').charAt(0).toUpperCase() %></span>
+    <% } %>
+    <div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h2><%= user.fullname || 'Chưa cập nhật tên' %></h2>
+        <% if (user.isFaceVerified) { %>
+          <span class="verified-pill"><i class="bi bi-patch-check-fill"></i>Đã xác minh</span>
+        <% } %>
+      </div>
+      <p>@<%= user.nickname || 'chưa-có-nickname' %></p>
+      <code class="uid-code"><%= user.uid %></code>
+    </div>
+  </div>
+  <div class="profile-quick-stats">
+    <div><strong><%= user.reputationScore.toLocaleString('vi-VN') %></strong><span>Điểm uy tín</span></div>
+    <div><strong><%= user.gem.toLocaleString('vi-VN') %></strong><span>Gem</span></div>
+    <div><strong><%= counts.reports.toLocaleString('vi-VN') %></strong><span>Báo cáo</span></div>
+    <div><strong><%= counts.posts.toLocaleString('vi-VN') %></strong><span>Bài viết</span></div>
+  </div>
+</section>
+
+<ul class="nav nav-tabs user-detail-tabs" id="userDetailTabs" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#overview" type="button"><i class="bi bi-person-vcard"></i>Tổng quan</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#security" type="button"><i class="bi bi-shield-lock"></i>Bảo mật</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#activity" type="button"><i class="bi bi-graph-up"></i>Hoạt động</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#violations" type="button"><i class="bi bi-flag"></i>Vi phạm</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#actions" type="button"><i class="bi bi-sliders"></i>Xử lý tài khoản</button></li>
+</ul>
+
+<div class="tab-content user-detail-content">
+  <div class="tab-pane fade show active" id="overview">
+    <div class="row g-4">
+      <div class="col-xl-7">
+        <section class="panel h-100">
+          <div class="panel-heading mb-3"><h3>Thông tin cá nhân</h3></div>
+          <dl class="detail-grid">
+            <div><dt>Họ và tên</dt><dd><%= user.fullname || '—' %></dd></div>
+            <div><dt>Nickname</dt><dd><%= user.nickname ? `@${user.nickname}` : '—' %></dd></div>
+            <div><dt>Email</dt><dd><%= maskEmail(auth?.email || user.email) %></dd></div>
+            <div><dt>Số điện thoại</dt><dd><%= maskPhone(auth?.phoneNumber || user.phonenumber) %></dd></div>
+            <div><dt>Ngày sinh</dt><dd><%= user.birthday ? user.birthday.toLocaleDateString('vi-VN') : '—' %></dd></div>
+            <div><dt>Giới tính</dt><dd><%= user.gender || '—' %></dd></div>
+            <div><dt>Vai trò</dt><dd><%= user.role %></dd></div>
+            <div><dt>Tài khoản riêng tư</dt><dd><%= user.isPrivateAccount ? 'Có' : 'Không' %></dd></div>
+            <div><dt>Quyền xem following</dt><dd><%= user.followingListVisibility %></dd></div>
+            <div><dt>Hoàn thiện hồ sơ</dt><dd><%= user.isProfileCompleted ? 'Đã hoàn thiện' : 'Chưa hoàn thiện' %></dd></div>
+            <div><dt>Ngày tạo</dt><dd><%= formatDate(user.createdAt) %></dd></div>
+            <div><dt>Cập nhật gần nhất</dt><dd><%= formatDate(user.updatedAt) %></dd></div>
+          </dl>
+          <% if (user.bio) { %>
+            <div class="detail-note"><span>Giới thiệu</span><p><%= user.bio %></p></div>
+          <% } %>
+          <% if (user.interests.length) { %>
+            <div class="interest-list">
+              <% user.interests.forEach((interest) => { %><span><%= interest %></span><% }) %>
+            </div>
+          <% } %>
+        </section>
+      </div>
+      <div class="col-xl-5">
+        <% const activeMeasure = user.accountStatus === 'restricted' ? user.restriction : user.accountStatus === 'suspended' ? user.suspension : user.accountStatus === 'banned' ? user.ban : null; %>
+        <% if (activeMeasure) { %>
+          <section class="alert <%= user.accountStatus === 'banned' ? 'alert-danger' : 'alert-warning' %> account-measure">
+            <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-shield-exclamation"></i><strong>Biện pháp quản trị đang áp dụng</strong></div>
+            <p><%= activeMeasure.reason || 'Không có mô tả.' %></p>
+            <% if (activeMeasure.features?.length) { %><small>Tính năng: <%= activeMeasure.features.join(', ') %></small><% } %>
+            <% if (activeMeasure.expiresAt) { %><small>Hết hạn dự kiến: <%= formatDate(activeMeasure.expiresAt) %></small><% } %>
+          </section>
+        <% } %>
+        <section class="panel mb-4">
+          <div class="panel-heading mb-3"><h3>Trạng thái hiện tại</h3></div>
+          <div class="status-summary">
+            <div><span>Trạng thái tài khoản</span><strong><%= statusLabels[user.accountStatus] || user.accountStatus %></strong></div>
+            <div><span>Trạng thái hoạt động</span><strong><%= user.activeStatus === 'online' ? 'Đang online' : 'Offline' %></strong></div>
+            <div><span>Hoạt động gần nhất</span><strong><%= formatDate(user.lastActiveAt) %></strong></div>
+            <div><span>Firebase Auth</span><strong><%= !auth ? 'Không còn tài khoản Auth' : auth.disabled ? 'Đã vô hiệu hóa' : 'Đang hoạt động' %></strong></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading mb-3"><h3>Quan hệ xã hội</h3></div>
+          <div class="metric-grid">
+            <div><strong><%= user.followersCount.toLocaleString('vi-VN') %></strong><span>Người theo dõi</span></div>
+            <div><strong><%= user.followingCount.toLocaleString('vi-VN') %></strong><span>Đang theo dõi</span></div>
+            <div><strong><%= user.totalLikes.toLocaleString('vi-VN') %></strong><span>Lượt thích</span></div>
+            <div><strong><%= user.avgChatRating.toFixed(1) %></strong><span>Đánh giá chat</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="security">
+    <div class="row g-4">
+      <div class="col-xl-5">
+        <section class="panel h-100">
+          <div class="panel-heading mb-3"><h3>Xác thực tài khoản</h3></div>
+          <div class="security-list">
+            <div><i class="bi bi-envelope-check"></i><span>Email</span><strong class="<%= auth?.emailVerified ? 'text-success' : 'text-warning' %>"><%= auth?.emailVerified ? 'Đã xác minh' : 'Chưa xác minh' %></strong></div>
+            <div><i class="bi bi-phone"></i><span>Số điện thoại</span><strong><%= auth?.phoneNumber ? 'Đã đăng ký' : 'Chưa đăng ký' %></strong></div>
+            <div><i class="bi bi-person-badge"></i><span>Khuôn mặt</span><strong class="<%= user.isFaceVerified ? 'text-success' : 'text-muted' %>"><%= user.isFaceVerified ? 'Đã xác minh' : 'Chưa xác minh' %></strong></div>
+            <div><i class="bi bi-shield-check"></i><span>MFA</span><strong><%= auth?.mfaFactors?.length ? `Đang bật (${auth.mfaFactors.length})` : 'Chưa bật' %></strong></div>
+          </div>
+          <hr>
+          <h4 class="detail-section-title">Phương thức đăng nhập</h4>
+          <div class="provider-list">
+            <% if (auth?.providers?.length) { auth.providers.forEach((provider) => { %>
+              <span><i class="bi bi-key"></i><%= provider %></span>
+            <% }) } else { %><span class="text-muted">Không có dữ liệu</span><% } %>
+          </div>
+          <dl class="detail-grid mt-4">
+            <div><dt>Đăng nhập gần nhất</dt><dd><%= formatDate(auth?.lastSignInTime) %></dd></div>
+            <div><dt>Token hợp lệ từ</dt><dd><%= formatDate(auth?.tokensValidAfterTime) %></dd></div>
+          </dl>
+        </section>
+      </div>
+      <div class="col-xl-7">
+        <section class="panel h-100">
+          <div class="panel-heading mb-3">
+            <div><h3>Thiết bị đã đăng nhập</h3><p class="panel-subtitle"><%= devices.length %> thiết bị được ghi nhận</p></div>
+          </div>
+          <% if (!devices.length) { %>
+            <div class="compact-empty"><i class="bi bi-devices"></i>Chưa có dữ liệu thiết bị.</div>
+          <% } else { %>
+            <div class="device-list">
+              <% devices.forEach((device) => { %>
+                <div class="device-item">
+                  <span class="device-icon"><i class="bi bi-<%= device.platform === 'android' || device.platform === 'ios' ? 'phone' : 'laptop' %>"></i></span>
+                  <div><strong><%= device.platform || 'Không xác định' %></strong><code><%= device.id %></code></div>
+                  <div class="device-state"><span class="account-status status-<%= device.status %>"><span></span><%= device.status %></span><small><%= formatDate(device.lastActiveAt) %></small></div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="activity">
+    <div class="row g-3 mb-4">
+      <% const activityCards = [
+        ['Bài viết', counts.posts, 'file-post'],
+        ['Follower', user.followersCount, 'people'],
+        ['Following', user.followingCount, 'person-plus'],
+        ['Lượt thích', user.totalLikes, 'heart'],
+        ['Rank', user.rank, 'trophy'],
+        ['Kinh nghiệm', user.experience, 'lightning'],
+        ['Gem', user.gem, 'gem'],
+        ['Đánh giá chat', user.totalChatRatings, 'star']
+      ]; %>
+      <% activityCards.forEach((item) => { %>
+        <div class="col-6 col-lg-3"><div class="activity-metric"><i class="bi bi-<%= item[2] %>"></i><div><strong><%= item[1].toLocaleString('vi-VN') %></strong><span><%= item[0] %></span></div></div></div>
+      <% }) %>
+    </div>
+    <section class="panel">
+      <div class="panel-heading mb-3"><h3>Thông tin đánh giá và uy tín</h3></div>
+      <dl class="detail-grid">
+        <div><dt>Điểm uy tín</dt><dd><%= user.reputationScore.toLocaleString('vi-VN') %></dd></div>
+        <div><dt>Cảnh báo chính thức</dt><dd><%= user.trustWarnings.toLocaleString('vi-VN') %></dd></div>
+        <div><dt>Đánh giá chat trung bình</dt><dd><%= user.avgChatRating.toFixed(1) %>/5</dd></div>
+        <div><dt>Số lượt đánh giá</dt><dd><%= user.totalChatRatings.toLocaleString('vi-VN') %></dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <div class="tab-pane fade" id="violations">
+    <div class="row g-4">
+      <div class="col-xl-4">
+        <section class="panel">
+          <div class="panel-heading mb-3"><h3>Tổng hợp báo cáo</h3></div>
+          <div class="report-breakdown">
+            <div><span>Báo cáo bài viết</span><strong><%= counts.postReports %></strong></div>
+            <div><span>Báo cáo hồ sơ</span><strong><%= counts.profileReports %></strong></div>
+            <div><span>Báo cáo matching</span><strong><%= counts.matchingReports %></strong></div>
+            <div class="report-total"><span>Tổng cộng</span><strong><%= counts.reports %></strong></div>
+          </div>
+          <p class="data-note"><i class="bi bi-info-circle"></i>Số báo cáo thô không đồng nghĩa với số vi phạm đã xác nhận.</p>
+        </section>
+      </div>
+      <div class="col-xl-8">
+        <section class="panel mb-4">
+          <div class="panel-heading mb-3"><h3>Vi phạm kiểm duyệt gần đây</h3><span class="badge text-bg-danger"><%= moderationViolations.length %></span></div>
+          <% if (!moderationViolations.length) { %>
+            <div class="compact-empty"><i class="bi bi-shield-check"></i>Không có vi phạm kiểm duyệt được ghi nhận.</div>
+          <% } else { %>
+            <div class="timeline-list">
+              <% moderationViolations.forEach((item) => { %>
+                <article><span class="timeline-dot danger"></span><div><strong><%= item.category || item.reason || item.type || 'Vi phạm nội dung' %></strong><p><%= item.message || item.userMessageVi || item.evidence || 'Không có mô tả.' %></p><small><%= formatDate(item.createdAt) %> · <code><%= item.id %></code></small></div></article>
+              <% }) %>
+            </div>
+          <% } %>
+        </section>
+        <section class="panel">
+          <div class="panel-heading mb-3"><h3>Lịch sử phạt uy tín</h3></div>
+          <% if (!penaltyLogs.length) { %>
+            <div class="compact-empty"><i class="bi bi-award"></i>Chưa có lịch sử trừ điểm uy tín.</div>
+          <% } else { %>
+            <div class="timeline-list">
+              <% penaltyLogs.forEach((item) => { %>
+                <article><span class="timeline-dot warning"></span><div><strong><%= item.reason || item.source || 'Điều chỉnh uy tín' %></strong><p>Mức điều chỉnh: <%= item.penalty || item.amount || 0 %></p><small><%= formatDate(item.createdAt) %></small></div></article>
+              <% }) %>
+            </div>
+          <% } %>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="actions">
+    <div class="row g-4">
+      <div class="col-xl-7">
+        <section class="panel">
+          <div class="panel-heading mb-3">
+            <div><h3>Thao tác quản trị</h3><p class="panel-subtitle">Mọi thao tác đều được ghi nhật ký và gắn với tài khoản admin.</p></div>
+          </div>
+          <div class="admin-action-grid">
+            <% const actions = [
+              ['warn', 'Cảnh báo', 'Gửi cảnh báo chính thức đến người dùng.', 'exclamation-triangle', 'warning'],
+              ['restrict', 'Hạn chế tính năng', 'Khóa đăng bài, bình luận, chat, matching hoặc cuộc gọi.', 'slash-circle', 'warning'],
+              ['suspend', 'Tạm khóa tài khoản', 'Tạm ngừng tài khoản và thu hồi phiên đăng nhập.', 'pause-circle', 'danger'],
+              ['ban', 'Cấm vĩnh viễn', 'Vô hiệu hóa đăng nhập và cấm tài khoản.', 'person-x', 'danger'],
+              ['restore', 'Khôi phục tài khoản', 'Gỡ hạn chế, khóa hoặc lệnh cấm hiện tại.', 'arrow-counterclockwise', 'success'],
+              ['revoke_sessions', 'Thu hồi phiên', 'Đăng xuất tài khoản khỏi toàn bộ thiết bị.', 'box-arrow-right', 'secondary'],
+              ['reset_face_verification', 'Đặt lại xác minh', 'Xóa mẫu khuôn mặt và yêu cầu xác minh lại.', 'person-bounding-box', 'secondary'],
+              ['send_password_reset', 'Đặt lại mật khẩu', 'Gửi email đặt lại mật khẩu qua Firebase.', 'envelope-lock', 'secondary'],
+              ['adjust_gem', 'Điều chỉnh gem', 'Cộng hoặc trừ gem thông qua giao dịch quản trị.', 'gem', 'primary'],
+              ['adjust_reputation', 'Điều chỉnh uy tín', 'Cộng hoặc trừ điểm uy tín có ghi nhận lịch sử.', 'award', 'primary']
+            ]; %>
+            <% actions.forEach((item) => { const allowed = canPerformAction(item[0]); %>
+              <button type="button" class="admin-action-card action-<%= item[4] %>" <%= allowed ? '' : 'disabled' %>
+                data-bs-toggle="modal" data-bs-target="#userActionModal"
+                data-user-action="<%= item[0] %>" data-action-title="<%= item[1] %>">
+                <i class="bi bi-<%= item[3] %>"></i>
+                <span><strong><%= item[1] %></strong><small><%= allowed ? item[2] : 'Bạn không có quyền thực hiện thao tác này.' %></small></span>
+              </button>
+            <% }) %>
+          </div>
+        </section>
+      </div>
+      <div class="col-xl-5">
+        <section class="panel">
+          <div class="panel-heading mb-3"><h3>Lịch sử quản trị</h3><span class="badge text-bg-light border"><%= adminActions.length %></span></div>
+          <% if (!adminActions.length) { %>
+            <div class="compact-empty"><i class="bi bi-clock-history"></i>Chưa có thao tác quản trị.</div>
+          <% } else { %>
+            <div class="timeline-list admin-history">
+              <% adminActions.forEach((item) => { %>
+                <article><span class="timeline-dot"></span><div><strong><%= item.action %></strong><p><%= item.reason || 'Không yêu cầu lý do.' %></p><small><%= formatDate(item.createdAt) %> · <%= item.adminEmail || item.adminId || 'Admin' %></small></div></article>
+              <% }) %>
+            </div>
+          <% } %>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="userActionModal" tabindex="-1" aria-labelledby="userActionModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" action="/users/<%= encodeURIComponent(user.uid) %>/actions" method="post" id="userActionForm">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="action" id="userActionInput">
+      <div class="modal-header">
+        <div><span class="modal-eyebrow">XỬ LÝ TÀI KHOẢN</span><h2 class="modal-title fs-5" id="userActionModalTitle">Xác nhận thao tác</h2></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="action-target">
+          <% if (user.avatarUrl) { %>
+            <img class="user-avatar" src="<%= user.avatarUrl %>"
+              alt="Avatar của <%= user.fullname || user.nickname || 'người dùng' %>"
+              decoding="async" referrerpolicy="no-referrer"
+              data-avatar-image
+              data-avatar-initial="<%= (user.fullname || user.nickname || 'U').charAt(0).toUpperCase() %>">
+          <% } else { %>
+            <span class="user-avatar user-avatar-fallback"><%= (user.fullname || user.nickname || 'U').charAt(0).toUpperCase() %></span>
+          <% } %>
+          <div><strong><%= user.fullname || user.nickname || 'Người dùng' %></strong><small><%= user.uid %></small></div>
+        </div>
+        <div class="mb-3 action-reason-field">
+          <label class="form-label" for="actionReason">Lý do xử lý</label>
+          <textarea class="form-control" id="actionReason" name="reason" rows="3" maxlength="500" placeholder="Nêu rõ lý do và căn cứ xử lý"></textarea>
+          <div class="form-text">Bắt buộc đối với cảnh báo, hạn chế, khóa, cấm và điều chỉnh số dư.</div>
+        </div>
+        <div class="mb-3 action-feature-field d-none">
+          <label class="form-label">Tính năng cần hạn chế</label>
+          <div class="feature-checks">
+            <% const featureLabels = { posts: 'Đăng bài', comments: 'Bình luận', chat: 'Chat', matching: 'Matching', calls: 'Cuộc gọi' }; %>
+            <% allowedFeatures.forEach((feature) => { %>
+              <label><input class="form-check-input" type="checkbox" name="features" value="<%= feature %>"><%= featureLabels[feature] %></label>
+            <% }) %>
+          </div>
+        </div>
+        <div class="mb-3 action-duration-field d-none">
+          <label class="form-label" for="actionDuration">Thời hạn</label>
+          <select class="form-select" id="actionDuration" name="durationDays">
+            <option value="1">1 ngày</option><option value="3">3 ngày</option><option value="7" selected>7 ngày</option><option value="30">30 ngày</option><option value="90">90 ngày</option><option value="365">365 ngày</option>
+          </select>
+        </div>
+        <div class="mb-3 action-amount-field d-none">
+          <label class="form-label" for="actionAmount">Mức điều chỉnh</label>
+          <input class="form-control" id="actionAmount" name="amount" type="number" min="-100000" max="100000" placeholder="Ví dụ: 10 hoặc -10">
+          <div class="form-text">Nhập số dương để cộng, số âm để trừ.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="actionReportId">Mã báo cáo liên quan <span class="text-muted">(không bắt buộc)</span></label>
+          <input class="form-control" id="actionReportId" name="reportId" maxlength="160">
+        </div>
+        <div class="alert alert-warning mb-0 action-warning">
+          <i class="bi bi-exclamation-triangle me-2"></i>Hãy kiểm tra kỹ thông tin trước khi xác nhận.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+        <button type="submit" class="btn btn-primary" id="userActionSubmit">Xác nhận</button>
+      </div>
+    </form>
+  </div>
+</div>

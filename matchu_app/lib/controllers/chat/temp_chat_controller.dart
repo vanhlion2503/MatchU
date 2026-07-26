@@ -6,6 +6,7 @@ import 'package:matchu_app/controllers/game/telepathy/telepathy_controller.dart'
 import 'package:matchu_app/controllers/game/wordChain/word_chain_controller.dart';
 import 'package:matchu_app/controllers/matching/matching_controller.dart';
 import 'package:matchu_app/models/quick_message.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
 import 'package:matchu_app/models/temp_messenger_moder.dart';
 import 'package:matchu_app/models/temp_room_extension.dart';
@@ -669,7 +670,11 @@ class TempChatController extends GetxController {
       _justSentMessage.value = false;
       Get.snackbar(
         MatchingChatTranslationKeys.notice.tr,
-        matchingChatTr("Không thể gửi tin nhắn lúc này."),
+        matchingChatTr(
+          error is AccountAccessException
+              ? error.message
+              : "Không thể gửi tin nhắn lúc này.",
+        ),
         snackPosition: SnackPosition.TOP,
         duration: const Duration(seconds: 2),
       );

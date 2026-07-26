@@ -1,6 +1,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
 const { admin, db } = require("../shared/firebase");
+const {
+  assertAccountFeatureAllowed,
+} = require("../shared/accountAccess");
 
 const MAX_B64_FIELD_LENGTH = 8192;
 const MAX_REPLY_TEXT_LENGTH = 500;
@@ -94,6 +97,7 @@ const sendEncryptedChatMessage = onCall(async (request) => {
   }
 
   const uid = request.auth.uid;
+  await assertAccountFeatureAllowed(uid, "chat");
   const roomId = cleanString(request.data?.roomId);
   const ciphertext = assertBase64Field("ciphertext", request.data?.ciphertext);
   const iv = assertBase64Field("iv", request.data?.iv);

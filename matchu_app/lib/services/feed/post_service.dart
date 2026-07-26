@@ -12,12 +12,14 @@ import 'package:matchu_app/models/feed/post_media_draft.dart';
 import 'package:matchu_app/models/feed/post_model.dart';
 import 'package:matchu_app/models/feed/post_page_result.dart';
 import 'package:matchu_app/models/feed/stats_model.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/repositories/profile_privacy/profile_privacy_access_repository.dart';
 import 'package:matchu_app/services/feed/post_text_moderation_service.dart';
 import 'package:matchu_app/utils/topic_taxonomy.dart';
 import 'package:matchu_app/services/moderation/image_moderation_service.dart';
 import 'package:matchu_app/services/user/user_service.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
@@ -30,6 +32,7 @@ class PostService {
     PostTextModerationService? textModerationService,
     ImageModerationService? imageModerationService,
     ProfilePrivacyAccessRepository? privacyAccessRepository,
+    AccountAccessService? accountAccessService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _storage = storage ?? FirebaseStorage.instance,
@@ -39,7 +42,10 @@ class PostService {
        _imageModerationService =
            imageModerationService ?? ImageModerationService(),
        _privacyAccessRepository =
-           privacyAccessRepository ?? ProfilePrivacyAccessRepository();
+           privacyAccessRepository ?? ProfilePrivacyAccessRepository(),
+       _accountAccessService =
+           accountAccessService ??
+           AccountAccessService(firestore: firestore, auth: auth);
 
   static const int defaultPageSize = 10;
   static const int maxContentLength = 300;
@@ -56,6 +62,7 @@ class PostService {
   final PostTextModerationService _textModerationService;
   final ImageModerationService _imageModerationService;
   final ProfilePrivacyAccessRepository _privacyAccessRepository;
+  final AccountAccessService _accountAccessService;
 
   CollectionReference<Map<String, dynamic>> get _postsRef =>
       _firestore.collection('posts');
@@ -1251,6 +1258,7 @@ class PostService {
     PostReferenceModel? referencePost,
     DocumentReference<Map<String, dynamic>>? explicitPostRef,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.posts);
     await _requireAuthenticatedUid(
       actionMessage: 'Bạn cần đăng nhập để đăng bài viết.',
     );

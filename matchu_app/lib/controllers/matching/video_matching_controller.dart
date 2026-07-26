@@ -10,6 +10,7 @@ import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/controllers/matching/video_matching_session_coordinator.dart';
 import 'package:matchu_app/controllers/matching/video_matching_admission_controller.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/models/temp_room_extension.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/routes/app_router.dart';
@@ -1134,6 +1135,9 @@ class VideoMatchingController extends GetxController {
   }
 
   String? _matchingAdmissionErrorMessage(Object error) {
+    if (error is AccountAccessException) {
+      return error.message;
+    }
     if (error is! FirebaseFunctionsException) {
       return null;
     }

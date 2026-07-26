@@ -1,11 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 
 class CallSignalingService {
-  CallSignalingService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  CallSignalingService({
+    FirebaseFirestore? firestore,
+    AccountAccessService? accountAccessService,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _accountAccessService =
+           accountAccessService ?? AccountAccessService(firestore: firestore);
 
   final FirebaseFirestore _firestore;
+  final AccountAccessService _accountAccessService;
 
   CollectionReference<Map<String, dynamic>> get _calls =>
       _firestore.collection('callSessions');
@@ -17,6 +24,7 @@ class CallSignalingService {
     required String type,
     required Map<String, dynamic> offer,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.calls);
     final callRef = _calls.doc();
 
     await callRef.set({
@@ -59,6 +67,7 @@ class CallSignalingService {
     required String callId,
     required Map<String, dynamic> offer,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.calls);
     await _calls.doc(callId).set({
       'offer': offer,
       'updatedAt': FieldValue.serverTimestamp(),

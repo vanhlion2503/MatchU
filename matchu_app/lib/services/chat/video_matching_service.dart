@@ -2,10 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:matchu_app/models/chat_peer_summary.dart';
+import 'package:matchu_app/models/account_access/account_access_model.dart';
 import 'package:matchu_app/repositories/matching/video_matching_repository.dart';
 import 'package:matchu_app/services/chat/call_signaling_service.dart';
 import 'package:matchu_app/services/chat/rating_service.dart';
 import 'package:matchu_app/services/chat/temp_chat_service.dart';
+import 'package:matchu_app/services/user/account_access_service.dart';
 
 class VideoMatchingService implements VideoMatchingRepository {
   VideoMatchingService({
@@ -13,15 +15,19 @@ class VideoMatchingService implements VideoMatchingRepository {
     FirebaseFunctions? functions,
     CallSignalingService? signalingService,
     TempChatService? tempChatService,
+    AccountAccessService? accountAccessService,
   }) : _firestore = firestore ?? FirebaseFirestore.instance,
        _functions = functions ?? FirebaseFunctions.instance,
        _signalingService = signalingService ?? CallSignalingService(),
-       _tempChatService = tempChatService ?? TempChatService();
+       _tempChatService = tempChatService ?? TempChatService(),
+       _accountAccessService =
+           accountAccessService ?? AccountAccessService(firestore: firestore);
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
   final CallSignalingService _signalingService;
   final TempChatService _tempChatService;
+  final AccountAccessService _accountAccessService;
 
   static const String _queueCollection = 'tempChatMatchingQueue';
 
@@ -33,6 +39,7 @@ class VideoMatchingService implements VideoMatchingRepository {
     required String faceProofId,
     required String deviceId,
   }) async {
+    await _accountAccessService.ensureAllowed(AccountFeature.matching);
     final result = await _functions
         .httpsCallable('startTempChatMatching')
         .call({
