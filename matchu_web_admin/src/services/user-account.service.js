@@ -487,7 +487,12 @@ async function executeUserAction(uid, payload, currentAdmin) {
     if (payload.action === USER_ACTIONS.SUSPEND) {
       const authUser = await safeGetAuthUser(uid);
       if (authUser) {
-        await auth.updateUser(uid, { disabled: true });
+        // Temporary suspension must still allow credential verification so
+        // mobile can securely read and display the suspension reason/expiry.
+        // Authorization remains blocked by accountStatus in Rules/Functions.
+        if (authUser.disabled) {
+          await auth.updateUser(uid, { disabled: false });
+        }
         await auth.revokeRefreshTokens(uid);
       }
       await markDevicesRevoked(userRef);

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/chat/unread_controller.dart';
 import 'package:matchu_app/controllers/feed/feed_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
+import 'package:matchu_app/controllers/notification/notification_unread_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/views/chat/list_chat/chat_list_view.dart';
 import 'package:matchu_app/views/chat/random_chat_view.dart';
@@ -21,6 +22,8 @@ class MainView extends StatefulWidget {
 class _MainViewState extends State<MainView> {
   final MainController c = Get.find<MainController>();
   final UnreadController unreadController = Get.find<UnreadController>();
+  final NotificationUnreadController notificationUnreadController =
+      Get.find<NotificationUnreadController>();
 
   Worker? _tabIndexWorker;
   Worker? _pageIndexWorker;
@@ -114,6 +117,8 @@ class _MainViewState extends State<MainView> {
                 return Obx(() {
                   final int currentIndex = c.currentIndex.value;
                   final int unreadCount = unreadController.totalUnread.value;
+                  final int notificationUnreadCount =
+                      notificationUnreadController.unreadCount.value;
                   final feedController =
                       Get.isRegistered<FeedController>()
                           ? Get.find<FeedController>()
@@ -131,6 +136,7 @@ class _MainViewState extends State<MainView> {
                     currentIndex: currentIndex,
                     isVisible: isBottomNavigationVisible,
                     unreadCount: unreadCount,
+                    notificationUnreadCount: notificationUnreadCount,
                     isHomeRefreshing: isHomeRefreshing,
                     isHomeFeedScrolled: isHomeFeedScrolled,
                     onTabSelected: _handleTabSelected,

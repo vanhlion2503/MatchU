@@ -145,9 +145,14 @@ service cloud.firestore {
       let restrictionExpired = hasRestriction
         && user.restriction.expiresAt is timestamp
         && request.time >= user.restriction.expiresAt;
+      let suspensionExpired = userExists
+        && user.suspension is map
+        && user.suspension.expiresAt is timestamp
+        && request.time >= user.suspension.expiresAt;
       return userExists
         && (
           status == "active"
+          || (status == "suspended" && suspensionExpired)
           || (
             status == "restricted"
             && hasRestriction

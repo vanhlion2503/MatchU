@@ -6,9 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 import 'package:matchu_app/controllers/feed/post_deep_link_controller.dart';
+import 'package:matchu_app/models/account_access/account_suspension_notice.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/auth/auth_service.dart';
+import 'package:matchu_app/services/auth/google_auth_credential_service.dart';
+import 'package:matchu_app/services/auth/logout_service.dart';
 import 'package:matchu_app/services/security/identity_key_service.dart';
+import 'package:matchu_app/widgets/auth/account_suspension_dialog.dart';
 
 class AuthGateController extends GetxController {
   final AuthService _auth = AuthService();
@@ -20,6 +24,7 @@ class AuthGateController extends GetxController {
   int _authEventToken = 0;
   String? _signedOutRedirectRoute;
   DateTime? _logoutSplashShownAt;
+  String? _suspensionDialogUid;
 
   static const _minimumSplashDuration = Duration(milliseconds: 700);
 
@@ -45,7 +50,9 @@ class AuthGateController extends GetxController {
     // 1️⃣ CHƯA LOGIN
     // ============================
     if (_isLoggingOut && user != null) {
-      return;
+      // A new successful sign-in can overtake the previous null auth event.
+      // Treat it as authoritative and clear the stale logout lock.
+      reset();
     }
 
     if (user == null) {
@@ -161,6 +168,13 @@ class AuthGateController extends GetxController {
       return;
     }
 
+    final suspensionNotice = AccountSuspensionNotice.fromUserData(snap.data());
+    if (suspensionNotice != null &&
+        suspensionNotice.isActiveAt(DateTime.now())) {
+      await _showSuspensionAndSignOut(user.uid, suspensionNotice);
+      return;
+    }
+
     // A Google login can create the Firebase account before a Firestore
     // profile exists. Derive onboarding from server state so a local flag race
     // (or an app restart) can never skip phone verification.
@@ -251,6 +265,49 @@ class AuthGateController extends GetxController {
     return await _auth.db.collection('users').doc(uid).get();
   }
 
+  Future<void> _showSuspensionAndSignOut(
+    String uid,
+    AccountSuspensionNotice notice,
+  ) async {
+    if (_suspensionDialogUid == uid) return;
+    _suspensionDialogUid = uid;
+    try {
+      await AccountSuspensionDialog.show(notice);
+    } finally {
+      _suspensionDialogUid = null;
+    }
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final signedInWithGoogle =
+        currentUser?.uid == uid &&
+        currentUser!.providerData.any(
+          (provider) => provider.providerId == GoogleAuthProvider.PROVIDER_ID,
+        );
+
+    beginLogout(redirectRoute: AppRouter.login);
+    try {
+      if (signedInWithGoogle) {
+        try {
+          await GoogleAuthCredentialService.signOut();
+        } catch (error, stackTrace) {
+          // Firebase logout must still continue if the provider cannot clear
+          // its local session.
+          debugPrint('Unable to clear Google session: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      }
+
+      final loggedOut = await LogoutService.logout(skipRemoteUpdates: true);
+      if (!loggedOut && FirebaseAuth.instance.currentUser != null) {
+        await FirebaseAuth.instance.signOut();
+      }
+    } catch (error, stackTrace) {
+      reset();
+      debugPrint('Unable to sign out suspended account: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   /// ============================
   /// RESET KHI LOGOUT
   /// ============================
@@ -265,6 +322,14 @@ class AuthGateController extends GetxController {
     _isLoggingOut = false;
     _signedOutRedirectRoute = null;
     _logoutSplashShownAt = null;
+  }
+
+  /// Clears a stale logout transition before the user starts a new explicit
+  /// login. This is safe only while Firebase has no authenticated user.
+  void prepareForLoginAttempt() {
+    if (FirebaseAuth.instance.currentUser == null) {
+      reset();
+    }
   }
 
   Future<void> refreshCurrentUser() async {

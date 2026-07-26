@@ -8,6 +8,7 @@ class MainBottomNavigationBar extends StatefulWidget {
     required this.currentIndex,
     required this.isVisible,
     required this.unreadCount,
+    required this.notificationUnreadCount,
     required this.isHomeRefreshing,
     required this.isHomeFeedScrolled,
     required this.onTabSelected,
@@ -17,6 +18,7 @@ class MainBottomNavigationBar extends StatefulWidget {
   final int currentIndex;
   final bool isVisible;
   final int unreadCount;
+  final int notificationUnreadCount;
   final bool isHomeRefreshing;
   final bool isHomeFeedScrolled;
   final ValueChanged<int> onTabSelected;
@@ -230,6 +232,7 @@ class _MainBottomNavigationBarState extends State<MainBottomNavigationBar>
                         ? Icons.refresh_rounded
                         : Iconsax.home_2,
                 isSelected: widget.currentIndex == 0,
+                badgeCount: widget.notificationUnreadCount,
                 rotation:
                     widget.isHomeRefreshing ? _homeRefreshController : null,
                 onTap: () => widget.onTabSelected(0),

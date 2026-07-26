@@ -960,6 +960,9 @@ class AuthController extends GetxController {
     if (loading.value) return;
 
     _box.remove('isRegistering');
+    if (Get.isRegistered<AuthGateController>()) {
+      Get.find<AuthGateController>().prepareForLoginAttempt();
+    }
     loading.value = true;
 
     try {
@@ -1018,6 +1021,9 @@ class AuthController extends GetxController {
     if (isLoadingLogin.value) return;
 
     _box.remove('isRegistering');
+    if (Get.isRegistered<AuthGateController>()) {
+      Get.find<AuthGateController>().prepareForLoginAttempt();
+    }
 
     if (emailC.text.isEmpty || passwordC.text.isEmpty) {
       _showAuthSnackbar("Lỗi", "Nhập email và mật khẩu");

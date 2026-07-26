@@ -183,7 +183,9 @@ class AuthService {
       return _auth.signInWithPopup(provider);
     }
 
-    final credential = await GoogleAuthCredentialService.requestCredential();
+    final credential = await GoogleAuthCredentialService.requestCredential(
+      clearPreviousSession: true,
+    );
     return _auth.signInWithCredential(credential);
   }
 

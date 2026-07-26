@@ -20,6 +20,7 @@ import 'package:matchu_app/controllers/feed/feed_engagement_controller.dart';
 import 'package:matchu_app/controllers/feed/post_chat_share_controller.dart';
 import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/controllers/nearby/nearby_controller.dart';
+import 'package:matchu_app/controllers/notification/notification_unread_controller.dart';
 import 'package:matchu_app/controllers/qr/profile_qr_controller.dart';
 import 'package:matchu_app/controllers/reputation/reputation_controller.dart';
 import 'package:matchu_app/controllers/search/search_user_controller.dart';
@@ -109,6 +110,7 @@ class AppPages {
       name: AppRouter.home,
       page: () => const HomeView(),
       binding: BindingsBuilder(() {
+        Get.put(NotificationUnreadController());
         Get.lazyPut<FeedController>(() => FeedController(), fenix: true);
         Get.lazyPut<FeedEngagementController>(
           () => FeedEngagementController(),
@@ -157,6 +159,7 @@ class AppPages {
         Get.put(UserController());
         Get.put(PresenceController());
         Get.put(UnreadController());
+        Get.put(NotificationUnreadController());
 
         // 🔹 Chat / cache
         Get.put(ChatUserCacheController());

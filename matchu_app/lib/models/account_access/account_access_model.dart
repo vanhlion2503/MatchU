@@ -126,6 +126,9 @@ class AccountAccessPolicy {
           message: 'Tài khoản này không còn hoạt động.',
         );
       case 'suspended':
+        if (restriction != null && !restriction.isActiveAt(now)) {
+          return const AccountAccessDecision.allowed();
+        }
         return AccountAccessDecision.denied(
           code: 'account-suspended',
           message: _statusMessage('Tài khoản đang bị tạm khóa', restriction),

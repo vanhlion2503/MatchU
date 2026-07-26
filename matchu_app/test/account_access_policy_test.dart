@@ -88,4 +88,19 @@ void main() {
     expect(malformed.allowed, isFalse);
     expect(malformed.code, 'account-restricted');
   });
+
+  test('expired temporary suspension is allowed', () {
+    final decision = AccountAccessPolicy.evaluate(
+      accountStatus: 'suspended',
+      restriction: AccountRestriction(
+        features: const {},
+        reason: 'Temporary suspension',
+        expiresAt: now.subtract(const Duration(seconds: 1)),
+      ),
+      feature: AccountFeature.chat,
+      now: now,
+    );
+
+    expect(decision.allowed, isTrue);
+  });
 }

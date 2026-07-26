@@ -3,8 +3,8 @@ import 'dart:ui';
 import 'package:matchu_app/translations/localized_material.dart';
 import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:matchu_app/controllers/notification/notification_unread_controller.dart';
 import 'package:matchu_app/routes/app_router.dart';
-import 'package:matchu_app/services/notification/notification_repository.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
 
 class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -122,61 +122,58 @@ class FeedAppBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 class _NotificationActionButton extends StatelessWidget {
-  _NotificationActionButton({required this.palette});
+  const _NotificationActionButton({required this.palette});
 
   final FeedPalette palette;
-  final NotificationRepository _repository = NotificationRepository();
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return StreamBuilder<int>(
-      stream: _repository.watchUnreadCount(),
-      builder: (context, snapshot) {
-        final unreadCount = snapshot.data ?? 0;
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              icon: Icon(
-                Iconsax.notification,
-                size: 22,
-                color: palette.textPrimary,
-              ),
-              onPressed: () => Get.toNamed(AppRouter.notifications),
+    return Obx(() {
+      final unreadCount =
+          Get.find<NotificationUnreadController>().unreadCount.value;
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            icon: Icon(
+              Iconsax.notification,
+              size: 22,
+              color: palette.textPrimary,
             ),
-            if (unreadCount > 0)
-              Positioned(
-                right: 5,
-                top: 8,
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 17),
-                  height: 17,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colorScheme.error,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: palette.headerBackground,
-                      width: 1.5,
-                    ),
+            onPressed: () => Get.toNamed(AppRouter.notifications),
+          ),
+          if (unreadCount > 0)
+            Positioned(
+              right: 5,
+              top: 8,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 17),
+                height: 17,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colorScheme.error,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: palette.headerBackground,
+                    width: 1.5,
                   ),
-                  child: Text(
-                    unreadCount > 9 ? '9+' : unreadCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
+                ),
+                child: Text(
+                  unreadCount > 9 ? '9+' : unreadCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
                   ),
                 ),
               ),
-          ],
-        );
-      },
-    );
+            ),
+        ],
+      );
+    });
   }
 }

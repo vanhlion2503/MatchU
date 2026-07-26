@@ -37,12 +37,17 @@ class AccountAccessService {
       );
     }
 
+    final accountStatus = (data['accountStatus'] ?? 'active').toString();
+    final measureField =
+        accountStatus.trim().toLowerCase() == 'suspended'
+            ? 'suspension'
+            : 'restriction';
     return AccountAccessPolicy.evaluate(
-      accountStatus: (data['accountStatus'] ?? 'active').toString(),
+      accountStatus: accountStatus,
       restriction:
-          data['restriction'] is Map
+          data[measureField] is Map
               ? AccountRestriction.fromJson(
-                Map<String, dynamic>.from(data['restriction'] as Map),
+                Map<String, dynamic>.from(data[measureField] as Map),
               )
               : null,
       feature: feature,

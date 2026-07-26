@@ -46,10 +46,21 @@ function evaluateAccountAccess(userData, feature, now = new Date()) {
     };
   }
   if (status === "suspended") {
+    const suspension =
+      userData.suspension && typeof userData.suspension === "object"
+        ? userData.suspension
+        : null;
+    const expiresAt = asDate(suspension?.expiresAt);
+    if (expiresAt && expiresAt.getTime() <= now.getTime()) {
+      return { allowed: true };
+    }
     return {
       allowed: false,
       reason: "account-suspended",
       message: "This account is suspended.",
+      restrictionReason:
+        typeof suspension?.reason === "string" ? suspension.reason.trim() : "",
+      expiresAt,
     };
   }
   if (status === "banned") {

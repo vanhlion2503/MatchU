@@ -6,8 +6,21 @@ import 'package:google_sign_in/google_sign_in.dart';
 abstract final class GoogleAuthCredentialService {
   static Future<void>? _initialization;
 
-  static Future<OAuthCredential> requestCredential() async {
+  static Future<OAuthCredential> requestCredential({
+    bool clearPreviousSession = false,
+  }) async {
     await _ensureInitialized();
+    if (clearPreviousSession) {
+      // Google Sign-In v7 uses Credential Manager on Android. Clearing its
+      // state immediately before an interactive login prevents the previously
+      // suspended account from being auto-selected again.
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {
+        // Continue with the interactive picker. A provider cleanup failure
+        // must not make the login button unusable.
+      }
+    }
     final googleUser = await GoogleSignIn.instance.authenticate();
     final googleAuthentication = googleUser.authentication;
     final idToken = googleAuthentication.idToken;
@@ -19,6 +32,13 @@ abstract final class GoogleAuthCredentialService {
     }
 
     return GoogleAuthProvider.credential(idToken: idToken);
+  }
+
+  /// Clears only the local Google account session. This does not revoke the
+  /// user's Google authorization and allows choosing another account next.
+  static Future<void> signOut() async {
+    await _ensureInitialized();
+    await GoogleSignIn.instance.signOut();
   }
 
   static Future<void> _ensureInitialized() async {

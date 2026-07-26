@@ -55,3 +55,15 @@ test("suspended, banned and malformed restricted accounts fail closed", () => {
     false
   );
 });
+
+test("temporary suspension is allowed immediately after expiry", () => {
+  const user = {
+    accountStatus: "suspended",
+    suspension: {
+      reason: "Temporary suspension",
+      expiresAt: new Date("2026-07-26T11:59:59.000Z"),
+    },
+  };
+
+  assert.equal(evaluateAccountAccess(user, "chat", NOW).allowed, true);
+});
