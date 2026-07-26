@@ -1,6 +1,9 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onTaskDispatched } = require("firebase-functions/v2/tasks");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { getFunctions } = require("firebase-admin/functions");
+const crypto = require("node:crypto");
 
 const { admin, db } = require("../shared/firebase");
 const {
@@ -10,7 +13,9 @@ const {
   isVideoMatchingFaceVerificationEnabled,
 } = require("../config/featureFlags");
 
+const REGION = "us-central1";
 const QUEUE_COLLECTION = "tempChatMatchingQueue";
+const EXPIRE_TEMP_CHAT_TASK_NAME = "expireTempChatRoomTask";
 const TEMP_CHAT_DURATION_MS = 7 * 60 * 1000;
 const VIDEO_CHAT_DURATION_MS = 8 * 60 * 1000;
 const VIDEO_CAMERA_LOCK_MS = 90 * 1000;
@@ -133,6 +138,47 @@ function videoMatchRefundId(roomId, uid) {
 
 function roomExtensionChargeId(roomId, extensionNumber) {
   return `room_extension_${roomId}_${extensionNumber}`;
+}
+
+function roomExpirationTaskId(roomId, expiresAtMillis) {
+  const digest = crypto
+    .createHash("sha256")
+    .update(`${roomId}:${expiresAtMillis}`)
+    .digest("hex")
+    .slice(0, 40);
+  return `room-expiry-${digest}`;
+}
+
+function roomExpirationDescriptor(roomId, roomData) {
+  const normalizedRoomId = cleanString(roomId, 128);
+  const expiresAtMillis = roomData?.expiresAt?.toMillis?.();
+  if (!normalizedRoomId) return null;
+  return {
+    roomId: normalizedRoomId,
+    expiresAtMillis: Number.isFinite(expiresAtMillis)
+      ? expiresAtMillis
+      : null,
+  };
+}
+
+function roomExpirationDecision(
+  roomData,
+  expectedExpiresAtMillis,
+  nowMillis
+) {
+  if (!roomData) return "missing";
+  if (roomData.status !== "active") return "already-ended";
+
+  const currentExpiresAtMillis = roomData.expiresAt?.toMillis?.();
+  if (!Number.isFinite(currentExpiresAtMillis)) return "invalid-expiry";
+  if (
+    Number.isFinite(expectedExpiresAtMillis) &&
+    currentExpiresAtMillis !== expectedExpiresAtMillis
+  ) {
+    return "stale";
+  }
+  if (currentExpiresAtMillis > nowMillis) return "not-due";
+  return "expire";
 }
 
 function roomExtensionFailureReason(roomData, uid, nowMillis) {
@@ -388,7 +434,7 @@ async function enqueueSeeker({
             "Another temporary session is already active."
           );
         }
-        return activeRoomId;
+        return roomExpirationDescriptor(activeRoomId, activeRoom.data());
       }
       // Recover from a stale lock left by an interrupted cleanup trigger.
       shouldClearStaleRoom = true;
@@ -659,7 +705,10 @@ async function tryCreateMatch({ uid, sessionId, matchingMode }) {
             );
           }
         }
-        return roomRef.id;
+        return {
+          roomId: roomRef.id,
+          expiresAtMillis: expiresAt.toMillis(),
+        };
       });
       if (roomId) return roomId;
     } catch (error) {
@@ -811,7 +860,7 @@ const startTempChatMatching = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Anonymous avatar is invalid.");
   }
 
-  const activeRoomId = await enqueueSeeker({
+  const activeRoom = await enqueueSeeker({
     uid,
     sessionId,
     targetGender,
@@ -820,10 +869,15 @@ const startTempChatMatching = onCall(async (request) => {
     faceProofId,
     deviceId,
   });
-  if (activeRoomId) {
-    return { status: "matched", roomId: activeRoomId, resumed: true };
+  if (activeRoom) {
+    await scheduleRoomExpirationBestEffort(activeRoom, "resume");
+    return { status: "matched", roomId: activeRoom.roomId, resumed: true };
   }
-  const roomId = await tryCreateMatch({ uid, sessionId, matchingMode });
+  const matchedRoom = await tryCreateMatch({ uid, sessionId, matchingMode });
+  if (matchedRoom) {
+    await scheduleRoomExpirationBestEffort(matchedRoom, "match_created");
+  }
+  const roomId = matchedRoom?.roomId || null;
   return { status: roomId ? "matched" : "waiting", roomId };
 });
 
@@ -862,7 +916,7 @@ const extendTempChatRoom = onCall(async (request) => {
   const roomRef = db.collection("tempChats").doc(roomId);
   const userRef = db.collection("users").doc(uid);
 
-  return db.runTransaction(async (tx) => {
+  const result = await db.runTransaction(async (tx) => {
     const [roomSnap, userSnap] = await tx.getAll(roomRef, userRef);
     if (!roomSnap.exists) {
       throw new HttpsError("not-found", "Temp room not found.");
@@ -944,6 +998,11 @@ const extendTempChatRoom = onCall(async (request) => {
       gemBalance: balanceBefore - ROOM_EXTENSION_GEM_COST,
     };
   });
+  await scheduleRoomExpirationBestEffort({
+    roomId,
+    expiresAtMillis: Date.parse(result.expiresAt),
+  }, "room_extended");
+  return result;
 });
 
 const revokeVideoMatchingFaceProof = onCall(async (request) => {
@@ -1066,6 +1125,10 @@ const releaseEndedTempChatParticipants = onDocumentUpdated(
     const before = event.data.before.data() || {};
     const after = event.data.after.data() || {};
     if (before.status !== "active" || after.status === "active") return;
+    // The expiration task releases the call and participants atomically with
+    // the room transition. Other end paths still use this compatibility
+    // trigger, preserving their existing behavior.
+    if (after.participantsReleasedAt) return;
     const participants = Array.isArray(after.participants) ? after.participants : [];
     const roomId = event.params.roomId;
 
@@ -1089,8 +1152,164 @@ const releaseEndedTempChatParticipants = onDocumentUpdated(
   }
 );
 
+async function scheduleRoomExpiration({
+  roomId,
+  expiresAtMillis,
+}) {
+  if (!roomId || !Number.isFinite(expiresAtMillis)) {
+    throw new Error("A valid room expiration descriptor is required.");
+  }
+  const queue = getFunctions().taskQueue(EXPIRE_TEMP_CHAT_TASK_NAME);
+  await queue.enqueue(
+    { roomId, expectedExpiresAtMillis: expiresAtMillis },
+    {
+      id: roomExpirationTaskId(roomId, expiresAtMillis),
+      scheduleTime: new Date(expiresAtMillis),
+      dispatchDeadlineSeconds: 60,
+    }
+  );
+}
+
+function isTaskAlreadyScheduledError(error) {
+  return error?.code === "functions/task-already-exists" ||
+    error?.code === "already-exists" ||
+    error?.code === 6;
+}
+
+async function scheduleRoomExpirationBestEffort(descriptor, source) {
+  try {
+    await scheduleRoomExpiration(descriptor);
+  } catch (error) {
+    if (isTaskAlreadyScheduledError(error)) return;
+    // Matching/extension has already committed. Do not return a false failure
+    // to the client; the low-frequency scheduler below remains a safety net.
+    console.error("Unable to schedule temp-chat expiration task:", {
+      roomId: descriptor?.roomId || null,
+      expiresAtMillis: descriptor?.expiresAtMillis || null,
+      source,
+      code: error?.code || null,
+      error: error?.message || String(error),
+    });
+  }
+}
+
+async function expireTempChatRoom({
+  roomId,
+  expectedExpiresAtMillis = null,
+  source,
+  now = admin.firestore.Timestamp.now(),
+}) {
+  const normalizedRoomId = cleanString(roomId, 128);
+  if (!normalizedRoomId) return { outcome: "invalid-room-id" };
+  const roomRef = db.collection("tempChats").doc(normalizedRoomId);
+  const nowMillis = now.toMillis();
+
+  return db.runTransaction(async (tx) => {
+    const roomSnap = await tx.get(roomRef);
+    const roomData = roomSnap.exists ? roomSnap.data() || {} : null;
+    const outcome = roomExpirationDecision(
+      roomData,
+      expectedExpiresAtMillis,
+      nowMillis
+    );
+    if (outcome !== "expire") return { outcome };
+
+    const participants = Array.isArray(roomData.participants)
+      ? Array.from(new Set(roomData.participants
+        .map((participant) => cleanString(participant, 128))
+        .filter(Boolean)))
+      : [];
+    const userRefs = participants.map((participant) =>
+      db.collection("users").doc(participant)
+    );
+    const callSessionId = cleanString(roomData.callSessionId, 128);
+    const callRef = callSessionId
+      ? db.collection("callSessions").doc(callSessionId)
+      : null;
+    const userSnaps = userRefs.length
+      ? await tx.getAll(...userRefs)
+      : [];
+
+    tx.update(roomRef, {
+      status: "ended",
+      endedReason: "timeout",
+      endedBy: "system",
+      endedAt: now,
+      expirationSource: source,
+      participantsReleasedAt: now,
+    });
+    userSnaps.forEach((userSnap, index) => {
+      if (
+        userSnap.exists &&
+        userSnap.get("activeTempRoomId") === normalizedRoomId
+      ) {
+        tx.set(userRefs[index], { activeTempRoomId: null }, { merge: true });
+      }
+    });
+    if (callRef) {
+      tx.set(callRef, {
+        status: "ended",
+        endedAt: now,
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    return {
+      outcome: "expired",
+      participantCount: userSnaps.length,
+      callSessionUpdated: Boolean(callRef),
+    };
+  });
+}
+
+const expireTempChatRoomTask = onTaskDispatched(
+  {
+    region: REGION,
+    timeoutSeconds: 60,
+    memory: "256MiB",
+    retryConfig: {
+      maxAttempts: 5,
+      minBackoffSeconds: 10,
+      maxBackoffSeconds: 60,
+      maxRetrySeconds: 10 * 60,
+    },
+    rateLimits: {
+      maxConcurrentDispatches: 20,
+      maxDispatchesPerSecond: 50,
+    },
+  },
+  async (request) => {
+    const roomId = cleanString(request.data?.roomId, 128);
+    const expectedExpiresAtMillis =
+      Number(request.data?.expectedExpiresAtMillis);
+    if (!roomId || !Number.isFinite(expectedExpiresAtMillis)) {
+      console.warn("Ignoring invalid temp-chat expiration task.", {
+        roomId: roomId || null,
+      });
+      return;
+    }
+    const result = await expireTempChatRoom({
+      roomId,
+      expectedExpiresAtMillis,
+      source: "cloud_task",
+    });
+    if (result.outcome !== "expired") {
+      console.info("Temp-chat expiration task completed without mutation:", {
+        roomId,
+        outcome: result.outcome,
+      });
+    }
+  }
+);
+
 const expireTempChatSessions = onSchedule(
-  { schedule: "every 1 minutes", timeZone: "Asia/Bangkok" },
+  {
+    schedule: "every 5 minutes",
+    timeZone: "Asia/Bangkok",
+    region: REGION,
+    timeoutSeconds: 120,
+    memory: "256MiB",
+  },
   async () => {
     const now = admin.firestore.Timestamp.now();
     const rooms = await db.collection("tempChats")
@@ -1100,16 +1319,15 @@ const expireTempChatSessions = onSchedule(
       .get();
     if (rooms.empty) return;
 
-    const batch = db.batch();
-    for (const room of rooms.docs) {
-      batch.update(room.ref, {
-        status: "ended",
-        endedReason: "timeout",
-        endedBy: "system",
-        endedAt: now,
-      });
+    const concurrency = 20;
+    for (let offset = 0; offset < rooms.docs.length; offset += concurrency) {
+      const chunk = rooms.docs.slice(offset, offset + concurrency);
+      await Promise.all(chunk.map((room) => expireTempChatRoom({
+        roomId: room.id,
+        source: "scheduler_fallback",
+        now,
+      })));
     }
-    await batch.commit();
   }
 );
 
@@ -1170,6 +1388,7 @@ module.exports = {
   revokeVideoMatchingFaceProof,
   convertTempChat,
   expireTempChatSessions,
+  expireTempChatRoomTask,
   cleanupExpiredMatchingSessions,
   cleanupExpiredTempChatPresence,
   convertMutualTempChat,
@@ -1178,6 +1397,9 @@ module.exports = {
   __test: {
     normalizeGender,
     normalizeMatchingMode,
+    roomExpirationDecision,
+    roomExpirationDescriptor,
+    roomExpirationTaskId,
     isActiveTempRoomForUser,
     isMutualMatch,
     reputationScoreFrom,

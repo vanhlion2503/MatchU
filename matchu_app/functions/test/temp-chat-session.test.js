@@ -269,3 +269,53 @@ test("only resumes an active temp room that contains the user", () => {
     false
   );
 });
+
+test("room expiration task ids are deterministic per expiration version", () => {
+  const first = __test.roomExpirationTaskId("room-a", 1_000_000);
+  assert.equal(first, __test.roomExpirationTaskId("room-a", 1_000_000));
+  assert.notEqual(first, __test.roomExpirationTaskId("room-a", 1_300_000));
+  assert.notEqual(first, __test.roomExpirationTaskId("room-b", 1_000_000));
+  assert.match(first, /^room-expiry-[a-f0-9]{40}$/);
+});
+
+test("room expiration descriptors retain room identity for fallback recovery", () => {
+  assert.deepEqual(
+    __test.roomExpirationDescriptor(" room-a ", {
+      expiresAt: { toMillis: () => 1_000_000 },
+    }),
+    { roomId: "room-a", expiresAtMillis: 1_000_000 }
+  );
+  assert.deepEqual(
+    __test.roomExpirationDescriptor("room-a", {}),
+    { roomId: "room-a", expiresAtMillis: null }
+  );
+  assert.equal(__test.roomExpirationDescriptor("", {}), null);
+});
+
+test("expiration task only ends the matching active room version when due", () => {
+  const activeRoom = {
+    status: "active",
+    expiresAt: { toMillis: () => 1_000_000 },
+  };
+
+  assert.equal(
+    __test.roomExpirationDecision(activeRoom, 1_000_000, 999_999),
+    "not-due"
+  );
+  assert.equal(
+    __test.roomExpirationDecision(activeRoom, 1_000_000, 1_000_000),
+    "expire"
+  );
+  assert.equal(
+    __test.roomExpirationDecision(activeRoom, 900_000, 1_000_000),
+    "stale"
+  );
+  assert.equal(
+    __test.roomExpirationDecision(
+      { ...activeRoom, status: "ended" },
+      1_000_000,
+      1_000_000
+    ),
+    "already-ended"
+  );
+});

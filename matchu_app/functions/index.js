@@ -115,6 +115,7 @@ const {
   cleanupExpiredMatchingSessions,
   cleanupExpiredTempChatPresence,
   convertMutualTempChat,
+  expireTempChatRoomTask,
   releaseEndedTempChatParticipants,
   refundFailedVideoMatch,
 } = require("./src/callables/tempChatSession");
@@ -216,6 +217,7 @@ exports.extendTempChatRoom = extendTempChatRoom;
 exports.revokeVideoMatchingFaceProof = revokeVideoMatchingFaceProof;
 exports.convertTempChat = convertTempChat;
 exports.expireTempChatSessions = expireTempChatSessions;
+exports.expireTempChatRoomTask = expireTempChatRoomTask;
 exports.cleanupExpiredMatchingSessions = cleanupExpiredMatchingSessions;
 exports.cleanupExpiredTempChatPresence = cleanupExpiredTempChatPresence;
 exports.convertMutualTempChat = convertMutualTempChat;
