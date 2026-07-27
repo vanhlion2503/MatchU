@@ -667,6 +667,27 @@ function requestedVisibilityOf(postData) {
   return "public";
 }
 
+function hasAdminDecisionForObject(postData, object) {
+  const adminModeration = safeMap(postData?.adminModeration);
+  const decidedGeneration = String(
+    adminModeration.videoStorageGeneration || ""
+  );
+  if (safeText(postData?.moderationSource, 40) !== "admin_manual") {
+    return false;
+  }
+  if (decidedGeneration.length > 0) {
+    return decidedGeneration === String(object?.generation || "");
+  }
+
+  const decisionAtMs = toMillis(adminModeration.updatedAt);
+  const objectCreatedAtMs = Date.parse(object?.timeCreated || object?.updated || "");
+  return (
+    decisionAtMs != null &&
+    Number.isFinite(objectCreatedAtMs) &&
+    decisionAtMs >= objectCreatedAtMs
+  );
+}
+
 async function claimModerationRun({ object, uid, postId }) {
   const postRef = db.collection("posts").doc(postId);
   const generation = String(object.generation || "");
@@ -681,6 +702,7 @@ async function claimModerationRun({ object, uid, postId }) {
     const data = postSnap.data() || {};
     if (data.deletedAt != null) return;
     if (safeText(data.authorId, 180) !== uid) return;
+    if (hasAdminDecisionForObject(data, object)) return;
 
     const videoModeration = safeMap(data.videoModeration);
     const currentStatus = safeText(data.moderationStatus, 40).toLowerCase();
@@ -764,6 +786,7 @@ async function applyFinalModerationResult({ object, uid, postId, result }) {
 
     const postData = postSnap.data() || {};
     if (safeText(postData.authorId, 180) !== uid) return;
+    if (hasAdminDecisionForObject(postData, object)) return;
 
     const previousVideoModeration = safeMap(postData.videoModeration);
     const currentGeneration = String(
@@ -1169,4 +1192,5 @@ const moderateUploadedPostVideo = onObjectFinalized(
 module.exports = {
   VIDEO_MODERATION_SYSTEM_PROMPT,
   moderateUploadedPostVideo,
+  __test: { hasAdminDecisionForObject },
 };

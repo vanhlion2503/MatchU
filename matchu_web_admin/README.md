@@ -56,6 +56,10 @@ Không commit `.env` hoặc JSON service account.
 | GET | `/users` | Danh sách, tìm kiếm và lọc tài khoản, cần `users.read` |
 | GET | `/users/:uid` | Hồ sơ quản trị 360° của người dùng, cần `users.read` |
 | POST | `/users/:uid/actions` | Thực hiện thao tác quản trị theo permission của từng hành động |
+| GET | `/posts` | Danh sách, tìm kiếm và lọc bài viết, cần `posts.read` |
+| GET | `/posts/moderation` | Hàng đợi kiểm duyệt và báo cáo, cần `posts.moderate` hoặc `reports.read` |
+| GET | `/posts/:postId` | Chi tiết bài, media, tín hiệu AI, báo cáo và lịch sử xử lý |
+| POST | `/posts/:postId/actions` | Duyệt, gỡ, xem xét, bác báo cáo hoặc khôi phục bài viết |
 
 ## Quản lý tài khoản người dùng
 
@@ -79,6 +83,33 @@ Các permission hành động:
 `super_admin` luôn có toàn quyền. Hành động thay đổi dữ liệu được bảo vệ CSRF,
 kiểm tra permission ở server, tạo lịch sử tại
 `users/{uid}/adminActions` và ghi `adminAuditLogs`.
+
+## Quản lý và kiểm duyệt bài viết
+
+Module bài viết đọc trực tiếp collection `posts` và `postReports` hiện hữu, không thay đổi luồng
+đăng bài trên ứng dụng mobile. Các quyết định thủ công dùng trạng thái kiểm duyệt tương thích với
+mobile và bổ sung metadata tại `posts/{postId}.adminModeration`,
+`moderationCases/{postId}` cùng subcollection `actions`.
+
+Các permission:
+
+- `posts.read`
+- `posts.moderate`
+- `posts.restore` (tùy chọn; `posts.moderate` vẫn được phép khôi phục)
+- `posts.delete` (xóa vĩnh viễn bài viết đã xóa mềm; nên chỉ cấp cho quản trị viên cấp cao)
+- `reports.read`
+
+Admin SDK bỏ qua Firestore Rules nên mọi thao tác ghi đều được kiểm tra Joi, permission, CSRF và
+thực hiện phía server. Báo cáo gốc được giữ nguyên trong luồng kiểm duyệt thông thường; thao tác
+xóa vĩnh viễn sẽ dọn bài viết và dữ liệu liên quan sau khi xác nhận chính xác Post ID.
+
+Tìm kiếm Admin dùng collection `adminPostSearchIndex`. Sau khi deploy trigger và Firestore index,
+chạy backfill một lần cho các bài viết hiện có:
+
+```bash
+cd matchu_web_admin
+npm run backfill:post-search-index
+```
 
 Chạy kiểm tra trước khi phát hành:
 

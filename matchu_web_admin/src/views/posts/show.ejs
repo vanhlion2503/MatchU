@@ -1,0 +1,293 @@
+<div class="post-detail-heading">
+  <div>
+    <a class="back-link" href="<%= backUrl %>"><i class="bi bi-arrow-left"></i>Quay lại</a>
+    <h1>Chi tiết bài viết</h1>
+    <code><%= post.postId %></code>
+  </div>
+  <div class="post-detail-statuses">
+    <% if (post.deletedAt) { %><span class="moderation-badge moderation-deleted">Đã xóa</span><% } %>
+    <span class="moderation-badge moderation-<%= post.moderationStatus %>"><%= moderationLabels[post.moderationStatus] || post.moderationStatus %></span>
+    <span class="priority-badge priority-<%= post.priority %>"><%= priorityLabels[post.priority] || post.priority %></span>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <section class="panel post-preview-panel mb-4">
+      <div class="post-preview-author">
+        <% if (post.author.avatar) { %>
+          <img class="post-detail-avatar" src="<%= post.author.avatar %>" alt="Avatar của <%= post.author.name || post.author.nickname || 'tác giả' %>" decoding="async" referrerpolicy="no-referrer" data-avatar-image data-avatar-initial="<%= (post.author.name || post.author.nickname || 'U').charAt(0).toUpperCase() %>">
+        <% } else { %>
+          <span class="post-detail-avatar user-avatar-fallback"><%= (post.author.name || post.author.nickname || 'U').charAt(0).toUpperCase() %></span>
+        <% } %>
+        <div>
+          <a href="/users/<%= encodeURIComponent(post.authorId) %>"><%= post.author.name || 'Chưa cập nhật tên' %></a>
+          <p>@<%= post.author.nickname || 'chưa-có-nickname' %> · <%= formatDate(post.createdAt) %></p>
+        </div>
+        <span class="ms-auto visibility-label"><i class="bi bi-<%= post.visibility === 'public' ? 'globe2' : post.visibility === 'followers' ? 'people' : 'lock' %>"></i><%= visibilityLabels[post.visibility] || post.visibility %></span>
+      </div>
+
+      <% if (post.content) { %><div class="post-detail-content"><%= post.content %></div><% } %>
+      <% if (post.tags.length) { %>
+        <div class="post-tag-list"><% post.tags.forEach((tag) => { %><span>#<%= tag %></span><% }) %></div>
+      <% } %>
+
+      <% if (post.media.length) { %>
+        <div class="post-media-grid media-count-<%= Math.min(post.media.length, 4) %>">
+          <% post.media.forEach((media, index) => { %>
+            <div class="post-media-card">
+              <% if (media.type === 'image' && media.url) { %>
+                <a href="<%= media.url %>" target="_blank" rel="noopener noreferrer" aria-label="Mở ảnh thứ <%= index + 1 %>">
+                  <img src="<%= media.url %>" alt="Ảnh đính kèm thứ <%= index + 1 %>" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                </a>
+              <% } else if (media.type === 'video' && media.url) { %>
+                <video controls preload="metadata"<% if (media.thumbnailUrl) { %> poster="<%= media.thumbnailUrl %>"<% } %>>
+                  <source src="<%= media.url %>" type="<%= media.mimeType || 'video/mp4' %>">
+                  Trình duyệt không hỗ trợ video.
+                </video>
+              <% } else if (media.type === 'audio' && media.url) { %>
+                <div class="audio-media-card">
+                  <i class="bi bi-mic-fill"></i><span>Bản ghi âm</span>
+                  <audio controls preload="metadata"><source src="<%= media.url %>" type="<%= media.mimeType || 'audio/mp4' %>"></audio>
+                </div>
+              <% } else { %>
+                <div class="unavailable-media"><i class="bi bi-hourglass-split"></i><span>Media đang xử lý hoặc không khả dụng</span><code><%= media.storagePath || 'Không có đường dẫn' %></code></div>
+              <% } %>
+              <span class="media-kind"><%= media.type %></span>
+            </div>
+          <% }) %>
+        </div>
+      <% } else if (!post.content) { %>
+        <div class="unavailable-media standalone"><i class="bi bi-file-earmark-x"></i><span>Bài viết không còn nội dung hiển thị.</span></div>
+      <% } %>
+
+      <% if (post.referencePost) { %>
+        <div class="referenced-post">
+          <span class="reference-label"><i class="bi bi-quote"></i>Bài viết được tham chiếu</span>
+          <strong><%= post.referencePost.author.name || post.referencePost.author.nickname || 'Không rõ tác giả' %></strong>
+          <p><%= post.referencePost.content || 'Bài gốc chỉ có media.' %></p>
+          <code><%= post.referencePost.postId %></code>
+          <% if (post.referencePost.deletedAt) { %><span class="badge text-bg-secondary ms-2">Bài gốc đã xóa</span><% } %>
+        </div>
+      <% } %>
+
+      <div class="post-detail-engagement">
+        <div><i class="bi bi-heart"></i><strong><%= formatNumber(post.stats.likeCount) %></strong><span>Lượt thích</span></div>
+        <div><i class="bi bi-chat"></i><strong><%= formatNumber(commentCount) %></strong><span>Bình luận</span></div>
+        <div><i class="bi bi-repeat"></i><strong><%= formatNumber(post.stats.shareCount) %></strong><span>Đăng lại/chia sẻ</span></div>
+        <div><i class="bi bi-send"></i><strong><%= formatNumber(post.stats.externalShareCount) %></strong><span>Chia sẻ ngoài</span></div>
+        <div><i class="bi bi-bookmark"></i><strong><%= formatNumber(post.stats.saveCount) %></strong><span>Lượt lưu</span></div>
+      </div>
+    </section>
+
+    <% if (post.videoModeration) { const ai = post.videoModeration; %>
+      <section class="panel mb-4">
+        <div class="panel-heading mb-3">
+          <div><h3>Kết quả kiểm duyệt video</h3><p class="panel-subtitle">Tín hiệu tự động được giữ nguyên để admin đối chiếu.</p></div>
+          <span class="moderation-badge moderation-<%= ai.decision || ai.status || post.moderationStatus %>"><%= moderationLabels[ai.decision || ai.status] || ai.decision || ai.status || 'Không rõ' %></span>
+        </div>
+        <div class="ai-moderation-grid">
+          <div><span>Độ tin cậy</span><strong><%= Math.round(Number(ai.confidence || 0) * 100) %>%</strong></div>
+          <div><span>Mức nghiêm trọng</span><strong><%= ai.overallSeverity ?? 0 %>/5</strong></div>
+          <div><span>Nhóm chính</span><strong><%= ai.primaryViolationCategory || 'Không có' %></strong></div>
+          <div><span>Cần người duyệt</span><strong><%= ai.needsHumanReview ? 'Có' : 'Không' %></strong></div>
+        </div>
+        <div class="ai-summary">
+          <span>Tóm tắt an toàn</span>
+          <p><%= ai.safeSummary || 'Không có tóm tắt.' %></p>
+          <% if (ai.humanReviewReason) { %><small><i class="bi bi-person-exclamation me-1"></i><%= ai.humanReviewReason %></small><% } %>
+        </div>
+        <% if (Array.isArray(ai.violations) && ai.violations.length) { %>
+          <div class="violation-chip-list">
+            <% ai.violations.forEach((item) => { %>
+              <span><strong><%= item.category || item.type || 'risk' %></strong> · mức <%= item.severity ?? 0 %></span>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+    <% } %>
+
+    <section class="panel mb-4" id="reports">
+      <div class="panel-heading mb-3">
+        <div><h3>Báo cáo cộng đồng</h3><p class="panel-subtitle">Báo cáo gốc và bằng chứng được giữ nguyên.</p></div>
+        <span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(reports.length) %></span>
+      </div>
+      <% if (!reports.length) { %>
+        <div class="compact-empty"><i class="bi bi-flag"></i>Chưa có báo cáo nào cho bài viết này.</div>
+      <% } else { %>
+        <div class="report-card-list">
+          <% reports.forEach((report) => { %>
+            <article class="report-card">
+              <div class="report-card-header">
+                <div>
+                  <span class="report-category"><%= report.categoryTitle || report.categoryKey || 'Khác' %></span>
+                  <strong><%= report.reasonTitle || report.reasonKey || 'Không nêu lý do' %></strong>
+                </div>
+                <time><%= formatDate(report.createdAt) %></time>
+              </div>
+              <% if (report.customReason) { %><p><strong>Lý do khác:</strong> <%= report.customReason %></p><% } %>
+              <% if (report.description) { %><p><%= report.description %></p><% } %>
+              <div class="reporter-line">
+                <i class="bi bi-person"></i>
+                <% if (report.reporter) { %>
+                  <a href="/users/<%= encodeURIComponent(report.fromUid) %>"><%= report.reporter.name || report.reporter.nickname || report.fromUid %></a>
+                  <span>· <%= report.reporter.accountStatus %></span>
+                <% } else { %>
+                  <code><%= report.fromUid %></code>
+                <% } %>
+                <code class="ms-auto"><%= report.id %></code>
+              </div>
+              <% if (report.imageUrls.length) { %>
+                <div class="report-evidence-grid">
+                  <% report.imageUrls.forEach((url, index) => { %>
+                    <a href="<%= url %>" target="_blank" rel="noopener noreferrer"><img src="<%= url %>" alt="Bằng chứng báo cáo thứ <%= index + 1 %>" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>
+                  <% }) %>
+                </div>
+              <% } %>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading mb-3"><h3>Lịch sử kiểm duyệt thủ công</h3><span class="badge text-bg-light border"><%= caseActions.length %></span></div>
+      <% if (!caseActions.length) { %>
+        <div class="compact-empty"><i class="bi bi-clock-history"></i>Chưa có quyết định thủ công.</div>
+      <% } else { %>
+        <div class="timeline-list admin-history">
+          <% caseActions.forEach((item) => { %>
+            <article>
+              <span class="timeline-dot <%= item.action === 'reject' ? 'danger' : item.action === 'review' ? 'warning' : '' %>"></span>
+              <div>
+                <strong><%= item.action %></strong>
+                <p><%= item.reason %></p>
+                <small><%= formatDate(item.createdAt) %> · <%= item.adminEmail || item.adminId || 'Admin' %> · <%= item.before.moderationStatus || '—' %> → <%= item.after.moderationStatus || '—' %></small>
+              </div>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="post-detail-sidebar">
+      <section class="panel mb-4">
+        <div class="panel-heading mb-3"><h3>Tác giả</h3><a href="/users/<%= encodeURIComponent(post.authorId) %>" class="small">Xem hồ sơ</a></div>
+        <% if (authorAccount) { %>
+          <div class="author-account-card">
+            <% if (authorAccount.avatarUrl) { %>
+              <img class="post-detail-avatar" src="<%= authorAccount.avatarUrl %>" alt="Avatar tác giả" decoding="async" referrerpolicy="no-referrer" data-avatar-image data-avatar-initial="<%= (authorAccount.fullname || authorAccount.nickname || 'U').charAt(0).toUpperCase() %>">
+            <% } else { %>
+              <span class="post-detail-avatar user-avatar-fallback"><%= (authorAccount.fullname || authorAccount.nickname || 'U').charAt(0).toUpperCase() %></span>
+            <% } %>
+            <div><strong><%= authorAccount.fullname || 'Chưa cập nhật tên' %></strong><span>@<%= authorAccount.nickname || 'chưa-có-nickname' %></span></div>
+          </div>
+          <div class="author-risk-metrics">
+            <div><span>Trạng thái</span><strong><%= authorAccount.accountStatus %></strong></div>
+            <div><span>Uy tín</span><strong><%= authorAccount.reputationScore %></strong></div>
+            <div><span>Tổng báo cáo</span><strong><%= formatNumber(authorAccount.totalReports) %></strong></div>
+            <div><span>Cảnh báo</span><strong><%= formatNumber(authorAccount.trustWarnings) %></strong></div>
+          </div>
+        <% } else { %>
+          <div class="compact-empty"><i class="bi bi-person-x"></i>Không tìm thấy hồ sơ tác giả.</div>
+        <% } %>
+      </section>
+
+      <section class="panel mb-4">
+        <div class="panel-heading mb-3"><h3>Hồ sơ xử lý</h3><span class="priority-badge priority-<%= post.priority %>"><%= priorityLabels[post.priority] %></span></div>
+        <% if (moderationCase) { %>
+          <dl class="case-detail-list">
+            <div><dt>Trạng thái</dt><dd><%= moderationCase.status %></dd></div>
+            <div><dt>Số báo cáo</dt><dd><%= formatNumber(post.reportCount) %></dd></div>
+            <div><dt>Admin phụ trách</dt><dd><%= moderationCase.assignedAdminEmail || moderationCase.assignedAdminId || 'Chưa phân công' %></dd></div>
+            <div><dt>Kết luận</dt><dd><%= moderationCase.resolution || 'Chưa có' %></dd></div>
+            <div><dt>Cập nhật</dt><dd><%= formatDate(moderationCase.updatedAt || moderationCase.createdAt) %></dd></div>
+          </dl>
+          <% if (moderationCase.resolutionReason) { %><div class="case-resolution"><span>Lý do gần nhất</span><p><%= moderationCase.resolutionReason %></p></div><% } %>
+        <% } else { %>
+          <div class="compact-empty"><i class="bi bi-shield-check"></i>Chưa phát sinh hồ sơ xử lý.</div>
+        <% } %>
+      </section>
+
+      <section class="panel mb-4">
+        <div class="panel-heading mb-3"><div><h3>Quyết định kiểm duyệt</h3><p class="panel-subtitle">Mọi hành động đều được lưu lịch sử.</p></div></div>
+        <% if (post.deletedAt) { %>
+          <div class="alert alert-secondary"><i class="bi bi-info-circle me-1"></i>Bài viết đã được xóa mềm và không còn hiển thị trên ứng dụng.</div>
+          <% if (canPerformAction('delete_permanently')) { %>
+            <div class="post-moderation-actions">
+              <button type="button" class="btn action-delete-permanently" data-bs-toggle="modal" data-bs-target="#postActionModal" data-post-action="delete_permanently" data-confirmation-value="<%= post.postId %>" data-action-title="Xóa vĩnh viễn bài viết" data-action-description="Thao tác này xóa nội dung bài viết, bình luận, lượt thích và các dữ liệu liên kết khỏi Firestore. Không thể hoàn tác."><i class="bi bi-trash3"></i>Xóa vĩnh viễn</button>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="post-moderation-actions">
+            <% if (post.moderationStatus !== 'approved' && canPerformAction('approve')) { %>
+              <button type="button" class="btn action-approve" data-bs-toggle="modal" data-bs-target="#postActionModal" data-post-action="approve" data-action-title="Duyệt bài viết" data-action-description="Bài viết sẽ được hiển thị lại theo quyền xem trước khi kiểm duyệt."><i class="bi bi-check-circle"></i>Duyệt bài</button>
+            <% } %>
+            <% if (reports.length && canPerformAction('dismiss')) { %>
+              <button type="button" class="btn action-dismiss" data-bs-toggle="modal" data-bs-target="#postActionModal" data-post-action="dismiss" data-action-title="Bác báo cáo" data-action-description="Đóng hồ sơ báo cáo và giữ bài viết ở trạng thái được duyệt."><i class="bi bi-flag"></i>Bác báo cáo</button>
+            <% } %>
+            <% if (post.moderationStatus !== 'review_required' && canPerformAction('review')) { %>
+              <button type="button" class="btn action-review" data-bs-toggle="modal" data-bs-target="#postActionModal" data-post-action="review" data-action-title="Chuyển xem xét thêm" data-action-description="Bài viết sẽ tạm chuyển riêng tư cho đến khi có quyết định cuối cùng."><i class="bi bi-person-exclamation"></i>Xem xét thêm</button>
+            <% } %>
+            <% if (post.moderationStatus !== 'rejected' && canPerformAction('reject')) { %>
+              <button type="button" class="btn action-reject" data-bs-toggle="modal" data-bs-target="#postActionModal" data-post-action="reject" data-action-title="Gỡ bài viết" data-action-description="Bài viết sẽ bị chuyển riêng tư và tác giả nhận được thông báo."><i class="bi bi-shield-x"></i>Gỡ bài</button>
+            <% } %>
+            <% if (post.moderationStatus === 'rejected' && canPerformAction('restore')) { %>
+              <button type="button" class="btn action-restore" data-bs-toggle="modal" data-bs-target="#postActionModal" data-post-action="restore" data-action-title="Khôi phục bài viết" data-action-description="Bài viết sẽ được duyệt và khôi phục quyền xem trước đó."><i class="bi bi-arrow-counterclockwise"></i>Khôi phục</button>
+            <% } %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading mb-3"><h3>Thông tin hệ thống</h3></div>
+        <dl class="case-detail-list">
+          <div><dt>Loại bài</dt><dd><%= typeLabels[post.postType] || post.postType %></dd></div>
+          <div><dt>Nguồn kiểm duyệt</dt><dd><%= post.moderationSource || 'Không có' %></dd></div>
+          <div><dt>Policy</dt><dd><%= post.moderationPolicyVersion || 'Không có' %></dd></div>
+          <div><dt>Đề xuất</dt><dd><%= post.recommendationStatus %></dd></div>
+          <div><dt>Trend score</dt><dd><%= Number(post.trendScore || 0).toFixed(2) %></dd></div>
+          <div><dt>Cập nhật</dt><dd><%= formatDate(post.updatedAt) %></dd></div>
+          <% if (post.deletedAt) { %><div><dt>Đã xóa lúc</dt><dd><%= formatDate(post.deletedAt) %></dd></div><% } %>
+        </dl>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="postActionModal" tabindex="-1" aria-labelledby="postActionModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" action="/posts/<%= encodeURIComponent(post.postId) %>/actions" method="post" id="postActionForm">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="action" id="postActionInput">
+      <div class="modal-header">
+        <div><span class="modal-eyebrow">KIỂM DUYỆ BÀI VIẾT</span><h2 class="modal-title fs-5" id="postActionModalTitle">Xác nhận quyết định</h2></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="moderation-action-target">
+          <i class="bi bi-file-post"></i>
+          <div><strong><%= post.content || 'Bài viết chỉ có media' %></strong><code><%= post.postId %></code></div>
+        </div>
+        <p class="post-action-description" id="postActionDescription"></p>
+        <div class="mb-3">
+          <label class="form-label" for="postActionReason">Lý do quyết định</label>
+          <textarea class="form-control" id="postActionReason" name="reason" rows="4" minlength="5" maxlength="500" required placeholder="Nêu rõ căn cứ và kết luận kiểm duyệt"></textarea>
+          <div class="form-text">Lý do được lưu vào hồ sơ kiểm duyệt và nhật ký quản trị.</div>
+        </div>
+        <div class="mb-3 d-none" id="postDeleteConfirmationGroup">
+          <label class="form-label" for="postDeleteConfirmation">Nhập mã bài viết để xác nhận</label>
+          <input class="form-control" id="postDeleteConfirmation" name="confirmation" maxlength="160" autocomplete="off">
+          <div class="form-text">Nhập chính xác: <code id="postDeleteConfirmationValue"><%= post.postId %></code></div>
+        </div>
+        <div class="alert alert-warning mb-0" id="postActionWarning"><i class="bi bi-exclamation-triangle me-2"></i>Kiểm tra nội dung và bằng chứng trước khi xác nhận.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+        <button type="submit" class="btn btn-primary" id="postActionSubmit">Xác nhận</button>
+      </div>
+    </form>
+  </div>
+</div>

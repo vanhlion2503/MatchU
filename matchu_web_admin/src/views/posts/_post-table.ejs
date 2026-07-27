@@ -1,0 +1,124 @@
+<% if (posts.length === 0) { %>
+  <div class="empty-state post-empty-state">
+    <div>
+      <i class="bi bi-file-earmark-x"></i>
+      <h4>Không có bài viết phù hợp</h4>
+      <p>Thử thay đổi bộ lọc hoặc kiểm tra một hàng đợi khác.</p>
+    </div>
+  </div>
+<% } else { %>
+  <div class="table-responsive">
+    <table class="table align-middle post-table">
+      <thead>
+        <tr>
+          <th>Bài viết</th>
+          <th>Tác giả</th>
+          <th>Phạm vi</th>
+          <th>Kiểm duyệt</th>
+          <th>Báo cáo</th>
+          <th>Tương tác</th>
+          <th>Thời gian</th>
+          <th class="text-end">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% posts.forEach((post) => { const firstMedia = post.media[0]; %>
+          <tr>
+            <td>
+              <div class="post-list-preview">
+                <div class="post-list-media">
+                  <% if (firstMedia?.type === 'image' && firstMedia.url) { %>
+                    <img src="<%= firstMedia.url %>" alt="Media của bài viết" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                  <% } else if (firstMedia?.type === 'video' && firstMedia.thumbnailUrl) { %>
+                    <img src="<%= firstMedia.thumbnailUrl %>" alt="Ảnh xem trước video" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                    <i class="bi bi-play-circle-fill media-overlay-icon"></i>
+                  <% } else { %>
+                    <i class="bi bi-<%= firstMedia?.type === 'video' ? 'camera-video' : firstMedia?.type === 'audio' ? 'mic' : 'file-text' %>"></i>
+                  <% } %>
+                </div>
+                <div>
+                  <a class="post-content-link" href="/posts/<%= encodeURIComponent(post.postId) %><%= moderationContext ? '?from=moderation' : '' %>">
+                    <%= post.content || (post.postType === 'repost' ? 'Bài đăng lại không kèm nội dung' : 'Bài viết chỉ có media') %>
+                  </a>
+                  <div class="post-list-meta">
+                    <span><%= typeLabels[post.postType] || post.postType %></span>
+                    <% if (post.media.length) { %><span>· <%= post.media.length %> media</span><% } %>
+                    <% if (post.deletedAt) { %><span class="text-danger">· Đã xóa</span><% } %>
+                  </div>
+                  <code class="post-id-code" title="<%= post.postId %>"><%= post.postId %></code>
+                </div>
+              </div>
+            </td>
+            <td>
+              <a class="post-author-link" href="/users/<%= encodeURIComponent(post.authorId) %>">
+                <%= post.author.name || post.author.nickname || 'Không rõ tên' %>
+              </a>
+              <div class="post-list-meta">@<%= post.author.nickname || 'chưa-có-nickname' %></div>
+              <code class="post-author-id" title="<%= post.authorId %>"><%= post.authorId %></code>
+            </td>
+            <td>
+              <span class="visibility-label">
+                <i class="bi bi-<%= post.visibility === 'public' ? 'globe2' : post.visibility === 'followers' ? 'people' : 'lock' %>"></i>
+                <%= visibilityLabels[post.visibility] || post.visibility %>
+              </span>
+            </td>
+            <td>
+              <span class="moderation-badge moderation-<%= post.moderationStatus %>">
+                <%= moderationLabels[post.moderationStatus] || post.moderationStatus %>
+              </span>
+              <% if (moderationContext) { %>
+                <span class="priority-badge priority-<%= post.priority %>">
+                  <%= priorityLabels[post.priority] || post.priority %>
+                </span>
+              <% } %>
+            </td>
+            <td>
+              <% if (post.reportCount > 0) { %>
+                <span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(post.reportCount) %></span>
+                <small class="case-state"><%= post.reportState === 'resolved' ? 'Đã xử lý' : post.reportState === 'dismissed' ? 'Đã bác' : 'Đang mở' %></small>
+              <% } else { %>
+                <span class="text-muted small">Chưa có</span>
+              <% } %>
+            </td>
+            <td>
+              <div class="post-engagement-compact">
+                <span title="Lượt thích"><i class="bi bi-heart"></i><%= formatNumber(post.stats.likeCount) %></span>
+                <span title="Bình luận"><i class="bi bi-chat"></i><%= formatNumber(post.stats.commentCount) %></span>
+                <span title="Chia sẻ"><i class="bi bi-repeat"></i><%= formatNumber(post.stats.shareCount) %></span>
+              </div>
+            </td>
+            <td>
+              <span class="post-date"><%= formatDate(post.createdAt) %></span>
+              <% if (post.updatedAt && post.updatedAt.getTime() !== post.createdAt?.getTime()) { %>
+                <small class="case-state">Sửa: <%= formatDate(post.updatedAt) %></small>
+              <% } %>
+            </td>
+            <td class="text-end">
+              <a class="btn btn-sm btn-outline-primary" href="/posts/<%= encodeURIComponent(post.postId) %><%= moderationContext ? '?from=moderation' : '' %>">
+                <i class="bi bi-eye me-1"></i>Xem
+              </a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<div class="post-pagination">
+  <div>
+    <strong><%= posts.length %></strong> kết quả · đã quét <%= formatNumber(scanned) %> bản ghi
+  </div>
+  <div class="d-flex gap-2">
+    <% if (hasPreviousPage) { %>
+      <a class="btn btn-sm btn-light border" href="<%= moderationContext ? '/posts/moderation' : '/posts' %>">
+        <i class="bi bi-arrow-bar-left me-1"></i>Trang đầu
+      </a>
+    <% } %>
+    <% if (nextPageUrl) { %>
+      <a class="btn btn-sm btn-primary" href="<%= nextPageUrl %>">
+        Trang tiếp<i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    <% } %>
+  </div>
+</div>

@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node --test",
-    "check": "node --test && node scripts/verify-templates.js"
+    "check": "node --test && node scripts/verify-templates.js",
+    "backfill:post-search-index": "node scripts/backfill-post-search-index.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

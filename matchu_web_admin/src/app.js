@@ -17,6 +17,11 @@ app.use(helmet({
         'https://storage.googleapis.com',
         'https://*.googleusercontent.com'
       ],
+      mediaSrc: [
+        "'self'",
+        'https://firebasestorage.googleapis.com',
+        'https://storage.googleapis.com'
+      ],
       connectSrc: ["'self'", 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com']
     }
   }

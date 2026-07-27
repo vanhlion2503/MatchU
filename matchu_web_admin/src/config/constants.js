@@ -34,6 +34,22 @@ const USER_ACTION_PERMISSIONS = Object.freeze({
   [USER_ACTIONS.ADJUST_GEM]: 'users.gems.adjust',
   [USER_ACTIONS.ADJUST_REPUTATION]: 'users.reputation.adjust'
 });
+const POST_MODERATION_ACTIONS = Object.freeze({
+  APPROVE: 'approve',
+  REJECT: 'reject',
+  REVIEW: 'review',
+  DISMISS: 'dismiss',
+  RESTORE: 'restore',
+  DELETE_PERMANENTLY: 'delete_permanently'
+});
+const POST_ACTION_PERMISSIONS = Object.freeze({
+  [POST_MODERATION_ACTIONS.APPROVE]: ['posts.moderate'],
+  [POST_MODERATION_ACTIONS.REJECT]: ['posts.moderate'],
+  [POST_MODERATION_ACTIONS.REVIEW]: ['posts.moderate'],
+  [POST_MODERATION_ACTIONS.DISMISS]: ['posts.moderate'],
+  [POST_MODERATION_ACTIONS.RESTORE]: ['posts.restore', 'posts.moderate'],
+  [POST_MODERATION_ACTIONS.DELETE_PERMANENTLY]: ['posts.delete']
+});
 const APP_VERSION = '1.0.0';
 module.exports = {
   ADMIN_ROLES,
@@ -41,5 +57,7 @@ module.exports = {
   USER_ACCOUNT_STATUSES,
   USER_ACTIONS,
   USER_ACTION_PERMISSIONS,
+  POST_MODERATION_ACTIONS,
+  POST_ACTION_PERMISSIONS,
   APP_VERSION
 };

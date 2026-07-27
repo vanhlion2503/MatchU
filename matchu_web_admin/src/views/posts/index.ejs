@@ -1,0 +1,100 @@
+<%- include('../partials/page-title') %>
+
+<section class="row g-3 mb-4">
+  <% const cards = [
+    { label: 'Tổng bài viết', value: statistics.total, icon: 'file-post', tone: 'primary' },
+    { label: 'Đã duyệt', value: statistics.approved, icon: 'check-circle', tone: 'success' },
+    { label: 'Cần kiểm tra', value: statistics.pending + statistics.reviewRequired, icon: 'shield-exclamation', tone: 'warning' },
+    { label: 'Đã từ chối', value: statistics.rejected, icon: 'x-octagon', tone: 'danger' },
+    { label: 'Báo cáo đã nhận', value: statistics.reportCount, icon: 'flag', tone: 'info' }
+  ]; %>
+  <% cards.forEach((card) => { %>
+    <div class="col-6 col-xl">
+      <article class="stat-card h-100">
+        <div class="stat-icon bg-<%= card.tone %>-subtle text-<%= card.tone %>"><i class="bi bi-<%= card.icon %>"></i></div>
+        <div><span><%= card.label %></span><strong><%= formatNumber(card.value) %></strong></div>
+      </article>
+    </div>
+  <% }) %>
+</section>
+
+<section class="panel mb-4">
+  <div class="panel-heading mb-3">
+    <div>
+      <h3>Tìm kiếm và lọc bài viết</h3>
+      <p class="panel-subtitle">Tra cứu theo mã bài, UID, tác giả, nội dung hoặc hashtag.</p>
+    </div>
+    <% if (filters.q || filters.type || filters.media || filters.visibility || filters.moderation || filters.lifecycle || filters.report) { %>
+      <a href="/posts" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>Xóa bộ lọc</a>
+    <% } %>
+  </div>
+  <form action="/posts" method="get" class="post-filter-form">
+    <div class="post-filter-search">
+      <label class="form-label" for="postSearch">Từ khóa</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input id="postSearch" class="form-control" type="search" name="q" value="<%= filters.q %>" maxlength="120" placeholder="Post ID, UID, tác giả, nội dung">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="postTypeFilter">Loại bài</label>
+      <select id="postTypeFilter" class="form-select" name="type">
+        <option value="">Tất cả</option>
+        <% Object.entries(typeLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.type === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="postMediaFilter">Media</label>
+      <select id="postMediaFilter" class="form-select" name="media">
+        <option value="">Tất cả</option>
+        <option value="text" <%= filters.media === 'text' ? 'selected' : '' %>>Chỉ văn bản</option>
+        <option value="image" <%= filters.media === 'image' ? 'selected' : '' %>>Hình ảnh</option>
+        <option value="video" <%= filters.media === 'video' ? 'selected' : '' %>>Video</option>
+        <option value="audio" <%= filters.media === 'audio' ? 'selected' : '' %>>Âm thanh</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="postVisibilityFilter">Quyền xem</label>
+      <select id="postVisibilityFilter" class="form-select" name="visibility">
+        <option value="">Tất cả</option>
+        <% Object.entries(visibilityLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.visibility === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="postModerationFilter">Kiểm duyệt</label>
+      <select id="postModerationFilter" class="form-select" name="moderation">
+        <option value="">Tất cả</option>
+        <% Object.entries(moderationLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.moderation === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="postLifecycleFilter">Vòng đời</label>
+      <select id="postLifecycleFilter" class="form-select" name="lifecycle">
+        <option value="">Tất cả</option>
+        <option value="active" <%= filters.lifecycle === 'active' ? 'selected' : '' %>>Đang tồn tại</option>
+        <option value="deleted" <%= filters.lifecycle === 'deleted' ? 'selected' : '' %>>Đã xóa mềm</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="postReportFilter">Báo cáo</label>
+      <select id="postReportFilter" class="form-select" name="report">
+        <option value="">Tất cả</option>
+        <option value="reported" <%= filters.report === 'reported' ? 'selected' : '' %>>Có báo cáo</option>
+        <option value="unreported" <%= filters.report === 'unreported' ? 'selected' : '' %>>Chưa báo cáo</option>
+        <option value="open" <%= filters.report === 'open' ? 'selected' : '' %>>Đang chờ xử lý</option>
+        <option value="resolved" <%= filters.report === 'resolved' ? 'selected' : '' %>>Đã xử lý</option>
+      </select>
+    </div>
+    <input type="hidden" name="limit" value="<%= filters.limit %>">
+    <button class="btn btn-primary post-filter-submit" type="submit"><i class="bi bi-funnel me-1"></i>Áp dụng</button>
+  </form>
+</section>
+
+<section class="panel post-list-panel">
+  <div class="panel-heading mb-3">
+    <div><h3>Danh sách bài viết</h3><p class="panel-subtitle">Nội dung mới nhất được hiển thị trước.</p></div>
+    <% if (canAccessModeration) { %><a href="/posts/moderation" class="btn btn-sm btn-outline-primary"><i class="bi bi-shield-check me-1"></i>Mở hàng đợi kiểm duyệt</a><% } %>
+  </div>
+  <% if (scanLimitReached) { %><div class="alert alert-warning py-2">Đã đạt giới hạn quét an toàn. Hãy thêm điều kiện để thu hẹp kết quả.</div><% } %>
+  <%- include('_post-table', { moderationContext: false }) %>
+</section>

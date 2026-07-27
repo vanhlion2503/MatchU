@@ -3,4 +3,5 @@ router.get('/', (req, res) => res.redirect(req.cookies[sessionCookieName] ? '/da
 router.use(require('./auth.routes'));
 router.use(require('./dashboard.routes'));
 router.use(require('./user-account.routes'));
+router.use(require('./post-management.routes'));
 module.exports = router;

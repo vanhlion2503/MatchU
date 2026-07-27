@@ -79,6 +79,9 @@ const {
   moderateUploadedPostVideo,
 } = require("./src/triggers/videoModeration");
 const {
+  syncAdminPostSearchIndex,
+} = require("./src/triggers/adminPostSearchIndex");
+const {
   backfillRecentPostEmbeddings,
   embedPostContent,
   invalidateRecommendationCacheOnBlockedBy,
@@ -172,6 +175,7 @@ exports.cleanupViewedImageMessage = cleanupViewedImageMessage;
 exports.generateTelepathyAiInsight = generateTelepathyAiInsight;
 exports.validateWordChainDictionary = validateWordChainDictionary;
 exports.moderateUploadedPostVideo = moderateUploadedPostVideo;
+exports.syncAdminPostSearchIndex = syncAdminPostSearchIndex;
 exports.embedPostContent = embedPostContent;
 exports.backfillRecentPostEmbeddings = backfillRecentPostEmbeddings;
 exports.updateInterestOnPostLike = updateInterestOnPostLike;

@@ -1,0 +1,81 @@
+<div class="moderation-page-heading">
+  <div>
+    <span class="moderation-eyebrow">CONTENT OPERATIONS</span>
+    <h1>Kiểm duyệt nội dung</h1>
+    <p>Ưu tiên các bài có tín hiệu rủi ro từ AI hoặc báo cáo cộng đồng.</p>
+  </div>
+  <a href="/posts" class="btn btn-light border"><i class="bi bi-journal-text me-1"></i>Tất cả bài viết</a>
+</div>
+
+<section class="moderation-summary-grid">
+  <article><i class="bi bi-hourglass-split text-info"></i><div><strong><%= formatNumber(statistics.pending) %></strong><span>Đang xử lý</span></div></article>
+  <article><i class="bi bi-person-exclamation text-warning"></i><div><strong><%= formatNumber(statistics.reviewRequired) %></strong><span>Cần duyệt thủ công</span></div></article>
+  <article><i class="bi bi-flag text-danger"></i><div><strong><%= formatNumber(statistics.reportCount) %></strong><span>Báo cáo đã nhận</span></div></article>
+  <article><i class="bi bi-shield-x text-secondary"></i><div><strong><%= formatNumber(statistics.rejected) %></strong><span>Đã từ chối</span></div></article>
+</section>
+
+<nav class="moderation-queue-tabs" aria-label="Hàng đợi kiểm duyệt">
+  <% const queues = [
+    ['all', 'Cần xử lý', 'inbox'],
+    ['reported', 'Bị báo cáo', 'flag'],
+    ['review_required', 'AI cần người duyệt', 'person-check'],
+    ['pending', 'Đang xử lý', 'hourglass-split'],
+    ['rejected', 'Đã từ chối', 'x-octagon']
+  ]; %>
+  <% queues.forEach(([value, label, icon]) => { %>
+    <a class="<%= filters.queue === value ? 'active' : '' %>" href="/posts/moderation?queue=<%= value %>">
+      <i class="bi bi-<%= icon %>"></i><%= label %>
+    </a>
+  <% }) %>
+</nav>
+
+<section class="panel mb-4">
+  <form action="/posts/moderation" method="get" class="moderation-filter-form">
+    <input type="hidden" name="queue" value="<%= filters.queue %>">
+    <div class="moderation-search">
+      <label class="form-label" for="moderationSearch">Tra cứu trong hàng đợi</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input id="moderationSearch" class="form-control" type="search" name="q" value="<%= filters.q %>" maxlength="120" placeholder="Post ID, UID, tác giả hoặc nội dung">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="priorityFilter">Mức ưu tiên</label>
+      <select id="priorityFilter" class="form-select" name="priority">
+        <option value="">Mọi mức</option>
+        <% Object.entries(priorityLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.priority === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="moderationTypeFilter">Loại bài</label>
+      <select id="moderationTypeFilter" class="form-select" name="type">
+        <option value="">Mọi loại</option>
+        <% Object.entries(typeLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.type === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="moderationMediaFilter">Media</label>
+      <select id="moderationMediaFilter" class="form-select" name="media">
+        <option value="">Mọi media</option>
+        <option value="text" <%= filters.media === 'text' ? 'selected' : '' %>>Văn bản</option>
+        <option value="image" <%= filters.media === 'image' ? 'selected' : '' %>>Hình ảnh</option>
+        <option value="video" <%= filters.media === 'video' ? 'selected' : '' %>>Video</option>
+        <option value="audio" <%= filters.media === 'audio' ? 'selected' : '' %>>Âm thanh</option>
+      </select>
+    </div>
+    <input type="hidden" name="limit" value="<%= filters.limit %>">
+    <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Lọc</button>
+    <% if (filters.q || filters.priority || filters.type || filters.media) { %>
+      <a class="btn btn-light border" href="/posts/moderation?queue=<%= filters.queue %>">Đặt lại</a>
+    <% } %>
+  </form>
+</section>
+
+<section class="panel post-list-panel">
+  <div class="panel-heading mb-3">
+    <div><h3>Hàng đợi cần xem xét</h3><p class="panel-subtitle">Mở từng bài để xem bằng chứng, tín hiệu AI và đưa ra quyết định.</p></div>
+    <span class="badge rounded-pill text-bg-light border"><%= posts.length %> kết quả</span>
+  </div>
+  <% if (scanLimitReached) { %><div class="alert alert-warning py-2">Đã đạt giới hạn quét an toàn. Hãy thêm điều kiện lọc.</div><% } %>
+  <%- include('_post-table', { moderationContext: true }) %>
+</section>
