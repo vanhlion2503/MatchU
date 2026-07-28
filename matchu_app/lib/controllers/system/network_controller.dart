@@ -9,17 +9,26 @@ import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_gate_controller.dart';
 import 'package:matchu_app/controllers/system/notification_controller.dart';
 
+typedef ConnectivityChecker = Future<List<ConnectivityResult>> Function();
+typedef InternetReachabilityProbe = Future<bool> Function();
+
 /// Keeps a single, app-wide view of whether MatchU can actually reach the
 /// internet. Connectivity alone is not enough: a device may be connected to a
 /// Wi-Fi access point which has no internet access.
 class NetworkController extends GetxController with WidgetsBindingObserver {
-  NetworkController({Connectivity? connectivity})
-    : _connectivity = connectivity ?? Connectivity();
+  NetworkController({
+    Connectivity? connectivity,
+    ConnectivityChecker? connectivityChecker,
+    InternetReachabilityProbe? internetProbe,
+  }) : _connectivity = connectivity ?? Connectivity(),
+       _connectivityChecker = connectivityChecker,
+       _internetProbe = internetProbe;
 
   final Connectivity _connectivity;
+  final ConnectivityChecker? _connectivityChecker;
+  final InternetReachabilityProbe? _internetProbe;
 
   final isOffline = false.obs;
-  // Once shown, this overlay is dismissed only by a successful manual retry.
   final shouldShowOfflineOverlay = false.obs;
   final isChecking = false.obs;
   final isRetrying = false.obs;
@@ -28,6 +37,7 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Timer? _healthCheckTimer;
+  Future<bool>? _activeCheck;
   bool _isForeground = true;
 
   @override
@@ -42,36 +52,49 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
   }
 
   /// Called by the retry button and after a transport change.
-  Future<bool> checkConnection() async {
-    if (isChecking.value) return !isOffline.value;
+  Future<bool> checkConnection() {
+    final activeCheck = _activeCheck;
+    if (activeCheck != null) return activeCheck;
 
+    final check = _performConnectionCheck();
+    _activeCheck = check;
+    return check.whenComplete(() {
+      if (identical(_activeCheck, check)) {
+        _activeCheck = null;
+      }
+    });
+  }
+
+  Future<bool> _performConnectionCheck() async {
     isChecking.value = true;
     try {
-      final transports = await _connectivity.checkConnectivity();
-      if (transports.contains(ConnectivityResult.none)) {
-        isOffline.value = true;
-        shouldShowOfflineOverlay.value = true;
+      final transports = await _checkConnectivity();
+      if (transports.isEmpty ||
+          transports.every((result) => result == ConnectivityResult.none)) {
+        _markOffline();
         return false;
       }
 
-      final hasInternet = await _canReachInternet();
-      isOffline.value = !hasInternet;
-      if (!hasInternet) shouldShowOfflineOverlay.value = true;
+      final hasInternet = await _canReachInternetReliably();
+      if (hasInternet) {
+        _markOnline();
+      } else {
+        _markOffline();
+      }
       return hasInternet;
     } catch (_) {
-      // A failed probe is treated as offline. The next transport event, the
-      // periodic probe, or a manual retry can immediately recover the app.
-      isOffline.value = true;
-      shouldShowOfflineOverlay.value = true;
-      return false;
+      // A platform-channel/connectivity query can fail briefly while Android or
+      // iOS is switching transports. That is not proof that internet was lost,
+      // so preserve the last confirmed state and retry on the next event/tick.
+      return !isOffline.value;
     } finally {
       isChecking.value = false;
       isReady.value = true;
     }
   }
 
-  /// Restores the application services after the user explicitly confirms that
-  /// their connection is back. A successful HTTP probe alone is not enough:
+  /// Restores the application services after the connection comes back. A
+  /// successful HTTP probe alone is not enough during an explicit retry:
   /// Firestore may have been disabled during logout and startup work may have
   /// failed while the device was offline.
   ///
@@ -137,20 +160,67 @@ class NetworkController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  Future<List<ConnectivityResult>> _checkConnectivity() {
+    return _connectivityChecker?.call() ?? _connectivity.checkConnectivity();
+  }
+
+  Future<bool> _canReachInternetReliably() async {
+    final probe = _internetProbe ?? _canReachInternet;
+    if (await probe()) return true;
+
+    // Do not block the whole app because of one short DNS/TLS/CDN hiccup.
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    return probe();
+  }
+
+  void _markOffline() {
+    isOffline.value = true;
+    shouldShowOfflineOverlay.value = true;
+  }
+
+  void _markOnline() {
+    final wasOffline = isOffline.value || shouldShowOfflineOverlay.value;
+    isOffline.value = false;
+    lastRetryFailed.value = false;
+
+    // A confirmed background recovery must also release an overlay raised by
+    // an earlier failed check. Manual retry keeps its loading UI until the
+    // existing Firebase/Auth recovery flow finishes.
+    if (wasOffline && !isRetrying.value) {
+      shouldShowOfflineOverlay.value = false;
+      unawaited(_restoreApplicationServices());
+    }
+  }
+
   Future<bool> _canReachInternet() async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+    const probeUrls = <String>[
+      'https://www.gstatic.com/generate_204',
+      'https://cp.cloudflare.com/generate_204',
+    ];
+
+    for (final url in probeUrls) {
+      if (await _canReach(Uri.parse(url))) return true;
+    }
+    return false;
+  }
+
+  Future<bool> _canReach(Uri uri) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
     try {
       final request = await client
-          .getUrl(Uri.parse('https://www.gstatic.com/generate_204'))
-          .timeout(const Duration(seconds: 5));
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 4));
       final response = await request.close().timeout(
-        const Duration(seconds: 5),
+        const Duration(seconds: 4),
       );
       await response.drain<void>();
-      return response.statusCode == HttpStatus.noContent;
+      return response.statusCode >= HttpStatus.ok &&
+          response.statusCode < HttpStatus.badRequest;
     } on SocketException {
       return false;
     } on TimeoutException {
+      return false;
+    } on HttpException {
       return false;
     } finally {
       client.close(force: true);
