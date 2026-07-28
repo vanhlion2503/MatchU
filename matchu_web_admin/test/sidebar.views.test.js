@@ -69,3 +69,14 @@ test('shows the notification module only with read permission', async () => {
   });
   assert.doesNotMatch(hidden, /href="\/notifications"/);
 });
+
+test('does not show unused comment and reputation placeholder navigation items', async () => {
+  const html = await ejs.renderFile(sidebar, {
+    currentPath: '/dashboard',
+    hasPermission: () => true,
+    pendingReportCount: 0,
+    pendingPostModerationCount: 0
+  });
+  assert.doesNotMatch(html, /<span>Bình luận<\/span>/);
+  assert.doesNotMatch(html, /<span>Điểm uy tín<\/span>/);
+});

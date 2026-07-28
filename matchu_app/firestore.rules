@@ -1335,13 +1335,22 @@ service cloud.firestore {
             && !isDeletedComment()
             && affectedCommentKeys().hasOnly([
               "content",
+              "imageUrl",
+              "voiceUrl",
+              "voiceDurationMs",
               "deletedAt",
               "deletedBy",
               "updatedAt",
             ])
             && request.resource.data.content == ""
+            && request.resource.data.imageUrl == ""
+            && request.resource.data.voiceUrl == ""
+            && request.resource.data.voiceDurationMs == null
             && request.resource.data.deletedBy == request.auth.uid
-            && request.resource.data.deletedAt is timestamp;
+            && request.resource.data.deletedAt is timestamp
+            && existsAfter(
+              /databases/$(database)/documents/posts/$(postId)/comments/$(commentId)/moderationEvidence/original
+            );
         }
 
         allow update: if request.auth != null
@@ -1370,6 +1379,94 @@ service cloud.firestore {
             && canAccessParentPost();
 
           allow update: if false;
+        }
+
+        // Original payload retained for moderation after a public soft delete.
+        // Mobile clients can create the immutable snapshot atomically, but can
+        // never read it back. Admin SDK access bypasses these client rules.
+        match /moderationEvidence/{evidenceId} {
+          function sourceComment() {
+            return get(
+              /databases/$(database)/documents/posts/$(postId)/comments/$(commentId)
+            ).data;
+          }
+
+          function isAllowedDeleter() {
+            return request.auth != null
+              && (
+                request.auth.uid == sourceComment().userId
+                || request.auth.uid == get(
+                  /databases/$(database)/documents/posts/$(postId)
+                ).data.authorId
+              );
+          }
+
+          function sourceParentId() {
+            return sourceComment().keys().hasAny(["parentId"])
+              ? sourceComment().parentId
+              : null;
+          }
+
+          function sourceContent() {
+            return sourceComment().keys().hasAny(["content"])
+              ? sourceComment().content
+              : "";
+          }
+
+          function sourceImageUrl() {
+            return sourceComment().keys().hasAny(["imageUrl"])
+              ? sourceComment().imageUrl
+              : "";
+          }
+
+          function sourceVoiceUrl() {
+            return sourceComment().keys().hasAny(["voiceUrl"])
+              ? sourceComment().voiceUrl
+              : "";
+          }
+
+          function sourceVoiceDurationMs() {
+            return sourceComment().keys().hasAny(["voiceDurationMs"])
+              ? sourceComment().voiceDurationMs
+              : null;
+          }
+
+          function sourceCreatedAt() {
+            return sourceComment().keys().hasAny(["createdAt"])
+              ? sourceComment().createdAt
+              : null;
+          }
+
+          function isValidOriginalEvidence() {
+            return evidenceId == "original"
+              && request.resource.data.keys().hasOnly([
+                "postId",
+                "commentId",
+                "userId",
+                "parentId",
+                "content",
+                "imageUrl",
+                "voiceUrl",
+                "voiceDurationMs",
+                "createdAt",
+                "capturedAt",
+                "deletedBy",
+              ])
+              && request.resource.data.postId == postId
+              && request.resource.data.commentId == commentId
+              && request.resource.data.userId == sourceComment().userId
+              && request.resource.data.parentId == sourceParentId()
+              && request.resource.data.content == sourceContent()
+              && request.resource.data.imageUrl == sourceImageUrl()
+              && request.resource.data.voiceUrl == sourceVoiceUrl()
+              && request.resource.data.voiceDurationMs == sourceVoiceDurationMs()
+              && request.resource.data.createdAt == sourceCreatedAt()
+              && request.resource.data.deletedBy == request.auth.uid
+              && request.resource.data.capturedAt is timestamp;
+          }
+
+          allow create: if isAllowedDeleter() && isValidOriginalEvidence();
+          allow read, update, delete: if false;
         }
       }
     }

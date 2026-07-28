@@ -58,6 +58,8 @@ class CommentReportModel {
       'customReason': customReason,
       'description': description,
       'source': 'comment',
+      'moderationEvidencePath':
+          'posts/$postId/comments/$commentId/moderationEvidence/original',
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }

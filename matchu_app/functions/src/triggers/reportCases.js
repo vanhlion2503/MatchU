@@ -76,6 +76,7 @@ function normalizeReport(source, reportId, data = {}) {
       cleanString(data.commentContentPreview).slice(0, 1000),
     commentImageUrl: cleanString(data.commentImageUrl),
     commentVoiceUrl: cleanString(data.commentVoiceUrl),
+    moderationEvidencePath: cleanString(data.moderationEvidencePath),
     commentAuthorName: cleanString(data.commentAuthorName),
     commentAuthorNickname: cleanString(data.commentAuthorNickname),
     createdAt: data.createdAt || admin.firestore.FieldValue.serverTimestamp(),

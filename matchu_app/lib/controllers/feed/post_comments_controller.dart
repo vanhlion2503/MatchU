@@ -188,6 +188,13 @@ class PostCommentsController extends GetxController {
       final cached = suppressedCache[comment.commentId];
       if (cached != null) return cached;
 
+      // A soft-deleted comment and its loaded reply branch must disappear
+      // entirely from user-facing comment trees.
+      if (comment.isDeleted) {
+        suppressedCache[comment.commentId] = true;
+        return true;
+      }
+
       if (hiddenIds.contains(comment.commentId)) {
         suppressedCache[comment.commentId] = true;
         return true;
@@ -210,25 +217,8 @@ class PostCommentsController extends GetxController {
       return isParentSuppressed;
     }
 
-    bool hasVisibleLoadedChild(PostCommentModel comment) {
-      return source.any(
-        (candidate) =>
-            candidate.parentId == comment.commentId &&
-            !isSuppressed(candidate) &&
-            (!candidate.isDeleted ||
-                candidate.replyCount > 0 ||
-                hasVisibleLoadedChild(candidate)),
-      );
-    }
-
     return source
         .where((comment) => !isSuppressed(comment))
-        .where(
-          (comment) =>
-              !comment.isDeleted ||
-              comment.replyCount > 0 ||
-              hasVisibleLoadedChild(comment),
-        )
         .toList(growable: false);
   }
 

@@ -51,6 +51,8 @@ test("normalizes a comment report as post context for the admin queue", () => {
     postId: "post-1",
     commentId: "comment-1",
     parentId: "parent-comment-1",
+    moderationEvidencePath:
+      "posts/post-1/comments/comment-1/moderationEvidence/original",
     commentContentPreview: "Nội dung cần xem xét",
     commentAuthorName: "Tác giả bình luận",
     categoryKey: "harassment",
@@ -63,6 +65,10 @@ test("normalizes a comment report as post context for the admin queue", () => {
   assert.equal(report.contextId, "comment-1");
   assert.equal(report.commentId, "comment-1");
   assert.equal(report.parentId, "parent-comment-1");
+  assert.equal(
+    report.moderationEvidencePath,
+    "posts/post-1/comments/comment-1/moderationEvidence/original"
+  );
   assert.equal(report.commentAuthorName, "Tác giả bình luận");
   assert.equal(report.commentContentPreview, "Nội dung cần xem xét");
 });

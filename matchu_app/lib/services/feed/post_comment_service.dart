@@ -365,6 +365,9 @@ class PostCommentService {
 
     final postRef = _postsRef.doc(normalizedPostId);
     final commentRef = postRef.collection('comments').doc(normalizedCommentId);
+    final evidenceRef = commentRef
+        .collection('moderationEvidence')
+        .doc('original');
     final deletedAt = DateTime.now();
 
     return _firestore.runTransaction((transaction) async {
@@ -379,6 +382,7 @@ class PostCommentService {
       }
 
       final postData = postSnap.data() ?? <String, dynamic>{};
+      final commentData = commentSnap.data() ?? <String, dynamic>{};
       final postAuthorId = (postData['authorId'] ?? '').toString();
       final existingComment = PostCommentModel.fromDoc(commentSnap);
       if (existingComment.deletedAt != null) {
@@ -403,8 +407,27 @@ class PostCommentService {
               : const <String, dynamic>{};
       final currentCommentCount = (stats['commentCount'] as num?)?.toInt() ?? 0;
 
+      // Keep the original content in an admin-only document before removing
+      // every public-facing payload from the deleted comment.
+      transaction.set(evidenceRef, {
+        'postId': normalizedPostId,
+        'commentId': normalizedCommentId,
+        'userId': existingComment.userId,
+        'parentId': existingComment.parentId,
+        'content': existingComment.content,
+        'imageUrl': existingComment.imageUrl,
+        'voiceUrl': existingComment.voiceUrl,
+        'voiceDurationMs': existingComment.voiceDurationMs,
+        'createdAt': commentData['createdAt'],
+        'capturedAt': FieldValue.serverTimestamp(),
+        'deletedBy': uid,
+      });
+
       transaction.update(commentRef, {
         'content': '',
+        'imageUrl': '',
+        'voiceUrl': '',
+        'voiceDurationMs': null,
         'deletedAt': FieldValue.serverTimestamp(),
         'deletedBy': uid,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -426,6 +449,8 @@ class PostCommentService {
 
       return existingComment.copyWith(
         content: '',
+        imageUrl: '',
+        voiceUrl: '',
         deletedAt: deletedAt,
         deletedBy: uid,
         updatedAt: deletedAt,
@@ -524,10 +549,10 @@ class PostCommentService {
         .map(PostCommentModel.fromDoc)
         .where(
           (comment) =>
-              comment.content.trim().isNotEmpty ||
-              comment.imageUrl.trim().isNotEmpty ||
-              comment.voiceUrl.trim().isNotEmpty ||
-              (comment.isDeleted && comment.replyCount > 0),
+              !comment.isDeleted &&
+              (comment.content.trim().isNotEmpty ||
+                  comment.imageUrl.trim().isNotEmpty ||
+                  comment.voiceUrl.trim().isNotEmpty),
         )
         .toList(growable: false);
 
@@ -577,6 +602,8 @@ class PostCommentService {
   }
 
   bool _shouldIncludeCommentData(Map<String, dynamic> data) {
+    if (data['deletedAt'] != null) return false;
+
     final content = (data['content'] ?? '').toString().trim();
     if (content.isNotEmpty) return true;
     final imageUrl = (data['imageUrl'] ?? '').toString().trim();
@@ -584,15 +611,7 @@ class PostCommentService {
     final voiceUrl = (data['voiceUrl'] ?? '').toString().trim();
     if (voiceUrl.isNotEmpty) return true;
 
-    final isDeleted = data['deletedAt'] != null;
-    final replyCount = _parseInt(data['replyCount']);
-    return isDeleted && replyCount > 0;
-  }
-
-  int _parseInt(dynamic value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return 0;
+    return false;
   }
 
   Future<File> _prepareImageFile(String commentId, File source) async {
