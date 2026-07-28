@@ -6,4 +6,5 @@ router.use(require('./user-account.routes'));
 router.use(require('./post-management.routes'));
 router.use(require('./report-management.routes'));
 router.use(require('./notification-campaign.routes'));
+router.use(require('./audit-log.routes'));
 module.exports = router;

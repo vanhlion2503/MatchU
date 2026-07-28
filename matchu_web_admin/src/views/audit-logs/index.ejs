@@ -1,0 +1,236 @@
+<div class="audit-heading">
+  <div>
+    <span class="audit-eyebrow">AN TOÀN & TRUY VẾT</span>
+    <h1>Nhật ký quản trị</h1>
+    <p>Theo dõi đầy đủ các lần đăng nhập và thao tác quản trị quan trọng trên MatchU.</p>
+  </div>
+  <div class="audit-integrity-note">
+    <i class="bi bi-shield-check"></i>
+    <div><strong>Nhật ký chỉ đọc</strong><span>Không hỗ trợ sửa hoặc xóa tại trang này</span></div>
+  </div>
+</div>
+
+<section class="audit-stat-grid mb-4" aria-label="Tổng quan nhật ký">
+  <article>
+    <span class="audit-stat-icon audit-stat-primary"><i class="bi bi-journals"></i></span>
+    <div><small>Tổng sự kiện</small><strong><%= formatNumber(statistics.total) %></strong></div>
+  </article>
+  <article>
+    <span class="audit-stat-icon audit-stat-success"><i class="bi bi-activity"></i></span>
+    <div><small>Trong 24 giờ</small><strong><%= formatNumber(statistics.last24Hours) %><%= statistics.recentTruncated ? '+' : '' %></strong></div>
+  </article>
+  <article>
+    <span class="audit-stat-icon audit-stat-danger"><i class="bi bi-exclamation-octagon"></i></span>
+    <div><small>Thất bại / từ chối</small><strong><%= formatNumber(statistics.failures24Hours + statistics.denied24Hours) %></strong></div>
+  </article>
+  <article>
+    <span class="audit-stat-icon audit-stat-info"><i class="bi bi-person-check"></i></span>
+    <div><small>Admin hoạt động</small><strong><%= formatNumber(statistics.activeAdmins24Hours) %></strong></div>
+  </article>
+</section>
+
+<section class="panel audit-filter-panel mb-4">
+  <div class="panel-heading mb-3">
+    <div>
+      <h3>Tra cứu sự kiện</h3>
+      <p class="panel-subtitle">Tìm theo mã sự kiện, hành động, email/UID admin, mã đối tượng, IP hoặc request ID.</p>
+    </div>
+    <% if (activeFilterCount) { %>
+      <a href="/admin-logs" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-x-circle me-1"></i>Xóa <%= activeFilterCount %> bộ lọc
+      </a>
+    <% } %>
+  </div>
+  <form action="/admin-logs" method="get" class="audit-filter-form">
+    <div class="audit-filter-search">
+      <label class="form-label" for="auditSearch">Từ khóa</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input id="auditSearch" class="form-control" type="search" name="q" value="<%= filters.q %>" maxlength="120" placeholder="Action, email, UID, IP, request ID">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="auditAdmin">Quản trị viên</label>
+      <select id="auditAdmin" class="form-select" name="adminId">
+        <option value="">Tất cả admin</option>
+        <% adminOptions.forEach((item) => { %>
+          <option value="<%= item.uid %>" <%= filters.adminId === item.uid ? 'selected' : '' %>><%= item.displayName %><%= item.status !== 'active' ? ' · ngừng hoạt động' : '' %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="auditCategory">Phân hệ</label>
+      <select id="auditCategory" class="form-select" name="category">
+        <option value="">Tất cả phân hệ</option>
+        <% Object.entries(categoryLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.category === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="auditResult">Kết quả</label>
+      <select id="auditResult" class="form-select" name="result">
+        <option value="">Mọi kết quả</option>
+        <% Object.entries(resultLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.result === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="auditTargetType">Đối tượng</label>
+      <select id="auditTargetType" class="form-select" name="targetType">
+        <option value="">Mọi đối tượng</option>
+        <% Object.entries(targetTypeLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.targetType === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="auditFrom">Từ ngày</label>
+      <input id="auditFrom" class="form-control" type="date" name="from" value="<%= filters.from %>">
+    </div>
+    <div>
+      <label class="form-label" for="auditTo">Đến ngày</label>
+      <input id="auditTo" class="form-control" type="date" name="to" value="<%= filters.to %>">
+    </div>
+    <div>
+      <label class="form-label" for="auditLimit">Mỗi trang</label>
+      <select id="auditLimit" class="form-select" name="limit">
+        <% [25, 50, 100].forEach((value) => { %><option value="<%= value %>" <%= filters.limit === value ? 'selected' : '' %>><%= value %> dòng</option><% }) %>
+      </select>
+    </div>
+    <button class="btn btn-primary audit-filter-submit" type="submit"><i class="bi bi-funnel me-1"></i>Áp dụng</button>
+  </form>
+</section>
+
+<section class="panel audit-list-panel">
+  <div class="panel-heading audit-list-heading">
+    <div>
+      <h3>Dòng thời gian hoạt động</h3>
+      <p class="panel-subtitle"><strong><%= logs.length %></strong> sự kiện hiển thị · đã kiểm tra <%= formatNumber(scanned) %> bản ghi</p>
+    </div>
+    <span class="audit-legend"><i></i> Múi giờ Việt Nam (UTC+7)</span>
+  </div>
+
+  <% if (scanLimitReached) { %>
+    <div class="alert alert-warning audit-scan-alert" role="alert">
+      <i class="bi bi-info-circle"></i>
+      <div><strong>Đã đạt giới hạn quét an toàn.</strong><span>Hãy thu hẹp khoảng ngày hoặc thêm bộ lọc để có kết quả chính xác hơn.</span></div>
+    </div>
+  <% } %>
+
+  <% if (!logs.length) { %>
+    <div class="empty-state audit-empty-state">
+      <div><i class="bi bi-journal-x"></i><h4>Không tìm thấy sự kiện phù hợp</h4><p>Thử thay đổi từ khóa, khoảng ngày hoặc xóa bớt bộ lọc.</p></div>
+    </div>
+  <% } else { %>
+    <div class="table-responsive audit-table-wrap">
+      <table class="table align-middle audit-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Sự kiện</th>
+            <th>Quản trị viên</th>
+            <th>Đối tượng</th>
+            <th>Kết quả</th>
+            <th><span class="visually-hidden">Chi tiết</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% logs.forEach((log, index) => { const detailId = `audit-detail-${index}`; %>
+            <tr class="audit-event-row">
+              <td>
+                <time class="audit-time" datetime="<%= formatIsoDate(log.createdAt) %>"><%= formatDateTime(log.createdAt) %></time>
+                <code class="audit-event-id" title="<%= log.id %>">#<%= log.id.slice(0, 8) %></code>
+              </td>
+              <td>
+                <div class="audit-action-cell">
+                  <span class="audit-action-icon audit-tone-<%= log.tone %>"><i class="bi bi-<%= categoryIcons[log.category] || 'gear' %>"></i></span>
+                  <div>
+                    <strong><%= log.actionLabel %></strong>
+                    <span><%= log.categoryLabel %> · <code><%= log.action %></code></span>
+                    <% if (log.summary) { %><small title="<%= log.summary %>"><%= log.summary %></small><% } %>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="audit-admin-cell">
+                  <span><%= (log.adminName || 'A').charAt(0).toUpperCase() %></span>
+                  <div><strong><%= log.adminName %></strong><small><%= log.adminEmail || log.adminId || 'Không xác định' %></small></div>
+                </div>
+              </td>
+              <td>
+                <span class="audit-target-type"><%= log.targetTypeLabel %></span>
+                <% if (log.targetUrl) { %>
+                  <a class="audit-target-id" href="<%= log.targetUrl %>" title="<%= log.targetId %>"><%= log.targetId || '—' %><i class="bi bi-box-arrow-up-right"></i></a>
+                <% } else { %>
+                  <code class="audit-target-id" title="<%= log.targetId %>"><%= log.targetId || '—' %></code>
+                <% } %>
+              </td>
+              <td>
+                <span class="audit-result audit-result-<%= log.result %>"><i class="bi bi-<%= log.result === 'success' ? 'check-circle-fill' : log.result === 'denied' ? 'shield-x' : 'x-circle-fill' %>"></i><%= log.resultLabel %></span>
+                <small class="audit-ip"><i class="bi bi-globe2"></i><%= log.ipAddress || 'Không rõ IP' %></small>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-light border audit-detail-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#<%= detailId %>" aria-expanded="false" aria-controls="<%= detailId %>">
+                  <span>Chi tiết</span><i class="bi bi-chevron-down"></i>
+                </button>
+              </td>
+            </tr>
+            <tr class="audit-detail-row">
+              <td colspan="6" class="p-0 border-0">
+                <div id="<%= detailId %>" class="collapse">
+                  <div class="audit-detail-panel">
+                    <div class="audit-detail-toolbar">
+                      <div><span>EVENT ID</span><code><%= log.id %></code></div>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" data-copy-value="<%= log.id %>"><i class="bi bi-copy me-1"></i>Sao chép ID</button>
+                    </div>
+                    <div class="audit-detail-grid">
+                      <div><span>Request ID</span><code><%= log.requestId || 'Không có (log cũ)' %></code></div>
+                      <div><span>Vai trò admin</span><strong><%= log.adminRole || 'Không ghi nhận' %></strong></div>
+                      <div><span>Địa chỉ IP</span><code><%= log.ipAddress || 'Không ghi nhận' %></code></div>
+                      <div><span>Thiết bị</span><strong><%= log.userAgentInfo.label %></strong></div>
+                      <div class="audit-detail-wide"><span>User-Agent</span><code><%= log.userAgentInfo.raw || 'Không ghi nhận' %></code></div>
+                    </div>
+
+                    <% if (log.changes.length) { %>
+                      <div class="audit-change-section">
+                        <h4><i class="bi bi-arrow-left-right"></i>Thay đổi dữ liệu</h4>
+                        <div class="audit-change-list">
+                          <% log.changes.forEach((change) => { %>
+                            <div>
+                              <strong><%= change.label %></strong>
+                              <span class="audit-before"><%= formatValue(change.before) %></span>
+                              <i class="bi bi-arrow-right"></i>
+                              <span class="audit-after"><%= formatValue(change.after) %></span>
+                            </div>
+                          <% }) %>
+                        </div>
+                      </div>
+                    <% } %>
+
+                    <% const metadataJson = formatMetadata(log.metadata); %>
+                    <% if (metadataJson) { %>
+                      <div class="audit-metadata-section">
+                        <div><h4><i class="bi bi-braces"></i>Metadata sự kiện</h4><button type="button" class="btn btn-sm btn-link" data-copy-value="<%= metadataJson %>"><i class="bi bi-copy me-1"></i>Sao chép</button></div>
+                        <pre><code><%= metadataJson %></code></pre>
+                      </div>
+                    <% } %>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="audit-pagination">
+    <div><i class="bi bi-lock"></i>Dữ liệu nhật ký được hiển thị ở chế độ chỉ đọc.</div>
+    <div class="d-flex gap-2">
+      <% if (hasPreviousPage) { %><a class="btn btn-sm btn-light border" href="<%= firstPageUrl %>"><i class="bi bi-arrow-left me-1"></i>Trang đầu</a><% } %>
+      <% if (nextPageUrl) { %><a class="btn btn-sm btn-primary" href="<%= nextPageUrl %>">Trang sau<i class="bi bi-arrow-right ms-1"></i></a><% } %>
+    </div>
+  </div>
+</section>

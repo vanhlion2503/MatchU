@@ -63,6 +63,7 @@ Không commit `.env` hoặc JSON service account.
 | GET | `/reports` | Hàng đợi thống nhất cho báo cáo bài viết, hồ sơ và matching |
 | GET | `/reports/:caseId` | Chi tiết đối tượng, bằng chứng, phân công và lịch sử xử lý |
 | POST | `/reports/:caseId/actions` | Nhận xử lý, xem xét, kết luận, bác hoặc mở lại hồ sơ |
+| GET | `/admin-logs` | Tra cứu nhật ký quản trị, cần `audit_logs.read` |
 
 ## Quản lý tài khoản người dùng
 
@@ -107,6 +108,14 @@ Các permission:
 Admin SDK bỏ qua Firestore Rules nên mọi thao tác ghi đều được kiểm tra Joi, permission, CSRF và
 thực hiện phía server. Báo cáo gốc được giữ nguyên trong luồng kiểm duyệt thông thường; thao tác
 xóa vĩnh viễn sẽ dọn bài viết và dữ liệu liên quan sau khi xác nhận chính xác Post ID.
+
+## Nhật ký quản trị
+
+Trang `/admin-logs` hiển thị dòng thời gian đăng nhập và thao tác quản trị, thống kê 24 giờ, bộ lọc
+theo admin/phân hệ/kết quả/đối tượng/thời gian, tìm kiếm và phần chi tiết trước/sau. Chỉ
+`super_admin` hoặc admin có permission `audit_logs.read` được truy cập. Log mới có request ID,
+snapshot tên/role admin và metadata được che các khóa nhạy cảm. Xem thiết kế và lưu ý vận hành tại
+[`docs/admin-audit-logs.md`](docs/admin-audit-logs.md).
 
 Tìm kiếm Admin dùng collection `adminPostSearchIndex`. Sau khi deploy trigger và Firestore index,
 chạy backfill một lần cho các bài viết hiện có:

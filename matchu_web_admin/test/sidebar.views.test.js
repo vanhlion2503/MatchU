@@ -80,3 +80,23 @@ test('does not show unused comment and reputation placeholder navigation items',
   assert.doesNotMatch(html, /<span>Bình luận<\/span>/);
   assert.doesNotMatch(html, /<span>Điểm uy tín<\/span>/);
 });
+
+test('shows the working audit log route only with audit read permission', async () => {
+  const visible = await ejs.renderFile(sidebar, {
+    currentPath: '/admin-logs',
+    hasPermission: (permission) => permission === 'audit_logs.read',
+    pendingReportCount: 0,
+    pendingPostModerationCount: 0
+  });
+  assert.match(visible, /href="\/admin-logs"/);
+  assert.match(visible, /nav-link active/);
+  assert.match(visible, /Nhật ký quản trị/);
+
+  const hidden = await ejs.renderFile(sidebar, {
+    currentPath: '/dashboard',
+    hasPermission: () => false,
+    pendingReportCount: 0,
+    pendingPostModerationCount: 0
+  });
+  assert.doesNotMatch(hidden, /href="\/admin-logs"/);
+});

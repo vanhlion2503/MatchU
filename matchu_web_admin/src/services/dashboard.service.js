@@ -1,4 +1,5 @@
 const { firestore } = require('../config/firebase-admin');
+const { presentAuditLog } = require('../utils/audit-log');
 
 const TIME_ZONE = 'Asia/Bangkok';
 const TIME_ZONE_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -280,39 +281,16 @@ function buildReportBreakdown(reports) {
 }
 
 function activityPresentation(activity) {
-  const action = String(activity.action || '').toUpperCase();
-  const labels = {
-    LOGIN_SUCCESS: 'Đăng nhập hệ thống',
-    LOGOUT: 'Đăng xuất hệ thống',
-    POST_APPROVE: 'Duyệt bài viết',
-    POST_REJECT: 'Từ chối bài viết',
-    POST_REVIEW: 'Chuyển bài sang xem xét',
-    POST_DISMISS: 'Bác báo cáo bài viết',
-    POST_RESTORE: 'Khôi phục bài viết',
-    POST_DELETE_PERMANENTLY: 'Xóa vĩnh viễn bài viết',
-    USER_WARN: 'Cảnh báo người dùng',
-    USER_RESTRICT: 'Hạn chế tài khoản',
-    USER_SUSPEND: 'Tạm khóa tài khoản',
-    USER_BAN: 'Cấm tài khoản',
-    USER_RESTORE: 'Khôi phục tài khoản'
-  };
-  const isDanger = /REJECT|DELETE|BAN|SUSPEND|FAILED/.test(action);
-  const isWarning = /WARN|RESTRICT|REVIEW/.test(action);
-  let targetUrl = null;
-  if (activity.targetType === 'user' && activity.targetId) {
-    targetUrl = `/users/${encodeURIComponent(activity.targetId)}`;
-  } else if (activity.targetType === 'post' && activity.targetId) {
-    targetUrl = `/posts/${encodeURIComponent(activity.targetId)}`;
-  }
+  const presented = presentAuditLog(activity);
   return {
-    id: activity.id,
-    label: labels[action] || action.toLowerCase().replaceAll('_', ' ') || 'Hoạt động quản trị',
-    adminName: activity.adminEmail || 'Quản trị viên',
-    targetType: activity.targetType || '',
-    targetId: activity.targetId || '',
-    targetUrl,
+    id: presented.id,
+    label: presented.actionLabel,
+    adminName: presented.adminName,
+    targetType: presented.targetType,
+    targetId: presented.targetId,
+    targetUrl: presented.targetUrl,
     createdAt: activity.createdAt,
-    tone: isDanger ? 'danger' : isWarning ? 'warning' : 'normal'
+    tone: presented.tone
   };
 }
 
