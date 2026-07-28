@@ -79,6 +79,7 @@ dependencies:
   qr_flutter: ^4.1.0
   share_plus: ^12.0.2
   app_links: 7.0.0
+  package_info_plus: ^9.0.0
   google_sign_in: ^7.2.0
   photo_manager: ^3.9.0
   record: ^6.2.1

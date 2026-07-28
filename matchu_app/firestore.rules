@@ -569,6 +569,9 @@ service cloud.firestore {
         function hasOnlyNotificationDeviceKeys() {
           return request.resource.data.keys().hasOnly([
             "platform",
+            "appVersion",
+            "buildNumber",
+            "locale",
             "status",
             "lastActiveAt",
             "fcmToken",
@@ -582,6 +585,18 @@ service cloud.firestore {
 
         function hasValidNotificationDeviceTypes() {
           return request.resource.data.platform is string
+            && (
+              !("appVersion" in request.resource.data)
+              || request.resource.data.appVersion is string
+            )
+            && (
+              !("buildNumber" in request.resource.data)
+              || request.resource.data.buildNumber is string
+            )
+            && (
+              !("locale" in request.resource.data)
+              || request.resource.data.locale is string
+            )
             && request.resource.data.status in [
               "active",
               "inactive",

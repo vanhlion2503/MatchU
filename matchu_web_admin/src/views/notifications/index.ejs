@@ -1,0 +1,98 @@
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <span class="eyebrow">TRUNG TÂM PHÂN PHỐI</span>
+    <h1 class="h3 mb-1">Quản lý thông báo</h1>
+    <p class="text-muted mb-0">Soạn, lên lịch và theo dõi thông báo gửi tới ứng dụng MatchU.</p>
+  </div>
+  <% if (hasPermission('notifications.create')) { %>
+    <a class="btn btn-primary" href="/notifications/new"><i class="bi bi-plus-lg me-1"></i>Tạo thông báo</a>
+  <% } %>
+</div>
+
+<section class="notification-stat-grid mb-4" aria-label="Thống kê chiến dịch">
+  <article><span>Bản nháp</span><strong><%= statistics.draft %></strong></article>
+  <article><span>Đã lên lịch</span><strong><%= statistics.scheduled %></strong></article>
+  <article><span>Đang xử lý</span><strong><%= statistics.active %></strong></article>
+  <article><span>Hoàn tất</span><strong><%= statistics.completed %></strong></article>
+  <article class="is-danger"><span>Có lỗi</span><strong><%= statistics.failed %></strong></article>
+</section>
+
+<section class="panel mb-4">
+  <form class="row g-3 align-items-end" action="/notifications" method="get">
+    <div class="col-md-4">
+      <label class="form-label" for="status">Trạng thái</label>
+      <select class="form-select" id="status" name="status">
+        <option value="">Tất cả trạng thái</option>
+        <% Object.entries(statusLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.status === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="category">Loại nội dung</label>
+      <select class="form-select" id="category" name="category">
+        <option value="">Tất cả loại</option>
+        <% Object.entries(categoryLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.category === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="audienceType">Đối tượng</label>
+      <select class="form-select" id="audienceType" name="audienceType">
+        <option value="">Tất cả đối tượng</option>
+        <% Object.entries(audienceLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.audienceType === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-2 d-flex gap-2">
+      <button class="btn btn-outline-primary flex-fill" type="submit">Lọc</button>
+      <a class="btn btn-light border" href="/notifications" aria-label="Xóa bộ lọc"><i class="bi bi-x-lg"></i></a>
+    </div>
+  </form>
+</section>
+
+<section class="panel p-0 overflow-hidden">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 notification-table">
+      <thead>
+        <tr>
+          <th>Nội dung</th>
+          <th>Đối tượng</th>
+          <th>Trạng thái</th>
+          <th>Kết quả thiết bị</th>
+          <th>Thời gian</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!campaigns.length) { %>
+          <tr><td colspan="6"><div class="empty-state py-5"><i class="bi bi-bell-slash"></i><h3>Chưa có chiến dịch phù hợp</h3><p>Hãy tạo thông báo mới hoặc thay đổi bộ lọc.</p></div></td></tr>
+        <% } %>
+        <% campaigns.forEach((campaign) => { %>
+          <tr>
+            <td>
+              <span class="notification-category"><%= categoryLabels[campaign.category] || campaign.category %></span>
+              <a class="notification-title" href="/notifications/<%= encodeURIComponent(campaign.id) %>"><%= campaign.title || 'Bản nháp chưa có tiêu đề' %></a>
+              <small><%= campaign.body || 'Chưa có nội dung' %></small>
+            </td>
+            <td><%= audienceLabels[campaign.audience.type] || campaign.audience.type %></td>
+            <td><span class="notification-status status-<%= campaign.status %>"><%= statusLabels[campaign.status] || campaign.status %></span></td>
+            <td>
+              <strong class="text-success"><%= campaign.metrics.acceptedDevices %></strong>
+              <span class="text-muted"> / </span>
+              <strong class="<%= campaign.metrics.failedDevices ? 'text-danger' : 'text-muted' %>"><%= campaign.metrics.failedDevices %></strong>
+              <small class="d-block text-muted">chấp nhận / thất bại</small>
+            </td>
+            <td>
+              <%= campaign.delivery.scheduledAt ? formatDate(campaign.delivery.scheduledAt) : formatDate(campaign.createdAt) %>
+              <small class="d-block text-muted"><%= campaign.delivery.scheduledAt ? 'Lịch gửi' : 'Ngày tạo' %></small>
+            </td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/notifications/<%= encodeURIComponent(campaign.id) %>">Xem</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>

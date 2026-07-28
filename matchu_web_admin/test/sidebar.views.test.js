@@ -51,3 +51,21 @@ test('shows a red badge and moderation shortcut for posts requiring review', asy
   assert.match(html, />7<\/strong>/);
   assert.match(html, /7 bài viết cần kiểm duyệt/);
 });
+
+test('shows the notification module only with read permission', async () => {
+  const visible = await ejs.renderFile(sidebar, {
+    currentPath: '/notifications',
+    hasPermission: (permission) => permission === 'notifications.read',
+    pendingReportCount: 0,
+    pendingPostModerationCount: 0
+  });
+  assert.match(visible, /href="\/notifications"/);
+  assert.match(visible, /nav-link active/);
+
+  const hidden = await ejs.renderFile(sidebar, {
+    ...baseLocals,
+    pendingReportCount: 0,
+    pendingPostModerationCount: 0
+  });
+  assert.doesNotMatch(hidden, /href="\/notifications"/);
+});

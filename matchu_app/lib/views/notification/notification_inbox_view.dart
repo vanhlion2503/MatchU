@@ -640,6 +640,10 @@ class _NotificationAvatar extends StatelessWidget {
       AppNotificationType.postLike => Iconsax.heart,
       AppNotificationType.postComment => Iconsax.message_text,
       AppNotificationType.moderationPenalty => Iconsax.shield_cross,
+      AppNotificationType.systemAnnouncement => Iconsax.notification_bing,
+      AppNotificationType.maintenance => Iconsax.setting_2,
+      AppNotificationType.appUpdate => Iconsax.refresh_circle,
+      AppNotificationType.policyUpdate => Iconsax.document_text,
       AppNotificationType.unknown => Iconsax.notification,
     };
     final color =

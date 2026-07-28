@@ -66,6 +66,12 @@ const {
   migrateLegacyNotificationDevices,
 } = require("./src/triggers/deviceMaintenance");
 const {
+  scheduleAdminNotificationCampaigns,
+  prepareAdminNotificationCampaign,
+  dispatchAdminNotificationJob,
+  maintainAdminNotificationCampaigns,
+} = require("./src/triggers/adminNotificationCampaigns");
+const {
   revokeAccountSessions,
   deleteAccount,
 } = require("./src/callables/accountSecurity");
@@ -174,6 +180,11 @@ exports.maintainPostEngagementNotificationQueues =
   maintainPostEngagementNotificationQueues;
 exports.cleanupStaleUserDevices = cleanupStaleUserDevices;
 exports.migrateLegacyNotificationDevices = migrateLegacyNotificationDevices;
+exports.scheduleAdminNotificationCampaigns = scheduleAdminNotificationCampaigns;
+exports.prepareAdminNotificationCampaign = prepareAdminNotificationCampaign;
+exports.dispatchAdminNotificationJob = dispatchAdminNotificationJob;
+exports.maintainAdminNotificationCampaigns =
+  maintainAdminNotificationCampaigns;
 exports.revokeAccountSessions = revokeAccountSessions;
 exports.deleteAccount = deleteAccount;
 exports.migrateTempChatMessages = migrateTempChatMessages;

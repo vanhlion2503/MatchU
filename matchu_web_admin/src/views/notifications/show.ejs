@@ -1,0 +1,85 @@
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <a class="back-link" href="/notifications"><i class="bi bi-arrow-left"></i>Quay lại danh sách</a>
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+      <h1 class="h3 mb-0"><%= campaign.title || 'Bản nháp chưa có tiêu đề' %></h1>
+      <span class="notification-status status-<%= campaign.status %>"><%= statusLabels[campaign.status] || campaign.status %></span>
+    </div>
+    <p class="text-muted mb-0 mt-1"><%= categoryLabels[campaign.category] || campaign.category %> · <%= audienceLabels[campaign.audience.type] || campaign.audience.type %></p>
+  </div>
+  <div class="d-flex gap-2">
+    <% if (['draft','scheduled'].includes(campaign.status) && hasPermission('notifications.create')) { %>
+      <a class="btn btn-outline-primary" href="/notifications/<%= encodeURIComponent(campaign.id) %>/edit"><i class="bi bi-pencil me-1"></i>Chỉnh sửa</a>
+    <% } %>
+    <% if (['scheduled','queued','preparing','sending'].includes(campaign.status) && hasPermission('notifications.cancel')) { %>
+      <form action="/notifications/<%= encodeURIComponent(campaign.id) %>/actions" method="post" onsubmit="return confirm('Hủy phần chiến dịch chưa được gửi?')">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="action" value="cancel">
+        <button class="btn btn-outline-danger" type="submit"><i class="bi bi-x-octagon me-1"></i>Hủy gửi</button>
+      </form>
+    <% } %>
+    <% if (['partial_failed','failed'].includes(campaign.status) && (campaign.failedJobs || 0) > 0 && hasPermission('notifications.retry')) { %>
+      <form action="/notifications/<%= encodeURIComponent(campaign.id) %>/actions" method="post">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="action" value="retry_failed">
+        <button class="btn btn-outline-primary" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Thử lại lỗi</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<section class="notification-metric-grid mb-4">
+  <article><span>Người dùng mục tiêu</span><strong><%= campaign.metrics.targetUsers %></strong></article>
+  <article><span>Đủ điều kiện</span><strong><%= campaign.metrics.eligibleUsers %></strong></article>
+  <article><span>Không có đích gửi</span><strong><%= campaign.metrics.skippedUsers %></strong></article>
+  <article><span>Thiết bị đã thử</span><strong><%= campaign.metrics.attemptedDevices %></strong></article>
+  <article class="is-success"><span>FCM chấp nhận</span><strong><%= campaign.metrics.acceptedDevices %></strong></article>
+  <article class="<%= campaign.metrics.failedDevices ? 'is-danger' : '' %>"><span>FCM thất bại</span><strong><%= campaign.metrics.failedDevices %></strong></article>
+  <article><span>Inbox đã tạo</span><strong><%= campaign.metrics.inboxCreated %></strong></article>
+  <article><span>Token vô hiệu</span><strong><%= campaign.metrics.invalidTokens %></strong></article>
+</section>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <section class="panel mb-4">
+      <div class="panel-heading"><h2>Nội dung</h2><span class="notification-category"><%= categoryLabels[campaign.category] || campaign.category %></span></div>
+      <div class="notification-content-preview">
+        <h3><%= campaign.title || '—' %></h3>
+        <p><%= campaign.body || '—' %></p>
+      </div>
+      <dl class="notification-detail-list">
+        <div><dt>Kênh</dt><dd><%= campaign.channels.length ? campaign.channels.join(', ') : 'Chưa chọn' %></dd></div>
+        <div><dt>Hành động</dt><dd><%= campaign.action.type %><%= campaign.action.value ? `: ${campaign.action.value}` : '' %></dd></div>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading"><h2>Đối tượng</h2></div>
+      <dl class="notification-detail-list">
+        <div><dt>Phạm vi</dt><dd><%= audienceLabels[campaign.audience.type] || campaign.audience.type %></dd></div>
+        <% if (campaign.audience.targetUserId) { %><div><dt>UID</dt><dd><a href="/users/<%= encodeURIComponent(campaign.audience.targetUserId) %>"><%= campaign.audience.targetUserId %></a></dd></div><% } %>
+        <% const rules = campaign.audience.rules || {}; %>
+        <% if (rules.accountStatuses?.length) { %><div><dt>Trạng thái</dt><dd><%= rules.accountStatuses.join(', ') %></dd></div><% } %>
+        <% if (rules.genders?.length) { %><div><dt>Giới tính</dt><dd><%= rules.genders.join(', ') %></dd></div><% } %>
+        <% if (rules.platforms?.length) { %><div><dt>Nền tảng</dt><dd><%= rules.platforms.join(', ') %></dd></div><% } %>
+        <% if (rules.interestTags?.length) { %><div><dt>Sở thích</dt><dd><%= rules.interestTags.join(', ') %></dd></div><% } %>
+      </dl>
+    </section>
+  </div>
+
+  <div class="col-lg-5">
+    <section class="panel">
+      <div class="panel-heading"><h2>Vận hành</h2></div>
+      <dl class="notification-detail-list">
+        <div><dt>Mã chiến dịch</dt><dd class="text-break"><%= campaign.id %></dd></div>
+        <div><dt>Người tạo</dt><dd><%= campaign.createdByEmail || campaign.createdBy || '—' %></dd></div>
+        <div><dt>Ngày tạo</dt><dd><%= formatDate(campaign.createdAt) %></dd></div>
+        <div><dt>Lịch gửi</dt><dd><%= formatDate(campaign.delivery.scheduledAt) %></dd></div>
+        <div><dt>Bắt đầu</dt><dd><%= formatDate(campaign.startedAt) %></dd></div>
+        <div><dt>Hoàn tất</dt><dd><%= formatDate(campaign.completedAt) %></dd></div>
+        <div><dt>Tiến độ lô</dt><dd><%= campaign.completedJobs || 0 %> / <%= campaign.totalJobs || 0 %></dd></div>
+      </dl>
+      <div class="alert alert-light border small mb-0">“FCM chấp nhận” nghĩa là Firebase đã nhận yêu cầu gửi; không đồng nghĩa người dùng chắc chắn đã đọc thông báo.</div>
+    </section>
+  </div>
+</div>

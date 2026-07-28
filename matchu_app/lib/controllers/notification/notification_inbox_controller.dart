@@ -8,6 +8,7 @@ import 'package:matchu_app/models/notification/app_notification_model.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/feed/post_service.dart';
 import 'package:matchu_app/services/notification/notification_repository.dart';
+import 'package:matchu_app/services/notification/admin_notification_navigation.dart';
 
 enum NotificationInboxFilter { all, unread }
 
@@ -174,6 +175,14 @@ class NotificationInboxController extends GetxController {
 
       if (notification.type == AppNotificationType.moderationPenalty) {
         await Get.toNamed(AppRouter.reputation);
+        return;
+      }
+
+      if ((notification.campaignId ?? '').trim().isNotEmpty) {
+        await AdminNotificationNavigation.open(
+          actionType: notification.actionType ?? 'inbox',
+          actionValue: notification.actionValue ?? '',
+        );
       }
     } catch (_) {
       Get.snackbar(

@@ -5,4 +5,5 @@ router.use(require('./dashboard.routes'));
 router.use(require('./user-account.routes'));
 router.use(require('./post-management.routes'));
 router.use(require('./report-management.routes'));
+router.use(require('./notification-campaign.routes'));
 module.exports = router;

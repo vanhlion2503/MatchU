@@ -16,6 +16,9 @@ class PushDeviceRepository {
     required String userId,
     required String platform,
     required NotificationSettings settings,
+    required String appVersion,
+    required String buildNumber,
+    required String locale,
     String? token,
   }) async {
     final deviceId = await DeviceService.getDeviceId();
@@ -24,6 +27,9 @@ class PushDeviceRepository {
 
     await deviceRef.set({
       'platform': platform,
+      'appVersion': appVersion.trim(),
+      'buildNumber': buildNumber.trim(),
+      'locale': locale.trim(),
       'status': 'active',
       'pushEnabled': isAuthorized,
       'notificationPermission': _statusName(settings.authorizationStatus),

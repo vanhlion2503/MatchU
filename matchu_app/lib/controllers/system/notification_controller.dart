@@ -13,10 +13,13 @@ import 'package:matchu_app/controllers/feed/post_deep_link_controller.dart';
 import 'package:matchu_app/controllers/main/main_controller.dart';
 import 'package:matchu_app/models/chat_notification_payload.dart';
 import 'package:matchu_app/models/notification/post_engagement_notification_payload.dart';
+import 'package:matchu_app/models/notification/admin_notification_payload.dart';
 import 'package:matchu_app/routes/app_router.dart';
 import 'package:matchu_app/services/notification/app_notification_service.dart';
 import 'package:matchu_app/services/notification/push_device_repository.dart';
+import 'package:matchu_app/services/notification/admin_notification_navigation.dart';
 import 'package:matchu_app/services/user/presence_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 enum NotificationScreenContext { other, chatList, chatRoom }
 
@@ -42,6 +45,8 @@ class NotificationController extends GetxController {
   bool _initialMessageChecked = false;
   int _authGeneration = 0;
   String? _activeAuthUid;
+  Future<PackageInfo>? _packageInfo;
+  AdminNotificationPayload? _pendingAdminNavigation;
 
   final ListQueue<ChatNotificationPayload> _pendingNavigations = ListQueue();
   bool _isFlushingNavigation = false;
@@ -63,6 +68,7 @@ class NotificationController extends GetxController {
     await AppNotificationService.initialize(
       onTap: _handleLocalTap,
       onPostTap: _handlePostTap,
+      onAdminTap: _handleAdminTap,
     );
     final launchDetails =
         await AppNotificationService.localNotifications
@@ -79,7 +85,16 @@ class NotificationController extends GetxController {
       final postPayload = PostEngagementNotificationPayload.fromPayloadString(
         launchDetails?.notificationResponse?.payload,
       );
-      if (postPayload != null) _queuePostNavigation(postPayload);
+      if (postPayload != null) {
+        _queuePostNavigation(postPayload);
+      } else {
+        final adminPayload = AdminNotificationPayload.fromPayloadString(
+          launchDetails?.notificationResponse?.payload,
+        );
+        if (adminPayload != null) {
+          await _handleAdminTap(adminPayload);
+        }
+      }
     }
     await _messaging.setAutoInitEnabled(true);
     await _messaging.setForegroundNotificationPresentationOptions(
@@ -101,7 +116,14 @@ class NotificationController extends GetxController {
       final postPayload = PostEngagementNotificationPayload.fromRemoteMessage(
         message,
       );
-      if (postPayload != null) _queuePostNavigation(postPayload);
+      if (postPayload != null) {
+        _queuePostNavigation(postPayload);
+        return;
+      }
+      final adminPayload = AdminNotificationPayload.fromRemoteMessage(message);
+      if (adminPayload != null) {
+        unawaited(_handleAdminTap(adminPayload));
+      }
     });
 
     if (!_initialMessageChecked) {
@@ -117,7 +139,14 @@ class NotificationController extends GetxController {
         final postPayload = PostEngagementNotificationPayload.fromRemoteMessage(
           initialMessage,
         );
-        if (postPayload != null) _queuePostNavigation(postPayload);
+        if (postPayload != null) {
+          _queuePostNavigation(postPayload);
+        } else {
+          final adminPayload = AdminNotificationPayload.fromRemoteMessage(
+            initialMessage,
+          );
+          if (adminPayload != null) await _handleAdminTap(adminPayload);
+        }
       }
     }
 
@@ -194,6 +223,11 @@ class NotificationController extends GetxController {
     if (Get.isRegistered<PostDeepLinkController>()) {
       unawaited(Get.find<PostDeepLinkController>().flushPendingNavigation());
     }
+    final pendingAdmin = _pendingAdminNavigation;
+    if (pendingAdmin != null) {
+      _pendingAdminNavigation = null;
+      unawaited(_handleAdminTap(pendingAdmin));
+    }
   }
 
   Future<NotificationSettings> _requestPermissionAndReadSettings() async {
@@ -223,11 +257,16 @@ class NotificationController extends GetxController {
     String? token,
   }) async {
     if (_auth.currentUser?.uid != userId) return;
+    _packageInfo ??= PackageInfo.fromPlatform();
+    final packageInfo = await _packageInfo!;
 
     await _pushDeviceRepository.upsert(
       userId: userId,
       platform: _platformName(),
       settings: settings,
+      appVersion: packageInfo.version,
+      buildNumber: packageInfo.buildNumber,
+      locale: PlatformDispatcher.instance.locale.toLanguageTag(),
       token: token,
     );
   }
@@ -244,6 +283,11 @@ class NotificationController extends GetxController {
       );
       if (postPayload != null) {
         await AppNotificationService.showLocalPostNotification(postPayload);
+        return;
+      }
+      final adminPayload = AdminNotificationPayload.fromRemoteMessage(message);
+      if (adminPayload != null) {
+        await AppNotificationService.showLocalAdminNotification(adminPayload);
       }
       return;
     }
@@ -457,6 +501,17 @@ class NotificationController extends GetxController {
 
   Future<void> _handlePostTap(PostEngagementNotificationPayload payload) async {
     _queuePostNavigation(payload);
+  }
+
+  Future<void> _handleAdminTap(AdminNotificationPayload payload) async {
+    if (_auth.currentUser == null) {
+      _pendingAdminNavigation = payload;
+      return;
+    }
+    await AdminNotificationNavigation.open(
+      actionType: payload.actionType,
+      actionValue: payload.actionValue,
+    );
   }
 
   void _queuePostNavigation(PostEngagementNotificationPayload payload) {

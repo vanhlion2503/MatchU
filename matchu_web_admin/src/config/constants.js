@@ -64,6 +64,28 @@ const REPORT_ACTION_PERMISSIONS = Object.freeze({
   [REPORT_CASE_ACTIONS.DISMISS]: ['reports.resolve'],
   [REPORT_CASE_ACTIONS.REOPEN]: ['reports.resolve']
 });
+const NOTIFICATION_CATEGORIES = Object.freeze({
+  GENERAL: 'general',
+  MAINTENANCE: 'maintenance',
+  APP_UPDATE: 'app_update',
+  POLICY_UPDATE: 'policy_update'
+});
+const NOTIFICATION_AUDIENCES = Object.freeze({
+  ALL: 'all',
+  SEGMENT: 'segment',
+  SINGLE_USER: 'single_user'
+});
+const NOTIFICATION_STATUSES = Object.freeze({
+  DRAFT: 'draft',
+  SCHEDULED: 'scheduled',
+  QUEUED: 'queued',
+  PREPARING: 'preparing',
+  SENDING: 'sending',
+  COMPLETED: 'completed',
+  PARTIAL_FAILED: 'partial_failed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+});
 const APP_VERSION = '1.0.0';
 module.exports = {
   ADMIN_ROLES,
@@ -75,5 +97,8 @@ module.exports = {
   POST_ACTION_PERMISSIONS,
   REPORT_CASE_ACTIONS,
   REPORT_ACTION_PERMISSIONS,
+  NOTIFICATION_CATEGORIES,
+  NOTIFICATION_AUDIENCES,
+  NOTIFICATION_STATUSES,
   APP_VERSION
 };

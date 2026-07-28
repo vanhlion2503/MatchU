@@ -4,6 +4,10 @@ enum AppNotificationType {
   postLike,
   postComment,
   moderationPenalty,
+  systemAnnouncement,
+  maintenance,
+  appUpdate,
+  policyUpdate,
   unknown;
 
   static AppNotificationType fromValue(dynamic value) {
@@ -14,6 +18,14 @@ enum AppNotificationType {
         return AppNotificationType.postComment;
       case 'moderation_penalty':
         return AppNotificationType.moderationPenalty;
+      case 'system_announcement':
+        return AppNotificationType.systemAnnouncement;
+      case 'maintenance':
+        return AppNotificationType.maintenance;
+      case 'app_update':
+        return AppNotificationType.appUpdate;
+      case 'policy_update':
+        return AppNotificationType.policyUpdate;
       default:
         return AppNotificationType.unknown;
     }
@@ -39,6 +51,10 @@ class AppNotificationModel {
     this.penalty,
     this.reputationBefore,
     this.reputationAfter,
+    this.campaignId,
+    this.category,
+    this.actionType,
+    this.actionValue,
   });
 
   final String id;
@@ -58,6 +74,10 @@ class AppNotificationModel {
   final int? penalty;
   final int? reputationBefore;
   final int? reputationAfter;
+  final String? campaignId;
+  final String? category;
+  final String? actionType;
+  final String? actionValue;
 
   bool get isUnread => readAt == null;
   bool get hasActorAvatar => (actorAvatarUrl ?? '').trim().isNotEmpty;
@@ -85,6 +105,10 @@ class AppNotificationModel {
       penalty: _parseInt(data['penalty']),
       reputationBefore: _parseInt(data['reputationBefore']),
       reputationAfter: _parseInt(data['reputationAfter']),
+      campaignId: _parseNullableString(data['campaignId']),
+      category: _parseNullableString(data['category']),
+      actionType: _parseNullableString(data['actionType']),
+      actionValue: _parseNullableString(data['actionValue']),
     );
   }
 

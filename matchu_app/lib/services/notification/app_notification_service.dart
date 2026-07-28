@@ -7,12 +7,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:matchu_app/firebase_options.dart';
 import 'package:matchu_app/models/chat_notification_payload.dart';
 import 'package:matchu_app/models/notification/post_engagement_notification_payload.dart';
+import 'package:matchu_app/models/notification/admin_notification_payload.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 
 typedef NotificationTapHandler =
     Future<void> Function(ChatNotificationPayload payload);
 typedef PostNotificationTapHandler =
     Future<void> Function(PostEngagementNotificationPayload payload);
+typedef AdminNotificationTapHandler =
+    Future<void> Function(AdminNotificationPayload payload);
 
 class AppNotificationService {
   AppNotificationService._();
@@ -38,11 +41,20 @@ class AppNotificationService {
         importance: Importance.high,
       );
 
+  static const AndroidNotificationChannel systemChannel =
+      AndroidNotificationChannel(
+        'system_announcements',
+        'System announcements',
+        description: 'Thông báo vận hành và cập nhật từ MatchU',
+        importance: Importance.high,
+      );
+
   static final FlutterLocalNotificationsPlugin localNotifications =
       FlutterLocalNotificationsPlugin();
 
   static NotificationTapHandler? _tapHandler;
   static PostNotificationTapHandler? _postTapHandler;
+  static AdminNotificationTapHandler? _adminTapHandler;
   static bool _initialized = false;
 
   static bool get isSupportedPlatform =>
@@ -53,9 +65,11 @@ class AppNotificationService {
   static Future<void> initialize({
     required NotificationTapHandler onTap,
     PostNotificationTapHandler? onPostTap,
+    AdminNotificationTapHandler? onAdminTap,
   }) async {
     _tapHandler = onTap;
     _postTapHandler = onPostTap;
+    _adminTapHandler = onAdminTap;
 
     if (!isSupportedPlatform || _initialized) {
       return;
@@ -89,7 +103,17 @@ class AppNotificationService {
         final postPayload = PostEngagementNotificationPayload.fromPayloadString(
           response.payload,
         );
-        if (postPayload != null) await _postTapHandler?.call(postPayload);
+        if (postPayload != null) {
+          await _postTapHandler?.call(postPayload);
+          return;
+        }
+
+        final adminPayload = AdminNotificationPayload.fromPayloadString(
+          response.payload,
+        );
+        if (adminPayload != null) {
+          await _adminTapHandler?.call(adminPayload);
+        }
       },
     );
 
@@ -103,6 +127,11 @@ class AppNotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.createNotificationChannel(postChannel);
+    await localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(systemChannel);
 
     _initialized = true;
   }
@@ -209,6 +238,51 @@ class AppNotificationService {
     );
   }
 
+  static Future<void> showLocalAdminNotification(
+    AdminNotificationPayload payload,
+  ) async {
+    if (!isSupportedPlatform) return;
+    if (!_initialized) {
+      await initialize(onTap: (_) async {});
+    }
+
+    await localNotifications.show(
+      id: payload.campaignId.hashCode,
+      title: payload.title,
+      body: payload.body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          systemChannel.id,
+          systemChannel.name,
+          icon: androidNotificationIcon,
+          channelDescription: systemChannel.description,
+          importance:
+              payload.category == 'general'
+                  ? Importance.defaultImportance
+                  : Importance.high,
+          priority:
+              payload.category == 'general'
+                  ? Priority.defaultPriority
+                  : Priority.high,
+          category: AndroidNotificationCategory.status,
+          color: AppTheme.primaryColor,
+          largeIcon: const DrawableResourceAndroidBitmap(_androidLargeIcon),
+          tag: 'campaign_${payload.campaignId}',
+          groupKey: 'matchu_system_announcements',
+        ),
+        iOS: DarwinNotificationDetails(
+          threadIdentifier: 'campaign_${payload.campaignId}',
+          presentAlert: true,
+          presentBadge: true,
+          presentBanner: true,
+          presentList: true,
+          presentSound: true,
+        ),
+      ),
+      payload: payload.toPayloadString(),
+    );
+  }
+
   static String _resolveNotificationTitle(ChatNotificationPayload payload) {
     final senderName = _normalizeNotificationText(payload.senderName);
     if (senderName != null && senderName.isNotEmpty) {
@@ -289,5 +363,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   );
   if (postPayload != null && message.notification == null) {
     await AppNotificationService.showLocalPostNotification(postPayload);
+    return;
+  }
+
+  final adminPayload = AdminNotificationPayload.fromRemoteMessage(message);
+  if (adminPayload != null && message.notification == null) {
+    await AppNotificationService.showLocalAdminNotification(adminPayload);
   }
 }

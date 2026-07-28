@@ -1,0 +1,171 @@
+<div class="d-flex align-items-start justify-content-between gap-3 mb-4">
+  <div>
+    <a class="back-link" href="<%= campaign ? `/notifications/${encodeURIComponent(campaign.id)}` : '/notifications' %>"><i class="bi bi-arrow-left"></i>Quay lại</a>
+    <h1 class="h3 mt-2 mb-1"><%= campaign ? 'Chỉnh sửa chiến dịch' : 'Tạo thông báo mới' %></h1>
+    <p class="text-muted mb-0">Nội dung sẽ được lưu vào inbox và/hoặc gửi push theo cấu hình bên dưới.</p>
+  </div>
+</div>
+
+<form
+  class="notification-composer"
+  action="<%= campaign ? `/notifications/${encodeURIComponent(campaign.id)}` : '/notifications' %>"
+  method="post"
+  data-notification-composer
+>
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <input type="hidden" name="revision" value="<%= form.revision || 0 %>">
+
+  <div class="row g-4">
+    <div class="col-xl-8">
+      <section class="panel mb-4">
+        <div class="notification-step-heading"><span>1</span><div><h2>Nội dung thông báo</h2><p>Chọn mục đích và viết nội dung ngắn gọn, rõ ràng.</p></div></div>
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label" for="category">Loại thông báo</label>
+            <select class="form-select" id="category" name="category">
+              <% Object.entries(categoryLabels).forEach(([value, label]) => { %>
+                <option value="<%= value %>" <%= form.category === value ? 'selected' : '' %>><%= label %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="title">Tiêu đề</label>
+            <input class="form-control" id="title" name="title" maxlength="120" value="<%= form.title || '' %>" placeholder="Ví dụ: MatchU sẽ bảo trì vào tối nay" data-preview-title>
+            <div class="form-text">Tối đa 120 ký tự.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="body">Nội dung</label>
+            <textarea class="form-control" id="body" name="body" rows="5" maxlength="500" placeholder="Nội dung người dùng sẽ nhìn thấy..." data-preview-body><%= form.body || '' %></textarea>
+            <div class="form-text">Tối đa 500 ký tự. Không đưa dữ liệu nhạy cảm vào thông báo.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="actionType">Khi người dùng nhấn</label>
+            <select class="form-select" id="actionType" name="actionType" data-action-type>
+              <option value="inbox" <%= form.actionType === 'inbox' ? 'selected' : '' %>>Mở hộp thông báo</option>
+              <option value="app_route" <%= form.actionType === 'app_route' ? 'selected' : '' %>>Mở màn hình ứng dụng</option>
+              <option value="external_url" <%= form.actionType === 'external_url' ? 'selected' : '' %>>Mở liên kết HTTPS</option>
+            </select>
+          </div>
+          <div class="col-md-8" data-action-value-wrap>
+            <label class="form-label" for="actionValue">Đích đến</label>
+            <input class="form-control" id="actionValue" name="actionValue" maxlength="500" value="<%= form.actionValue || '' %>" placeholder="notifications, settings, account_security hoặc https://...">
+            <div class="form-text">Màn hình ứng dụng chỉ chấp nhận: notifications, settings, account_security, reputation.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel mb-4">
+        <div class="notification-step-heading"><span>2</span><div><h2>Đối tượng nhận</h2><p>Chọn toàn bộ, một nhóm hoặc đúng một người dùng.</p></div></div>
+        <div class="notification-choice-grid mb-3">
+          <% Object.entries(audienceLabels).forEach(([value, label]) => { %>
+            <label class="notification-choice">
+              <input type="radio" name="audienceType" value="<%= value %>" <%= form.audienceType === value ? 'checked' : '' %>>
+              <span><strong><%= label %></strong><small><%= value === 'all' ? 'Mọi tài khoản phù hợp để nhận' : value === 'segment' ? 'Lọc theo hồ sơ, hoạt động và thiết bị' : 'Tìm theo UID người dùng' %></small></span>
+            </label>
+          <% }) %>
+        </div>
+
+        <div data-single-audience>
+          <label class="form-label" for="targetUserId">UID người dùng</label>
+          <input class="form-control" id="targetUserId" name="targetUserId" maxlength="128" value="<%= form.targetUserId || '' %>" placeholder="Tìm theo tên, email, số điện thoại hoặc UID" autocomplete="off" data-user-search>
+          <div class="notification-user-results" data-user-results hidden></div>
+          <div class="form-text">Chọn kết quả tìm kiếm hoặc nhập chính xác Firebase UID.</div>
+        </div>
+
+        <div class="notification-segment-fields" data-segment-audience>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Trạng thái tài khoản</label>
+              <div class="filter-check-grid">
+                <% [['active','Hoạt động'],['restricted','Hạn chế'],['suspended','Tạm khóa'],['banned','Đã cấm']].forEach(([value,label]) => { %>
+                  <label><input type="checkbox" name="accountStatuses" value="<%= value %>" <%= (form.accountStatuses || []).includes(value) ? 'checked' : '' %>> <%= label %></label>
+                <% }) %>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Giới tính</label>
+              <div class="filter-check-grid">
+                <% [['male','Nam'],['female','Nữ'],['other','Khác']].forEach(([value,label]) => { %>
+                  <label><input type="checkbox" name="genders" value="<%= value %>" <%= (form.genders || []).includes(value) ? 'checked' : '' %>> <%= label %></label>
+                <% }) %>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="verification">Xác minh</label>
+              <select class="form-select" id="verification" name="verification">
+                <% [['','Không giới hạn'],['face_verified','Đã xác minh khuôn mặt'],['face_unverified','Chưa xác minh khuôn mặt'],['profile_completed','Đã hoàn tất hồ sơ'],['profile_incomplete','Chưa hoàn tất hồ sơ']].forEach(([value,label]) => { %>
+                  <option value="<%= value %>" <%= form.verification === value ? 'selected' : '' %>><%= label %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="activityDays">Hoạt động trong</label>
+              <div class="input-group"><input class="form-control" id="activityDays" name="activityDays" type="number" min="1" max="3650" value="<%= form.activityDays %>"><span class="input-group-text">ngày</span></div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Nền tảng</label>
+              <div class="filter-check-grid">
+                <% [['android','Android'],['ios','iOS']].forEach(([value,label]) => { %>
+                  <label><input type="checkbox" name="platforms" value="<%= value %>" <%= (form.platforms || []).includes(value) ? 'checked' : '' %>> <%= label %></label>
+                <% }) %>
+              </div>
+            </div>
+            <div class="col-md-3"><label class="form-label" for="minAge">Tuổi từ</label><input class="form-control" id="minAge" name="minAge" type="number" min="13" max="120" value="<%= form.minAge %>"></div>
+            <div class="col-md-3"><label class="form-label" for="maxAge">Đến</label><input class="form-control" id="maxAge" name="maxAge" type="number" min="13" max="120" value="<%= form.maxAge %>"></div>
+            <div class="col-md-3"><label class="form-label" for="minReputation">Uy tín từ</label><input class="form-control" id="minReputation" name="minReputation" type="number" min="0" value="<%= form.minReputation %>"></div>
+            <div class="col-md-3"><label class="form-label" for="maxReputation">Đến</label><input class="form-control" id="maxReputation" name="maxReputation" type="number" min="0" value="<%= form.maxReputation %>"></div>
+            <div class="col-md-6"><label class="form-label" for="minAppVersion">Phiên bản tối thiểu</label><input class="form-control" id="minAppVersion" name="minAppVersion" value="<%= form.minAppVersion %>" placeholder="1.0.0"></div>
+            <div class="col-md-6"><label class="form-label" for="maxAppVersion">Phiên bản tối đa</label><input class="form-control" id="maxAppVersion" name="maxAppVersion" value="<%= form.maxAppVersion %>" placeholder="2.0.0"></div>
+            <div class="col-12"><label class="form-label" for="interestTags">Sở thích</label><input class="form-control" id="interestTags" name="interestTags" value="<%= form.interestTags || '' %>" placeholder="âm nhạc, du lịch, thể thao"><div class="form-text">Phân cách bằng dấu phẩy; chỉ cần trùng một sở thích.</div></div>
+          </div>
+        </div>
+        <div class="notification-audience-estimate mt-3">
+          <button class="btn btn-sm btn-outline-primary" type="button" data-estimate-audience><i class="bi bi-calculator me-1"></i>Ước tính người nhận</button>
+          <span class="small text-muted" data-estimate-output>Chưa tính toán.</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="notification-step-heading"><span>3</span><div><h2>Kênh và thời gian gửi</h2><p>Chọn cách phân phối và thời điểm bắt đầu.</p></div></div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label d-block">Kênh phân phối</label>
+            <label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="channelPush" <%= form.channelPush ? 'checked' : '' %>><span class="form-check-label">Push về thiết bị</span></label>
+            <label class="form-check form-switch"><input class="form-check-input" type="checkbox" name="channelInbox" <%= form.channelInbox ? 'checked' : '' %>><span class="form-check-label">Lưu vào inbox ứng dụng</span></label>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="sendMode">Thời điểm</label>
+            <select class="form-select" id="sendMode" name="sendMode" data-send-mode>
+              <option value="immediate" <%= form.sendMode === 'immediate' ? 'selected' : '' %>>Gửi ngay khi phát hành</option>
+              <option value="scheduled" <%= form.sendMode === 'scheduled' ? 'selected' : '' %>>Hẹn giờ</option>
+            </select>
+            <div class="mt-3" data-schedule-fields>
+              <label class="form-label" for="scheduledAtLocal">Thời gian gửi (Asia/Bangkok)</label>
+              <input class="form-control" id="scheduledAtLocal" name="scheduledAtLocal" type="datetime-local" value="<%= form.scheduledAtLocal || '' %>">
+              <input type="hidden" name="timeZone" value="Asia/Bangkok">
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="col-xl-4">
+      <div class="notification-preview-sticky">
+        <section class="panel notification-phone-preview">
+          <span class="eyebrow">XEM TRƯỚC</span>
+          <div class="phone-notification">
+            <div class="phone-notification-icon"><i class="bi bi-heart-fill"></i></div>
+            <div><strong data-preview-title-output><%= form.title || 'Tiêu đề thông báo' %></strong><p data-preview-body-output><%= form.body || 'Nội dung thông báo sẽ hiển thị tại đây.' %></p><small>Bây giờ</small></div>
+          </div>
+          <p class="small text-muted mb-0">Thiết bị có thể rút gọn nội dung tùy hệ điều hành.</p>
+        </section>
+        <div class="notification-submit-panel">
+          <button class="btn btn-light border" type="submit" name="intent" value="save_draft"><i class="bi bi-file-earmark me-1"></i>Lưu nháp</button>
+          <% if (hasPermission('notifications.publish')) { %>
+            <button class="btn btn-primary" type="submit" name="intent" value="publish" data-publish-button><i class="bi bi-send me-1"></i><span data-publish-label>Phát hành</span></button>
+          <% } %>
+        </div>
+      </div>
+    </aside>
+  </div>
+</form>
