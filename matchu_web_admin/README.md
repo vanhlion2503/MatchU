@@ -57,7 +57,7 @@ Không commit `.env` hoặc JSON service account.
 | GET | `/users/:uid` | Hồ sơ quản trị 360° của người dùng, cần `users.read` |
 | POST | `/users/:uid/actions` | Thực hiện thao tác quản trị theo permission của từng hành động |
 | GET | `/posts` | Danh sách, tìm kiếm và lọc bài viết, cần `posts.read` |
-| GET | `/posts/moderation` | Hàng đợi kiểm duyệt và báo cáo, cần `posts.moderate` hoặc `reports.read` |
+| GET | `/posts/moderation` | Chuyển hướng tương thích sang `/reports` |
 | GET | `/posts/:postId` | Chi tiết bài, media, tín hiệu AI, báo cáo và lịch sử xử lý |
 | POST | `/posts/:postId/actions` | Duyệt, gỡ, xem xét, bác báo cáo hoặc khôi phục bài viết |
 | GET | `/reports` | Hàng đợi thống nhất cho báo cáo bài viết, hồ sơ và matching |

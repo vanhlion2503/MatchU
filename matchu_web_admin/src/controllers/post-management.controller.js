@@ -1,7 +1,6 @@
 const {
   getPostStatistics,
   listPosts,
-  listModerationPosts,
   getPostDetail,
   executePostModerationAction
 } = require('../services/post-management.service');
@@ -11,7 +10,6 @@ const {
 } = require('../services/report-management.service');
 const {
   validatePostListQuery,
-  validateModerationQueueQuery,
   validatePostId,
   validatePostAction
 } = require('../validators/post-management.validator');
@@ -62,14 +60,13 @@ function formatNumber(value) {
   return Number(value || 0).toLocaleString('vi-VN');
 }
 
-function listQueryString(filters, overrides = {}, includeQueue = false) {
+function listQueryString(filters, overrides = {}) {
   const params = new URLSearchParams();
   const merged = { ...filters, ...overrides };
   const keys = [
     'q', 'type', 'media', 'visibility', 'moderation', 'lifecycle',
     'report', 'priority', 'cursor', 'limit'
   ];
-  if (includeQueue) keys.unshift('queue');
   for (const key of keys) {
     if (merged[key] !== '' && merged[key] !== null && merged[key] !== undefined) {
       params.set(key, String(merged[key]));
@@ -92,8 +89,7 @@ function commonViewData(req) {
     priorityLabels: PRIORITY_LABELS,
     formatDate,
     formatNumber,
-    canAccessModeration: req.admin?.role === 'super_admin'
-      || req.admin?.permissions?.includes('posts.moderate')
+    canAccessReports: req.admin?.role === 'super_admin'
       || req.admin?.permissions?.includes('reports.read'),
     canPerformAction: (action) => canPerformAction(req.admin, action)
   };
@@ -131,30 +127,6 @@ async function index(req, res) {
   });
 }
 
-async function moderation(req, res) {
-  const { error, value: filters } = validateModerationQueueQuery(req.query);
-  if (error) throw new AppError('Bộ lọc hàng đợi kiểm duyệt không hợp lệ.', 400);
-
-  const [{ posts, nextCursor, scanned, scanLimitReached }, statistics] = await Promise.all([
-    listModerationPosts(filters),
-    getPostStatistics()
-  ]);
-  return res.render('posts/moderation', {
-    layout: 'layouts/admin-layout',
-    pageTitle: 'Kiểm duyệt nội dung',
-    posts,
-    statistics,
-    filters,
-    nextPageUrl: nextCursor
-      ? `/posts/moderation?${listQueryString(filters, { cursor: nextCursor }, true)}`
-      : null,
-    hasPreviousPage: Boolean(filters.cursor),
-    scanned,
-    scanLimitReached,
-    ...commonViewData(req)
-  });
-}
-
 async function show(req, res) {
   const postId = validatedPostId(req.params.postId);
   const detail = await getPostDetail(postId);
@@ -170,7 +142,9 @@ async function show(req, res) {
     errorMessage: String(req.query.error || '').slice(0, 300) || null,
     backUrl: returnCaseId
       ? `/reports/${encodeURIComponent(returnCaseId)}`
-      : req.query.from === 'moderation' ? '/posts/moderation' : '/posts',
+      : req.query.from === 'moderation'
+        ? '/reports?type=post&source=content_moderation'
+        : '/posts',
     returnCaseId,
     ...commonViewData(req)
   });
@@ -262,4 +236,4 @@ async function action(req, res) {
   }
 }
 
-module.exports = { index, moderation, show, action };
+module.exports = { index, show, action };

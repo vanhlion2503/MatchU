@@ -16,6 +16,7 @@ const listSchema = Joi.object({
   q: Joi.string().trim().max(120).allow('').default(''),
   type: Joi.string().valid('', ...reportTypes).default(''),
   status: Joi.string().valid('', ...reportStatuses).default(''),
+  source: Joi.string().valid('', 'community', 'content_moderation').default(''),
   priority: Joi.string().valid('', ...reportPriorities).default(''),
   assignee: Joi.string().valid('', 'me', 'unassigned').default(''),
   cursor: Joi.string().trim().max(160).allow('').default(''),

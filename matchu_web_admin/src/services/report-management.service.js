@@ -64,6 +64,12 @@ function normalizeCase(document) {
     priority: cleanString(data.priority) || 'normal',
     reportCount: Math.max(0, toInteger(data.reportCount)),
     categoryKeys: cleanStringArray(data.categoryKeys),
+    caseSources: cleanStringArray(data.caseSources, 10),
+    contentModerationRequired: data.contentModerationRequired === true,
+    moderationStatus: cleanString(data.moderationStatus),
+    moderationSource: cleanString(data.moderationSource),
+    moderationSummary: cleanString(data.moderationSummary),
+    moderationReason: cleanString(data.moderationReason),
     latestReasonKey: cleanString(data.latestReasonKey),
     latestReportAt: toDate(data.latestReportAt),
     assignedAdminId: cleanString(data.assignedAdminId),
@@ -150,6 +156,17 @@ function normalizePost(document) {
     postType: cleanString(data.postType) || 'post',
     visibility: cleanString(data.visibility) || (data.isPublic === false ? 'private' : 'public'),
     moderationStatus: cleanString(data.moderationStatus) || 'approved',
+    moderationSource: cleanString(data.moderationSource),
+    videoModeration: data.videoModeration && typeof data.videoModeration === 'object'
+      ? {
+        decision: cleanString(data.videoModeration.decision),
+        confidence: Number(data.videoModeration.confidence) || 0,
+        overallSeverity: Math.max(0, toInteger(data.videoModeration.overallSeverity)),
+        primaryViolationCategory: cleanString(data.videoModeration.primaryViolationCategory),
+        safeSummary: cleanString(data.videoModeration.safeSummary),
+        humanReviewReason: cleanString(data.videoModeration.humanReviewReason)
+      }
+      : null,
     deletedAt: toDate(data.deletedAt),
     author: {
       name: cleanString(author.name),
@@ -160,6 +177,12 @@ function normalizePost(document) {
 }
 
 function matchesFilters(reportCase, filters, currentAdmin) {
+  if (filters.source === 'community' && !reportCase.caseSources.includes('community_reports')) {
+    return false;
+  }
+  if (filters.source === 'content_moderation' && !reportCase.contentModerationRequired) {
+    return false;
+  }
   if (filters.priority && reportCase.priority !== filters.priority) return false;
   if (filters.assignee === 'me' && reportCase.assignedAdminId !== currentAdmin.uid) return false;
   if (filters.assignee === 'unassigned' && reportCase.assignedAdminId) return false;
@@ -173,6 +196,9 @@ function matchesFilters(reportCase, filters, currentAdmin) {
     reportCase.roomId,
     reportCase.assignedAdminEmail,
     reportCase.latestReasonKey,
+    reportCase.moderationStatus,
+    reportCase.moderationSource,
+    reportCase.moderationSummary,
     ...reportCase.categoryKeys
   ].join(' ').toLocaleLowerCase('vi-VN').includes(query);
 }
@@ -197,6 +223,12 @@ async function getReportStatistics() {
     countQuery(cases.where('status', '==', 'dismissed'))
   ]);
   return { total, open, inReview, resolved, dismissed };
+}
+
+async function getPendingReportCount() {
+  return countQuery(
+    firestore.collection(REPORT_CASES).where('status', '==', 'open')
+  );
 }
 
 function baseListQuery(filters) {
@@ -468,6 +500,7 @@ async function recordUserModerationOutcome({
 }
 
 module.exports = {
+  getPendingReportCount,
   getReportStatistics,
   listReportCases,
   getReportCaseDetail,

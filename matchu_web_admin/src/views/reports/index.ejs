@@ -4,7 +4,7 @@
     <h1>Quản lý báo cáo</h1>
     <p>Một hàng đợi thống nhất cho báo cáo bài viết, hồ sơ người dùng và matching.</p>
   </div>
-  <a href="/posts/moderation" class="btn btn-light border"><i class="bi bi-shield-check me-1"></i>Kiểm duyệt nội dung</a>
+  <a href="/posts" class="btn btn-light border"><i class="bi bi-journal-text me-1"></i>Tất cả bài viết</a>
 </div>
 
 <section class="moderation-summary-grid">
@@ -23,7 +23,7 @@
     ['dismissed', 'Đã bác', 'x-circle']
   ]; %>
   <% statusTabs.forEach(([value, label, icon]) => { %>
-    <a class="<%= filters.status === value ? 'active' : '' %>" href="/reports?<%= new URLSearchParams({ ...(filters.type ? { type: filters.type } : {}), ...(value ? { status: value } : {}) }).toString() %>">
+    <a class="<%= filters.status === value ? 'active' : '' %>" href="/reports?<%= new URLSearchParams({ ...(filters.type ? { type: filters.type } : {}), ...(filters.source ? { source: filters.source } : {}), ...(value ? { status: value } : {}) }).toString() %>">
       <i class="bi bi-<%= icon %>"></i><%= label %>
     </a>
   <% }) %>
@@ -53,6 +53,14 @@
       </select>
     </div>
     <div>
+      <label class="form-label" for="reportSource">Nguồn tín hiệu</label>
+      <select id="reportSource" class="form-select" name="source">
+        <option value="">Tất cả</option>
+        <option value="community" <%= filters.source === 'community' ? 'selected' : '' %>>Báo cáo cộng đồng</option>
+        <option value="content_moderation" <%= filters.source === 'content_moderation' ? 'selected' : '' %>>AI / kiểm duyệt hệ thống</option>
+      </select>
+    </div>
+    <div>
       <label class="form-label" for="reportAssignee">Phụ trách</label>
       <select id="reportAssignee" class="form-select" name="assignee">
         <option value="">Tất cả</option>
@@ -63,7 +71,7 @@
     <input type="hidden" name="status" value="<%= filters.status %>">
     <input type="hidden" name="limit" value="<%= filters.limit %>">
     <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Lọc</button>
-    <% if (filters.q || filters.type || filters.status || filters.priority || filters.assignee) { %>
+    <% if (filters.q || filters.type || filters.status || filters.source || filters.priority || filters.assignee) { %>
       <a class="btn btn-light border" href="/reports">Đặt lại</a>
     <% } %>
   </form>
@@ -106,7 +114,8 @@
               </td>
               <td><span class="report-type-chip type-<%= item.type %>"><i class="bi bi-<%= typeIcon %>"></i><%= typeLabels[item.type] || item.type %></span></td>
               <td>
-                <span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(item.reportCount) %></span>
+                <% if (item.reportCount > 0) { %><span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(item.reportCount) %></span><% } %>
+                <% if (item.contentModerationRequired) { %><span class="moderation-source-badge"><i class="bi bi-stars"></i>AI</span><% } %>
                 <div class="report-category-compact"><%= item.categoryKeys.slice(0, 2).join(', ') || item.latestReasonKey || 'Không rõ' %></div>
               </td>
               <td>

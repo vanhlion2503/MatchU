@@ -148,7 +148,7 @@
         <h2>Hàng đợi kiểm duyệt</h2>
         <p>Những tín hiệu cần được ưu tiên xử lý.</p>
       </div>
-      <a class="dashboard-panel-link" href="/posts/moderation">Mở hàng đợi</a>
+      <a class="dashboard-panel-link" href="/reports?type=post">Mở hàng đợi</a>
     </div>
     <div class="operations-hero">
       <div class="operations-score">
@@ -161,15 +161,15 @@
       </div>
     </div>
     <div class="operations-list">
-      <a href="/posts/moderation?queue=pending">
+      <a href="/reports?type=post&source=content_moderation&status=open">
         <span><i class="bi bi-hourglass-split"></i>Đang xử lý tự động</span>
         <strong><%= formatNumber(dashboard.moderation.pending) %></strong>
       </a>
-      <a href="/posts/moderation?queue=review_required">
+      <a href="/reports?type=post&source=content_moderation&status=open">
         <span><i class="bi bi-person-check"></i>Cần duyệt thủ công</span>
         <strong><%= formatNumber(dashboard.moderation.review) %></strong>
       </a>
-      <a href="/posts/moderation?queue=reported">
+      <a href="/reports?type=post&source=community&status=open">
         <span><i class="bi bi-folder2-open"></i>Case đang mở</span>
         <strong><%= formatNumber(dashboard.moderation.openCases) %></strong>
       </a>

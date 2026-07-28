@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   validatePostListQuery,
-  validateModerationQueueQuery,
   validatePostId,
   validatePostAction
 } = require('../src/validators/post-management.validator');
@@ -20,8 +19,7 @@ test('normalizes post list filters with safe defaults', () => {
   assert.equal(value.lifecycle, '');
 });
 
-test('rejects unsupported moderation queue and unsafe post id', () => {
-  assert.ok(validateModerationQueueQuery({ queue: 'unknown' }).error);
+test('rejects unsafe post id', () => {
   assert.ok(validatePostId('../users/admin').error);
   assert.equal(validatePostId('repost_user-1_post-2').error, undefined);
 });

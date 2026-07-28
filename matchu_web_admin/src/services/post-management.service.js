@@ -13,7 +13,6 @@ const LIST_SCAN_BATCH = 100;
 const LIST_MAX_SCANNED = 3000;
 const FIRESTORE_IN_LIMIT = 30;
 const REPORT_DETAIL_LIMIT = 200;
-const MODERATION_CANDIDATE_LIMIT = 2000;
 const SEARCH_CANDIDATE_LIMIT = 1000;
 const VALID_VISIBILITIES = new Set(['public', 'followers', 'private']);
 const OPEN_CASE_STATUSES = new Set(['open', 'in_review']);
@@ -297,13 +296,6 @@ function matchesPostFilters(post, filters) {
   if (filters.report === 'resolved' && (post.reportCount <= 0 || hasOpenReports(post))) return false;
   if (filters.priority && post.priority !== filters.priority) return false;
 
-  if (filters.queue === 'reported' && !hasOpenReports(post)) return false;
-  if (filters.queue === 'review_required' && post.moderationStatus !== 'review_required') return false;
-  if (filters.queue === 'pending' && post.moderationStatus !== 'pending_moderation') return false;
-  if (filters.queue === 'rejected' && post.moderationStatus !== 'rejected') return false;
-  if (filters.queue === 'all'
-    && !hasOpenReports(post)
-    && !['review_required', 'pending_moderation'].includes(post.moderationStatus)) return false;
   return true;
 }
 
@@ -534,77 +526,6 @@ async function loadPostDocuments(postIds) {
     documents.push(...snapshots.filter((snapshot) => snapshot.exists));
   }
   return documents;
-}
-
-async function listModerationPosts(filters) {
-  const candidateDocuments = new Map();
-  const queries = [];
-
-  if (filters.queue === 'all' || filters.queue === 'reported') {
-    queries.push(
-      firestore.collection(POST_REPORTS)
-        .orderBy('createdAt', 'desc')
-        .limit(MODERATION_CANDIDATE_LIMIT)
-        .get()
-        .then(async (snapshot) => {
-          const postIds = [...new Set(snapshot.docs
-            .map((doc) => cleanString(doc.data()?.postId))
-            .filter(Boolean))];
-          const postDocuments = await loadPostDocuments(postIds);
-          for (const document of postDocuments) candidateDocuments.set(document.id, document);
-        })
-    );
-  }
-
-  const statuses = filters.queue === 'all'
-    ? ['review_required', 'pending_moderation']
-    : filters.queue === 'review_required'
-      ? ['review_required']
-      : filters.queue === 'pending'
-        ? ['pending_moderation']
-        : filters.queue === 'rejected'
-          ? ['rejected']
-          : [];
-  for (const status of statuses) {
-    queries.push(
-      firestore.collection(POSTS)
-        .where('moderationStatus', '==', status)
-        .limit(MODERATION_CANDIDATE_LIMIT)
-        .get()
-        .then((snapshot) => {
-          for (const document of snapshot.docs) candidateDocuments.set(document.id, document);
-        })
-    );
-  }
-
-  await Promise.all(queries);
-  const hydrated = await hydrateOperationalMetadata(
-    [...candidateDocuments.values()].map(normalizePost)
-  );
-  const priorityRank = { critical: 4, high: 3, medium: 2, normal: 1 };
-  const matching = hydrated
-    .filter((post) => matchesPostFilters(post, filters))
-    .sort((left, right) => {
-      const priorityDelta = (priorityRank[right.priority] || 0) - (priorityRank[left.priority] || 0);
-      if (priorityDelta !== 0) return priorityDelta;
-      const leftTime = left.latestReportAt?.getTime() || left.createdAt?.getTime() || 0;
-      const rightTime = right.latestReportAt?.getTime() || right.createdAt?.getTime() || 0;
-      return rightTime - leftTime;
-    });
-
-  let startIndex = 0;
-  if (filters.cursor) {
-    const cursorIndex = matching.findIndex((post) => post.postId === filters.cursor);
-    if (cursorIndex >= 0) startIndex = cursorIndex + 1;
-  }
-  const posts = matching.slice(startIndex, startIndex + filters.limit);
-  const hasMore = startIndex + posts.length < matching.length;
-  return {
-    posts,
-    nextCursor: hasMore ? posts.at(-1)?.postId || null : null,
-    scanned: hydrated.length,
-    scanLimitReached: candidateDocuments.size >= MODERATION_CANDIDATE_LIMIT
-  };
 }
 
 async function getReporters(reports) {
@@ -975,7 +896,6 @@ async function executePostModerationAction(postId, payload, currentAdmin) {
 module.exports = {
   getPostStatistics,
   listPosts,
-  listModerationPosts,
   getPostDetail,
   executePostModerationAction,
   __test: {

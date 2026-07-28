@@ -18,6 +18,7 @@ test('normalizes report queue filters', () => {
   assert.equal(error, undefined);
   assert.equal(value.q, 'post-1');
   assert.equal(value.limit, 50);
+  assert.equal(value.source, '');
 });
 
 test('accepts only generated report case ids', () => {

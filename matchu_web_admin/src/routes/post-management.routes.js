@@ -20,8 +20,7 @@ router.get(
   '/posts/moderation',
   authenticate,
   requireAnyPermission('posts.moderate', 'reports.read'),
-  csrfProtection,
-  asyncHandler(controller.moderation)
+  (req, res) => res.redirect('/reports?type=post&source=content_moderation')
 );
 router.get(
   '/posts/:postId',

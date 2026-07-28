@@ -1,5 +1,8 @@
 const crypto = require("crypto");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const { admin, db } = require("../shared/firebase");
 
 const REPORT_CASES = "reportCases";
@@ -81,6 +84,40 @@ function higherPriority(current, candidate) {
   return (rank[current] || 0) >= (rank[candidate] || 0) ? current : candidate;
 }
 
+function toMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+function normalizeModerationStatus(value) {
+  const normalized = cleanString(value).toLowerCase();
+  if (["pending", "processing"].includes(normalized)) return "pending_moderation";
+  if (["needs_review", "human_review"].includes(normalized)) return "review_required";
+  return normalized || "approved";
+}
+
+function moderationPriority(post = {}) {
+  const video = post.videoModeration && typeof post.videoModeration === "object"
+    ? post.videoModeration
+    : {};
+  const violations = Array.isArray(video.violations) ? video.violations : [];
+  const severity = Math.max(
+    Number(video.overallSeverity) || 0,
+    ...violations.map((item) => Number(item?.severity) || 0),
+  );
+  if (severity >= 4) return "critical";
+  return normalizeModerationStatus(post.moderationStatus) === "review_required"
+    || severity >= 2 ? "high" : "medium";
+}
+
+function needsContentModeration(post = {}) {
+  return ["pending_moderation", "review_required"].includes(
+    normalizeModerationStatus(post.moderationStatus),
+  );
+}
+
 async function upsertReportCase(source, reportId, data) {
   const report = normalizeReport(source, reportId, data);
   if (!report.id || !report.targetId || !report.reportedUid || !report.reporterUid) {
@@ -109,6 +146,8 @@ async function upsertReportCase(source, reportId, data) {
     const shouldReopen = ["resolved", "dismissed"].includes(previousStatus);
     const categoryKeys = new Set(cleanStringArray(existing.categoryKeys, 30));
     if (report.categoryKey) categoryKeys.add(report.categoryKey);
+    const caseSources = new Set(cleanStringArray(existing.caseSources, 10));
+    caseSources.add("community_reports");
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     transaction.set(caseRef, {
@@ -130,6 +169,7 @@ async function upsertReportCase(source, reportId, data) {
       ),
       reportCount,
       categoryKeys: [...categoryKeys].slice(0, 30),
+      caseSources: [...caseSources],
       latestReportId: report.id,
       latestReportSource: source,
       latestReasonKey: report.reasonKey || null,
@@ -149,6 +189,95 @@ async function upsertReportCase(source, reportId, data) {
       originalPath: `${source}/${report.id}`,
       projectedAt: now,
     });
+  });
+
+  return caseId;
+}
+
+async function syncPostModerationCase(postId, post = {}) {
+  const normalizedPostId = cleanString(postId);
+  if (!normalizedPostId) return null;
+  const caseId = buildReportCaseId("post", normalizedPostId);
+  const caseRef = db.collection(REPORT_CASES).doc(caseId);
+  const requiresReview = needsContentModeration(post);
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(caseRef);
+    if (!requiresReview && !snapshot.exists) return;
+
+    const existing = snapshot.data() || {};
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const moderationStatus = normalizeModerationStatus(post.moderationStatus);
+    const reportCount = Math.max(0, Number(existing.reportCount) || 0);
+
+    if (!requiresReview) {
+      const update = {
+        contentModerationRequired: false,
+        moderationStatus,
+        moderationSource: cleanString(post.moderationSource),
+        targetDeleted: post.deletedAt != null,
+        updatedAt: now,
+      };
+      if (
+        reportCount === 0
+        && ["open", "in_review"].includes(cleanString(existing.status))
+      ) {
+        update.status = "resolved";
+        update.resolution = "no_action";
+        update.resolutionReason = "Luồng kiểm duyệt nội dung đã hoàn tất.";
+        update.resolvedAt = now;
+      }
+      transaction.set(caseRef, update, { merge: true });
+      return;
+    }
+
+    const previousStatus = cleanString(existing.status);
+    const shouldReopen = ["resolved", "dismissed"].includes(previousStatus);
+    const video = post.videoModeration && typeof post.videoModeration === "object"
+      ? post.videoModeration
+      : {};
+    const categoryKey = cleanString(video.primaryViolationCategory);
+    const categoryKeys = new Set(cleanStringArray(existing.categoryKeys, 30));
+    if (categoryKey) categoryKeys.add(categoryKey);
+    const caseSources = new Set(cleanStringArray(existing.caseSources, 10));
+    caseSources.add("content_moderation");
+    const activityAt = post.updatedAt || post.createdAt || now;
+    const latestActivity = toMillis(activityAt) >= toMillis(existing.latestReportAt)
+      ? activityAt
+      : existing.latestReportAt;
+
+    transaction.set(caseRef, {
+      caseId,
+      type: "post",
+      targetId: normalizedPostId,
+      contextId: null,
+      reportedUid: cleanString(post.authorId),
+      postId: normalizedPostId,
+      roomId: null,
+      status: shouldReopen || !previousStatus ? "open" : previousStatus,
+      priority: higherPriority(
+        cleanString(existing.priority),
+        moderationPriority(post),
+      ),
+      reportCount,
+      categoryKeys: [...categoryKeys].slice(0, 30),
+      caseSources: [...caseSources],
+      contentModerationRequired: true,
+      moderationStatus,
+      moderationSource: cleanString(post.moderationSource),
+      moderationSummary: cleanString(video.safeSummary).slice(0, 1000),
+      moderationReason: cleanString(video.humanReviewReason).slice(0, 1000),
+      latestReportAt: latestActivity,
+      assignedAdminId: shouldReopen ? null : existing.assignedAdminId || null,
+      assignedAdminEmail: shouldReopen ? null : existing.assignedAdminEmail || null,
+      resolution: shouldReopen ? null : existing.resolution || null,
+      resolutionReason: shouldReopen ? null : existing.resolutionReason || null,
+      resolvedAt: shouldReopen ? null : existing.resolvedAt || null,
+      reopenedAt: shouldReopen ? now : existing.reopenedAt || null,
+      targetDeleted: post.deletedAt != null,
+      createdAt: snapshot.exists ? existing.createdAt || now : now,
+      updatedAt: now,
+    }, { merge: true });
   });
 
   return caseId;
@@ -174,16 +303,39 @@ function createReportCaseTrigger(source) {
 const createPostReportCase = createReportCaseTrigger("postReports");
 const createProfileReportCase = createReportCaseTrigger("userProfileReports");
 const createMatchingReportCase = createReportCaseTrigger("userMatchingReports");
+const syncPostModerationReportCase = onDocumentWritten(
+  {
+    document: "posts/{postId}",
+    timeoutSeconds: 60,
+    memory: "256MiB",
+  },
+  async (event) => {
+    const postId = String(event.params.postId || "");
+    const post = event.data?.after?.exists
+      ? event.data.after.data() || {}
+      : {
+        ...(event.data?.before?.data() || {}),
+        deletedAt: admin.firestore.Timestamp.now(),
+        moderationStatus: "deleted",
+      };
+    await syncPostModerationCase(postId, post);
+  },
+);
 
 module.exports = {
   createPostReportCase,
   createProfileReportCase,
   createMatchingReportCase,
+  syncPostModerationReportCase,
   upsertReportCase,
+  syncPostModerationCase,
   _test: {
     buildReportCaseId,
     calculatePriority,
     higherPriority,
+    moderationPriority,
+    needsContentModeration,
+    normalizeModerationStatus,
     normalizeReport,
   },
 };

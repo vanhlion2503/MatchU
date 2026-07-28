@@ -54,13 +54,30 @@
       <% } %>
     </section>
 
+    <% if (reportCase.contentModerationRequired || reportCase.post?.videoModeration) { const ai = reportCase.post?.videoModeration; %>
+      <section class="panel mb-4">
+        <div class="panel-heading mb-3">
+          <div><h3>Tín hiệu kiểm duyệt hệ thống</h3><p class="panel-subtitle">Bài viết được đưa trực tiếp vào cùng hàng đợi quản lý báo cáo.</p></div>
+          <span class="moderation-source-badge"><i class="bi bi-stars"></i>AI / hệ thống</span>
+        </div>
+        <div class="ai-moderation-grid">
+          <div><span>Trạng thái</span><strong><%= reportCase.moderationStatus || reportCase.post?.moderationStatus || 'Không rõ' %></strong></div>
+          <div><span>Nguồn</span><strong><%= reportCase.moderationSource || reportCase.post?.moderationSource || 'Không rõ' %></strong></div>
+          <div><span>Danh mục chính</span><strong><%= ai?.primaryViolationCategory || reportCase.categoryKeys[0] || 'Không rõ' %></strong></div>
+          <div><span>Mức nghiêm trọng</span><strong><%= ai ? ai.overallSeverity : '—' %></strong></div>
+        </div>
+        <% if (reportCase.moderationSummary || ai?.safeSummary) { %><div class="ai-summary"><span>Tóm tắt an toàn</span><p><%= reportCase.moderationSummary || ai.safeSummary %></p></div><% } %>
+        <% if (reportCase.moderationReason || ai?.humanReviewReason) { %><div class="ai-summary"><span>Lý do cần người duyệt</span><p><%= reportCase.moderationReason || ai.humanReviewReason %></p></div><% } %>
+      </section>
+    <% } %>
+
     <section class="panel mb-4">
       <div class="panel-heading mb-3">
         <div><h3>Bằng chứng cộng đồng</h3><p class="panel-subtitle">Các báo cáo gốc được giữ nguyên và sắp xếp mới nhất trước.</p></div>
         <span class="badge text-bg-light border"><%= reports.length %> bản ghi</span>
       </div>
       <% if (!reports.length) { %>
-        <div class="compact-empty"><div><i class="bi bi-inbox"></i><p>Chưa có projection báo cáo. Hãy chạy backfill cho dữ liệu cũ.</p></div></div>
+        <div class="compact-empty"><div><i class="bi bi-inbox"></i><p>Hồ sơ này đến từ kiểm duyệt hệ thống và chưa có báo cáo cộng đồng.</p></div></div>
       <% } else { %>
         <div class="report-card-list">
           <% reports.forEach((report) => { %>

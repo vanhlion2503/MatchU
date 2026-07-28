@@ -93,8 +93,8 @@
 <section class="panel post-list-panel">
   <div class="panel-heading mb-3">
     <div><h3>Danh sách bài viết</h3><p class="panel-subtitle">Nội dung mới nhất được hiển thị trước.</p></div>
-    <% if (canAccessModeration) { %><a href="/posts/moderation" class="btn btn-sm btn-outline-primary"><i class="bi bi-shield-check me-1"></i>Mở hàng đợi kiểm duyệt</a><% } %>
+    <% if (canAccessReports) { %><a href="/reports?type=post" class="btn btn-sm btn-outline-primary"><i class="bi bi-flag me-1"></i>Mở quản lý báo cáo</a><% } %>
   </div>
   <% if (scanLimitReached) { %><div class="alert alert-warning py-2">Đã đạt giới hạn quét an toàn. Hãy thêm điều kiện để thu hẹp kết quả.</div><% } %>
-  <%- include('_post-table', { moderationContext: false }) %>
+  <%- include('_post-table') %>
 </section>

@@ -85,7 +85,7 @@ const common = {
   priorityLabels,
   formatDate,
   formatNumber,
-  canAccessModeration: true,
+  canAccessReports: true,
   canPerformAction: () => true
 };
 
@@ -107,26 +107,6 @@ test('renders post list with operational filters', async () => {
   assert.match(html, /Quản lý bài viết/);
   assert.match(html, /Nội dung bài viết kiểm thử/);
   assert.match(html, /Cần duyệt thủ công/);
-});
-
-test('renders moderation queue tabs and priority', async () => {
-  const html = await ejs.renderFile(path.join(views, 'moderation.ejs'), {
-    pageTitle: 'Kiểm duyệt nội dung',
-    posts: [basePost],
-    statistics: { total: 1, approved: 0, pending: 0, reviewRequired: 1, rejected: 0, reportCount: 1 },
-    filters: {
-      queue: 'all', q: '', type: '', media: '', visibility: '', moderation: '',
-      lifecycle: '', report: '', priority: '', cursor: '', limit: 20
-    },
-    nextPageUrl: null,
-    hasPreviousPage: false,
-    scanned: 1,
-    scanLimitReached: false,
-    ...common
-  });
-  assert.match(html, /CONTENT OPERATIONS/);
-  assert.match(html, /Bị báo cáo/);
-  assert.match(html, /Cao/);
 });
 
 test('renders post detail, evidence and protected moderation form', async () => {
@@ -170,7 +150,7 @@ test('renders post detail, evidence and protected moderation form', async () => 
     commentCount: 2,
     successMessage: null,
     errorMessage: null,
-    backUrl: '/posts/moderation',
+    backUrl: '/reports?type=post&source=content_moderation',
     csrfToken: 'a'.repeat(64),
     ...common
   });

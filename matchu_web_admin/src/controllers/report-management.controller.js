@@ -75,7 +75,7 @@ function canPerformAction(currentAdmin, action) {
 function listQueryString(filters, overrides = {}) {
   const params = new URLSearchParams();
   const merged = { ...filters, ...overrides };
-  for (const key of ['q', 'type', 'status', 'priority', 'assignee', 'cursor', 'limit']) {
+  for (const key of ['q', 'type', 'status', 'source', 'priority', 'assignee', 'cursor', 'limit']) {
     if (merged[key] !== '' && merged[key] !== null && merged[key] !== undefined) {
       params.set(key, String(merged[key]));
     }

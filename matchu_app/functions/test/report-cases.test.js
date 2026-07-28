@@ -1,7 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  _test: { buildReportCaseId, calculatePriority, higherPriority, normalizeReport },
+  _test: {
+    buildReportCaseId,
+    calculatePriority,
+    higherPriority,
+    moderationPriority,
+    needsContentModeration,
+    normalizeModerationStatus,
+    normalizeReport,
+  },
 } = require("../src/triggers/reportCases");
 
 test("builds stable report case ids without exposing target identifiers", () => {
@@ -41,4 +49,15 @@ test("raises report case priority for volume and high-risk reasons", () => {
   assert.equal(calculatePriority({ reportCount: 1, categoryKey: "scam" }), "high");
   assert.equal(calculatePriority({ reportCount: 10, categoryKey: "spam" }), "critical");
   assert.equal(higherPriority("high", "medium"), "high");
+});
+
+test("normalizes legacy moderation states into the unified report queue", () => {
+  assert.equal(normalizeModerationStatus("processing"), "pending_moderation");
+  assert.equal(normalizeModerationStatus("human_review"), "review_required");
+  assert.equal(needsContentModeration({ moderationStatus: "review_required" }), true);
+  assert.equal(needsContentModeration({ moderationStatus: "approved" }), false);
+  assert.equal(moderationPriority({
+    moderationStatus: "review_required",
+    videoModeration: { overallSeverity: 4 },
+  }), "critical");
 });

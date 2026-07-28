@@ -17,6 +17,12 @@ const reportCase = {
   priority: 'high',
   reportCount: 2,
   categoryKeys: ['spam'],
+  caseSources: ['community_reports', 'content_moderation'],
+  contentModerationRequired: true,
+  moderationStatus: 'review_required',
+  moderationSource: 'gemini_video',
+  moderationSummary: 'Cần kiểm tra thêm.',
+  moderationReason: 'Độ tin cậy chưa đủ cao.',
   latestReasonKey: 'repeated_posts',
   latestReportAt: new Date(),
   assignedAdminId: '',
@@ -30,7 +36,15 @@ const reportCase = {
     authorId: 'user-1',
     content: 'Nội dung bài viết bị báo cáo',
     author: { name: 'Nguyễn An', nickname: 'an' },
-    mediaUrl: ''
+    mediaUrl: '',
+    moderationStatus: 'review_required',
+    moderationSource: 'gemini_video',
+    videoModeration: {
+      primaryViolationCategory: 'spam',
+      overallSeverity: 2,
+      safeSummary: 'Cần kiểm tra thêm.',
+      humanReviewReason: 'Độ tin cậy chưa đủ cao.'
+    }
   }
 };
 const common = {
@@ -53,7 +67,7 @@ test('renders unified report queue and filters', async () => {
   const html = await ejs.renderFile(path.join(views, 'index.ejs'), {
     cases: [reportCase],
     statistics: { total: 1, open: 1, inReview: 0, resolved: 0, dismissed: 0 },
-    filters: { q: '', type: '', status: '', priority: '', assignee: '', cursor: '', limit: 20 },
+    filters: { q: '', type: '', status: '', source: '', priority: '', assignee: '', cursor: '', limit: 20 },
     nextPageUrl: null,
     hasPreviousPage: false,
     scanned: 1,
@@ -62,6 +76,7 @@ test('renders unified report queue and filters', async () => {
   });
   assert.match(html, /Quản lý báo cáo/);
   assert.match(html, /Nội dung bài viết bị báo cáo/);
+  assert.match(html, /AI/);
   assert.match(html, new RegExp(`/reports/${caseId}`));
 });
 
@@ -89,6 +104,7 @@ test('renders report evidence, target links and protected actions', async () => 
     ...common
   });
   assert.match(html, /Bằng chứng cộng đồng/);
+  assert.match(html, /Tín hiệu kiểm duyệt hệ thống/);
   assert.match(html, /Người báo cáo/);
   assert.match(html, /name="_csrf"/);
   assert.match(html, /data-report-action="resolve"/);

@@ -411,7 +411,7 @@ function buildDashboardModel(sources, counts, period, quality) {
         tone: 'danger',
         change: null,
         hint: `${openCaseCount} case đang mở`,
-        href: '/posts/moderation'
+        href: '/reports?type=post&source=content_moderation'
       }
     ],
     totals: {

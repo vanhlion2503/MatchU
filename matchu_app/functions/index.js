@@ -85,6 +85,7 @@ const {
   createPostReportCase,
   createProfileReportCase,
   createMatchingReportCase,
+  syncPostModerationReportCase,
 } = require("./src/triggers/reportCases");
 const {
   backfillRecentPostEmbeddings,
@@ -184,6 +185,7 @@ exports.syncAdminPostSearchIndex = syncAdminPostSearchIndex;
 exports.createPostReportCase = createPostReportCase;
 exports.createProfileReportCase = createProfileReportCase;
 exports.createMatchingReportCase = createMatchingReportCase;
+exports.syncPostModerationReportCase = syncPostModerationReportCase;
 exports.embedPostContent = embedPostContent;
 exports.backfillRecentPostEmbeddings = backfillRecentPostEmbeddings;
 exports.updateInterestOnPostLike = updateInterestOnPostLike;
