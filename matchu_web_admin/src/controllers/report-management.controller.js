@@ -15,6 +15,7 @@ const AppError = require('../utils/app-error');
 
 const TYPE_LABELS = Object.freeze({
   post: 'Bài viết',
+  comment: 'Bình luận',
   profile: 'Hồ sơ người dùng',
   matching: 'Matching'
 });

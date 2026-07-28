@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="/css/report-comment.css">
 <div class="report-detail-heading">
   <div>
     <a href="/reports" class="back-link"><i class="bi bi-arrow-left"></i>Quay lại hàng đợi</a>
@@ -15,11 +16,39 @@
   <div>
     <section class="panel mb-4 report-target-panel">
       <div class="panel-heading mb-3">
-        <div><h3>Đối tượng bị báo cáo</h3><p class="panel-subtitle"><%= typeLabels[reportCase.type] || reportCase.type %></p></div>
+        <div><h3>Đối tượng bị báo cáo</h3><p class="panel-subtitle"><%= typeLabels[reportCase.subjectType] || reportCase.subjectType %></p></div>
         <span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(reportCase.reportCount) %> báo cáo</span>
       </div>
 
-      <% if (reportCase.type === 'post') { %>
+      <% if (reportCase.subjectType === 'comment') { %>
+        <% if (reportCase.comment) { %>
+          <div class="report-comment-preview">
+            <% if (reportCase.comment.imageUrl) { %>
+              <a href="<%= reportCase.comment.imageUrl %>" target="_blank" rel="noopener noreferrer">
+                <img src="<%= reportCase.comment.imageUrl %>" alt="Hình ảnh trong bình luận" loading="lazy" referrerpolicy="no-referrer">
+              </a>
+            <% } else { %><div class="report-target-icon"><i class="bi bi-chat-left-text"></i></div><% } %>
+            <div class="report-comment-body">
+              <strong><%= reportCase.comment.content || (reportCase.comment.voiceUrl ? 'Bình luận bằng ghi âm' : 'Bình luận không có văn bản') %></strong>
+              <p>
+                <%= reportCase.comment.parentId ? 'Phản hồi' : 'Bình luận' %>
+                <% if (reportCase.comment.isEdited) { %> · Đã chỉnh sửa<% } %>
+                <% if (reportCase.comment.deletedAt) { %> · Đã xóa<% } %>
+              </p>
+              <code><%= reportCase.commentId %></code>
+              <% if (reportCase.comment.voiceUrl) { %>
+                <audio class="report-comment-audio" controls preload="none" src="<%= reportCase.comment.voiceUrl %>">Trình duyệt không hỗ trợ phát âm thanh.</audio>
+              <% } %>
+            </div>
+            <a class="btn btn-outline-primary btn-sm ms-auto" href="/posts/<%= encodeURIComponent(reportCase.postId) %>?from=reports&caseId=<%= encodeURIComponent(reportCase.caseId) %>">Mở bài viết</a>
+          </div>
+        <% } else { %>
+          <div class="alert alert-warning mb-0">
+            Bình luận gốc không còn tồn tại. Bản chụp nội dung, hình ảnh hoặc ghi âm tại thời điểm báo cáo vẫn được giữ bên dưới.
+            <% if (reportCase.post) { %><a class="alert-link ms-1" href="/posts/<%= encodeURIComponent(reportCase.postId) %>?from=reports&caseId=<%= encodeURIComponent(reportCase.caseId) %>">Mở bài viết</a><% } %>
+          </div>
+        <% } %>
+      <% } else if (reportCase.type === 'post') { %>
         <% if (reportCase.post) { %>
           <div class="report-post-preview">
             <% if (reportCase.post.mediaUrl) { %><img src="<%= reportCase.post.mediaUrl %>" alt="Media bài viết" loading="lazy" referrerpolicy="no-referrer"><% } else { %><div class="report-target-icon"><i class="bi bi-file-post"></i></div><% } %>
@@ -91,7 +120,21 @@
               </div>
               <% if (report.customReason) { %><p><strong>Lý do khác:</strong> <%= report.customReason %></p><% } %>
               <% if (report.description) { %><p><%= report.description %></p><% } %>
-              <% if (report.postContentPreview) { %><blockquote class="report-content-snapshot"><%= report.postContentPreview %></blockquote><% } %>
+              <% if (report.commentContentPreview) { %>
+                <div class="report-snapshot-label"><i class="bi bi-chat-left-quote"></i>Nội dung bình luận khi được báo cáo</div>
+                <blockquote class="report-content-snapshot"><%= report.commentContentPreview %></blockquote>
+              <% } else if (report.postContentPreview) { %><blockquote class="report-content-snapshot"><%= report.postContentPreview %></blockquote><% } %>
+              <% if (report.commentAuthorName || report.commentAuthorNickname) { %>
+                <p class="report-comment-author"><strong>Tác giả:</strong> <%= report.commentAuthorName || report.commentAuthorNickname %></p>
+              <% } %>
+              <% if (report.commentImageUrl) { %>
+                <div class="report-comment-media">
+                  <a href="<%= report.commentImageUrl %>" target="_blank" rel="noopener noreferrer"><img src="<%= report.commentImageUrl %>" alt="Ảnh trong bình luận bị báo cáo" loading="lazy" referrerpolicy="no-referrer"></a>
+                </div>
+              <% } %>
+              <% if (report.commentVoiceUrl) { %>
+                <div class="report-comment-media"><audio controls preload="none" src="<%= report.commentVoiceUrl %>">Trình duyệt không hỗ trợ phát âm thanh.</audio></div>
+              <% } %>
               <div class="reporter-line">
                 <i class="bi bi-person"></i>
                 <% if (report.reporter) { %>
@@ -160,7 +203,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
       </div>
       <div class="modal-body">
-        <div class="action-target"><i class="bi bi-flag"></i><div><strong><%= typeLabels[reportCase.type] %> · <%= reportCase.targetId %></strong><small><%= reportCase.reportCount %> báo cáo trong hồ sơ</small></div></div>
+        <div class="action-target"><i class="bi bi-flag"></i><div><strong><%= typeLabels[reportCase.subjectType] %> · <%= reportCase.subjectType === 'comment' ? reportCase.commentId : reportCase.targetId %></strong><small><%= reportCase.reportCount %> báo cáo trong hồ sơ</small></div></div>
         <div class="mb-3 report-resolution-field d-none">
           <label for="reportResolution" class="form-label">Kết luận</label>
           <select class="form-select" id="reportResolution" name="resolution">

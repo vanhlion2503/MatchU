@@ -50,21 +50,28 @@ test("normalizes a comment report as post context for the admin queue", () => {
     toUid: "comment-author",
     postId: "post-1",
     commentId: "comment-1",
+    parentId: "parent-comment-1",
     commentContentPreview: "Nội dung cần xem xét",
+    commentAuthorName: "Tác giả bình luận",
     categoryKey: "harassment",
     reasonKey: "personal_insults",
   });
 
   assert.equal(report.type, "post");
+  assert.equal(report.subjectType, "comment");
   assert.equal(report.targetId, "post-1");
   assert.equal(report.contextId, "comment-1");
   assert.equal(report.commentId, "comment-1");
+  assert.equal(report.parentId, "parent-comment-1");
+  assert.equal(report.commentAuthorName, "Tác giả bình luận");
   assert.equal(report.commentContentPreview, "Nội dung cần xem xét");
 });
 
 test("raises report case priority for volume and high-risk reasons", () => {
   assert.equal(calculatePriority({ reportCount: 1, categoryKey: "spam" }), "medium");
   assert.equal(calculatePriority({ reportCount: 1, categoryKey: "scam" }), "high");
+  assert.equal(calculatePriority({ reportCount: 1, categoryKey: "hate_speech" }), "high");
+  assert.equal(calculatePriority({ reportCount: 1, categoryKey: "privacy_violation" }), "high");
   assert.equal(calculatePriority({ reportCount: 10, categoryKey: "spam" }), "critical");
   assert.equal(higherPriority("high", "medium"), "high");
 });

@@ -21,6 +21,12 @@ test('normalizes report queue filters', () => {
   assert.equal(value.source, '');
 });
 
+test('accepts comment as a dedicated report queue filter', () => {
+  const { error, value } = validateReportListQuery({ type: 'comment' });
+  assert.equal(error, undefined);
+  assert.equal(value.type, 'comment');
+});
+
 test('accepts only generated report case ids', () => {
   assert.equal(validateReportCaseId(`post_${'a'.repeat(40)}`).error, undefined);
   assert.ok(validateReportCaseId('../reportCases/admin').error);

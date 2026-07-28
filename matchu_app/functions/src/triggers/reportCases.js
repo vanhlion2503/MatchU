@@ -8,7 +8,9 @@ const { admin, db } = require("../shared/firebase");
 const REPORT_CASES = "reportCases";
 const HIGH_RISK_CATEGORIES = new Set([
   "harassment",
+  "hate_speech",
   "inappropriate_content",
+  "privacy_violation",
   "scam",
 ]);
 const HIGH_RISK_MATCHING_REASONS = new Set(["phamcam", "quayroi"]);
@@ -35,6 +37,7 @@ function normalizeReport(source, reportId, data = {}) {
   const type = source === "postReports" || source === "commentReports"
     ? "post"
     : source === "userProfileReports" ? "profile" : "matching";
+  const subjectType = source === "commentReports" ? "comment" : type;
   const reportedUid = cleanString(data.toUid);
   const postId = type === "post" ? cleanString(data.postId) : "";
   const commentId = source === "commentReports"
@@ -50,12 +53,14 @@ function normalizeReport(source, reportId, data = {}) {
     id: cleanString(reportId),
     source,
     type,
+    subjectType,
     targetId,
     contextId,
     reportedUid,
     reporterUid: cleanString(data.fromUid),
     postId,
     commentId,
+    parentId: cleanString(data.parentId),
     roomId,
     categoryKey: cleanString(data.categoryKey) || (type === "matching" ? reasonKey : ""),
     categoryTitle: cleanString(data.categoryTitle),
@@ -71,6 +76,8 @@ function normalizeReport(source, reportId, data = {}) {
       cleanString(data.commentContentPreview).slice(0, 1000),
     commentImageUrl: cleanString(data.commentImageUrl),
     commentVoiceUrl: cleanString(data.commentVoiceUrl),
+    commentAuthorName: cleanString(data.commentAuthorName),
+    commentAuthorNickname: cleanString(data.commentAuthorNickname),
     createdAt: data.createdAt || admin.firestore.FieldValue.serverTimestamp(),
   };
 }
@@ -161,10 +168,12 @@ async function upsertReportCase(source, reportId, data) {
     transaction.set(caseRef, {
       caseId,
       type: report.type,
+      subjectType: report.subjectType,
       targetId: report.targetId,
       contextId: report.contextId || null,
       reportedUid: report.reportedUid,
       postId: report.postId || null,
+      commentId: report.commentId || null,
       roomId: report.roomId || null,
       status: shouldReopen || !previousStatus ? "open" : previousStatus,
       priority: higherPriority(

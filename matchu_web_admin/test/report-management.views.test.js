@@ -48,7 +48,7 @@ const reportCase = {
   }
 };
 const common = {
-  typeLabels: { post: 'Bài viết', profile: 'Hồ sơ người dùng', matching: 'Matching' },
+  typeLabels: { post: 'Bài viết', comment: 'Bình luận', profile: 'Hồ sơ người dùng', matching: 'Matching' },
   statusLabels: { open: 'Chờ xử lý', in_review: 'Đang xem xét', resolved: 'Đã xử lý', dismissed: 'Đã bác' },
   priorityLabels: { normal: 'Thông thường', medium: 'Trung bình', high: 'Cao', critical: 'Khẩn cấp' },
   resolutionLabels: {
@@ -108,4 +108,58 @@ test('renders report evidence, target links and protected actions', async () => 
   assert.match(html, /Người báo cáo/);
   assert.match(html, /name="_csrf"/);
   assert.match(html, /data-report-action="resolve"/);
+});
+
+test('renders a reported comment with live and snapshotted media evidence', async () => {
+  const commentCase = {
+    ...reportCase,
+    subjectType: 'comment',
+    contextId: 'comment-1',
+    commentId: 'comment-1',
+    contentModerationRequired: false,
+    comment: {
+      commentId: 'comment-1',
+      userId: 'user-1',
+      content: 'Bình luận đang bị báo cáo',
+      parentId: 'parent-1',
+      imageUrl: 'https://storage.googleapis.com/comment.jpg',
+      voiceUrl: 'https://storage.googleapis.com/comment.m4a',
+      isEdited: true,
+      deletedAt: null
+    }
+  };
+  const html = await ejs.renderFile(path.join(views, 'show.ejs'), {
+    reportCase: commentCase,
+    reports: [{
+      id: 'comment-report-1',
+      type: 'post',
+      source: 'commentReports',
+      reporterUid: 'reporter-1',
+      reporter: { fullname: 'Người báo cáo', accountStatus: 'active' },
+      categoryTitle: 'Quấy rối',
+      reasonTitle: 'Công kích cá nhân',
+      customReason: '',
+      description: '',
+      commentContentPreview: 'Bản chụp bình luận',
+      commentAuthorName: 'Tác giả bình luận',
+      commentAuthorNickname: '',
+      commentImageUrl: 'https://storage.googleapis.com/snapshot.jpg',
+      commentVoiceUrl: 'https://storage.googleapis.com/snapshot.m4a',
+      postContentPreview: '',
+      imageUrls: [],
+      createdAt: new Date()
+    }],
+    actions: [],
+    matchingContext: null,
+    csrfToken: 'a'.repeat(64),
+    successMessage: null,
+    errorMessage: null,
+    ...common
+  });
+
+  assert.match(html, /Bình luận đang bị báo cáo/);
+  assert.match(html, /Nội dung bình luận khi được báo cáo/);
+  assert.match(html, /snapshot\.jpg/);
+  assert.match(html, /snapshot\.m4a/);
+  assert.match(html, /Mở bài viết/);
 });

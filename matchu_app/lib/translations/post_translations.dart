@@ -96,6 +96,82 @@ const postVietnameseTranslations = <String, String>{
       'Bạn có muốn báo cáo bình luận này không?',
   'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.':
       'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.',
+  'Spam hoặc quảng cáo': 'Spam hoặc quảng cáo',
+  'Bình luận lặp lại hoặc đăng quá nhiều lần':
+      'Bình luận lặp lại hoặc đăng quá nhiều lần',
+  'Nội dung không liên quan hoặc làm loãng cuộc trò chuyện':
+      'Nội dung không liên quan hoặc làm loãng cuộc trò chuyện',
+  'Quảng cáo, mời chào hoặc tuyển thành viên không mong muốn':
+      'Quảng cáo, mời chào hoặc tuyển thành viên không mong muốn',
+  'Câu tương tác, kéo lượt thích hoặc dẫn dụ người dùng':
+      'Câu tương tác, kéo lượt thích hoặc dẫn dụ người dùng',
+  'Hình thức spam khác': 'Hình thức spam khác',
+  'Chửi bới, hạ nhục hoặc công kích cá nhân':
+      'Chửi bới, hạ nhục hoặc công kích cá nhân',
+  'Đe dọa, uy hiếp hoặc gây áp lực tinh thần':
+      'Đe dọa, uy hiếp hoặc gây áp lực tinh thần',
+  'Liên tục nhắm vào hoặc quấy rối một người':
+      'Liên tục nhắm vào hoặc quấy rối một người',
+  'Quấy rối tình dục hoặc bình phẩm khiếm nhã':
+      'Quấy rối tình dục hoặc bình phẩm khiếm nhã',
+  'Kêu gọi người khác công kích hoặc làm nhục':
+      'Kêu gọi người khác công kích hoặc làm nhục',
+  'Hình thức quấy rối khác': 'Hình thức quấy rối khác',
+  'Ngôn từ thù ghét hoặc phân biệt đối xử':
+      'Ngôn từ thù ghét hoặc phân biệt đối xử',
+  'Công kích dựa trên giới tính, dân tộc, tôn giáo hoặc vùng miền':
+      'Công kích dựa trên giới tính, dân tộc, tôn giáo hoặc vùng miền',
+  'Hạ thấp nhân phẩm hoặc coi một nhóm người là thấp kém':
+      'Hạ thấp nhân phẩm hoặc coi một nhóm người là thấp kém',
+  'Cổ súy phân biệt đối xử hoặc loại trừ một nhóm người':
+      'Cổ súy phân biệt đối xử hoặc loại trừ một nhóm người',
+  'Ngôn từ thù ghét khác': 'Ngôn từ thù ghét khác',
+  'Nội dung phản cảm hoặc nguy hiểm': 'Nội dung phản cảm hoặc nguy hiểm',
+  'Nội dung tình dục, khỏa thân hoặc gợi dục':
+      'Nội dung tình dục, khỏa thân hoặc gợi dục',
+  'Bạo lực, máu me hoặc nội dung gây ám ảnh':
+      'Bạo lực, máu me hoặc nội dung gây ám ảnh',
+  'Khuyến khích tự làm hại bản thân hoặc tự tử':
+      'Khuyến khích tự làm hại bản thân hoặc tự tử',
+  'Ngôn từ tục tĩu hoặc cực kỳ phản cảm':
+      'Ngôn từ tục tĩu hoặc cực kỳ phản cảm',
+  'Khuyến khích hành vi nguy hiểm hoặc trái pháp luật':
+      'Khuyến khích hành vi nguy hiểm hoặc trái pháp luật',
+  'Nội dung phản cảm khác': 'Nội dung phản cảm khác',
+  'Lừa đảo hoặc liên kết nguy hiểm': 'Lừa đảo hoặc liên kết nguy hiểm',
+  'Liên kết giả mạo hoặc đánh cắp tài khoản':
+      'Liên kết giả mạo hoặc đánh cắp tài khoản',
+  'Lừa chuyển tiền, thanh toán hoặc đầu tư':
+      'Lừa chuyển tiền, thanh toán hoặc đầu tư',
+  'Phần thưởng, quà tặng hoặc ưu đãi giả':
+      'Phần thưởng, quà tặng hoặc ưu đãi giả',
+  'Mạo danh nhân viên hỗ trợ hoặc cơ quan có thẩm quyền':
+      'Mạo danh nhân viên hỗ trợ hoặc cơ quan có thẩm quyền',
+  'Hình thức lừa đảo khác': 'Hình thức lừa đảo khác',
+  'Xâm phạm quyền riêng tư': 'Xâm phạm quyền riêng tư',
+  'Chia sẻ số điện thoại, địa chỉ hoặc thông tin cá nhân':
+      'Chia sẻ số điện thoại, địa chỉ hoặc thông tin cá nhân',
+  'Công khai danh tính, vị trí hoặc kêu gọi truy tìm':
+      'Công khai danh tính, vị trí hoặc kêu gọi truy tìm',
+  'Chia sẻ nội dung riêng tư khi chưa được đồng ý':
+      'Chia sẻ nội dung riêng tư khi chưa được đồng ý',
+  'Đe dọa phát tán thông tin hoặc nội dung riêng tư':
+      'Đe dọa phát tán thông tin hoặc nội dung riêng tư',
+  'Hình thức xâm phạm quyền riêng tư khác':
+      'Hình thức xâm phạm quyền riêng tư khác',
+  'Thông tin sai lệch hoặc gây hiểu nhầm':
+      'Thông tin sai lệch hoặc gây hiểu nhầm',
+  'Thông tin sai có thể gây nguy hiểm cho người khác':
+      'Thông tin sai có thể gây nguy hiểm cho người khác',
+  'Bịa đặt sự việc hoặc cáo buộc không có căn cứ':
+      'Bịa đặt sự việc hoặc cáo buộc không có căn cứ',
+  'Cắt ghép hoặc trình bày sai ngữ cảnh để gây hiểu nhầm':
+      'Cắt ghép hoặc trình bày sai ngữ cảnh để gây hiểu nhầm',
+  'Thông tin sai lệch khác': 'Thông tin sai lệch khác',
+  'Vi phạm khác': 'Vi phạm khác',
+  'Vi phạm tiêu chuẩn cộng đồng nhưng không thuộc các mục trên':
+      'Vi phạm tiêu chuẩn cộng đồng nhưng không thuộc các mục trên',
+  'Lý do khác': 'Lý do khác',
   'Gửi báo cáo nếu nội dung này không phù hợp.':
       'Báo cáo nếu nội dung này không phù hợp.',
   'Cập nhật nội dung bình luận của bạn.':
@@ -372,6 +448,77 @@ const postEnglishTranslations = <String, String>{
       'Do you want to report this comment?',
   'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.':
       'Send this comment to the moderation team for review.',
+  'Spam hoặc quảng cáo': 'Spam or advertising',
+  'Bình luận lặp lại hoặc đăng quá nhiều lần': 'Repeated or excessive comments',
+  'Nội dung không liên quan hoặc làm loãng cuộc trò chuyện':
+      'Irrelevant content or conversation flooding',
+  'Quảng cáo, mời chào hoặc tuyển thành viên không mong muốn':
+      'Unwanted advertising, solicitation, or recruitment',
+  'Câu tương tác, kéo lượt thích hoặc dẫn dụ người dùng':
+      'Engagement bait or attempts to manipulate users',
+  'Hình thức spam khác': 'Another form of spam',
+  'Chửi bới, hạ nhục hoặc công kích cá nhân':
+      'Insults, humiliation, or personal attacks',
+  'Đe dọa, uy hiếp hoặc gây áp lực tinh thần':
+      'Threats, intimidation, or psychological pressure',
+  'Liên tục nhắm vào hoặc quấy rối một người':
+      'Repeatedly targeting or harassing someone',
+  'Quấy rối tình dục hoặc bình phẩm khiếm nhã':
+      'Sexual harassment or inappropriate remarks',
+  'Kêu gọi người khác công kích hoặc làm nhục':
+      'Encouraging others to attack or humiliate someone',
+  'Hình thức quấy rối khác': 'Another form of harassment',
+  'Ngôn từ thù ghét hoặc phân biệt đối xử': 'Hate speech or discrimination',
+  'Công kích dựa trên giới tính, dân tộc, tôn giáo hoặc vùng miền':
+      'Attacks based on gender, ethnicity, religion, or region',
+  'Hạ thấp nhân phẩm hoặc coi một nhóm người là thấp kém':
+      'Dehumanizing or degrading a group of people',
+  'Cổ súy phân biệt đối xử hoặc loại trừ một nhóm người':
+      'Promoting discrimination or exclusion',
+  'Ngôn từ thù ghét khác': 'Another form of hate speech',
+  'Nội dung phản cảm hoặc nguy hiểm': 'Offensive or dangerous content',
+  'Nội dung tình dục, khỏa thân hoặc gợi dục':
+      'Sexual, nude, or suggestive content',
+  'Bạo lực, máu me hoặc nội dung gây ám ảnh':
+      'Graphic violence, gore, or disturbing content',
+  'Khuyến khích tự làm hại bản thân hoặc tự tử':
+      'Encouraging self-harm or suicide',
+  'Ngôn từ tục tĩu hoặc cực kỳ phản cảm':
+      'Obscene or extremely offensive language',
+  'Khuyến khích hành vi nguy hiểm hoặc trái pháp luật':
+      'Encouraging dangerous or illegal activity',
+  'Nội dung phản cảm khác': 'Another type of offensive content',
+  'Lừa đảo hoặc liên kết nguy hiểm': 'Scams or dangerous links',
+  'Liên kết giả mạo hoặc đánh cắp tài khoản': 'Phishing links or account theft',
+  'Lừa chuyển tiền, thanh toán hoặc đầu tư':
+      'Money transfer, payment, or investment scam',
+  'Phần thưởng, quà tặng hoặc ưu đãi giả':
+      'Fake reward, giveaway, or promotion',
+  'Mạo danh nhân viên hỗ trợ hoặc cơ quan có thẩm quyền':
+      'Impersonating support staff or an authority',
+  'Hình thức lừa đảo khác': 'Another form of scam',
+  'Xâm phạm quyền riêng tư': 'Privacy violation',
+  'Chia sẻ số điện thoại, địa chỉ hoặc thông tin cá nhân':
+      'Sharing phone numbers, addresses, or personal information',
+  'Công khai danh tính, vị trí hoặc kêu gọi truy tìm':
+      'Exposing identity or location, or encouraging tracking',
+  'Chia sẻ nội dung riêng tư khi chưa được đồng ý':
+      'Sharing private content without consent',
+  'Đe dọa phát tán thông tin hoặc nội dung riêng tư':
+      'Threatening to expose private information or content',
+  'Hình thức xâm phạm quyền riêng tư khác': 'Another form of privacy violation',
+  'Thông tin sai lệch hoặc gây hiểu nhầm': 'False or misleading information',
+  'Thông tin sai có thể gây nguy hiểm cho người khác':
+      'False information that could put others at risk',
+  'Bịa đặt sự việc hoặc cáo buộc không có căn cứ':
+      'Fabricated events or unsupported accusations',
+  'Cắt ghép hoặc trình bày sai ngữ cảnh để gây hiểu nhầm':
+      'Manipulated or misleading context',
+  'Thông tin sai lệch khác': 'Another type of misinformation',
+  'Vi phạm khác': 'Other violation',
+  'Vi phạm tiêu chuẩn cộng đồng nhưng không thuộc các mục trên':
+      'Community standards violation not covered above',
+  'Lý do khác': 'Another reason',
   'Gửi báo cáo nếu nội dung này không phù hợp.':
       'Report this post if it is inappropriate.',
   'Cập nhật nội dung bình luận của bạn.': 'Update your comment.',

@@ -124,10 +124,10 @@ npm run check
 
 ## Quản lý báo cáo hợp nhất
 
-Mobile tiếp tục ghi vào ba collection hiện hữu: `postReports`, `userProfileReports` và
-`userMatchingReports`. Không có thay đổi đối với luồng gửi báo cáo trên ứng dụng.
+Mobile tiếp tục ghi vào bốn collection hiện hữu: `postReports`, `commentReports`,
+`userProfileReports` và `userMatchingReports`. Không có thay đổi đối với luồng gửi báo cáo trên ứng dụng.
 
-Ba Cloud Functions mới tạo projection vận hành tại `reportCases/{caseId}` và lưu bản
+Bốn Cloud Functions tạo projection vận hành tại `reportCases/{caseId}` và lưu bản
 chuẩn hóa của từng báo cáo trong subcollection `reports`. Báo cáo mới cho một hồ sơ đã
 kết thúc sẽ tự mở lại hồ sơ. Quyết định kiểm duyệt bài viết hoặc xử lý tài khoản được
 thực hiện từ liên kết trong trang chi tiết báo cáo sẽ đồng bộ kết luận về report case.

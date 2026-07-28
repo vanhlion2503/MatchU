@@ -60,3 +60,46 @@ test('maps report actions to safe workflow states', () => {
     { status: 'dismissed', resolution: 'not_violation' }
   );
 });
+
+test('recognizes legacy comment cases and normalizes comment evidence safely', () => {
+  const reportCase = __test.normalizeCase(fakeDocument(`post_${'c'.repeat(40)}`, {
+    type: 'post',
+    targetId: 'post-1',
+    contextId: 'comment-1',
+    postId: 'post-1',
+    reportedUid: 'author-1'
+  }));
+  const report = __test.normalizeReport(fakeDocument('commentReports_report-1', {
+    source: 'commentReports',
+    commentId: 'comment-1',
+    parentId: 'parent-1',
+    commentContentPreview: 'Nội dung bình luận',
+    commentImageUrl: 'javascript:alert(1)',
+    commentVoiceUrl: 'https://storage.googleapis.com/comment.m4a'
+  }));
+
+  assert.equal(reportCase.subjectType, 'comment');
+  assert.equal(reportCase.commentId, 'comment-1');
+  assert.equal(report.commentImageUrl, '');
+  assert.equal(report.commentVoiceUrl, 'https://storage.googleapis.com/comment.m4a');
+  assert.equal(
+    __test.matchesFilters(reportCase, {
+      type: 'comment',
+      source: '',
+      priority: '',
+      assignee: '',
+      q: 'comment-1'
+    }, { uid: 'admin-1' }),
+    true
+  );
+  assert.equal(
+    __test.matchesFilters(reportCase, {
+      type: 'post',
+      source: '',
+      priority: '',
+      assignee: '',
+      q: ''
+    }, { uid: 'admin-1' }),
+    false
+  );
+});

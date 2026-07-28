@@ -6,7 +6,12 @@ const {
   syncPostModerationCase,
 } = require("../src/triggers/reportCases");
 
-const SOURCES = ["postReports", "userProfileReports", "userMatchingReports"];
+const SOURCES = [
+  "postReports",
+  "commentReports",
+  "userProfileReports",
+  "userMatchingReports",
+];
 const PAGE_SIZE = 200;
 
 async function backfillSource(source) {

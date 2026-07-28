@@ -1,8 +1,9 @@
+<link rel="stylesheet" href="/css/report-comment.css">
 <div class="report-page-heading">
   <div>
     <span class="moderation-eyebrow">TRUST &amp; SAFETY</span>
     <h1>Quản lý báo cáo</h1>
-    <p>Một hàng đợi thống nhất cho báo cáo bài viết, hồ sơ người dùng và matching.</p>
+    <p>Một hàng đợi thống nhất cho báo cáo bài viết, bình luận, hồ sơ người dùng và matching.</p>
   </div>
   <a href="/posts" class="btn btn-light border"><i class="bi bi-journal-text me-1"></i>Tất cả bài viết</a>
 </div>
@@ -99,20 +100,25 @@
         <thead><tr><th>Đối tượng</th><th>Loại</th><th>Tín hiệu</th><th>Trạng thái</th><th>Phụ trách</th><th>Mới nhất</th><th></th></tr></thead>
         <tbody>
           <% cases.forEach((item) => {
-            const targetName = item.post
+            const targetName = item.subjectType === 'comment'
+              ? (item.comment?.content || `Bình luận ${item.commentId}`)
+              : item.post
               ? (item.post.content || `Bài viết ${item.postId}`)
               : item.reportedUser
                 ? (item.reportedUser.fullname || item.reportedUser.nickname || item.reportedUid)
                 : item.type === 'matching' ? `Phòng ${item.roomId || item.targetId}` : item.targetId;
-            const typeIcon = item.type === 'post' ? 'file-post' : item.type === 'profile' ? 'person-badge' : 'people';
+            const typeIcon = item.subjectType === 'comment'
+              ? 'chat-left-text'
+              : item.type === 'post' ? 'file-post' : item.type === 'profile' ? 'person-badge' : 'people';
           %>
             <tr>
               <td>
                 <a class="report-target-link" href="/reports/<%= encodeURIComponent(item.caseId) %>"><%= targetName %></a>
-                <code><%= item.targetId %></code>
+                <code><%= item.subjectType === 'comment' ? item.commentId : item.targetId %></code>
+                <% if (item.subjectType === 'comment') { %><small>Post ID: <%= item.postId %></small><% } %>
                 <% if (item.reportedUid && item.targetId !== item.reportedUid) { %><small>UID: <%= item.reportedUid %></small><% } %>
               </td>
-              <td><span class="report-type-chip type-<%= item.type %>"><i class="bi bi-<%= typeIcon %>"></i><%= typeLabels[item.type] || item.type %></span></td>
+              <td><span class="report-type-chip type-<%= item.subjectType %>"><i class="bi bi-<%= typeIcon %>"></i><%= typeLabels[item.subjectType] || item.subjectType %></span></td>
               <td>
                 <% if (item.reportCount > 0) { %><span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(item.reportCount) %></span><% } %>
                 <% if (item.contentModerationRequired) { %><span class="moderation-source-badge"><i class="bi bi-stars"></i>AI</span><% } %>

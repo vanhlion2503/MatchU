@@ -1,7 +1,7 @@
 const Joi = require('joi');
 const { REPORT_CASE_ACTIONS } = require('../config/constants');
 
-const reportTypes = ['post', 'profile', 'matching'];
+const reportTypes = ['post', 'comment', 'profile', 'matching'];
 const reportStatuses = ['open', 'in_review', 'resolved', 'dismissed'];
 const reportPriorities = ['normal', 'medium', 'high', 'critical'];
 const resolutions = [

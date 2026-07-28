@@ -52,13 +52,21 @@ function buildReportCaseId(type, targetId, contextId = '') {
 
 function normalizeCase(document) {
   const data = document.data() || {};
+  const type = cleanString(data.type);
+  const contextId = cleanString(data.contextId);
+  const commentId = cleanString(data.commentId)
+    || (type === 'post' && contextId ? contextId : '');
+  const subjectType = cleanString(data.subjectType)
+    || (commentId ? 'comment' : type);
   return {
     caseId: document.id,
-    type: cleanString(data.type),
+    type,
+    subjectType,
     targetId: cleanString(data.targetId),
-    contextId: cleanString(data.contextId),
+    contextId,
     reportedUid: cleanString(data.reportedUid),
     postId: cleanString(data.postId),
+    commentId,
     roomId: cleanString(data.roomId),
     status: cleanString(data.status) || 'open',
     priority: cleanString(data.priority) || 'normal',
@@ -80,7 +88,8 @@ function normalizeCase(document) {
     updatedAt: toDate(data.updatedAt),
     resolvedAt: toDate(data.resolvedAt),
     reportedUser: null,
-    post: null
+    post: null,
+    comment: null
   };
 }
 
@@ -94,6 +103,8 @@ function normalizeReport(document) {
     reporterUid: cleanString(data.reporterUid),
     reportedUid: cleanString(data.reportedUid),
     postId: cleanString(data.postId),
+    commentId: cleanString(data.commentId),
+    parentId: cleanString(data.parentId),
     roomId: cleanString(data.roomId),
     categoryKey: cleanString(data.categoryKey),
     categoryTitle: cleanString(data.categoryTitle),
@@ -109,6 +120,11 @@ function normalizeReport(document) {
     postMediaUrls: Array.isArray(data.postMediaUrls)
       ? data.postMediaUrls.map(safeHttpsUrl).filter(Boolean)
       : [],
+    commentContentPreview: cleanString(data.commentContentPreview),
+    commentImageUrl: safeHttpsUrl(data.commentImageUrl),
+    commentVoiceUrl: safeHttpsUrl(data.commentVoiceUrl),
+    commentAuthorName: cleanString(data.commentAuthorName),
+    commentAuthorNickname: cleanString(data.commentAuthorNickname),
     originalPath: cleanString(data.originalPath),
     createdAt: toDate(data.createdAt),
     reporter: null
@@ -176,7 +192,29 @@ function normalizePost(document) {
   };
 }
 
+function normalizeComment(document) {
+  if (!document?.exists) return null;
+  const data = document.data() || {};
+  return {
+    commentId: document.id,
+    userId: cleanString(data.userId),
+    content: cleanString(data.content),
+    parentId: cleanString(data.parentId),
+    imageUrl: safeHttpsUrl(data.imageUrl),
+    voiceUrl: safeHttpsUrl(data.voiceUrl),
+    voiceDurationMs: Math.max(0, toInteger(data.voiceDurationMs)),
+    likeCount: Math.max(0, toInteger(data.likeCount)),
+    replyCount: Math.max(0, toInteger(data.replyCount)),
+    isEdited: data.isEdited === true,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+    deletedAt: toDate(data.deletedAt),
+    deletedBy: cleanString(data.deletedBy)
+  };
+}
+
 function matchesFilters(reportCase, filters, currentAdmin) {
+  if (filters.type && reportCase.subjectType !== filters.type) return false;
   if (filters.source === 'community' && !reportCase.caseSources.includes('community_reports')) {
     return false;
   }
@@ -193,6 +231,7 @@ function matchesFilters(reportCase, filters, currentAdmin) {
     reportCase.targetId,
     reportCase.reportedUid,
     reportCase.postId,
+    reportCase.commentId,
     reportCase.roomId,
     reportCase.assignedAdminEmail,
     reportCase.latestReasonKey,
@@ -233,7 +272,9 @@ async function getPendingReportCount() {
 
 function baseListQuery(filters) {
   let query = firestore.collection(REPORT_CASES);
-  if (filters.type) query = query.where('type', '==', filters.type);
+  if (filters.type) {
+    query = query.where('type', '==', filters.type === 'comment' ? 'post' : filters.type);
+  }
   if (filters.status) query = query.where('status', '==', filters.status);
   return query.orderBy('latestReportAt', 'desc');
 }
@@ -251,19 +292,30 @@ async function hydrateCases(cases) {
   if (!cases.length) return cases;
   const userIds = [...new Set(cases.map((item) => item.reportedUid).filter(Boolean))];
   const postIds = [...new Set(cases.map((item) => item.postId).filter(Boolean))];
-  const [userSnapshots, postSnapshots] = await Promise.all([
+  const commentCases = cases.filter((item) => item.postId && item.commentId);
+  const [userSnapshots, postSnapshots, commentSnapshots] = await Promise.all([
     userIds.length
       ? firestore.getAll(...userIds.map((uid) => firestore.collection('users').doc(uid)))
       : [],
     postIds.length
       ? firestore.getAll(...postIds.map((postId) => firestore.collection('posts').doc(postId)))
+      : [],
+    commentCases.length
+      ? firestore.getAll(...commentCases.map((item) => (
+        firestore.collection('posts').doc(item.postId).collection('comments').doc(item.commentId)
+      )))
       : []
   ]);
   const users = new Map(userSnapshots.map((item) => [item.id, normalizeUser(item)]));
   const posts = new Map(postSnapshots.map((item) => [item.id, normalizePost(item)]));
+  const comments = new Map(commentSnapshots.map((item) => [
+    `${item.ref.parent.parent.id}:${item.id}`,
+    normalizeComment(item)
+  ]));
   for (const reportCase of cases) {
     reportCase.reportedUser = users.get(reportCase.reportedUid) || null;
     reportCase.post = posts.get(reportCase.postId) || null;
+    reportCase.comment = comments.get(`${reportCase.postId}:${reportCase.commentId}`) || null;
   }
   return cases;
 }
@@ -511,6 +563,7 @@ module.exports = {
     buildReportCaseId,
     normalizeCase,
     normalizeReport,
+    normalizeComment,
     matchesFilters,
     actionOutcome,
     safeHttpsUrl

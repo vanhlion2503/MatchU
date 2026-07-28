@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:matchu_app/controllers/auth/auth_controller.dart';
 import 'package:matchu_app/models/comment_report_model.dart';
+import 'package:matchu_app/models/comment_report_reason.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/models/post_report_reason.dart';
 import 'package:matchu_app/services/report/comment_report_service.dart';
@@ -18,7 +19,7 @@ class CommentReportController extends GetxController {
   final PostCommentModel comment;
   final CommentReportService _service;
 
-  final List<PostReportCategory> categories = postReportCategories;
+  final List<PostReportCategory> categories = commentReportCategories;
   final selectedCategory = Rxn<PostReportCategory>();
   final selectedReason = Rxn<PostReportReason>();
   final isSubmitting = false.obs;
