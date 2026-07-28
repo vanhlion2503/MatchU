@@ -10,13 +10,19 @@ test('normalizes post list filters with safe defaults', () => {
   const { error, value } = validatePostListQuery({
     q: '  noi dung  ',
     moderation: 'review_required',
+    queue: 'moderation',
     limit: '50'
   });
   assert.equal(error, undefined);
   assert.equal(value.q, 'noi dung');
   assert.equal(value.moderation, 'review_required');
+  assert.equal(value.queue, 'moderation');
   assert.equal(value.limit, 50);
   assert.equal(value.lifecycle, '');
+});
+
+test('rejects unsupported post queues', () => {
+  assert.ok(validatePostListQuery({ queue: 'deleted_posts' }).error);
 });
 
 test('rejects unsafe post id', () => {

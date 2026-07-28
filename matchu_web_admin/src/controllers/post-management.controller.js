@@ -65,7 +65,7 @@ function listQueryString(filters, overrides = {}) {
   const merged = { ...filters, ...overrides };
   const keys = [
     'q', 'type', 'media', 'visibility', 'moderation', 'lifecycle',
-    'report', 'priority', 'cursor', 'limit'
+    'report', 'queue', 'priority', 'cursor', 'limit'
   ];
   for (const key of keys) {
     if (merged[key] !== '' && merged[key] !== null && merged[key] !== undefined) {
@@ -134,6 +134,7 @@ async function show(req, res) {
     && /^(post|profile|matching)_[a-f0-9]{40}$/.test(String(req.query.caseId || ''))
     ? String(req.query.caseId)
     : '';
+  const returnToModerationQueue = req.query.from === 'post_moderation';
   return res.render('posts/show', {
     layout: 'layouts/admin-layout',
     pageTitle: 'Chi tiết bài viết',
@@ -142,20 +143,24 @@ async function show(req, res) {
     errorMessage: String(req.query.error || '').slice(0, 300) || null,
     backUrl: returnCaseId
       ? `/reports/${encodeURIComponent(returnCaseId)}`
-      : req.query.from === 'moderation'
+      : req.query.from === 'post_moderation'
+        ? '/posts?queue=moderation'
+        : req.query.from === 'moderation'
         ? '/reports?type=post&source=content_moderation'
         : '/posts',
     returnCaseId,
+    returnToModerationQueue,
     ...commonViewData(req)
   });
 }
 
 async function action(req, res) {
   const postId = validatedPostId(req.params.postId);
+  const returnToModerationQueue = req.body.returnQueue === 'moderation';
   const { error, value } = validatePostAction(req.body);
   if (error) {
     return res.redirect(
-      `/posts/${encodeURIComponent(postId)}?from=moderation&error=${encodeURIComponent(
+      `/posts/${encodeURIComponent(postId)}?from=${returnToModerationQueue ? 'post_moderation' : 'moderation'}&error=${encodeURIComponent(
         `Dữ liệu xử lý không hợp lệ: ${error.details[0].message}`
       )}`
     );
@@ -201,6 +206,11 @@ async function action(req, res) {
           )}`
         );
       }
+      if (returnToModerationQueue) {
+        return res.redirect(
+          `/posts?queue=moderation&success=${encodeURIComponent(ACTION_MESSAGES[value.action])}`
+        );
+      }
       return res.redirect(
         `/posts?lifecycle=deleted&success=${encodeURIComponent(ACTION_MESSAGES[value.action])}`
       );
@@ -216,7 +226,7 @@ async function action(req, res) {
       );
     }
     return res.redirect(
-      `/posts/${encodeURIComponent(postId)}?from=moderation&success=${encodeURIComponent(
+      `/posts/${encodeURIComponent(postId)}?from=${returnToModerationQueue ? 'post_moderation' : 'moderation'}&success=${encodeURIComponent(
         ACTION_MESSAGES[value.action] || 'Đã cập nhật bài viết.'
       )}`
     );
@@ -231,7 +241,7 @@ async function action(req, res) {
     });
     if (!(error instanceof AppError)) throw error;
     return res.redirect(
-      `/posts/${encodeURIComponent(postId)}?from=moderation&error=${encodeURIComponent(error.message)}`
+      `/posts/${encodeURIComponent(postId)}?from=${returnToModerationQueue ? 'post_moderation' : 'moderation'}&error=${encodeURIComponent(error.message)}`
     );
   }
 }

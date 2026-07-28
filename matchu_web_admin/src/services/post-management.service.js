@@ -283,6 +283,10 @@ function matchesPostDocumentFilters(post, filters) {
   if (filters.media && filters.media !== 'text' && !post.mediaTypes.includes(filters.media)) return false;
   if (filters.visibility && post.visibility !== filters.visibility) return false;
   if (filters.moderation && post.moderationStatus !== filters.moderation) return false;
+  if (
+    filters.queue === 'moderation'
+    && !['pending_moderation', 'review_required'].includes(post.moderationStatus)
+  ) return false;
   if (filters.lifecycle === 'active' && post.deletedAt) return false;
   if (filters.lifecycle === 'deleted' && !post.deletedAt) return false;
   return true;
@@ -321,6 +325,16 @@ async function getPostStatistics() {
     countQuery(reports)
   ]);
   return { total, approved, pending, reviewRequired, rejected, reportCount };
+}
+
+async function getPendingPostModerationCount() {
+  return countQuery(
+    firestore.collection(POSTS).where(
+      'moderationStatus',
+      'in',
+      ['pending_moderation', 'review_required']
+    )
+  );
 }
 
 async function loadReportMetadata(postIds) {
@@ -894,6 +908,7 @@ async function executePostModerationAction(postId, payload, currentAdmin) {
 }
 
 module.exports = {
+  getPendingPostModerationCount,
   getPostStatistics,
   listPosts,
   getPostDetail,

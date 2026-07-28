@@ -96,7 +96,7 @@ test('renders post list with operational filters', async () => {
     statistics: { total: 1, approved: 0, pending: 0, reviewRequired: 1, rejected: 0, reportCount: 1 },
     filters: {
       q: '', type: '', media: '', visibility: '', moderation: '',
-      lifecycle: '', report: '', priority: '', cursor: '', limit: 20
+      lifecycle: '', report: '', queue: 'moderation', priority: '', cursor: '', limit: 20
     },
     nextPageUrl: null,
     hasPreviousPage: false,
@@ -107,6 +107,8 @@ test('renders post list with operational filters', async () => {
   assert.match(html, /Quản lý bài viết/);
   assert.match(html, /Nội dung bài viết kiểm thử/);
   assert.match(html, /Cần duyệt thủ công/);
+  assert.match(html, /Hàng đợi kiểm duyệt bài viết/);
+  assert.match(html, /from=post_moderation/);
 });
 
 test('renders post detail, evidence and protected moderation form', async () => {

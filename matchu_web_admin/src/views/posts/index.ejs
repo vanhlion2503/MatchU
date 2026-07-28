@@ -1,5 +1,19 @@
 <%- include('../partials/page-title') %>
 
+<nav class="post-queue-navigation mb-4" aria-label="Khu vực quản lý bài viết">
+  <a class="post-queue-link <%= !filters.queue ? 'active' : '' %>" href="/posts">
+    <i class="bi bi-collection"></i>
+    <span>Tất cả bài viết</span>
+  </a>
+  <a class="post-queue-link <%= filters.queue === 'moderation' ? 'active' : '' %>" href="/posts?queue=moderation">
+    <i class="bi bi-shield-exclamation"></i>
+    <span>Cần kiểm duyệt</span>
+    <% if (statistics.pending + statistics.reviewRequired > 0) { %>
+      <strong><%= statistics.pending + statistics.reviewRequired > 99 ? '99+' : formatNumber(statistics.pending + statistics.reviewRequired) %></strong>
+    <% } %>
+  </a>
+</nav>
+
 <section class="row g-3 mb-4">
   <% const cards = [
     { label: 'Tổng bài viết', value: statistics.total, icon: 'file-post', tone: 'primary' },
@@ -25,7 +39,7 @@
       <p class="panel-subtitle">Tra cứu theo mã bài, UID, tác giả, nội dung hoặc hashtag.</p>
     </div>
     <% if (filters.q || filters.type || filters.media || filters.visibility || filters.moderation || filters.lifecycle || filters.report) { %>
-      <a href="/posts" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>Xóa bộ lọc</a>
+      <a href="<%= filters.queue === 'moderation' ? '/posts?queue=moderation' : '/posts' %>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>Xóa bộ lọc</a>
     <% } %>
   </div>
   <form action="/posts" method="get" class="post-filter-form">
@@ -85,6 +99,7 @@
         <option value="resolved" <%= filters.report === 'resolved' ? 'selected' : '' %>>Đã xử lý</option>
       </select>
     </div>
+    <input type="hidden" name="queue" value="<%= filters.queue %>">
     <input type="hidden" name="limit" value="<%= filters.limit %>">
     <button class="btn btn-primary post-filter-submit" type="submit"><i class="bi bi-funnel me-1"></i>Áp dụng</button>
   </form>
@@ -92,7 +107,10 @@
 
 <section class="panel post-list-panel">
   <div class="panel-heading mb-3">
-    <div><h3>Danh sách bài viết</h3><p class="panel-subtitle">Nội dung mới nhất được hiển thị trước.</p></div>
+    <div>
+      <h3><%= filters.queue === 'moderation' ? 'Hàng đợi kiểm duyệt bài viết' : 'Danh sách bài viết' %></h3>
+      <p class="panel-subtitle"><%= filters.queue === 'moderation' ? 'Tập trung các bài đang xử lý hoặc cần quản trị viên duyệt thủ công.' : 'Nội dung mới nhất được hiển thị trước.' %></p>
+    </div>
     <% if (canAccessReports) { %><a href="/reports?type=post" class="btn btn-sm btn-outline-primary"><i class="bi bi-flag me-1"></i>Mở quản lý báo cáo</a><% } %>
   </div>
   <% if (scanLimitReached) { %><div class="alert alert-warning py-2">Đã đạt giới hạn quét an toàn. Hãy thêm điều kiện để thu hẹp kết quả.</div><% } %>

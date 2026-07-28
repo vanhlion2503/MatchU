@@ -15,6 +15,7 @@ const baseListFields = {
   moderation: Joi.string().valid('', ...moderationStatuses).default(''),
   lifecycle: Joi.string().valid('', 'active', 'deleted').default(''),
   report: Joi.string().valid('', 'reported', 'unreported', 'open', 'resolved').default(''),
+  queue: Joi.string().valid('', 'moderation').default(''),
   priority: Joi.string().valid('', ...priorities).default(''),
   cursor: Joi.string().trim().max(160).allow('').default(''),
   limit: Joi.number().integer().min(10).max(50).default(20)

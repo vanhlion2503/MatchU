@@ -90,6 +90,11 @@ test('matches post filters and respects resolved report cases', () => {
   assert.equal(__test.matchesPostFilters(post, { ...base, report: 'resolved' }), true);
   assert.equal(__test.matchesPostDocumentFilters(post, { ...base, q: 'music' }), true);
   assert.equal(__test.matchesPostDocumentFilters(post, { ...base, q: 'không tồn tại' }), false);
+  assert.equal(__test.matchesPostDocumentFilters(post, { ...base, queue: 'moderation' }), false);
+  assert.equal(__test.matchesPostDocumentFilters(
+    { ...post, moderationStatus: 'review_required' },
+    { ...base, queue: 'moderation' }
+  ), true);
 });
 
 test('reopens a resolved case when a newer community report arrives', () => {

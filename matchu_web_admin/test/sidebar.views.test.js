@@ -38,3 +38,16 @@ test('caps large pending report counts while preserving the exact accessible val
   assert.match(html, />99\+<\/strong>/);
   assert.match(html, /123 báo cáo đang chờ xử lý/);
 });
+
+test('shows a red badge and moderation shortcut for posts requiring review', async () => {
+  const html = await ejs.renderFile(sidebar, {
+    currentPath: '/dashboard',
+    hasPermission: (permission) => permission === 'posts.read',
+    pendingPostModerationCount: 7
+  });
+
+  assert.match(html, /href="\/posts\?queue=moderation"/);
+  assert.match(html, /sidebar-post-badge/);
+  assert.match(html, />7<\/strong>/);
+  assert.match(html, /7 bài viết cần kiểm duyệt/);
+});
