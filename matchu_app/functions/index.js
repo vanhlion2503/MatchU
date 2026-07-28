@@ -82,6 +82,11 @@ const {
   syncAdminPostSearchIndex,
 } = require("./src/triggers/adminPostSearchIndex");
 const {
+  createPostReportCase,
+  createProfileReportCase,
+  createMatchingReportCase,
+} = require("./src/triggers/reportCases");
+const {
   backfillRecentPostEmbeddings,
   embedPostContent,
   invalidateRecommendationCacheOnBlockedBy,
@@ -176,6 +181,9 @@ exports.generateTelepathyAiInsight = generateTelepathyAiInsight;
 exports.validateWordChainDictionary = validateWordChainDictionary;
 exports.moderateUploadedPostVideo = moderateUploadedPostVideo;
 exports.syncAdminPostSearchIndex = syncAdminPostSearchIndex;
+exports.createPostReportCase = createPostReportCase;
+exports.createProfileReportCase = createProfileReportCase;
+exports.createMatchingReportCase = createMatchingReportCase;
 exports.embedPostContent = embedPostContent;
 exports.backfillRecentPostEmbeddings = backfillRecentPostEmbeddings;
 exports.updateInterestOnPostLike = updateInterestOnPostLike;

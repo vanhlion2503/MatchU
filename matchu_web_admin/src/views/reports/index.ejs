@@ -1,0 +1,135 @@
+<div class="report-page-heading">
+  <div>
+    <span class="moderation-eyebrow">TRUST &amp; SAFETY</span>
+    <h1>Quản lý báo cáo</h1>
+    <p>Một hàng đợi thống nhất cho báo cáo bài viết, hồ sơ người dùng và matching.</p>
+  </div>
+  <a href="/posts/moderation" class="btn btn-light border"><i class="bi bi-shield-check me-1"></i>Kiểm duyệt nội dung</a>
+</div>
+
+<section class="moderation-summary-grid">
+  <article><i class="bi bi-inbox text-primary"></i><div><strong><%= formatNumber(statistics.total) %></strong><span>Tổng hồ sơ</span></div></article>
+  <article><i class="bi bi-flag text-danger"></i><div><strong><%= formatNumber(statistics.open) %></strong><span>Chờ xử lý</span></div></article>
+  <article><i class="bi bi-search text-warning"></i><div><strong><%= formatNumber(statistics.inReview) %></strong><span>Đang xem xét</span></div></article>
+  <article><i class="bi bi-check2-circle text-success"></i><div><strong><%= formatNumber(statistics.resolved + statistics.dismissed) %></strong><span>Đã kết thúc</span></div></article>
+</section>
+
+<nav class="moderation-queue-tabs" aria-label="Trạng thái báo cáo">
+  <% const statusTabs = [
+    ['', 'Tất cả', 'collection'],
+    ['open', 'Chờ xử lý', 'flag'],
+    ['in_review', 'Đang xem xét', 'search'],
+    ['resolved', 'Đã xử lý', 'check2-circle'],
+    ['dismissed', 'Đã bác', 'x-circle']
+  ]; %>
+  <% statusTabs.forEach(([value, label, icon]) => { %>
+    <a class="<%= filters.status === value ? 'active' : '' %>" href="/reports?<%= new URLSearchParams({ ...(filters.type ? { type: filters.type } : {}), ...(value ? { status: value } : {}) }).toString() %>">
+      <i class="bi bi-<%= icon %>"></i><%= label %>
+    </a>
+  <% }) %>
+</nav>
+
+<section class="panel mb-4">
+  <form action="/reports" method="get" class="report-filter-form">
+    <div class="report-filter-search">
+      <label class="form-label" for="reportSearch">Tra cứu</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input id="reportSearch" class="form-control" type="search" name="q" value="<%= filters.q %>" maxlength="120" placeholder="Case ID, UID, Post ID, Room ID hoặc lý do">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="reportType">Loại báo cáo</label>
+      <select id="reportType" class="form-select" name="type">
+        <option value="">Tất cả</option>
+        <% Object.entries(typeLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.type === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="reportPriority">Mức ưu tiên</label>
+      <select id="reportPriority" class="form-select" name="priority">
+        <option value="">Tất cả</option>
+        <% Object.entries(priorityLabels).forEach(([value, label]) => { %><option value="<%= value %>" <%= filters.priority === value ? 'selected' : '' %>><%= label %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="reportAssignee">Phụ trách</label>
+      <select id="reportAssignee" class="form-select" name="assignee">
+        <option value="">Tất cả</option>
+        <option value="me" <%= filters.assignee === 'me' ? 'selected' : '' %>>Của tôi</option>
+        <option value="unassigned" <%= filters.assignee === 'unassigned' ? 'selected' : '' %>>Chưa phân công</option>
+      </select>
+    </div>
+    <input type="hidden" name="status" value="<%= filters.status %>">
+    <input type="hidden" name="limit" value="<%= filters.limit %>">
+    <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Lọc</button>
+    <% if (filters.q || filters.type || filters.status || filters.priority || filters.assignee) { %>
+      <a class="btn btn-light border" href="/reports">Đặt lại</a>
+    <% } %>
+  </form>
+</section>
+
+<section class="panel report-list-panel">
+  <div class="panel-heading mb-3">
+    <div>
+      <h3>Hàng đợi báo cáo</h3>
+      <p class="panel-subtitle">Các hồ sơ được sắp xếp theo báo cáo mới nhất.</p>
+    </div>
+    <span class="badge rounded-pill text-bg-light border"><%= cases.length %> kết quả</span>
+  </div>
+  <% if (scanLimitReached) { %><div class="alert alert-warning py-2">Đã đạt giới hạn quét an toàn. Hãy bổ sung bộ lọc để thu hẹp kết quả.</div><% } %>
+
+  <% if (!cases.length) { %>
+    <div class="empty-state report-empty-state">
+      <i class="bi bi-shield-check"></i>
+      <h4>Không có hồ sơ phù hợp</h4>
+      <p>Thử thay đổi bộ lọc hoặc kiểm tra lại sau.</p>
+    </div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table align-middle report-table">
+        <thead><tr><th>Đối tượng</th><th>Loại</th><th>Tín hiệu</th><th>Trạng thái</th><th>Phụ trách</th><th>Mới nhất</th><th></th></tr></thead>
+        <tbody>
+          <% cases.forEach((item) => {
+            const targetName = item.post
+              ? (item.post.content || `Bài viết ${item.postId}`)
+              : item.reportedUser
+                ? (item.reportedUser.fullname || item.reportedUser.nickname || item.reportedUid)
+                : item.type === 'matching' ? `Phòng ${item.roomId || item.targetId}` : item.targetId;
+            const typeIcon = item.type === 'post' ? 'file-post' : item.type === 'profile' ? 'person-badge' : 'people';
+          %>
+            <tr>
+              <td>
+                <a class="report-target-link" href="/reports/<%= encodeURIComponent(item.caseId) %>"><%= targetName %></a>
+                <code><%= item.targetId %></code>
+                <% if (item.reportedUid && item.targetId !== item.reportedUid) { %><small>UID: <%= item.reportedUid %></small><% } %>
+              </td>
+              <td><span class="report-type-chip type-<%= item.type %>"><i class="bi bi-<%= typeIcon %>"></i><%= typeLabels[item.type] || item.type %></span></td>
+              <td>
+                <span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(item.reportCount) %></span>
+                <div class="report-category-compact"><%= item.categoryKeys.slice(0, 2).join(', ') || item.latestReasonKey || 'Không rõ' %></div>
+              </td>
+              <td>
+                <span class="report-status-badge report-status-<%= item.status %>"><%= statusLabels[item.status] || item.status %></span>
+                <span class="priority-badge priority-<%= item.priority %>"><%= priorityLabels[item.priority] || item.priority %></span>
+              </td>
+              <td>
+                <% if (item.assignedAdminEmail) { %><span class="report-assignee"><i class="bi bi-person-check"></i><%= item.assignedAdminEmail %></span><% } else { %><span class="text-muted small">Chưa phân công</span><% } %>
+              </td>
+              <td><span class="post-date"><%= formatDate(item.latestReportAt) %></span></td>
+              <td><a class="btn btn-sm btn-outline-primary" href="/reports/<%= encodeURIComponent(item.caseId) %>">Xem</a></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+
+  <div class="post-pagination">
+    <div><strong><%= cases.length %></strong> kết quả · đã quét <%= formatNumber(scanned) %> hồ sơ</div>
+    <div class="d-flex gap-2">
+      <% if (hasPreviousPage) { %><a class="btn btn-sm btn-light border" href="/reports"><i class="bi bi-arrow-left"></i> Trang đầu</a><% } %>
+      <% if (nextPageUrl) { %><a class="btn btn-sm btn-primary" href="<%= nextPageUrl %>">Trang sau <i class="bi bi-arrow-right"></i></a><% } %>
+    </div>
+  </div>
+</section>

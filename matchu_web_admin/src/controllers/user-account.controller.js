@@ -5,6 +5,7 @@ const {
   executeUserAction
 } = require('../services/user-account.service');
 const { writeAuditLog } = require('../services/audit-log.service');
+const { recordUserModerationOutcome } = require('../services/report-management.service');
 const {
   validateListQuery,
   validateUserAction,
@@ -106,6 +107,9 @@ async function index(req, res) {
 
 async function show(req, res) {
   const detail = await getUserDetail(req.params.uid);
+  const linkedReportId = /^(post|profile|matching)_[a-f0-9]{40}$/.test(
+    String(req.query.reportCase || '')
+  ) ? String(req.query.reportCase) : '';
   const successMessage = String(req.query.success || '').slice(0, 300);
   const errorMessage = String(req.query.error || '').slice(0, 300);
   return res.render('users/show', {
@@ -119,6 +123,7 @@ async function show(req, res) {
     maskEmail,
     maskPhone,
     allowedFeatures,
+    linkedReportId,
     canPerformAction: (action) => canPerformAction(req.admin, action)
   });
 }
@@ -133,6 +138,22 @@ async function action(req, res) {
 
   try {
     const result = await executeUserAction(uid, value, req.admin);
+    const linkedReportId = /^(post|profile|matching)_[a-f0-9]{40}$/.test(
+      String(value.reportId || '')
+    ) ? String(value.reportId) : '';
+    if (linkedReportId) {
+      try {
+        await recordUserModerationOutcome({
+          caseId: linkedReportId,
+          userId: uid,
+          action: value.action,
+          reason: value.reason,
+          currentAdmin: req.admin
+        });
+      } catch (syncError) {
+        console.error('Unable to synchronize user report case outcome:', syncError.message);
+      }
+    }
     await writeAuditLog({
       admin: req.admin,
       action: `USER_${value.action.toUpperCase()}`,
@@ -151,6 +172,9 @@ async function action(req, res) {
       req
     });
     const message = encodeURIComponent(ACTION_MESSAGES[value.action] || 'Đã cập nhật tài khoản.');
+    if (linkedReportId) {
+      return res.redirect(`/reports/${encodeURIComponent(linkedReportId)}?success=${message}`);
+    }
     return res.redirect(`/users/${encodeURIComponent(uid)}?success=${message}`);
   } catch (error) {
     await writeAuditLog({

@@ -326,7 +326,7 @@
         </div>
         <div class="mb-3">
           <label class="form-label" for="actionReportId">Mã báo cáo liên quan <span class="text-muted">(không bắt buộc)</span></label>
-          <input class="form-control" id="actionReportId" name="reportId" maxlength="160">
+          <input class="form-control" id="actionReportId" name="reportId" maxlength="160" value="<%= typeof linkedReportId !== 'undefined' ? linkedReportId : '' %>">
         </div>
         <div class="alert alert-warning mb-0 action-warning">
           <i class="bi bi-exclamation-triangle me-2"></i>Hãy kiểm tra kỹ thông tin trước khi xác nhận.

@@ -60,6 +60,9 @@ Không commit `.env` hoặc JSON service account.
 | GET | `/posts/moderation` | Hàng đợi kiểm duyệt và báo cáo, cần `posts.moderate` hoặc `reports.read` |
 | GET | `/posts/:postId` | Chi tiết bài, media, tín hiệu AI, báo cáo và lịch sử xử lý |
 | POST | `/posts/:postId/actions` | Duyệt, gỡ, xem xét, bác báo cáo hoặc khôi phục bài viết |
+| GET | `/reports` | Hàng đợi thống nhất cho báo cáo bài viết, hồ sơ và matching |
+| GET | `/reports/:caseId` | Chi tiết đối tượng, bằng chứng, phân công và lịch sử xử lý |
+| POST | `/reports/:caseId/actions` | Nhận xử lý, xem xét, kết luận, bác hoặc mở lại hồ sơ |
 
 ## Quản lý tài khoản người dùng
 
@@ -98,6 +101,8 @@ Các permission:
 - `posts.restore` (tùy chọn; `posts.moderate` vẫn được phép khôi phục)
 - `posts.delete` (xóa vĩnh viễn bài viết đã xóa mềm; nên chỉ cấp cho quản trị viên cấp cao)
 - `reports.read`
+- `reports.manage` (nhận xử lý và chuyển sang xem xét)
+- `reports.resolve` (kết luận, bác hoặc mở lại hồ sơ)
 
 Admin SDK bỏ qua Firestore Rules nên mọi thao tác ghi đều được kiểm tra Joi, permission, CSRF và
 thực hiện phía server. Báo cáo gốc được giữ nguyên trong luồng kiểm duyệt thông thường; thao tác
@@ -116,6 +121,28 @@ Chạy kiểm tra trước khi phát hành:
 ```bash
 npm run check
 ```
+
+## Quản lý báo cáo hợp nhất
+
+Mobile tiếp tục ghi vào ba collection hiện hữu: `postReports`, `userProfileReports` và
+`userMatchingReports`. Không có thay đổi đối với luồng gửi báo cáo trên ứng dụng.
+
+Ba Cloud Functions mới tạo projection vận hành tại `reportCases/{caseId}` và lưu bản
+chuẩn hóa của từng báo cáo trong subcollection `reports`. Báo cáo mới cho một hồ sơ đã
+kết thúc sẽ tự mở lại hồ sơ. Quyết định kiểm duyệt bài viết hoặc xử lý tài khoản được
+thực hiện từ liên kết trong trang chi tiết báo cáo sẽ đồng bộ kết luận về report case.
+
+Trước khi mở module trên production:
+
+```bash
+cd matchu_app
+firebase deploy --only firestore:rules,firestore:indexes,functions
+cd functions
+npm run backfill:report-cases
+```
+
+Backfill có tính idempotent: chạy lại không làm tăng trùng số báo cáo vì mỗi projection
+dùng khóa cố định theo collection nguồn và Report ID.
 
 ## Cấu trúc
 

@@ -1,0 +1,162 @@
+<div class="report-detail-heading">
+  <div>
+    <a href="/reports" class="back-link"><i class="bi bi-arrow-left"></i>Quay lại hàng đợi</a>
+    <span class="moderation-eyebrow d-block mt-3">REPORT CASE</span>
+    <h1>Chi tiết hồ sơ báo cáo</h1>
+    <code><%= reportCase.caseId %></code>
+  </div>
+  <div class="post-detail-statuses">
+    <span class="report-status-badge report-status-<%= reportCase.status %>"><%= statusLabels[reportCase.status] || reportCase.status %></span>
+    <span class="priority-badge priority-<%= reportCase.priority %>"><%= priorityLabels[reportCase.priority] || reportCase.priority %></span>
+  </div>
+</div>
+
+<div class="report-detail-layout">
+  <div>
+    <section class="panel mb-4 report-target-panel">
+      <div class="panel-heading mb-3">
+        <div><h3>Đối tượng bị báo cáo</h3><p class="panel-subtitle"><%= typeLabels[reportCase.type] || reportCase.type %></p></div>
+        <span class="report-count-badge"><i class="bi bi-flag-fill"></i><%= formatNumber(reportCase.reportCount) %> báo cáo</span>
+      </div>
+
+      <% if (reportCase.type === 'post') { %>
+        <% if (reportCase.post) { %>
+          <div class="report-post-preview">
+            <% if (reportCase.post.mediaUrl) { %><img src="<%= reportCase.post.mediaUrl %>" alt="Media bài viết" loading="lazy" referrerpolicy="no-referrer"><% } else { %><div class="report-target-icon"><i class="bi bi-file-post"></i></div><% } %>
+            <div>
+              <strong><%= reportCase.post.content || 'Bài viết chỉ có media' %></strong>
+              <p><%= reportCase.post.author.name || reportCase.post.author.nickname || reportCase.post.authorId %></p>
+              <code><%= reportCase.postId %></code>
+            </div>
+            <a class="btn btn-outline-primary btn-sm ms-auto" href="/posts/<%= encodeURIComponent(reportCase.postId) %>?from=reports&caseId=<%= encodeURIComponent(reportCase.caseId) %>">Mở bài viết</a>
+          </div>
+        <% } else { %>
+          <div class="alert alert-warning mb-0">Bài viết gốc không còn tồn tại. Bản chụp nội dung trong từng báo cáo vẫn được giữ bên dưới.</div>
+        <% } %>
+      <% } else { %>
+        <div class="report-user-preview">
+          <div class="report-target-icon"><i class="bi bi-person-badge"></i></div>
+          <div>
+            <strong><%= reportCase.reportedUser ? (reportCase.reportedUser.fullname || reportCase.reportedUser.nickname || reportCase.reportedUid) : reportCase.reportedUid %></strong>
+            <p>Trạng thái: <%= reportCase.reportedUser?.accountStatus || 'Không tìm thấy tài khoản' %></p>
+            <code><%= reportCase.reportedUid %></code>
+          </div>
+          <% if (reportCase.reportedUser) { %><a class="btn btn-outline-primary btn-sm ms-auto" href="/users/<%= encodeURIComponent(reportCase.reportedUid) %>?reportCase=<%= encodeURIComponent(reportCase.caseId) %>">Mở hồ sơ người dùng</a><% } %>
+        </div>
+        <% if (matchingContext) { %>
+          <div class="matching-context">
+            <div><span>Room ID</span><strong><%= matchingContext.roomId %></strong></div>
+            <div><span>Nguồn</span><strong><%= matchingContext.collection %></strong></div>
+            <div><span>Trạng thái</span><strong><%= matchingContext.status || 'Không rõ' %></strong></div>
+            <div><span>Người tham gia</span><strong><%= matchingContext.participants.length %></strong></div>
+          </div>
+        <% } %>
+      <% } %>
+    </section>
+
+    <section class="panel mb-4">
+      <div class="panel-heading mb-3">
+        <div><h3>Bằng chứng cộng đồng</h3><p class="panel-subtitle">Các báo cáo gốc được giữ nguyên và sắp xếp mới nhất trước.</p></div>
+        <span class="badge text-bg-light border"><%= reports.length %> bản ghi</span>
+      </div>
+      <% if (!reports.length) { %>
+        <div class="compact-empty"><div><i class="bi bi-inbox"></i><p>Chưa có projection báo cáo. Hãy chạy backfill cho dữ liệu cũ.</p></div></div>
+      <% } else { %>
+        <div class="report-card-list">
+          <% reports.forEach((report) => { %>
+            <article class="report-card">
+              <div class="report-card-header">
+                <div>
+                  <span class="report-category"><%= report.categoryTitle || report.categoryKey || typeLabels[report.type] || 'Khác' %></span>
+                  <strong><%= report.reasonTitle || report.reasonKey || 'Không nêu lý do' %></strong>
+                </div>
+                <time><%= formatDate(report.createdAt) %></time>
+              </div>
+              <% if (report.customReason) { %><p><strong>Lý do khác:</strong> <%= report.customReason %></p><% } %>
+              <% if (report.description) { %><p><%= report.description %></p><% } %>
+              <% if (report.postContentPreview) { %><blockquote class="report-content-snapshot"><%= report.postContentPreview %></blockquote><% } %>
+              <div class="reporter-line">
+                <i class="bi bi-person"></i>
+                <% if (report.reporter) { %>
+                  <a href="/users/<%= encodeURIComponent(report.reporterUid) %>"><%= report.reporter.fullname || report.reporter.nickname || report.reporterUid %></a>
+                  <span>· <%= report.reporter.accountStatus %></span>
+                <% } else { %><code><%= report.reporterUid %></code><% } %>
+                <code class="ms-auto"><%= report.id %></code>
+              </div>
+              <% if (report.imageUrls.length) { %>
+                <div class="report-evidence-grid">
+                  <% report.imageUrls.forEach((url, index) => { %><a href="<%= url %>" target="_blank" rel="noopener noreferrer"><img src="<%= url %>" alt="Bằng chứng <%= index + 1 %>" loading="lazy" referrerpolicy="no-referrer"></a><% }) %>
+                </div>
+              <% } %>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+
+  <aside class="report-detail-sidebar">
+    <section class="panel mb-4">
+      <div class="panel-heading mb-3"><h3>Hồ sơ xử lý</h3></div>
+      <dl class="case-detail-list">
+        <div><dt>Trạng thái</dt><dd><%= statusLabels[reportCase.status] || reportCase.status %></dd></div>
+        <div><dt>Mức ưu tiên</dt><dd><%= priorityLabels[reportCase.priority] || reportCase.priority %></dd></div>
+        <div><dt>Phụ trách</dt><dd><%= reportCase.assignedAdminEmail || 'Chưa phân công' %></dd></div>
+        <div><dt>Báo cáo mới nhất</dt><dd><%= formatDate(reportCase.latestReportAt) %></dd></div>
+        <div><dt>Cập nhật</dt><dd><%= formatDate(reportCase.updatedAt) %></dd></div>
+        <% if (reportCase.resolution) { %><div><dt>Kết luận</dt><dd><%= resolutionLabels[reportCase.resolution] || reportCase.resolution %></dd></div><% } %>
+      </dl>
+      <% if (reportCase.resolutionReason) { %><div class="case-resolution"><span>Lý do kết luận</span><p><%= reportCase.resolutionReason %></p></div><% } %>
+
+      <div class="report-case-actions mt-3">
+        <% if (canPerformAction('assign_to_me')) { %><button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#reportActionModal" data-report-action="assign_to_me" data-action-title="Nhận xử lý hồ sơ"><i class="bi bi-person-check"></i>Nhận xử lý</button><% } %>
+        <% if (reportCase.status !== 'in_review' && canPerformAction('start_review')) { %><button class="btn btn-warning-subtle" data-bs-toggle="modal" data-bs-target="#reportActionModal" data-report-action="start_review" data-action-title="Bắt đầu xem xét"><i class="bi bi-search"></i>Xem xét</button><% } %>
+        <% if (!['resolved', 'dismissed'].includes(reportCase.status) && canPerformAction('resolve')) { %><button class="btn btn-success-subtle" data-bs-toggle="modal" data-bs-target="#reportActionModal" data-report-action="resolve" data-action-title="Kết luận hồ sơ"><i class="bi bi-check2-circle"></i>Kết luận</button><% } %>
+        <% if (!['resolved', 'dismissed'].includes(reportCase.status) && canPerformAction('dismiss')) { %><button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#reportActionModal" data-report-action="dismiss" data-action-title="Bác báo cáo"><i class="bi bi-x-circle"></i>Bác báo cáo</button><% } %>
+        <% if (['resolved', 'dismissed'].includes(reportCase.status) && canPerformAction('reopen')) { %><button class="btn btn-light border" data-bs-toggle="modal" data-bs-target="#reportActionModal" data-report-action="reopen" data-action-title="Mở lại hồ sơ"><i class="bi bi-arrow-counterclockwise"></i>Mở lại</button><% } %>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading mb-3"><h3>Lịch sử xử lý</h3><span class="badge text-bg-light border"><%= actions.length %></span></div>
+      <% if (!actions.length) { %><div class="compact-empty"><div><i class="bi bi-clock-history"></i><p>Chưa có thao tác quản trị.</p></div></div><% } else { %>
+        <div class="timeline-list">
+          <% actions.forEach((item) => { %>
+            <article>
+              <span class="timeline-dot <%= item.afterStatus === 'dismissed' ? 'warning' : item.afterStatus === 'resolved' ? '' : 'danger' %>"></span>
+              <div><strong><%= item.action %></strong><p><%= item.reason || `${item.beforeStatus} → ${item.afterStatus}` %></p><small><%= formatDate(item.createdAt) %> · <%= item.adminEmail || item.adminId %></small></div>
+            </article>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </aside>
+</div>
+
+<div class="modal fade" id="reportActionModal" tabindex="-1" aria-labelledby="reportActionModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" action="/reports/<%= encodeURIComponent(reportCase.caseId) %>/actions" method="post" id="reportActionForm">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="action" id="reportActionInput">
+      <div class="modal-header">
+        <div><span class="modal-eyebrow">XỬ LÝ BÁO CÁO</span><h2 class="modal-title fs-5" id="reportActionModalTitle">Xác nhận thao tác</h2></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="action-target"><i class="bi bi-flag"></i><div><strong><%= typeLabels[reportCase.type] %> · <%= reportCase.targetId %></strong><small><%= reportCase.reportCount %> báo cáo trong hồ sơ</small></div></div>
+        <div class="mb-3 report-resolution-field d-none">
+          <label for="reportResolution" class="form-label">Kết luận</label>
+          <select class="form-select" id="reportResolution" name="resolution">
+            <% Object.entries(resolutionLabels).filter(([value]) => value !== 'not_violation').forEach(([value, label]) => { %><option value="<%= value %>"><%= label %></option><% }) %>
+          </select>
+        </div>
+        <div class="mb-3 report-action-reason-field">
+          <label for="reportActionReason" class="form-label">Lý do / ghi chú</label>
+          <textarea class="form-control" id="reportActionReason" name="reason" rows="4" maxlength="500" placeholder="Nêu rõ căn cứ và kết luận xử lý"></textarea>
+        </div>
+        <div class="alert alert-warning mb-0 report-action-warning"><i class="bi bi-exclamation-triangle me-2"></i>Thao tác sẽ được lưu vào lịch sử quản trị.</div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button><button type="submit" class="btn btn-primary" id="reportActionSubmit">Xác nhận</button></div>
+    </form>
+  </div>
+</div>

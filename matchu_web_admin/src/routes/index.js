@@ -4,4 +4,5 @@ router.use(require('./auth.routes'));
 router.use(require('./dashboard.routes'));
 router.use(require('./user-account.routes'));
 router.use(require('./post-management.routes'));
+router.use(require('./report-management.routes'));
 module.exports = router;

@@ -2239,6 +2239,16 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // Admin-only operational projection. Mobile continues writing the
+    // original report collections; Cloud Functions maintains these cases.
+    match /reportCases/{caseId} {
+      allow read, write: if false;
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
   }
 }
 

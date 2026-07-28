@@ -261,6 +261,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <form class="modal-content" action="/posts/<%= encodeURIComponent(post.postId) %>/actions" method="post" id="postActionForm">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <% if (typeof returnCaseId !== 'undefined' && returnCaseId) { %><input type="hidden" name="returnCaseId" value="<%= returnCaseId %>"><% } %>
       <input type="hidden" name="action" id="postActionInput">
       <div class="modal-header">
         <div><span class="modal-eyebrow">KIỂM DUYỆ BÀI VIẾT</span><h2 class="modal-title fs-5" id="postActionModalTitle">Xác nhận quyết định</h2></div>

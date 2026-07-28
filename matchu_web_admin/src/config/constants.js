@@ -50,6 +50,20 @@ const POST_ACTION_PERMISSIONS = Object.freeze({
   [POST_MODERATION_ACTIONS.RESTORE]: ['posts.restore', 'posts.moderate'],
   [POST_MODERATION_ACTIONS.DELETE_PERMANENTLY]: ['posts.delete']
 });
+const REPORT_CASE_ACTIONS = Object.freeze({
+  ASSIGN_TO_ME: 'assign_to_me',
+  START_REVIEW: 'start_review',
+  RESOLVE: 'resolve',
+  DISMISS: 'dismiss',
+  REOPEN: 'reopen'
+});
+const REPORT_ACTION_PERMISSIONS = Object.freeze({
+  [REPORT_CASE_ACTIONS.ASSIGN_TO_ME]: ['reports.manage'],
+  [REPORT_CASE_ACTIONS.START_REVIEW]: ['reports.manage'],
+  [REPORT_CASE_ACTIONS.RESOLVE]: ['reports.resolve'],
+  [REPORT_CASE_ACTIONS.DISMISS]: ['reports.resolve'],
+  [REPORT_CASE_ACTIONS.REOPEN]: ['reports.resolve']
+});
 const APP_VERSION = '1.0.0';
 module.exports = {
   ADMIN_ROLES,
@@ -59,5 +73,7 @@ module.exports = {
   USER_ACTION_PERMISSIONS,
   POST_MODERATION_ACTIONS,
   POST_ACTION_PERMISSIONS,
+  REPORT_CASE_ACTIONS,
+  REPORT_ACTION_PERMISSIONS,
   APP_VERSION
 };

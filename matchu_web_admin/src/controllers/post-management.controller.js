@@ -7,6 +7,9 @@ const {
 } = require('../services/post-management.service');
 const { writeAuditLog } = require('../services/audit-log.service');
 const {
+  recordTargetModerationOutcome
+} = require('../services/report-management.service');
+const {
   validatePostListQuery,
   validateModerationQueueQuery,
   validatePostId,
@@ -155,13 +158,20 @@ async function moderation(req, res) {
 async function show(req, res) {
   const postId = validatedPostId(req.params.postId);
   const detail = await getPostDetail(postId);
+  const returnCaseId = req.query.from === 'reports'
+    && /^(post|profile|matching)_[a-f0-9]{40}$/.test(String(req.query.caseId || ''))
+    ? String(req.query.caseId)
+    : '';
   return res.render('posts/show', {
     layout: 'layouts/admin-layout',
     pageTitle: 'Chi tiết bài viết',
     ...detail,
     successMessage: String(req.query.success || '').slice(0, 300) || null,
     errorMessage: String(req.query.error || '').slice(0, 300) || null,
-    backUrl: req.query.from === 'moderation' ? '/posts/moderation' : '/posts',
+    backUrl: returnCaseId
+      ? `/reports/${encodeURIComponent(returnCaseId)}`
+      : req.query.from === 'moderation' ? '/posts/moderation' : '/posts',
+    returnCaseId,
     ...commonViewData(req)
   });
 }
@@ -179,6 +189,17 @@ async function action(req, res) {
 
   try {
     const result = await executePostModerationAction(postId, value, req.admin);
+    try {
+      await recordTargetModerationOutcome({
+        type: 'post',
+        targetId: postId,
+        action: value.action,
+        reason: value.reason,
+        currentAdmin: req.admin
+      });
+    } catch (syncError) {
+      console.error('Unable to synchronize report case outcome:', syncError.message);
+    }
     await writeAuditLog({
       admin: req.admin,
       action: `POST_${value.action.toUpperCase()}`,
@@ -196,8 +217,28 @@ async function action(req, res) {
       req
     });
     if (value.action === 'delete_permanently') {
+      const returnCaseId = /^(post|profile|matching)_[a-f0-9]{40}$/.test(
+        String(req.body.returnCaseId || '')
+      ) ? String(req.body.returnCaseId) : '';
+      if (returnCaseId) {
+        return res.redirect(
+          `/reports/${encodeURIComponent(returnCaseId)}?success=${encodeURIComponent(
+            ACTION_MESSAGES[value.action]
+          )}`
+        );
+      }
       return res.redirect(
         `/posts?lifecycle=deleted&success=${encodeURIComponent(ACTION_MESSAGES[value.action])}`
+      );
+    }
+    const returnCaseId = /^(post|profile|matching)_[a-f0-9]{40}$/.test(
+      String(req.body.returnCaseId || '')
+    ) ? String(req.body.returnCaseId) : '';
+    if (returnCaseId) {
+      return res.redirect(
+        `/reports/${encodeURIComponent(returnCaseId)}?success=${encodeURIComponent(
+          ACTION_MESSAGES[value.action] || 'Đã cập nhật bài viết.'
+        )}`
       );
     }
     return res.redirect(
