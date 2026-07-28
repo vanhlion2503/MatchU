@@ -9,10 +9,13 @@ import 'package:matchu_app/translations/post_translations.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:matchu_app/controllers/user/user_controller.dart';
+import 'package:matchu_app/controllers/feed/post_restrictions_controller.dart';
 import 'package:matchu_app/models/feed/post_comment_model.dart';
 import 'package:matchu_app/models/account_access/account_access_model.dart';
+import 'package:matchu_app/models/user_model.dart';
 import 'package:matchu_app/services/feed/post_comment_service.dart';
 import 'package:matchu_app/services/feed/post_restriction_service.dart';
+import 'package:matchu_app/services/user/user_service.dart';
 import 'package:matchu_app/translates/firebase_error_translator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -263,6 +266,20 @@ class PostCommentsController extends GetxController {
     return comment.userId.trim() == uid || postAuthorId.trim() == uid;
   }
 
+  bool isPostOwnerModerating(PostCommentModel comment) {
+    final uid = currentUserId;
+    return uid.isNotEmpty &&
+        postAuthorId.trim() == uid &&
+        comment.userId.trim().isNotEmpty &&
+        comment.userId.trim() != uid;
+  }
+
+  bool canReportComment(PostCommentModel comment) {
+    final uid = currentUserId;
+    if (uid.isEmpty || comment.isSending || comment.isDeleted) return false;
+    return comment.userId.trim().isNotEmpty && comment.userId.trim() != uid;
+  }
+
   bool canHideComment(PostCommentModel comment) {
     final uid = currentUserId;
     if (comment.isSending || comment.isDeleted) return false;
@@ -273,6 +290,7 @@ class PostCommentsController extends GetxController {
   bool hasCommentActions(PostCommentModel comment) {
     return canEditComment(comment) ||
         canDeleteComment(comment) ||
+        canReportComment(comment) ||
         canHideComment(comment);
   }
 
@@ -772,10 +790,12 @@ class PostCommentsController extends GetxController {
     }
   }
 
-  Future<void> deleteComment(PostCommentModel comment) async {
+  Future<bool> deleteComment(PostCommentModel comment) async {
     final currentComment = _findComment(comment.commentId);
-    if (currentComment == null || !canDeleteComment(currentComment)) return;
-    if (actioningCommentIds.contains(currentComment.commentId)) return;
+    if (currentComment == null || !canDeleteComment(currentComment)) {
+      return false;
+    }
+    if (actioningCommentIds.contains(currentComment.commentId)) return false;
 
     final commentId = currentComment.commentId;
     final previousRank = _topLevelOrderRanks[commentId];
@@ -827,6 +847,7 @@ class PostCommentsController extends GetxController {
           );
         }
       }
+      return true;
     } catch (error) {
       _upsertComments(<PostCommentModel>[
         currentComment,
@@ -839,10 +860,64 @@ class PostCommentsController extends GetxController {
       onCommentCountChanged?.call(1);
       _rebuildThreadEntries();
       _showError(_mapError(error));
+      return false;
     } finally {
       actioningCommentIds.remove(commentId);
       actioningCommentIds.refresh();
     }
+  }
+
+  Future<void> blockCommentAuthor(PostCommentModel comment) async {
+    final userId = comment.userId.trim();
+    if (userId.isEmpty || userId == currentUserId) return;
+
+    try {
+      final targetUser = await UserService().getUser(userId);
+      if (targetUser == null) {
+        throw StateError('Không tìm thấy người dùng để chặn.');
+      }
+
+      final restrictionsController =
+          Get.isRegistered<PostRestrictionsController>()
+              ? Get.find<PostRestrictionsController>()
+              : null;
+      final blocked =
+          restrictionsController != null
+              ? await restrictionsController.blockUser(targetUser)
+              : await _blockUserWithoutGlobalController(targetUser);
+      if (!blocked) return;
+
+      _blockedUserIds.add(userId);
+      _clearComposerTarget(comment.commentId);
+      _rebuildThreadEntries();
+    } catch (error) {
+      _showError(_mapError(error));
+    }
+  }
+
+  Future<bool> applyReportedCommentDisposition(PostCommentModel comment) async {
+    final currentComment = _findComment(comment.commentId);
+    if (currentComment == null) return true;
+
+    if (isPostOwnerModerating(currentComment)) {
+      return deleteComment(currentComment);
+    }
+
+    if (canHideComment(currentComment)) {
+      await hideComment(currentComment);
+    }
+    return true;
+  }
+
+  Future<bool> _blockUserWithoutGlobalController(UserModel targetUser) async {
+    await _restrictionService.blockUser(targetUser);
+    Get.snackbar(
+      PostTranslationKeys.notice.tr,
+      'Đã chặn người dùng này.',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
+    return true;
   }
 
   Future<void> hideComment(PostCommentModel comment) async {

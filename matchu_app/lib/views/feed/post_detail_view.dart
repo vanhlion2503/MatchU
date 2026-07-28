@@ -30,6 +30,7 @@ import 'package:matchu_app/views/feed/widgets/post_ui_helpers.dart';
 import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 import 'package:matchu_app/views/profile/other_profile_view.dart';
+import 'package:matchu_app/views/report/comment_report_bottom_sheet.dart';
 
 const double _kComposerFloatingGap = 10;
 const double _kComposerListBottomPadding = 104;
@@ -293,6 +294,10 @@ class _CommentsSliverSection extends StatelessWidget {
     PostCommentModel comment,
   ) {
     final commentsController = controller.commentsController;
+    final shouldOfferModeration = commentsController.isPostOwnerModerating(
+      comment,
+    );
+    final canReport = commentsController.canReportComment(comment);
     return CommentActionSheet.show(
       context,
       canEdit: commentsController.canEditComment(comment),
@@ -304,6 +309,27 @@ class _CommentsSliverSection extends StatelessWidget {
       onDeleteTap:
           commentsController.canDeleteComment(comment)
               ? () => commentsController.deleteComment(comment)
+              : null,
+      offerModerationAfterDelete: shouldOfferModeration,
+      commentAuthorName: comment.author?.displayName ?? '',
+      canReport: canReport,
+      onReportTap:
+          canReport
+              ? () async =>
+                  await CommentReportBottomSheet.show(
+                    postId: controller.post.value.postId,
+                    comment: comment,
+                  ) ==
+                  true
+              : null,
+      onReportCompleted:
+          canReport
+              ? () =>
+                  commentsController.applyReportedCommentDisposition(comment)
+              : null,
+      onBlockTap:
+          canReport
+              ? () => commentsController.blockCommentAuthor(comment)
               : null,
       canHide: commentsController.canHideComment(comment),
       onHideTap:

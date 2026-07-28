@@ -138,37 +138,75 @@ const createPostCommentNotification = onDocumentCreated(
     if (!postSnap.exists) return;
 
     const post = postSnap.data() || {};
-    const recipientId = toSafeUid(post.authorId);
-    if (!recipientId || recipientId === actorId) return;
-    if (await isNotificationAuthorMuted(recipientId, actorId)) return;
-
     const actor = await loadActorProfile(actorId);
     const commentPreview =
       cleanString(comment.content, 120) ||
       (cleanString(comment.imageUrl, 10) ? "Đã bình luận bằng hình ảnh" : "") ||
       (cleanString(comment.voiceUrl, 10) ? "Đã bình luận bằng ghi âm" : "") ||
       "Đã bình luận bài viết của bạn";
+    const postAuthorId = toSafeUid(post.authorId);
+    const recipients = [];
+    const parentId = cleanString(comment.parentId, 120);
+    let parentAuthorId = "";
+    if (parentId) {
+      const parentSnap = await db
+        .collection("posts")
+        .doc(postId)
+        .collection("comments")
+        .doc(parentId)
+        .get();
+      parentAuthorId = toSafeUid(parentSnap.data()?.userId);
+    }
 
-    await createNotification(
-      recipientId,
-      `post_comment_${postId}_${commentId}`,
-      {
-        type: "post_comment",
-        title: `${actor.actorName} đã bình luận bài viết của bạn`,
-        body: commentPreview,
-        postId,
-        commentId,
-        ...actor,
+    if (postAuthorId && postAuthorId !== actorId) {
+      const repliesToPostAuthor = parentAuthorId === postAuthorId;
+      recipients.push({
+        userId: postAuthorId,
+        eventType: repliesToPostAuthor ? "reply" : "comment",
+        title: repliesToPostAuthor
+          ? `${actor.actorName} đã trả lời bình luận của bạn`
+          : `${actor.actorName} đã bình luận bài viết của bạn`,
+      });
+    }
+
+    if (parentAuthorId) {
+      if (
+        parentAuthorId &&
+        parentAuthorId !== actorId &&
+        parentAuthorId !== postAuthorId
+      ) {
+        recipients.push({
+          userId: parentAuthorId,
+          eventType: "reply",
+          title: `${actor.actorName} đã trả lời bình luận của bạn`,
+        });
       }
-    );
-    await queuePostEngagementPush({
-      recipientId,
-      postId,
-      actorName: actor.actorName,
-      eventType: "comment",
-      commentId,
-      commentPreview,
-    });
+    }
+
+    for (const recipient of recipients) {
+      if (await isNotificationAuthorMuted(recipient.userId, actorId)) continue;
+      await createNotification(
+        recipient.userId,
+        `post_comment_${postId}_${commentId}`,
+        {
+          type: "post_comment",
+          title: recipient.title,
+          body: commentPreview,
+          postId,
+          commentId,
+          parentId: parentId || null,
+          ...actor,
+        }
+      );
+      await queuePostEngagementPush({
+        recipientId: recipient.userId,
+        postId,
+        actorName: actor.actorName,
+        eventType: recipient.eventType,
+        commentId,
+        commentPreview,
+      });
+    }
   }
 );
 
@@ -192,7 +230,7 @@ async function queuePostEngagementPush({
     const likeCount = (canAggregate ? toInt(current.likeCount) : 0) +
       (eventType === "like" ? 1 : 0);
     const commentCount = (canAggregate ? toInt(current.commentCount) : 0) +
-      (eventType === "comment" ? 1 : 0);
+      (eventType === "comment" || eventType === "reply" ? 1 : 0);
     const pendingCount = likeCount + commentCount;
     const existingScheduleMs = timestampToMillis(current.scheduledAt);
     const lastSentAtMs = timestampToMillis(current.lastSentAt);
@@ -382,8 +420,11 @@ function buildPostEngagementText(queueData) {
     };
   }
   if (total === 1 && comments === 1) {
+    const isReply = cleanString(queueData.lastEventType) === "reply";
     return {
-      title: `${actorName} \u0111\u00E3 b\u00ECnh lu\u1EADn b\u00E0i vi\u1EBFt c\u1EE7a b\u1EA1n`,
+      title: isReply
+        ? `${actorName} \u0111\u00E3 tr\u1EA3 l\u1EDDi b\u00ECnh lu\u1EADn c\u1EE7a b\u1EA1n`
+        : `${actorName} \u0111\u00E3 b\u00ECnh lu\u1EADn b\u00E0i vi\u1EBFt c\u1EE7a b\u1EA1n`,
       body:
         cleanString(queueData.lastCommentPreview, 160) ||
         "Nh\u1EA5n \u0111\u1EC3 xem b\u00ECnh lu\u1EADn.",

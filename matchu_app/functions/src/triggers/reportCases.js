@@ -32,14 +32,17 @@ function buildReportCaseId(type, targetId, contextId = "") {
 }
 
 function normalizeReport(source, reportId, data = {}) {
-  const type = source === "postReports"
+  const type = source === "postReports" || source === "commentReports"
     ? "post"
     : source === "userProfileReports" ? "profile" : "matching";
   const reportedUid = cleanString(data.toUid);
   const postId = type === "post" ? cleanString(data.postId) : "";
+  const commentId = source === "commentReports"
+    ? cleanString(data.commentId)
+    : "";
   const roomId = type === "matching" ? cleanString(data.roomId) : "";
   const targetId = postId || reportedUid;
-  const contextId = type === "matching" ? roomId : "";
+  const contextId = type === "matching" ? roomId : commentId;
   const reasonKey = cleanString(data.reasonKey) || cleanString(data.reason);
   const reasonTitle = cleanString(data.reasonTitle) || reasonKey;
 
@@ -52,6 +55,7 @@ function normalizeReport(source, reportId, data = {}) {
     reportedUid,
     reporterUid: cleanString(data.fromUid),
     postId,
+    commentId,
     roomId,
     categoryKey: cleanString(data.categoryKey) || (type === "matching" ? reasonKey : ""),
     categoryTitle: cleanString(data.categoryTitle),
@@ -63,6 +67,10 @@ function normalizeReport(source, reportId, data = {}) {
     postType: cleanString(data.postType),
     postContentPreview: cleanString(data.postContentPreview).slice(0, 1000),
     postMediaUrls: cleanStringArray(data.postMediaUrls, 10),
+    commentContentPreview:
+      cleanString(data.commentContentPreview).slice(0, 1000),
+    commentImageUrl: cleanString(data.commentImageUrl),
+    commentVoiceUrl: cleanString(data.commentVoiceUrl),
     createdAt: data.createdAt || admin.firestore.FieldValue.serverTimestamp(),
   };
 }
@@ -301,6 +309,7 @@ function createReportCaseTrigger(source) {
 }
 
 const createPostReportCase = createReportCaseTrigger("postReports");
+const createCommentReportCase = createReportCaseTrigger("commentReports");
 const createProfileReportCase = createReportCaseTrigger("userProfileReports");
 const createMatchingReportCase = createReportCaseTrigger("userMatchingReports");
 const syncPostModerationReportCase = onDocumentWritten(
@@ -324,6 +333,7 @@ const syncPostModerationReportCase = onDocumentWritten(
 
 module.exports = {
   createPostReportCase,
+  createCommentReportCase,
   createProfileReportCase,
   createMatchingReportCase,
   syncPostModerationReportCase,

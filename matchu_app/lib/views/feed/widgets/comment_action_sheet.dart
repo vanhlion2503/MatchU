@@ -1,4 +1,5 @@
 import 'package:matchu_app/translations/localized_material.dart';
+import 'package:get/get.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:matchu_app/theme/app_theme.dart';
 import 'package:matchu_app/views/feed/widgets/feed_palette.dart';
@@ -10,6 +11,12 @@ class CommentActionSheet extends StatelessWidget {
     this.onEditTap,
     this.canDelete = false,
     this.onDeleteTap,
+    this.offerModerationAfterDelete = false,
+    this.commentAuthorName = '',
+    this.canReport = false,
+    this.onReportTap,
+    this.onReportCompleted,
+    this.onBlockTap,
     this.canHide = false,
     this.onHideTap,
   });
@@ -17,7 +24,13 @@ class CommentActionSheet extends StatelessWidget {
   final bool canEdit;
   final Future<void> Function()? onEditTap;
   final bool canDelete;
-  final Future<void> Function()? onDeleteTap;
+  final Future<bool> Function()? onDeleteTap;
+  final bool offerModerationAfterDelete;
+  final String commentAuthorName;
+  final bool canReport;
+  final Future<bool> Function()? onReportTap;
+  final Future<bool> Function()? onReportCompleted;
+  final Future<void> Function()? onBlockTap;
   final bool canHide;
   final Future<void> Function()? onHideTap;
 
@@ -28,11 +41,17 @@ class CommentActionSheet extends StatelessWidget {
     bool canEdit = false,
     Future<void> Function()? onEditTap,
     bool canDelete = false,
-    Future<void> Function()? onDeleteTap,
+    Future<bool> Function()? onDeleteTap,
+    bool offerModerationAfterDelete = false,
+    String commentAuthorName = '',
+    bool canReport = false,
+    Future<bool> Function()? onReportTap,
+    Future<bool> Function()? onReportCompleted,
+    Future<void> Function()? onBlockTap,
     bool canHide = false,
     Future<void> Function()? onHideTap,
   }) {
-    if (!canEdit && !canDelete && !canHide) {
+    if (!canEdit && !canDelete && !canReport && !canHide) {
       return Future<void>.value();
     }
 
@@ -46,6 +65,12 @@ class CommentActionSheet extends StatelessWidget {
             onEditTap: onEditTap,
             canDelete: canDelete,
             onDeleteTap: onDeleteTap,
+            offerModerationAfterDelete: offerModerationAfterDelete,
+            commentAuthorName: commentAuthorName,
+            canReport: canReport,
+            onReportTap: onReportTap,
+            onReportCompleted: onReportCompleted,
+            onBlockTap: onBlockTap,
             canHide: canHide,
             onHideTap: onHideTap,
           ),
@@ -93,6 +118,19 @@ class CommentActionSheet extends StatelessWidget {
                   subtitle: 'Cập nhật nội dung bình luận của bạn.',
                   palette: palette,
                   onTap: () => _onEditTap(context),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (canReport) ...[
+                _CommentActionTile(
+                  icon: Iconsax.flag,
+                  title: 'Báo cáo bình luận',
+                  subtitle:
+                      'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.',
+                  palette: palette,
+                  iconColor: theme.colorScheme.error,
+                  textColor: theme.colorScheme.error,
+                  onTap: () => _onReportActionTap(context),
                 ),
                 const SizedBox(height: 10),
               ],
@@ -145,11 +183,63 @@ class CommentActionSheet extends StatelessWidget {
     if (!shouldDelete) return;
     if (!context.mounted) return;
 
+    final hostContext = Navigator.of(context).context;
     Navigator.of(context).pop();
     if (onDeleteTap == null) return;
 
     await Future<void>.delayed(_sheetExitDelay);
-    await onDeleteTap!();
+    final deleted = await onDeleteTap!();
+    if (!deleted ||
+        !offerModerationAfterDelete ||
+        onReportTap == null ||
+        !hostContext.mounted) {
+      return;
+    }
+
+    final shouldReport = await _confirmFollowUp(
+      hostContext,
+      title: 'Báo cáo bình luận'.tr,
+      message: 'Bạn có muốn báo cáo bình luận này không?'.tr,
+      confirmLabel: 'Báo cáo',
+    );
+    if (!shouldReport) return;
+
+    final reported = await onReportTap!();
+    if (!reported || onBlockTap == null || !hostContext.mounted) return;
+
+    await _askToBlock(hostContext);
+  }
+
+  Future<void> _onReportActionTap(BuildContext context) async {
+    if (onReportTap == null) return;
+
+    final hostContext = Navigator.of(context).context;
+    Navigator.of(context).pop();
+    await Future<void>.delayed(_sheetExitDelay);
+
+    final reported = await onReportTap!();
+    if (!reported) return;
+
+    final dispositionSucceeded = await onReportCompleted?.call() ?? true;
+    if (!dispositionSucceeded || onBlockTap == null || !hostContext.mounted) {
+      return;
+    }
+
+    await _askToBlock(hostContext);
+  }
+
+  Future<void> _askToBlock(BuildContext context) async {
+    final displayName = commentAuthorName.trim();
+    final shouldBlock = await _confirmFollowUp(
+      context,
+      title: 'Chặn người dùng',
+      message:
+          displayName.isEmpty
+              ? 'Bạn có muốn chặn người dùng này không?'
+              : 'Bạn có muốn chặn $displayName không?',
+      confirmLabel: 'Chặn',
+    );
+    if (shouldBlock) await onBlockTap?.call();
   }
 
   Future<bool> _confirmDeleteComment(BuildContext context) async {
@@ -230,6 +320,46 @@ class CommentActionSheet extends StatelessWidget {
       },
     );
 
+    return result ?? false;
+  }
+
+  Future<bool> _confirmFollowUp(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final palette = FeedPalette.of(dialogContext);
+        final isDark = theme.brightness == Brightness.dark;
+
+        return AlertDialog(
+          backgroundColor: isDark ? AppTheme.darkSurface : palette.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Không'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: theme.colorScheme.error,
+                foregroundColor: theme.colorScheme.onError,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(confirmLabel),
+            ),
+          ],
+        );
+      },
+    );
     return result ?? false;
   }
 }

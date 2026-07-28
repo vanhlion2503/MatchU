@@ -2254,6 +2254,21 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // ================= COMMENT REPORT =================
+    match /commentReports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.fromUid != request.resource.data.toUid
+        && request.resource.data.source == "comment"
+        && request.resource.data.postId is string
+        && request.resource.data.commentId is string
+        && get(
+          /databases/$(database)/documents/posts/$(request.resource.data.postId)/comments/$(request.resource.data.commentId)
+        ).data.userId == request.resource.data.toUid;
+
+      allow read, update, delete: if false;
+    }
+
     // Admin-only operational projection. Mobile continues writing the
     // original report collections; Cloud Functions maintains these cases.
     match /reportCases/{caseId} {

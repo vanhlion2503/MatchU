@@ -10,6 +10,7 @@ import 'package:matchu_app/views/feed/widgets/comment_section_shimmer.dart';
 import 'package:matchu_app/views/feed/widgets/comment_sort_dropdown.dart';
 import 'package:matchu_app/views/feed/widgets/comment_tree_item.dart';
 import 'package:matchu_app/views/feed/widgets/post_voice_player.dart';
+import 'package:matchu_app/views/report/comment_report_bottom_sheet.dart';
 import 'package:matchu_app/widgets/photo_library_bottom_sheet.dart';
 
 const double _kCommentsAutoLoadTriggerExtent = 320;
@@ -93,6 +94,8 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
   }
 
   Future<void> _openCommentActionSheet(PostCommentModel comment) {
+    final shouldOfferModeration = _controller.isPostOwnerModerating(comment);
+    final canReport = _controller.canReportComment(comment);
     return CommentActionSheet.show(
       context,
       canEdit: _controller.canEditComment(comment),
@@ -105,6 +108,24 @@ class _PostCommentsSheetState extends State<PostCommentsSheet> {
           _controller.canDeleteComment(comment)
               ? () => _controller.deleteComment(comment)
               : null,
+      offerModerationAfterDelete: shouldOfferModeration,
+      commentAuthorName: comment.author?.displayName ?? '',
+      canReport: canReport,
+      onReportTap:
+          canReport
+              ? () async =>
+                  await CommentReportBottomSheet.show(
+                    postId: widget.post.postId,
+                    comment: comment,
+                  ) ==
+                  true
+              : null,
+      onReportCompleted:
+          canReport
+              ? () => _controller.applyReportedCommentDisposition(comment)
+              : null,
+      onBlockTap:
+          canReport ? () => _controller.blockCommentAuthor(comment) : null,
       canHide: _controller.canHideComment(comment),
       onHideTap:
           _controller.canHideComment(comment)

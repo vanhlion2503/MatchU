@@ -89,6 +89,7 @@ const {
 } = require("./src/triggers/adminPostSearchIndex");
 const {
   createPostReportCase,
+  createCommentReportCase,
   createProfileReportCase,
   createMatchingReportCase,
   syncPostModerationReportCase,
@@ -194,6 +195,7 @@ exports.validateWordChainDictionary = validateWordChainDictionary;
 exports.moderateUploadedPostVideo = moderateUploadedPostVideo;
 exports.syncAdminPostSearchIndex = syncAdminPostSearchIndex;
 exports.createPostReportCase = createPostReportCase;
+exports.createCommentReportCase = createCommentReportCase;
 exports.createProfileReportCase = createProfileReportCase;
 exports.createMatchingReportCase = createMatchingReportCase;
 exports.syncPostModerationReportCase = syncPostModerationReportCase;

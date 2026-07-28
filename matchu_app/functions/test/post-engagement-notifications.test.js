@@ -34,6 +34,19 @@ test("uses the latest comment preview for one comment", () => {
   assert.equal(result.body, "B\u00E0i vi\u1EBFt hay qu\u00E1!");
 });
 
+test("uses a reply title when the latest activity answers a comment", () => {
+  const result = buildPostEngagementText({
+    likeCount: 0,
+    commentCount: 1,
+    lastActorName: "Lan",
+    lastEventType: "reply",
+    lastCommentPreview: "Cảm ơn bạn!",
+  });
+
+  assert.equal(result.title, "Lan đã trả lời bình luận của bạn");
+  assert.equal(result.body, "Cảm ơn bạn!");
+});
+
 test("summarizes a burst of likes and comments", () => {
   assert.deepEqual(
     buildPostEngagementText({ likeCount: 7, commentCount: 3 }),

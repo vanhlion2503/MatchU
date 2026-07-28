@@ -44,6 +44,24 @@ test("normalizes all report sources without changing original payloads", () => {
   assert.equal(matching.reasonKey, "quayroi");
 });
 
+test("normalizes a comment report as post context for the admin queue", () => {
+  const report = normalizeReport("commentReports", "comment-report-1", {
+    fromUid: "post-owner",
+    toUid: "comment-author",
+    postId: "post-1",
+    commentId: "comment-1",
+    commentContentPreview: "Nội dung cần xem xét",
+    categoryKey: "harassment",
+    reasonKey: "personal_insults",
+  });
+
+  assert.equal(report.type, "post");
+  assert.equal(report.targetId, "post-1");
+  assert.equal(report.contextId, "comment-1");
+  assert.equal(report.commentId, "comment-1");
+  assert.equal(report.commentContentPreview, "Nội dung cần xem xét");
+});
+
 test("raises report case priority for volume and high-risk reasons", () => {
   assert.equal(calculatePriority({ reportCount: 1, categoryKey: "spam" }), "medium");
   assert.equal(calculatePriority({ reportCount: 1, categoryKey: "scam" }), "high");

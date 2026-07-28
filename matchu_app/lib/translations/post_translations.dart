@@ -91,6 +91,11 @@ const postVietnameseTranslations = <String, String>{
   'Xóa vĩnh viễn bài viết này khỏi tài khoản của bạn.':
       'Xóa vĩnh viễn bài viết này khỏi tài khoản của bạn.',
   'Báo cáo bài viết': 'Báo cáo bài viết',
+  'Báo cáo bình luận': 'Báo cáo bình luận',
+  'Bạn có muốn báo cáo bình luận này không?':
+      'Bạn có muốn báo cáo bình luận này không?',
+  'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.':
+      'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.',
   'Gửi báo cáo nếu nội dung này không phù hợp.':
       'Báo cáo nếu nội dung này không phù hợp.',
   'Cập nhật nội dung bình luận của bạn.':
@@ -362,6 +367,11 @@ const postEnglishTranslations = <String, String>{
   'Xóa vĩnh viễn bài viết này khỏi tài khoản của bạn.':
       'Permanently delete this post from your account.',
   'Báo cáo bài viết': 'Report post',
+  'Báo cáo bình luận': 'Report comment',
+  'Bạn có muốn báo cáo bình luận này không?':
+      'Do you want to report this comment?',
+  'Gửi bình luận này đến đội ngũ kiểm duyệt để xem xét.':
+      'Send this comment to the moderation team for review.',
   'Gửi báo cáo nếu nội dung này không phù hợp.':
       'Report this post if it is inappropriate.',
   'Cập nhật nội dung bình luận của bạn.': 'Update your comment.',
