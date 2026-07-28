@@ -1,1 +1,315 @@
-<%- include('../partials/page-title') %><section class="welcome-card"><div><h2>Xin chào, <%= currentAdmin.displayName %>!</h2><p>Đây là tổng quan hoạt động của nền tảng MatchU.</p></div><i class="bi bi-graph-up-arrow"></i></section><section class="row g-3 mb-4"><% const cards = [{ label: 'Tổng người dùng', value: statistics.totalUsers, icon: 'people', tone: 'primary' }, { label: 'Tổng bài viết', value: statistics.totalPosts, icon: 'file-post', tone: 'success' }, { label: 'Báo cáo chờ xử lý', value: statistics.pendingReports, icon: 'flag', tone: 'warning' }, { label: 'Nội dung chờ duyệt', value: statistics.pendingModeration, icon: 'shield-exclamation', tone: 'danger' }]; %><% cards.forEach((card) => { %><div class="col-12 col-sm-6 col-xl-3"><article class="stat-card"><div class="stat-icon bg-<%= card.tone %>-subtle text-<%= card.tone %>"><i class="bi bi-<%= card.icon %>"></i></div><div><span><%= card.label %></span><strong><%= card.value.toLocaleString('vi-VN') %></strong></div></article></div><% }) %></section><section class="row g-3"><div class="col-lg-8"><article class="panel h-100"><div class="panel-heading"><h3>Hoạt động hệ thống</h3><span class="badge text-bg-light">Placeholder</span></div><div class="chart-placeholder"><i class="bi bi-bar-chart-line"></i><p>Biểu đồ sẽ hiển thị khi dữ liệu Firestore được tích hợp.</p></div></article></div><div class="col-lg-4"><article class="panel h-100"><div class="panel-heading"><h3>Hoạt động gần đây</h3></div><div class="empty-state"><i class="bi bi-clock-history"></i><p>Chưa có hoạt động nào để hiển thị.</p></div></article></div></section>
+<div class="dashboard-heading">
+  <div>
+    <span class="dashboard-eyebrow">MATCHU CONTROL CENTER</span>
+    <h1>Trung tâm điều hành</h1>
+    <p>Theo dõi tăng trưởng, kết nối và an toàn của nền tảng trong một màn hình.</p>
+  </div>
+  <form class="dashboard-range-form" method="get" action="/dashboard">
+    <label for="dashboardRange">Khoảng thời gian</label>
+    <select id="dashboardRange" name="range" class="form-select">
+      <% allowedRanges.forEach((range) => { %>
+        <option value="<%= range %>" <%= selectedRange === range ? 'selected' : '' %>>
+          <%= range %> ngày
+        </option>
+      <% }) %>
+    </select>
+    <button class="btn btn-primary" type="submit">Áp dụng</button>
+  </form>
+</div>
+
+<section class="dashboard-statusbar" aria-label="Trạng thái dữ liệu">
+  <div>
+    <span class="status-pulse <%= dashboard.quality.partial ? 'status-pulse-warning' : '' %>"></span>
+    <strong><%= dashboard.quality.partial ? 'Dữ liệu một phần' : 'Dữ liệu đã đồng bộ' %></strong>
+    <span>
+      <%= formatDateTime(dashboard.period.from) %> – <%= formatDateTime(dashboard.period.to) %>
+    </span>
+  </div>
+  <small>Cập nhật lúc <%= formatDateTime(dashboard.quality.generatedAt) %> · cache tối đa 60 giây</small>
+</section>
+
+<% if (dashboard.quality.partial || dashboard.quality.truncatedSources.length) { %>
+  <div class="alert alert-warning dashboard-data-alert" role="alert">
+    <i class="bi bi-exclamation-triangle"></i>
+    <div>
+      <strong>Một phần thống kê có thể chưa đầy đủ.</strong>
+      <span>
+        Hệ thống vẫn hiển thị các nguồn khả dụng.
+        <% if (dashboard.quality.truncatedSources.length) { %>
+          Một số nguồn đã chạm giới hạn quét an toàn.
+        <% } %>
+      </span>
+    </div>
+  </div>
+<% } %>
+
+<section class="dashboard-kpi-grid" aria-label="Chỉ số chính">
+  <% dashboard.cards.forEach((card) => { %>
+    <article class="dashboard-kpi dashboard-kpi-<%= card.tone %>">
+      <div class="dashboard-kpi-top">
+        <span class="dashboard-kpi-icon"><i class="bi bi-<%= card.icon %>"></i></span>
+        <% if (card.change) { %>
+          <span class="dashboard-change dashboard-change-<%= card.change.direction %>">
+            <% if (card.change.direction === 'up') { %><i class="bi bi-arrow-up-right"></i><% } %>
+            <% if (card.change.direction === 'down') { %><i class="bi bi-arrow-down-right"></i><% } %>
+            <% if (card.change.direction === 'new') { %><i class="bi bi-stars"></i><% } %>
+            <%= card.change.value == null ? 'Mới' : `${Math.abs(card.change.value).toLocaleString('vi-VN')}%` %>
+          </span>
+        <% } %>
+      </div>
+      <span class="dashboard-kpi-label"><%= card.label %></span>
+      <strong><%= formatNumber(card.value) %></strong>
+      <div class="dashboard-kpi-footer">
+        <small><%= card.hint || (card.change ? 'so với kỳ trước' : `trong ${selectedRange} ngày`) %></small>
+        <% if (card.href) { %>
+          <a href="<%= card.href %>" aria-label="Xem chi tiết <%= card.label %>">
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        <% } %>
+      </div>
+    </article>
+  <% }) %>
+</section>
+
+<section class="dashboard-summary-strip" aria-label="Tổng quan nền tảng">
+  <div>
+    <span>Tài khoản đang quản lý</span>
+    <strong><%= formatNumber(dashboard.totals.users) %></strong>
+  </div>
+  <div>
+    <span>Bài viết hiện hữu</span>
+    <strong><%= formatNumber(dashboard.totals.posts) %></strong>
+  </div>
+  <div>
+    <span>Tỷ lệ xác minh khuôn mặt</span>
+    <strong><%= formatPercent(dashboard.totals.verifiedRate) %></strong>
+  </div>
+  <div>
+    <span>Báo cáo mới trong kỳ</span>
+    <strong><%= formatNumber(dashboard.totals.newReports) %></strong>
+  </div>
+</section>
+
+<section class="dashboard-grid dashboard-grid-primary">
+  <article class="panel dashboard-panel dashboard-trend-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker">XU HƯỚNG</span>
+        <h2>Nhịp hoạt động nền tảng</h2>
+        <p>Biến động theo ngày trong kỳ đang chọn.</p>
+      </div>
+      <div class="dashboard-chart-legend" aria-label="Chọn chuỗi dữ liệu">
+        <button type="button" class="active" data-series-toggle="users" aria-pressed="true">
+          <span class="legend-dot legend-users"></span>Người dùng mới
+        </button>
+        <button type="button" class="active" data-series-toggle="posts" aria-pressed="true">
+          <span class="legend-dot legend-posts"></span>Bài viết
+        </button>
+        <button type="button" class="active" data-series-toggle="matches" aria-pressed="true">
+          <span class="legend-dot legend-matches"></span>Kết nối
+        </button>
+        <button type="button" data-series-toggle="reports" aria-pressed="false">
+          <span class="legend-dot legend-reports"></span>Báo cáo
+        </button>
+      </div>
+    </div>
+    <div class="dashboard-chart-wrap">
+      <canvas
+        id="activityChart"
+        role="img"
+        aria-label="Biểu đồ xu hướng người dùng mới, bài viết, kết nối và báo cáo theo ngày"
+      ></canvas>
+      <div id="activityChartEmpty" class="dashboard-chart-empty" hidden>
+        <i class="bi bi-bar-chart"></i>
+        <span>Chưa có dữ liệu trong khoảng thời gian này.</span>
+      </div>
+      <table class="visually-hidden">
+        <caption>Số liệu hoạt động nền tảng theo ngày</caption>
+        <thead><tr><th>Ngày</th><th>Người dùng mới</th><th>Bài viết</th><th>Kết nối</th><th>Báo cáo</th></tr></thead>
+        <tbody>
+          <% dashboard.series.forEach((point) => { %>
+            <tr>
+              <th><%= point.label %></th>
+              <td><%= point.users %></td>
+              <td><%= point.posts %></td>
+              <td><%= point.matches %></td>
+              <td><%= point.reports %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article class="panel dashboard-panel dashboard-operations-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker dashboard-panel-kicker-danger">VẬN HÀNH</span>
+        <h2>Hàng đợi kiểm duyệt</h2>
+        <p>Những tín hiệu cần được ưu tiên xử lý.</p>
+      </div>
+      <a class="dashboard-panel-link" href="/posts/moderation">Mở hàng đợi</a>
+    </div>
+    <div class="operations-hero">
+      <div class="operations-score">
+        <strong><%= formatNumber(dashboard.moderation.pending + dashboard.moderation.review) %></strong>
+        <span>nội dung chờ xử lý</span>
+      </div>
+      <div class="operations-ring" style="--ring-value:<%= Math.min(100, dashboard.moderation.review * 10) %>">
+        <span><%= formatNumber(dashboard.moderation.review) %></span>
+        <small>cần duyệt tay</small>
+      </div>
+    </div>
+    <div class="operations-list">
+      <a href="/posts/moderation?queue=pending">
+        <span><i class="bi bi-hourglass-split"></i>Đang xử lý tự động</span>
+        <strong><%= formatNumber(dashboard.moderation.pending) %></strong>
+      </a>
+      <a href="/posts/moderation?queue=review_required">
+        <span><i class="bi bi-person-check"></i>Cần duyệt thủ công</span>
+        <strong><%= formatNumber(dashboard.moderation.review) %></strong>
+      </a>
+      <a href="/posts/moderation?queue=reported">
+        <span><i class="bi bi-folder2-open"></i>Case đang mở</span>
+        <strong><%= formatNumber(dashboard.moderation.openCases) %></strong>
+      </a>
+    </div>
+    <% if (dashboard.moderation.oldestCaseHours > 0) { %>
+      <div class="operations-sla <%= dashboard.moderation.oldestCaseHours >= 24 ? 'operations-sla-danger' : '' %>">
+        <i class="bi bi-stopwatch"></i>
+        <span>Case lâu nhất đã chờ <strong><%= dashboard.moderation.oldestCaseHours %> giờ</strong></span>
+      </div>
+    <% } %>
+  </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid-secondary">
+  <article class="panel dashboard-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker">MATCHING FUNNEL</span>
+        <h2>Chất lượng kết nối</h2>
+        <p>Từ phiên ghép thành công đến cuộc trò chuyện dài hạn.</p>
+      </div>
+      <strong class="dashboard-panel-metric"><%= formatPercent(dashboard.matching.conversionRate) %></strong>
+    </div>
+    <div class="matching-funnel">
+      <% dashboard.matching.funnel.forEach((step, index) => { const width = dashboard.matching.total ? Math.max(12, (step.value / dashboard.matching.total) * 100) : 0; %>
+        <div class="matching-funnel-row">
+          <div class="matching-funnel-label">
+            <span><%= step.label %></span>
+            <strong><%= formatNumber(step.value) %></strong>
+          </div>
+          <div class="matching-funnel-track">
+            <span style="width:<%= width %>%"></span>
+          </div>
+          <% if (index < dashboard.matching.funnel.length - 1) { %>
+            <i class="bi bi-chevron-down"></i>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+    <div class="matching-mode-split">
+      <div><i class="bi bi-chat-dots"></i><span>Chat ẩn danh</span><strong><%= formatNumber(dashboard.matching.text) %></strong></div>
+      <div><i class="bi bi-camera-video"></i><span>Video matching</span><strong><%= formatNumber(dashboard.matching.video) %></strong></div>
+    </div>
+  </article>
+
+  <article class="panel dashboard-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker dashboard-panel-kicker-warning">SAFETY SIGNALS</span>
+        <h2>Lý do báo cáo nổi bật</h2>
+        <p>Tổng hợp từ bài viết, hồ sơ và matching.</p>
+      </div>
+      <strong class="dashboard-panel-metric"><%= formatNumber(dashboard.totals.newReports) %></strong>
+    </div>
+    <% if (dashboard.moderation.reportBreakdown.length) { const maxReport = dashboard.moderation.reportBreakdown[0].count; %>
+      <div class="report-category-list">
+        <% dashboard.moderation.reportBreakdown.forEach((item) => { %>
+          <div>
+            <div><span><%= item.label %></span><strong><%= formatNumber(item.count) %></strong></div>
+            <div class="report-category-track"><span style="width:<%= (item.count / maxReport) * 100 %>%"></span></div>
+          </div>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="dashboard-compact-empty">
+        <i class="bi bi-shield-check"></i>
+        <span>Không phát sinh báo cáo mới trong kỳ.</span>
+      </div>
+    <% } %>
+  </article>
+
+  <article class="panel dashboard-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker dashboard-panel-kicker-success">ENGAGEMENT</span>
+        <h2>Tương tác nội dung</h2>
+        <p>Trên các bài viết được tạo trong kỳ.</p>
+      </div>
+      <strong class="dashboard-panel-metric"><%= formatNumber(dashboard.totals.newPosts) %></strong>
+    </div>
+    <div class="engagement-grid">
+      <div><i class="bi bi-heart"></i><strong><%= formatNumber(dashboard.engagement.likes) %></strong><span>Lượt thích</span></div>
+      <div><i class="bi bi-chat-square-text"></i><strong><%= formatNumber(dashboard.engagement.comments) %></strong><span>Bình luận</span></div>
+      <div><i class="bi bi-send"></i><strong><%= formatNumber(dashboard.engagement.shares) %></strong><span>Chia sẻ</span></div>
+      <div><i class="bi bi-bookmark"></i><strong><%= formatNumber(dashboard.engagement.saves) %></strong><span>Lượt lưu</span></div>
+    </div>
+    <a class="dashboard-wide-link" href="/posts">
+      Xem hiệu suất bài viết <i class="bi bi-arrow-right"></i>
+    </a>
+  </article>
+</section>
+
+<section class="dashboard-grid dashboard-grid-bottom">
+  <article class="panel dashboard-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker dashboard-panel-kicker-gem">GEM ECONOMY</span>
+        <h2>Dòng Gem trong kỳ</h2>
+      </div>
+    </div>
+    <div class="gem-economy-grid">
+      <div class="gem-spent"><i class="bi bi-arrow-up-right"></i><span>Đã sử dụng</span><strong><%= formatNumber(dashboard.gemEconomy.spent) %></strong></div>
+      <div class="gem-issued"><i class="bi bi-arrow-down-left"></i><span>Đã cấp</span><strong><%= formatNumber(dashboard.gemEconomy.issued) %></strong></div>
+      <div class="gem-refunded"><i class="bi bi-arrow-counterclockwise"></i><span>Hoàn trả</span><strong><%= formatNumber(dashboard.gemEconomy.refunded) %></strong></div>
+    </div>
+    <p class="dashboard-data-note"><i class="bi bi-info-circle"></i>Đây là kinh tế vật phẩm trong ứng dụng, không phải doanh thu tiền tệ.</p>
+  </article>
+
+  <article class="panel dashboard-panel dashboard-activity-panel">
+    <div class="panel-heading dashboard-panel-heading">
+      <div>
+        <span class="dashboard-panel-kicker">AUDIT TRAIL</span>
+        <h2>Hoạt động quản trị gần đây</h2>
+      </div>
+    </div>
+    <% if (dashboard.recentActivity.length) { %>
+      <div class="dashboard-activity-list">
+        <% dashboard.recentActivity.forEach((activity) => { %>
+          <article>
+            <span class="dashboard-activity-dot dashboard-activity-dot-<%= activity.tone %>"></span>
+            <div>
+              <% if (activity.targetUrl) { %>
+                <a href="<%= activity.targetUrl %>"><%= activity.label %></a>
+              <% } else { %>
+                <strong><%= activity.label %></strong>
+              <% } %>
+              <p><%= activity.adminName %><% if (activity.targetId) { %> · <code><%= activity.targetId %></code><% } %></p>
+            </div>
+            <time datetime="<%= activity.createdAt?.toISOString() || '' %>"><%= formatDateTime(activity.createdAt) %></time>
+          </article>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="dashboard-compact-empty">
+        <i class="bi bi-clock-history"></i>
+        <span>Chưa có hoạt động quản trị để hiển thị.</span>
+      </div>
+    <% } %>
+  </article>
+</section>
+
+<script id="dashboardChartData" type="application/json"><%- chartDataJson %></script>
+<script src="/js/dashboard.js" defer></script>
