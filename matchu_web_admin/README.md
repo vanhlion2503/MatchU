@@ -63,6 +63,10 @@ Không commit `.env` hoặc JSON service account.
 | GET | `/reports` | Hàng đợi thống nhất cho báo cáo bài viết, hồ sơ và matching |
 | GET | `/reports/:caseId` | Chi tiết đối tượng, bằng chứng, phân công và lịch sử xử lý |
 | POST | `/reports/:caseId/actions` | Nhận xử lý, xem xét, kết luận, bác hoặc mở lại hồ sơ |
+| GET | `/admins` | Danh sách, tìm kiếm và phân quyền tài khoản admin, cần `admins.manage` |
+| POST | `/admins` | Cấp quyền admin cho tài khoản Firebase Authentication hiện có |
+| POST | `/admins/:uid/access` | Cập nhật vai trò và phạm vi quyền của admin |
+| POST | `/admins/:uid/status` | Kích hoạt hoặc vô hiệu hóa quyền truy cập quản trị |
 | GET | `/admin-logs` | Tra cứu nhật ký quản trị, cần `audit_logs.read` |
 
 ## Quản lý tài khoản người dùng
@@ -87,6 +91,33 @@ Các permission hành động:
 `super_admin` luôn có toàn quyền. Hành động thay đổi dữ liệu được bảo vệ CSRF,
 kiểm tra permission ở server, tạo lịch sử tại
 `users/{uid}/adminActions` và ghi `adminAuditLogs`.
+
+## Quản lý và phân quyền admin
+
+Trang `/admins` sử dụng collection `adminProfiles` hiện có làm nguồn phân quyền. Khi cấp quyền,
+Super Admin nhập email hoặc UID của một tài khoản đã tồn tại trong Firebase Authentication,
+chọn vai trò và phạm vi quyền cần thiết. Hệ thống không nhận, lưu hoặc thay đổi mật khẩu tại
+module này.
+
+Bốn vai trò được hỗ trợ:
+
+- `super_admin`: toàn quyền hệ thống, không cần lưu danh sách permission.
+- `moderator`: xử lý người dùng, nội dung và báo cáo.
+- `support`: hỗ trợ tài khoản và tiếp nhận hồ sơ người dùng.
+- `analyst`: xem dữ liệu vận hành và báo cáo ở chế độ đọc.
+
+Giao diện cung cấp bộ quyền gợi ý theo vai trò nhưng quyền thực tế luôn được lưu tường minh
+trong `adminProfiles/{uid}.permissions` đối với các vai trò không phải `super_admin`. Mọi tài
+khoản admin thường phải có `dashboard.read` để đăng nhập và truy cập trang tổng quan.
+
+Các chốt an toàn được kiểm tra trong transaction phía server:
+
+- Không cho admin tự thay đổi vai trò, quyền hoặc vô hiệu hóa chính mình.
+- Không cho hạ quyền hoặc vô hiệu hóa Super Admin đang hoạt động cuối cùng.
+- Admin được ủy quyền qua `admins.manage` chỉ quản lý tài khoản cấp dưới và chỉ cấp những
+  quyền mà chính họ đang có.
+- Chỉ Super Admin được cấp vai trò `super_admin` hoặc quyền `admins.manage`.
+- Mọi lần cấp quyền, cập nhật quyền, kích hoạt và vô hiệu hóa đều ghi `adminAuditLogs`.
 
 ## Quản lý và kiểm duyệt bài viết
 

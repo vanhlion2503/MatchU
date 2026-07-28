@@ -100,3 +100,16 @@ test('shows the working audit log route only with audit read permission', async 
   });
   assert.doesNotMatch(hidden, /href="\/admin-logs"/);
 });
+
+test('links the admin management item to the working route', async () => {
+  const html = await ejs.renderFile(sidebar, {
+    currentPath: '/admins',
+    hasPermission: (permission) => permission === 'admins.manage',
+    pendingReportCount: 0,
+    pendingPostModerationCount: 0
+  });
+
+  assert.match(html, /href="\/admins"/);
+  assert.match(html, /nav-link active/);
+  assert.match(html, /Quản lý admin/);
+});

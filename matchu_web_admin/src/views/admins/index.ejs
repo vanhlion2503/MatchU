@@ -1,0 +1,335 @@
+<div class="admin-access-heading">
+  <div>
+    <span class="admin-access-eyebrow">QUẢN TRỊ & PHÂN QUYỀN</span>
+    <h1>Quản lý admin</h1>
+    <p>Cấp quyền truy cập và kiểm soát chính xác phạm vi thao tác của từng tài khoản quản trị.</p>
+  </div>
+  <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#grantAdminModal">
+    <i class="bi bi-person-plus me-2"></i>Cấp quyền admin
+  </button>
+</div>
+
+<section class="admin-access-stat-grid mb-4" aria-label="Tổng quan tài khoản admin">
+  <article>
+    <span class="admin-access-stat-icon admin-access-stat-primary"><i class="bi bi-people"></i></span>
+    <div><small>Tổng tài khoản</small><strong><%= statistics.total.toLocaleString('vi-VN') %></strong></div>
+  </article>
+  <article>
+    <span class="admin-access-stat-icon admin-access-stat-success"><i class="bi bi-person-check"></i></span>
+    <div><small>Đang hoạt động</small><strong><%= statistics.active.toLocaleString('vi-VN') %></strong></div>
+  </article>
+  <article>
+    <span class="admin-access-stat-icon admin-access-stat-muted"><i class="bi bi-person-dash"></i></span>
+    <div><small>Đã vô hiệu hóa</small><strong><%= statistics.inactive.toLocaleString('vi-VN') %></strong></div>
+  </article>
+  <article>
+    <span class="admin-access-stat-icon admin-access-stat-warning"><i class="bi bi-shield-fill-check"></i></span>
+    <div><small>Super Admin hoạt động</small><strong><%= statistics.superAdmins.toLocaleString('vi-VN') %></strong></div>
+  </article>
+</section>
+
+<section class="panel admin-access-filter-panel mb-4">
+  <div class="panel-heading mb-3">
+    <div>
+      <h3>Tìm kiếm tài khoản quản trị</h3>
+      <p class="panel-subtitle">Tra cứu theo tên hiển thị, email, UID, vai trò hoặc trạng thái.</p>
+    </div>
+    <% if (filters.q || filters.role || filters.status) { %>
+      <a class="btn btn-sm btn-outline-secondary" href="/admins">
+        <i class="bi bi-x-circle me-1"></i>Xóa bộ lọc
+      </a>
+    <% } %>
+  </div>
+  <form class="admin-access-filter-form" action="/admins" method="get">
+    <div class="admin-access-filter-search">
+      <label class="form-label" for="adminSearch">Từ khóa</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input id="adminSearch" class="form-control" type="search" name="q" value="<%= filters.q %>" maxlength="120" placeholder="Tên, email hoặc UID">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" for="adminRoleFilter">Vai trò</label>
+      <select id="adminRoleFilter" class="form-select" name="role">
+        <option value="">Tất cả vai trò</option>
+        <% Object.entries(roleLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.role === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="adminStatusFilter">Trạng thái</label>
+      <select id="adminStatusFilter" class="form-select" name="status">
+        <option value="">Mọi trạng thái</option>
+        <% Object.entries(statusLabels).forEach(([value, label]) => { %>
+          <option value="<%= value %>" <%= filters.status === value ? 'selected' : '' %>><%= label %></option>
+        <% }) %>
+      </select>
+    </div>
+    <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Áp dụng</button>
+  </form>
+</section>
+
+<section class="panel admin-access-list-panel">
+  <div class="panel-heading admin-access-list-heading">
+    <div>
+      <h3>Danh sách admin</h3>
+      <p class="panel-subtitle">Hiển thị <strong><%= profiles.length %></strong> tài khoản phù hợp.</p>
+    </div>
+    <div class="admin-access-guardrail">
+      <i class="bi bi-shield-lock"></i>
+      <span>Phân quyền được kiểm tra tại server</span>
+    </div>
+  </div>
+
+  <% if (!profiles.length) { %>
+    <div class="empty-state admin-access-empty-state">
+      <div>
+        <i class="bi bi-person-exclamation"></i>
+        <h4>Không tìm thấy tài khoản admin</h4>
+        <p>Thử thay đổi bộ lọc hoặc cấp quyền cho một tài khoản mới.</p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table align-middle admin-access-table">
+        <thead>
+          <tr>
+            <th>Tài khoản</th>
+            <th>Vai trò</th>
+            <th>Phạm vi quyền</th>
+            <th>Trạng thái</th>
+            <th>Đăng nhập gần nhất</th>
+            <th>Cập nhật</th>
+            <th class="text-end">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% profiles.forEach((profile) => { const manageable = canManageProfile(profile); %>
+            <tr class="<%= profile.status === 'inactive' ? 'admin-access-row-inactive' : '' %>">
+              <td>
+                <div class="admin-access-identity">
+                  <% if (profile.avatarUrl) { %>
+                    <img class="admin-access-avatar" src="<%= profile.avatarUrl %>" alt="Avatar của <%= profile.displayName %>" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-avatar-image data-avatar-initial="<%= profile.displayName.charAt(0).toUpperCase() %>">
+                  <% } else { %>
+                    <span class="admin-access-avatar admin-access-avatar-fallback"><%= profile.displayName.charAt(0).toUpperCase() %></span>
+                  <% } %>
+                  <div>
+                    <div class="admin-access-name">
+                      <strong><%= profile.displayName %></strong>
+                      <% if (profile.uid === currentAdmin.uid) { %><span>Bạn</span><% } %>
+                    </div>
+                    <small><%= profile.email || 'Chưa có email' %></small>
+                    <code title="<%= profile.uid %>"><%= profile.uid %></code>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="admin-role-badge admin-role-<%= profile.role %>">
+                  <i class="bi bi-<%= profile.role === 'super_admin' ? 'shield-fill-check' : profile.role === 'moderator' ? 'shield-check' : profile.role === 'support' ? 'headset' : 'bar-chart' %>"></i>
+                  <%= roleLabels[profile.role] || profile.role %>
+                </span>
+                <small class="admin-access-role-description"><%= roleDescriptions[profile.role] || '' %></small>
+              </td>
+              <td>
+                <% if (profile.role === 'super_admin') { %>
+                  <span class="admin-access-full-permission"><i class="bi bi-infinity"></i> Toàn quyền hệ thống</span>
+                <% } else if (profile.permissions.length) { %>
+                  <div class="admin-access-permission-summary">
+                    <strong><%= profile.permissions.length %> quyền</strong>
+                    <span title="<%= profile.permissions.map((permission) => permissionLabels[permission] || permission).join(', ') %>">
+                      <%= profile.permissions.slice(0, 2).map((permission) => permissionLabels[permission] || permission).join(' · ') %><%= profile.permissions.length > 2 ? ` · +${profile.permissions.length - 2}` : '' %>
+                    </span>
+                  </div>
+                <% } else { %>
+                  <span class="text-danger small fw-semibold">Chưa được cấp quyền</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="admin-access-status admin-access-status-<%= profile.status %>">
+                  <i></i><%= statusLabels[profile.status] %>
+                </span>
+                <% if (profile.statusReason) { %><small class="admin-access-status-reason" title="<%= profile.statusReason %>"><%= profile.statusReason %></small><% } %>
+              </td>
+              <td><span class="admin-access-date"><%= formatDate(profile.lastLoginAt) %></span></td>
+              <td><span class="admin-access-date"><%= formatDate(profile.updatedAt || profile.createdAt) %></span></td>
+              <td class="text-end">
+                <% if (manageable) { %>
+                  <div class="dropdown">
+                    <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Thao tác</button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                      <li>
+                        <button class="dropdown-item" type="button"
+                          data-bs-toggle="modal" data-bs-target="#editAdminModal"
+                          data-admin-edit
+                          data-admin-uid="<%= profile.uid %>"
+                          data-admin-name="<%= profile.displayName %>"
+                          data-admin-email="<%= profile.email %>"
+                          data-admin-role="<%= profile.role %>"
+                          data-admin-permissions="<%= profile.permissions.join(',') %>">
+                          <i class="bi bi-sliders me-2"></i>Chỉnh phân quyền
+                        </button>
+                      </li>
+                      <li><hr class="dropdown-divider"></li>
+                      <li>
+                        <button class="dropdown-item <%= profile.status === 'active' ? 'text-danger' : 'text-success' %>" type="button"
+                          data-bs-toggle="modal" data-bs-target="#adminStatusModal"
+                          data-admin-status
+                          data-admin-uid="<%= profile.uid %>"
+                          data-admin-name="<%= profile.displayName %>"
+                          data-next-status="<%= profile.status === 'active' ? 'inactive' : 'active' %>">
+                          <i class="bi bi-<%= profile.status === 'active' ? 'person-dash' : 'person-check' %> me-2"></i>
+                          <%= profile.status === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại' %>
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                <% } else { %>
+                  <span class="admin-access-protected"><i class="bi bi-lock"></i><%= profile.uid === currentAdmin.uid ? 'Tài khoản hiện tại' : 'Ngoài phạm vi' %></span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<div id="adminAccessRoot" data-role-presets='<%- JSON.stringify(rolePresets) %>'></div>
+
+<div class="modal fade" id="grantAdminModal" tabindex="-1" aria-labelledby="grantAdminModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <form class="modal-content admin-access-form" action="/admins" method="post" data-admin-access-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="modal-header">
+        <div>
+          <span class="admin-access-modal-eyebrow">CẤP QUYỀN TRUY CẬP</span>
+          <h2 class="modal-title fs-5" id="grantAdminModalTitle">Thêm tài khoản admin</h2>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-light border admin-access-info">
+          <i class="bi bi-info-circle"></i>
+          <span>Nhập email hoặc UID của một tài khoản đã tồn tại trong Firebase Authentication. Hệ thống không lưu hay thay đổi mật khẩu người dùng.</span>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-lg-7">
+            <label class="form-label" for="adminIdentifier">Email hoặc Firebase UID</label>
+            <input id="adminIdentifier" class="form-control" type="text" name="identifier" minlength="3" maxlength="254" required autocomplete="off" placeholder="admin@matchu.vn">
+          </div>
+          <div class="col-lg-5">
+            <label class="form-label" for="grantAdminRole">Vai trò</label>
+            <select id="grantAdminRole" class="form-select" name="role" required data-admin-role-select>
+              <% roles.forEach((role) => { %>
+                <option value="<%= role %>" <%= role === 'moderator' ? 'selected' : '' %>><%= roleLabels[role] %></option>
+              <% }) %>
+            </select>
+            <small class="form-text" data-role-description></small>
+          </div>
+        </div>
+        <div class="admin-access-permission-header">
+          <div><h3>Phạm vi quyền</h3><p>Chỉ cấp đúng những chức năng cần thiết cho vai trò này.</p></div>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-apply-role-preset><i class="bi bi-magic me-1"></i>Áp dụng quyền gợi ý</button>
+        </div>
+        <div class="admin-access-super-note d-none" data-super-admin-note><i class="bi bi-shield-fill-check"></i><div><strong>Super Admin có toàn quyền</strong><span>Không cần chọn từng quyền bên dưới.</span></div></div>
+        <div class="admin-access-permission-grid" data-permission-grid>
+          <% permissionGroups.forEach((group) => { %>
+            <fieldset class="admin-access-permission-group">
+              <legend><i class="bi bi-<%= group.icon %>"></i><%= group.label %></legend>
+              <% group.permissions.forEach((permission) => { %>
+                <label class="admin-access-permission-item <%= permission.sensitive ? 'is-sensitive' : '' %>">
+                  <input class="form-check-input" type="checkbox" name="permissions" value="<%= permission.key %>">
+                  <span><strong><%= permission.label %><% if (permission.sensitive) { %><i class="bi bi-exclamation-diamond" title="Quyền nhạy cảm"></i><% } %></strong><small><%= permission.description %></small><code><%= permission.key %></code></span>
+                </label>
+              <% }) %>
+            </fieldset>
+          <% }) %>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-person-check me-2"></i>Cấp quyền admin</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="editAdminModal" tabindex="-1" aria-labelledby="editAdminModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <form class="modal-content admin-access-form" method="post" data-admin-access-form data-edit-admin-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="modal-header">
+        <div>
+          <span class="admin-access-modal-eyebrow">ĐIỀU CHỈNH QUYỀN</span>
+          <h2 class="modal-title fs-5" id="editAdminModalTitle">Chỉnh phân quyền admin</h2>
+          <small class="text-muted" data-edit-admin-identity></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 mb-4">
+          <div class="col-lg-5">
+            <label class="form-label" for="editAdminRole">Vai trò</label>
+            <select id="editAdminRole" class="form-select" name="role" required data-admin-role-select>
+              <% roles.forEach((role) => { %><option value="<%= role %>"><%= roleLabels[role] %></option><% }) %>
+            </select>
+            <small class="form-text" data-role-description></small>
+          </div>
+          <div class="col-lg-7">
+            <div class="alert alert-warning py-2 mb-0 admin-access-edit-warning">
+              <i class="bi bi-lightning-charge me-2"></i>Thay đổi có hiệu lực ở yêu cầu tiếp theo của tài khoản này.
+            </div>
+          </div>
+        </div>
+        <div class="admin-access-permission-header">
+          <div><h3>Phạm vi quyền</h3><p>Kiểm tra kỹ các quyền nhạy cảm trước khi lưu.</p></div>
+          <button class="btn btn-sm btn-outline-primary" type="button" data-apply-role-preset><i class="bi bi-magic me-1"></i>Áp dụng quyền gợi ý</button>
+        </div>
+        <div class="admin-access-super-note d-none" data-super-admin-note><i class="bi bi-shield-fill-check"></i><div><strong>Super Admin có toàn quyền</strong><span>Không cần chọn từng quyền bên dưới.</span></div></div>
+        <div class="admin-access-permission-grid" data-permission-grid>
+          <% permissionGroups.forEach((group) => { %>
+            <fieldset class="admin-access-permission-group">
+              <legend><i class="bi bi-<%= group.icon %>"></i><%= group.label %></legend>
+              <% group.permissions.forEach((permission) => { %>
+                <label class="admin-access-permission-item <%= permission.sensitive ? 'is-sensitive' : '' %>">
+                  <input class="form-check-input" type="checkbox" name="permissions" value="<%= permission.key %>">
+                  <span><strong><%= permission.label %><% if (permission.sensitive) { %><i class="bi bi-exclamation-diamond" title="Quyền nhạy cảm"></i><% } %></strong><small><%= permission.description %></small><code><%= permission.key %></code></span>
+                </label>
+              <% }) %>
+            </fieldset>
+          <% }) %>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-circle me-2"></i>Lưu phân quyền</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="adminStatusModal" tabindex="-1" aria-labelledby="adminStatusModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="post" data-admin-status-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <input type="hidden" name="status" data-next-status-input>
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="adminStatusModalTitle" data-status-modal-title>Thay đổi trạng thái admin</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <div class="admin-access-status-confirmation" data-status-confirmation></div>
+        <div class="mt-3" data-status-reason-field>
+          <label class="form-label" for="adminStatusReason">Lý do vô hiệu hóa</label>
+          <textarea id="adminStatusReason" class="form-control" name="reason" rows="3" minlength="5" maxlength="300" placeholder="Nhập lý do để lưu trong nhật ký quản trị"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Hủy</button>
+        <button type="submit" class="btn" data-status-submit>Xác nhận</button>
+      </div>
+    </form>
+  </div>
+</div>

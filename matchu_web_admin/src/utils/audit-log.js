@@ -2,6 +2,13 @@ const ACTION_DEFINITIONS = Object.freeze({
   ADMIN_LOGIN: ['Đăng nhập hệ thống', 'auth', 'normal'],
   ADMIN_LOGIN_DENIED: ['Đăng nhập bị từ chối', 'auth', 'danger'],
   ADMIN_LOGOUT: ['Đăng xuất hệ thống', 'auth', 'normal'],
+  ADMIN_ACCESS_GRANTED: ['Cấp quyền quản trị', 'system', 'success'],
+  ADMIN_ACCESS_GRANT_FAILED: ['Cấp quyền quản trị thất bại', 'system', 'danger'],
+  ADMIN_ACCESS_UPDATED: ['Cập nhật phân quyền admin', 'system', 'warning'],
+  ADMIN_ACCESS_UPDATE_FAILED: ['Cập nhật phân quyền admin thất bại', 'system', 'danger'],
+  ADMIN_ACCESS_DEACTIVATED: ['Vô hiệu hóa quyền quản trị', 'system', 'danger'],
+  ADMIN_ACCESS_REACTIVATED: ['Kích hoạt lại quyền quản trị', 'system', 'success'],
+  ADMIN_ACCESS_STATUS_FAILED: ['Cập nhật trạng thái admin thất bại', 'system', 'danger'],
   LOGIN_SUCCESS: ['Đăng nhập hệ thống', 'auth', 'normal'],
   LOGOUT: ['Đăng xuất hệ thống', 'auth', 'normal'],
   USER_WARN: ['Cảnh báo người dùng', 'users', 'warning'],
@@ -64,7 +71,10 @@ const CHANGE_FIELD_LABELS = Object.freeze({
   moderationStatus: 'Trạng thái kiểm duyệt',
   visibility: 'Quyền xem',
   deletedAt: 'Thời điểm xóa',
-  permanentlyDeleted: 'Xóa vĩnh viễn'
+  permanentlyDeleted: 'Xóa vĩnh viễn',
+  role: 'Vai trò admin',
+  permissions: 'Phạm vi quyền',
+  status: 'Trạng thái admin'
 });
 
 const SENSITIVE_KEY = /authorization|cookie|credential|id.?token|password|passcode|private.?key|refresh.?token|secret|session/i;
@@ -124,6 +134,7 @@ function targetUrl(targetType, targetId) {
   if (!targetId) return null;
   const encoded = encodeURIComponent(targetId);
   return {
+    admin: `/admins?q=${encoded}`,
     user: `/users/${encoded}`,
     post: `/posts/${encoded}`,
     report_case: `/reports/${encoded}`,
