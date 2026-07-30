@@ -130,6 +130,7 @@ async function grant(req, res) {
       targetId: result.uid,
       metadata: {
         email: result.email,
+        authUserCreated: result.authUserCreated,
         before: result.before,
         after: result.after
       },
@@ -146,7 +147,7 @@ async function grant(req, res) {
       action: 'ADMIN_ACCESS_GRANT_FAILED',
       category: 'system',
       targetType: 'admin',
-      targetId: String(value.identifier || '').slice(0, 128),
+      targetId: String(value.identifier || value.email || '').slice(0, 128),
       result: 'failure',
       metadata: { errorCode: caughtError.code || 'UNKNOWN' },
       req

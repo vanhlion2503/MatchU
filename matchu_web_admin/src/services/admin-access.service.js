@@ -6,6 +6,7 @@ const {
   PROTECTED_ADMIN_PERMISSIONS
 } = require('../config/admin-access');
 const AppError = require('../utils/app-error');
+const logger = require('../utils/logger');
 
 const COLLECTION = 'adminProfiles';
 
@@ -188,10 +189,80 @@ async function resolveAuthUser(identifier) {
   }
 }
 
+function mapCreateUserError(error) {
+  const definitions = {
+    'auth/email-already-exists': [
+      'Email này đã có tài khoản. Hãy chọn “Tài khoản có sẵn” để cấp quyền.',
+      409,
+      'AUTH_EMAIL_EXISTS'
+    ],
+    'auth/invalid-email': [
+      'Địa chỉ email không hợp lệ.',
+      400,
+      'AUTH_EMAIL_INVALID'
+    ],
+    'auth/invalid-password': [
+      'Mật khẩu không đáp ứng yêu cầu của Firebase Authentication.',
+      400,
+      'AUTH_PASSWORD_INVALID'
+    ],
+    'auth/password-does-not-meet-requirements': [
+      'Mật khẩu không đáp ứng chính sách mật khẩu của Firebase project.',
+      400,
+      'AUTH_PASSWORD_POLICY_FAILED'
+    ],
+    'auth/operation-not-allowed': [
+      'Firebase chưa bật phương thức đăng nhập Email/Password.',
+      503,
+      'AUTH_PASSWORD_PROVIDER_DISABLED'
+    ],
+    'auth/insufficient-permission': [
+      'Firebase service account chưa có quyền tạo tài khoản Authentication.',
+      503,
+      'AUTH_CREATE_USER_FORBIDDEN'
+    ]
+  };
+  const definition = definitions[error?.code];
+  return definition
+    ? new AppError(definition[0], definition[1], definition[2])
+    : error;
+}
+
+async function provisionAuthUser(input) {
+  if (input.mode !== 'create') {
+    return {
+      authUser: await resolveAuthUser(input.identifier),
+      created: false
+    };
+  }
+  try {
+    const authUser = await auth.createUser({
+      email: input.email,
+      password: input.password,
+      displayName: input.displayName,
+      emailVerified: false,
+      disabled: false
+    });
+    return { authUser, created: true };
+  } catch (error) {
+    throw mapCreateUserError(error);
+  }
+}
+
+async function rollbackCreatedAuthUser(uid) {
+  try {
+    await auth.deleteUser(uid);
+    return true;
+  } catch (error) {
+    logger.error(`Unable to roll back newly created Firebase Auth user ${uid}`, error);
+    return false;
+  }
+}
+
 async function grantAdminAccess(input, currentAdmin) {
   const permissions = normalizePermissions(input.role, input.permissions);
   ensureCanAssign(currentAdmin, input.role, permissions);
-  const authUser = await resolveAuthUser(input.identifier);
+  const { authUser, created } = await provisionAuthUser(input);
   if (authUser.disabled) {
     throw new AppError(
       'Tài khoản Firebase Authentication đang bị vô hiệu hóa.',
@@ -218,28 +289,41 @@ async function grantAdminAccess(input, currentAdmin) {
     permissions,
     status: ADMIN_STATUSES.ACTIVE,
     statusReason: '',
+    authenticationSource: created ? 'admin_created_password' : 'existing_firebase_account',
     createdAt: timestamp,
     createdBy: currentAdmin.uid,
     updatedAt: timestamp,
     updatedBy: currentAdmin.uid
   };
 
-  await firestore.runTransaction(async (transaction) => {
-    const existing = await transaction.get(reference);
-    if (existing.exists) {
+  try {
+    await firestore.runTransaction(async (transaction) => {
+      const existing = await transaction.get(reference);
+      if (existing.exists) {
+        throw new AppError(
+          'Tài khoản này đã có hồ sơ admin. Hãy cập nhật quyền trong danh sách.',
+          409,
+          'ADMIN_PROFILE_EXISTS'
+        );
+      }
+      transaction.set(reference, profile);
+    });
+  } catch (error) {
+    if (created && !await rollbackCreatedAuthUser(authUser.uid)) {
       throw new AppError(
-        'Tài khoản này đã có hồ sơ admin. Hãy cập nhật quyền trong danh sách.',
-        409,
-        'ADMIN_PROFILE_EXISTS'
+        `Không thể hoàn tất phân quyền và không thể tự dọn tài khoản ${authUser.uid}. Vui lòng kiểm tra Firebase Authentication.`,
+        500,
+        'ADMIN_PROVISION_ROLLBACK_FAILED'
       );
     }
-    transaction.set(reference, profile);
-  });
+    throw error;
+  }
 
   return {
     uid: authUser.uid,
     email: authUser.email,
     displayName: profile.displayName,
+    authUserCreated: created,
     before: null,
     after: {
       role: profile.role,
@@ -379,6 +463,7 @@ module.exports = {
     matchesFilters,
     normalizePermissions,
     normalizeProfile,
+    mapCreateUserError,
     toDate
   }
 };

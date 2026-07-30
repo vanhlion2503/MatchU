@@ -1,6 +1,6 @@
 # MatchU Web Admin
 
-Nền tảng quản trị MatchU dùng Node.js, Express, EJS và Firebase Admin SDK. Mật khẩu được Firebase Authentication kiểm tra ở trình duyệt; server chỉ nhận Firebase ID Token một lần để tạo session cookie HttpOnly.
+Nền tảng quản trị MatchU dùng Node.js, Express, EJS và Firebase Admin SDK. Khi đăng nhập, mật khẩu được Firebase Authentication kiểm tra ở trình duyệt; server chỉ nhận Firebase ID Token một lần để tạo session cookie HttpOnly.
 
 ## Yêu cầu và chạy dự án
 
@@ -64,7 +64,7 @@ Không commit `.env` hoặc JSON service account.
 | GET | `/reports/:caseId` | Chi tiết đối tượng, bằng chứng, phân công và lịch sử xử lý |
 | POST | `/reports/:caseId/actions` | Nhận xử lý, xem xét, kết luận, bác hoặc mở lại hồ sơ |
 | GET | `/admins` | Danh sách, tìm kiếm và phân quyền tài khoản admin, cần `admins.manage` |
-| POST | `/admins` | Cấp quyền admin cho tài khoản Firebase Authentication hiện có |
+| POST | `/admins` | Tạo tài khoản Email/Password mới hoặc cấp quyền cho tài khoản Firebase hiện có |
 | POST | `/admins/:uid/access` | Cập nhật vai trò và phạm vi quyền của admin |
 | POST | `/admins/:uid/status` | Kích hoạt hoặc vô hiệu hóa quyền truy cập quản trị |
 | GET | `/admin-logs` | Tra cứu nhật ký quản trị, cần `audit_logs.read` |
@@ -95,9 +95,17 @@ kiểm tra permission ở server, tạo lịch sử tại
 ## Quản lý và phân quyền admin
 
 Trang `/admins` sử dụng collection `adminProfiles` hiện có làm nguồn phân quyền. Khi cấp quyền,
-Super Admin nhập email hoặc UID của một tài khoản đã tồn tại trong Firebase Authentication,
-chọn vai trò và phạm vi quyền cần thiết. Hệ thống không nhận, lưu hoặc thay đổi mật khẩu tại
-module này.
+Super Admin có thể chọn một trong hai cách:
+
+- Tạo tài khoản mới bằng tên hiển thị, email và mật khẩu. Server gọi Firebase Admin SDK
+  `createUser`, sau đó tạo `adminProfiles/{uid}`.
+- Nhập email hoặc UID của một tài khoản Firebase Authentication đã tồn tại và chỉ bổ sung
+  hồ sơ phân quyền.
+
+Mật khẩu tạo mới phải dài hơn 8 ký tự (tối thiểu 9), bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt.
+Mật khẩu chỉ được chuyển đến Firebase Authentication; không được ghi vào Firestore,
+audit log hoặc dữ liệu phiên. Nếu tạo Firebase Auth thành công nhưng ghi hồ sơ phân quyền
+thất bại, hệ thống tự xóa tài khoản Auth vừa tạo để tránh dữ liệu mồ côi.
 
 Bốn vai trò được hỗ trợ:
 

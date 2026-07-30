@@ -39,6 +39,68 @@
     updateRoleState(form);
   }
 
+  function setProvisionMode(form) {
+    const mode = form.querySelector('input[name="mode"]:checked')?.value || 'create';
+    const createFields = form.querySelector('[data-grant-create-fields]');
+    const existingFields = form.querySelector('[data-grant-existing-fields]');
+    const creating = mode === 'create';
+    createFields?.classList.toggle('d-none', !creating);
+    existingFields?.classList.toggle('d-none', creating);
+    createFields?.querySelectorAll('input').forEach((input) => {
+      input.disabled = !creating;
+      input.required = creating;
+    });
+    existingFields?.querySelectorAll('input').forEach((input) => {
+      input.disabled = creating;
+      input.required = !creating;
+    });
+  }
+
+  function randomIndex(maximum) {
+    const values = new Uint32Array(1);
+    window.crypto.getRandomValues(values);
+    return values[0] % maximum;
+  }
+
+  function generateStrongPassword() {
+    const groups = [
+      'ABCDEFGHJKLMNPQRSTUVWXYZ',
+      'abcdefghijkmnopqrstuvwxyz',
+      '23456789',
+      '!@#$%&*_-+=?'
+    ];
+    const allCharacters = groups.join('');
+    const characters = groups.map((group) => group[randomIndex(group.length)]);
+    while (characters.length < 16) {
+      characters.push(allCharacters[randomIndex(allCharacters.length)]);
+    }
+    for (let index = characters.length - 1; index > 0; index -= 1) {
+      const swapIndex = randomIndex(index + 1);
+      [characters[index], characters[swapIndex]] = [characters[swapIndex], characters[index]];
+    }
+    return characters.join('');
+  }
+
+  function updatePasswordPolicy(form) {
+    const password = form.querySelector('[data-admin-password]')?.value || '';
+    const confirmation = form.querySelector('[data-admin-password-confirmation]')?.value || '';
+    const results = {
+      length: password.length >= 9,
+      lower: /[a-z]/.test(password),
+      upper: /[A-Z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[^A-Za-z0-9\s]/.test(password),
+      match: Boolean(password) && password === confirmation
+    };
+    Object.entries(results).forEach(([key, valid]) => {
+      const rule = form.querySelector(`[data-password-rule="${key}"]`);
+      if (!rule) return;
+      rule.classList.toggle('is-valid', valid);
+      const icon = rule.querySelector('i');
+      if (icon) icon.className = `bi bi-${valid ? 'check-circle-fill' : 'circle'}`;
+    });
+  }
+
   document.querySelectorAll('[data-admin-access-form]').forEach((form) => {
     const roleSelect = form.querySelector('[data-admin-role-select]');
     roleSelect?.addEventListener('change', () => updateRoleState(form));
@@ -53,7 +115,41 @@
   });
 
   const grantForm = document.querySelector('#grantAdminModal [data-admin-access-form]');
-  if (grantForm) applyPreset(grantForm);
+  if (grantForm) {
+    applyPreset(grantForm);
+    setProvisionMode(grantForm);
+    grantForm.querySelectorAll('input[name="mode"]').forEach((radio) => {
+      radio.addEventListener('change', () => setProvisionMode(grantForm));
+    });
+    grantForm.querySelectorAll('[data-admin-password], [data-admin-password-confirmation]')
+      .forEach((input) => input.addEventListener('input', () => updatePasswordPolicy(grantForm)));
+    grantForm.querySelector('[data-generate-password]')?.addEventListener('click', () => {
+      const generated = generateStrongPassword();
+      const password = grantForm.querySelector('[data-admin-password]');
+      const confirmation = grantForm.querySelector('[data-admin-password-confirmation]');
+      if (password) {
+        password.value = generated;
+        password.type = 'text';
+      }
+      if (confirmation) {
+        confirmation.value = generated;
+        confirmation.type = 'text';
+      }
+      grantForm.querySelectorAll('[data-password-toggle] i')
+        .forEach((icon) => { icon.className = 'bi bi-eye-slash'; });
+      updatePasswordPolicy(grantForm);
+    });
+    grantForm.querySelectorAll('[data-password-toggle]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.passwordTarget || '');
+        if (!input) return;
+        input.type = input.type === 'password' ? 'text' : 'password';
+        const icon = button.querySelector('i');
+        if (icon) icon.className = `bi bi-${input.type === 'password' ? 'eye' : 'eye-slash'}`;
+      });
+    });
+    updatePasswordPolicy(grantForm);
+  }
 
   const editModal = document.getElementById('editAdminModal');
   editModal?.addEventListener('show.bs.modal', (event) => {

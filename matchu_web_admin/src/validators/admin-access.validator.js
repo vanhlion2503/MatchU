@@ -11,6 +11,14 @@ const permissions = Joi.array()
   .unique()
   .max(ALL_ADMIN_PERMISSIONS.length)
   .default([]);
+const strongPassword = Joi.string()
+  .min(9)
+  .max(4096)
+  .pattern(/[a-z]/, 'chữ thường')
+  .pattern(/[A-Z]/, 'chữ hoa')
+  .pattern(/[0-9]/, 'chữ số')
+  .pattern(/[^A-Za-z0-9\s]/, 'ký tự đặc biệt')
+  .pattern(/^\S+$/, 'không chứa khoảng trắng');
 
 const listSchema = Joi.object({
   q: Joi.string().trim().max(120).allow('').default(''),
@@ -20,7 +28,32 @@ const listSchema = Joi.object({
 
 const grantSchema = Joi.object({
   _csrf: Joi.any().strip(),
-  identifier: Joi.string().trim().min(3).max(254).required(),
+  mode: Joi.string().valid('create', 'existing').default('existing'),
+  identifier: Joi.when('mode', {
+    is: 'existing',
+    then: Joi.string().trim().min(3).max(254).required(),
+    otherwise: Joi.any().strip()
+  }),
+  email: Joi.when('mode', {
+    is: 'create',
+    then: Joi.string().trim().lowercase().email({ tlds: { allow: false } }).max(254).required(),
+    otherwise: Joi.any().strip()
+  }),
+  displayName: Joi.when('mode', {
+    is: 'create',
+    then: Joi.string().trim().min(2).max(80).required(),
+    otherwise: Joi.any().strip()
+  }),
+  password: Joi.when('mode', {
+    is: 'create',
+    then: strongPassword.required(),
+    otherwise: Joi.any().strip()
+  }),
+  passwordConfirmation: Joi.when('mode', {
+    is: 'create',
+    then: Joi.string().valid(Joi.ref('password')).required(),
+    otherwise: Joi.any().strip()
+  }),
   role: assignableRole,
   permissions
 }).unknown(false);

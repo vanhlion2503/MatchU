@@ -91,6 +91,14 @@ test('renders admin statistics, protected forms and permission controls', async 
   assert.match(html, /Cấp quyền admin/);
   assert.match(html, /action="\/admins"/);
   assert.match(html, /name="_csrf" value="csrf-token"/);
+  assert.match(html, /name="mode" value="create" checked/);
+  assert.match(html, /name="email"/);
+  assert.match(html, /name="displayName"/);
+  assert.match(html, /name="password"/);
+  assert.match(html, /name="passwordConfirmation"/);
+  assert.match(html, /data-generate-password/);
+  assert.match(html, /Mật khẩu chỉ được gửi đến Firebase Authentication/);
+  assert.match(html, /name="mode" value="existing"/);
   assert.match(html, /value="admins.manage"/);
   assert.match(html, /data-admin-uid="moderator-1"/);
   assert.match(html, /data-admin-status/);

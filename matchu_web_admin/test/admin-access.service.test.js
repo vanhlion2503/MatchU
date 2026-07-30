@@ -106,3 +106,18 @@ test('filters admin profiles by search, role and status', () => {
     status: ''
   }), false);
 });
+
+test('maps Firebase account provisioning errors to safe operational messages', () => {
+  const existing = __test.mapCreateUserError({ code: 'auth/email-already-exists' });
+  const policy = __test.mapCreateUserError({
+    code: 'auth/password-does-not-meet-requirements'
+  });
+  const unknown = { code: 'auth/internal-error' };
+
+  assert.equal(existing.statusCode, 409);
+  assert.equal(existing.code, 'AUTH_EMAIL_EXISTS');
+  assert.match(existing.message, /Tài khoản có sẵn/);
+  assert.equal(policy.statusCode, 400);
+  assert.equal(policy.code, 'AUTH_PASSWORD_POLICY_FAILED');
+  assert.equal(__test.mapCreateUserError(unknown), unknown);
+});

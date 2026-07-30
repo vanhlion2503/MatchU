@@ -210,16 +210,68 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
       </div>
       <div class="modal-body">
-        <div class="alert alert-light border admin-access-info">
-          <i class="bi bi-info-circle"></i>
-          <span>Nhập email hoặc UID của một tài khoản đã tồn tại trong Firebase Authentication. Hệ thống không lưu hay thay đổi mật khẩu người dùng.</span>
+        <div class="admin-provision-mode" role="radiogroup" aria-label="Cách cấp tài khoản">
+          <label>
+            <input type="radio" name="mode" value="create" checked>
+            <span><i class="bi bi-person-plus"></i><strong>Tạo tài khoản mới</strong><small>Tạo email và mật khẩu đăng nhập mới trên Firebase.</small></span>
+          </label>
+          <label>
+            <input type="radio" name="mode" value="existing">
+            <span><i class="bi bi-person-check"></i><strong>Tài khoản có sẵn</strong><small>Cấp quyền cho email hoặc UID Firebase đã tồn tại.</small></span>
+          </label>
         </div>
-        <div class="row g-3 mb-4">
-          <div class="col-lg-7">
-            <label class="form-label" for="adminIdentifier">Email hoặc Firebase UID</label>
-            <input id="adminIdentifier" class="form-control" type="text" name="identifier" minlength="3" maxlength="254" required autocomplete="off" placeholder="admin@matchu.vn">
+
+        <div class="admin-provision-fields" data-grant-create-fields>
+          <div class="row g-3">
+            <div class="col-lg-5">
+              <label class="form-label" for="newAdminDisplayName">Tên hiển thị</label>
+              <input id="newAdminDisplayName" class="form-control" type="text" name="displayName" minlength="2" maxlength="80" required autocomplete="name" placeholder="Nguyễn Minh Anh">
+            </div>
+            <div class="col-lg-7">
+              <label class="form-label" for="newAdminEmail">Email đăng nhập</label>
+              <input id="newAdminEmail" class="form-control" type="email" name="email" maxlength="254" required autocomplete="email" placeholder="admin@matchu.vn">
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label" for="newAdminPassword">Mật khẩu</label>
+              <div class="input-group">
+                <input id="newAdminPassword" class="form-control" type="password" name="password" minlength="9" maxlength="4096" required autocomplete="new-password" data-admin-password>
+                <button class="btn btn-outline-secondary" type="button" data-password-toggle data-password-target="newAdminPassword" aria-label="Hiện hoặc ẩn mật khẩu"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-outline-primary" type="button" data-generate-password><i class="bi bi-stars me-1"></i>Tạo mạnh</button>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <label class="form-label" for="newAdminPasswordConfirmation">Nhập lại mật khẩu</label>
+              <div class="input-group">
+                <input id="newAdminPasswordConfirmation" class="form-control" type="password" name="passwordConfirmation" minlength="9" maxlength="4096" required autocomplete="new-password" data-admin-password-confirmation>
+                <button class="btn btn-outline-secondary" type="button" data-password-toggle data-password-target="newAdminPasswordConfirmation" aria-label="Hiện hoặc ẩn mật khẩu xác nhận"><i class="bi bi-eye"></i></button>
+              </div>
+            </div>
           </div>
-          <div class="col-lg-5">
+          <div class="admin-password-policy" data-password-policy>
+            <span data-password-rule="length"><i class="bi bi-circle"></i>Tối thiểu 9 ký tự</span>
+            <span data-password-rule="lower"><i class="bi bi-circle"></i>Chữ thường</span>
+            <span data-password-rule="upper"><i class="bi bi-circle"></i>Chữ hoa</span>
+            <span data-password-rule="number"><i class="bi bi-circle"></i>Chữ số</span>
+            <span data-password-rule="special"><i class="bi bi-circle"></i>Ký tự đặc biệt</span>
+            <span data-password-rule="match"><i class="bi bi-circle"></i>Mật khẩu trùng khớp</span>
+          </div>
+          <div class="alert alert-warning admin-password-security-note">
+            <i class="bi bi-shield-exclamation"></i>
+            <span>Mật khẩu chỉ được gửi đến Firebase Authentication và không được lưu trong Firestore hoặc audit log. Hãy chuyển mật khẩu cho người nhận qua kênh an toàn.</span>
+          </div>
+        </div>
+
+        <div class="admin-provision-fields d-none" data-grant-existing-fields>
+          <div class="alert alert-light border admin-access-info">
+            <i class="bi bi-info-circle"></i>
+            <span>Nhập email hoặc UID của tài khoản đã tồn tại. Hệ thống chỉ thêm hồ sơ phân quyền và không thay đổi mật khẩu hiện tại.</span>
+          </div>
+          <label class="form-label" for="adminIdentifier">Email hoặc Firebase UID</label>
+          <input id="adminIdentifier" class="form-control" type="text" name="identifier" minlength="3" maxlength="254" autocomplete="off" placeholder="admin@matchu.vn">
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-lg-6">
             <label class="form-label" for="grantAdminRole">Vai trò</label>
             <select id="grantAdminRole" class="form-select" name="role" required data-admin-role-select>
               <% roles.forEach((role) => { %>
@@ -227,6 +279,12 @@
               <% }) %>
             </select>
             <small class="form-text" data-role-description></small>
+          </div>
+          <div class="col-lg-6">
+            <div class="admin-account-ready-note">
+              <i class="bi bi-check2-circle"></i>
+              <span>Tài khoản sẽ được kích hoạt ngay sau khi tạo thành công.</span>
+            </div>
           </div>
         </div>
         <div class="admin-access-permission-header">
